@@ -1,0 +1,50 @@
+openapi: 3.1.0
+info:
+  title: persistence-q — consultas (lado de leitura)
+  version: "1.0"
+  description: >
+    Consulta projeções materializadas por critério (DSL modo array/object). Idempotente; não modifica
+    estado. Detalhe: README.md, endpoints/consulta.md. Apenas o endpoint autenticado consta.
+servers:
+  - url: /
+    description: Acesso via gateway da plataforma (host omitido por política).
+security:
+  - bearerAuth: []
+paths:
+  /:
+    post:
+      summary: Consultar projeções por critério
+      parameters: [{ $ref: '#/components/parameters/tenant' }]
+      requestBody:
+        required: true
+        description: "Modo detectado pelo 1º caractere: '[' array (multi-critério) ou '{' object (critério único). Cada critério: { rótulo: { predicado: valor } }."
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - { type: array, items: { $ref: '#/components/schemas/Criterio' } }
+                - { $ref: '#/components/schemas/Criterio' }
+      responses:
+        '200':
+          description: "Array no topo, mesma ordem dos critérios; itens vazios como []."
+          content: { application/json: { schema: { type: array, items: { type: object } } } }
+        '204': { description: Todos os critérios vazios }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { description: Não autenticado }
+        '403': { description: Tenant não autorizado }
+        '510': { description: Falha de execução da consulta (ex. predicado desconhecido) }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+  parameters:
+    tenant: { name: X-Tenant-Id, in: header, required: true, schema: { type: string, format: uuid }, description: "Cabeçalho de tenant (isolamento)." }
+  responses:
+    BadRequest: { description: JSON inválido, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  schemas:
+    Error: { type: object, properties: { error: { type: string } } }
+    Criterio:
+      type: object
+      minProperties: 1
+      maxProperties: 1
+      description: "Um rótulo (escolhido pelo cliente) → objeto de predicados (combinados por E)."
+      additionalProperties: { type: object, additionalProperties: true }

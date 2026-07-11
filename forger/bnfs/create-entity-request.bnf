@@ -1,0 +1,412 @@
+/**
+ * BNF Grammar for createEntity Request Body
+ * Endpoint: POST /org/{org}/project/{project}/dataschema/{dataschema}/entity
+ *
+ * This grammar defines the JSON structure required to create a database entity (table).
+ *
+ * IMPORTANT: This endpoint creates BOTH:
+ * 1. Metadata record in yc_db.resource.entity
+ * 2. Physical SQL table in tenant schema
+ *
+ * Validation levels:
+ * - Lexical: Token validation (name patterns, types)
+ * - Syntactic: JSON structure validation
+ * - Semantic: Business rules (FK references, unique constraints, etc)
+ */
+
+<entity-request> ::= "{" <required-fields> [ "," <optional-fields> ] "}"
+
+<required-fields> ::= <name> "," <conf>
+
+<optional-fields> ::= <attributes> [ "," <associations> ]
+                    | <associations> [ "," <attributes> ]
+                    | <attributes>
+                    | <associations>
+
+/* Required Fields */
+
+<name> ::= "\"name\"" ":" <quoted-entity-name>
+
+<conf> ::= "\"_conf\"" ":" "{" <conf-required> [ "," <conf-optional> ] "}"
+
+<conf-required> ::= <type>
+
+<conf-optional> ::= <comment> [ "," <more-conf-optional> ]
+                  | <concurrency-control> [ "," <more-conf-optional> ]
+                  | <unique-key> [ "," <more-conf-optional> ]
+                  | <index-key> [ "," <more-conf-optional> ]
+                  | <access-control> [ "," <more-conf-optional> ]
+                  | <super-entity> [ "," <more-conf-optional> ]
+                  | <super-entity-strategy> [ "," <more-conf-optional> ]
+                  | <partition> [ "," <more-conf-optional> ]
+                  | <enumeration> [ "," <more-conf-optional> ]
+
+<more-conf-optional> ::= <comment>
+                       | <concurrency-control>
+                       | <unique-key>
+                       | <index-key>
+                       | <access-control>
+                       | <super-entity>
+                       | <super-entity-strategy>
+                       | <partition>
+                       | <enumeration>
+                       | <comment> "," <more-conf-optional>
+                       | <concurrency-control> "," <more-conf-optional>
+                       | <unique-key> "," <more-conf-optional>
+                       | <index-key> "," <more-conf-optional>
+                       | <access-control> "," <more-conf-optional>
+                       | <super-entity> "," <more-conf-optional>
+                       | <super-entity-strategy> "," <more-conf-optional>
+                       | <partition> "," <more-conf-optional>
+                       | <enumeration> "," <more-conf-optional>
+
+<type> ::= "\"type\"" ":" ( "\"entity\"" | "\"abstract\"" | "\"component\"" | "\"enumeration\"" )
+
+<comment> ::= "\"comment\"" ":" <quoted-string>
+
+<concurrency-control> ::= "\"concurrencyControl\"" ":" <boolean>
+
+<unique-key> ::= "\"uniqueKey\"" ":" "[" [ <attribute-name-list> ] "]"
+
+<index-key> ::= "\"indexKey\"" ":" "[" [ <attribute-name-list> ] "]"
+
+<access-control> ::= "\"accessControl\"" ":" "{" <read-roles> "," <write-roles> "}"
+
+<read-roles> ::= "\"read\"" ":" "[" <role-list> "]"
+
+<write-roles> ::= "\"write\"" ":" "[" <role-list> "]"
+
+<role-list> ::= <quoted-role> [ "," <role-list> ]
+
+<quoted-role> ::= "\"" <role-name> "\""
+
+<role-name> ::= "MASTER" | "ENGINEER" | "DEVELOPER" | <custom-role>
+
+<custom-role> ::= <uppercase-letter> { <uppercase-letter> | <digit> | "_" }
+
+<super-entity> ::= "\"superEntity\"" ":" <quoted-entity-name-or-empty>
+
+<super-entity-strategy> ::= "\"superEntityStrategy\"" ":" ( "\"JoinEntity\"" | "\"\"" )
+
+<partition> ::= "\"partition\"" ":" "{" <partition-by> "," <partition-ranges> "}"
+
+<partition-by> ::= "\"by\"" ":" <quoted-string>
+
+<partition-ranges> ::= "\"ranges\"" ":" "[" [ <partition-range-list> ] "]"
+
+<partition-range-list> ::= <partition-range> [ "," <partition-range-list> ]
+
+<partition-range> ::= "{" "\"name\"" ":" <quoted-string> "," "\"infLimit\"" ":" <value> "," "\"supLimit\"" ":" <value> "}"
+
+<enumeration> ::= "\"enumeration\"" ":" "[" [ <string-list> ] "]"
+
+<string-list> ::= <quoted-string> [ "," <string-list> ]
+
+/* Optional Fields - Attributes */
+
+<attributes> ::= "\"attributes\"" ":" "[" [ <attribute-list> ] "]"
+
+<attribute-list> ::= <attribute> [ "," <attribute-list> ]
+
+<attribute> ::= "{" <attr-required> [ "," <attr-optional> ] "}"
+
+<attr-required> ::= <attr-name> "," <attr-type>
+
+<attr-name> ::= "\"name\"" ":" <quoted-attribute-name>
+
+<attr-type> ::= "\"type\"" ":" ( "\"String\"" | "\"Text\"" | "\"Integer\"" | "\"Long\"" | "\"Double\"" | "\"Float\"" | "\"Boolean\"" | "\"Date\"" | "\"Timestamp\"" | "\"Json\"" | "\"Jsonb\"" )
+
+<attr-optional> ::= <attr-length> [ "," <more-attr-optional> ]
+                  | <attr-nullable> [ "," <more-attr-optional> ]
+                  | <attr-unique> [ "," <more-attr-optional> ]
+                  | <attr-comment> [ "," <more-attr-optional> ]
+                  | <attr-default> [ "," <more-attr-optional> ]
+
+<more-attr-optional> ::= <attr-length>
+                       | <attr-nullable>
+                       | <attr-unique>
+                       | <attr-comment>
+                       | <attr-default>
+                       | <attr-length> "," <more-attr-optional>
+                       | <attr-nullable> "," <more-attr-optional>
+                       | <attr-unique> "," <more-attr-optional>
+                       | <attr-comment> "," <more-attr-optional>
+                       | <attr-default> "," <more-attr-optional>
+
+<attr-length> ::= "\"length\"" ":" <positive-integer>
+
+<attr-nullable> ::= "\"nullable\"" ":" <boolean>
+
+<attr-unique> ::= "\"unique\"" ":" <boolean>
+
+<attr-comment> ::= "\"comment\"" ":" <quoted-string>
+
+<attr-default> ::= "\"default\"" ":" <value>
+
+/* Optional Fields - Associations */
+
+<associations> ::= "\"associations\"" ":" "[" [ <association-list> ] "]"
+
+<association-list> ::= <association> [ "," <association-list> ]
+
+<association> ::= "{" <assoc-required> [ "," <assoc-optional> ] "}"
+
+<assoc-required> ::= <assoc-name> "," <assoc-type>
+
+<assoc-name> ::= "\"name\"" ":" <quoted-attribute-name>
+
+<assoc-type> ::= "\"type\"" ":" <quoted-entity-name>
+
+<assoc-optional> ::= <assoc-nullable> [ "," <more-assoc-optional> ]
+                   | <assoc-unique> [ "," <more-assoc-optional> ]
+                   | <assoc-comment> [ "," <more-assoc-optional> ]
+
+<more-assoc-optional> ::= <assoc-nullable>
+                        | <assoc-unique>
+                        | <assoc-comment>
+                        | <assoc-nullable> "," <more-assoc-optional>
+                        | <assoc-unique> "," <more-assoc-optional>
+                        | <assoc-comment> "," <more-assoc-optional>
+
+<assoc-nullable> ::= "\"nullable\"" ":" <boolean>
+
+<assoc-unique> ::= "\"unique\"" ":" <boolean>
+
+<assoc-comment> ::= "\"comment\"" ":" <quoted-string>
+
+/* Primitives */
+
+<quoted-entity-name> ::= "\"" <entity-name> "\""
+
+<quoted-entity-name-or-empty> ::= "\"" [ <entity-name> ] "\""
+
+<entity-name> ::= <lowercase-letter> { <lowercase-letter> }
+
+<quoted-attribute-name> ::= "\"" <attribute-name> "\""
+
+<attribute-name> ::= <lowercase-letter> { <lowercase-letter> }
+
+<attribute-name-list> ::= <quoted-attribute-name> [ "," <attribute-name-list> ]
+
+<lowercase-letter> ::= "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m"
+                     | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z"
+
+<uppercase-letter> ::= "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M"
+                     | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
+
+<quoted-string> ::= "\"" { <string-char> } "\""
+
+<string-char> ::= <letter> | <digit> | <special-char> | <space>
+
+<letter> ::= <lowercase-letter> | <uppercase-letter>
+
+<digit> ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+
+<special-char> ::= "-" | "_" | "@" | "." | "," | ":" | ";" | "!" | "?"
+
+<space> ::= " "
+
+<boolean> ::= "true" | "false"
+
+<positive-integer> ::= <nonzero-digit> { <digit> }
+
+<nonzero-digit> ::= "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+
+<value> ::= <quoted-string> | <positive-integer> | <boolean> | "null"
+
+/* ============================================================================
+ * CONSTRAINTS (enforced by endpoint validation)
+ *
+ * 1. name: REQUIRED, pattern ^[a-z]+$ (lowercase, 1-64 chars)
+ *    - IMMUTABLE after creation
+ *
+ * 2. _conf.type: REQUIRED, enum ["entity", "abstract", "component", "enumeration"]
+ *    - IMMUTABLE after creation
+ *
+ * 3. _conf.comment: OPTIONAL, default "" (empty string)
+ *    - UPDATABLE via PUT
+ *
+ * 4. _conf.concurrencyControl: OPTIONAL, boolean
+ *    - If true, adds logversion column for optimistic locking
+ *    - UPDATABLE via PUT
+ *
+ * 5. _conf.uniqueKey: OPTIONAL, array of attribute names, default []
+ *    - Creates composite UNIQUE constraint
+ *    - Attribute names must exist in attributes array
+ *    - UPDATABLE via PUT
+ *
+ * 6. _conf.indexKey: OPTIONAL, array of attribute names, default []
+ *    - Creates composite INDEX
+ *    - Attribute names must exist in attributes array
+ *    - UPDATABLE via PUT
+ *
+ * 7. _conf.accessControl: OPTIONAL, {read: [roles], write: [roles]}
+ *    - Both read and write MUST include "MASTER"
+ *    - Roles: pattern ^[A-Z0-9_]+$
+ *    - UPDATABLE via PUT
+ *
+ * 8. _conf.superEntity: OPTIONAL, entity name or "" (empty string)
+ *    - For inheritance (JoinEntity strategy only)
+ *    - IMMUTABLE after creation
+ *
+ * 9. _conf.superEntityStrategy: OPTIONAL, "JoinEntity" or "" (empty string)
+ *    - Only "JoinEntity" supported
+ *    - IMMUTABLE after creation
+ *
+ * 10. _conf.partition: OPTIONAL, {by: "column", ranges: [{name, infLimit, supLimit}]}
+ *     - by: attribute name or "" (empty string)
+ *     - ranges: array of partition definitions
+ *     - IMMUTABLE after creation
+ *
+ * 11. _conf.enumeration: OPTIONAL, array of strings, default []
+ *     - Only for type="enumeration"
+ *     - minItems: 1 when type=enumeration
+ *     - IMMUTABLE after creation
+ *
+ * 12. attributes[].name: REQUIRED, pattern ^[a-z]+$ (lowercase, 1-64 chars)
+ *
+ * 13. attributes[].type: REQUIRED, enum (String, Text, Integer, Long, Double, Float, Boolean, Date, Timestamp, Json, Jsonb)
+ *
+ * 14. attributes[].length: REQUIRED for String type, integer >= 1
+ *
+ * 15. attributes[].nullable: OPTIONAL, boolean, default true
+ *
+ * 16. attributes[].unique: OPTIONAL, boolean, default false
+ *
+ * 17. attributes[].comment: OPTIONAL, string, default ""
+ *
+ * 18. attributes[].default: OPTIONAL, type depends on attribute type
+ *
+ * 19. associations[].name: REQUIRED, pattern ^[a-z]+$ (lowercase, 1-64 chars)
+ *
+ * 20. associations[].type: REQUIRED, pattern ^[a-z]+$ (target entity name)
+ *
+ * 21. associations[].nullable: OPTIONAL, boolean, default false
+ *
+ * 22. associations[].unique: OPTIONAL, boolean, default false (true = one-to-one)
+ *
+ * 23. associations[].comment: OPTIONAL, string, default ""
+ *
+ * ============================================================================
+ * POST BODY EXAMPLES
+ *
+ * Example 1: Minimal entity (entity type, no attributes)
+ * {
+ *   "name": "cliente",
+ *   "_conf": {
+ *     "type": "entity"
+ *   }
+ * }
+ *
+ * Example 2: Entity with attributes
+ * {
+ *   "name": "produto",
+ *   "_conf": {
+ *     "type": "entity",
+ *     "comment": "Catálogo de produtos",
+ *     "concurrencyControl": true
+ *   },
+ *   "attributes": [
+ *     {"name": "codigo", "type": "String", "length": 20, "nullable": false, "unique": true},
+ *     {"name": "descricao", "type": "String", "length": 200, "nullable": false},
+ *     {"name": "preco", "type": "Double", "nullable": false}
+ *   ]
+ * }
+ *
+ * Example 3: Entity with association (FK)
+ * {
+ *   "name": "pedido",
+ *   "_conf": {
+ *     "type": "entity",
+ *     "concurrencyControl": true
+ *   },
+ *   "attributes": [
+ *     {"name": "numero", "type": "String", "length": 10, "nullable": false, "unique": true},
+ *     {"name": "data", "type": "Date", "nullable": false}
+ *   ],
+ *   "associations": [
+ *     {"name": "cliente", "type": "cliente", "nullable": false, "comment": "Cliente do pedido"}
+ *   ]
+ * }
+ *
+ * Example 4: Entity with access control
+ * {
+ *   "name": "financeiro",
+ *   "_conf": {
+ *     "type": "entity",
+ *     "accessControl": {
+ *       "read": ["MASTER", "ENGINEER", "DEVELOPER"],
+ *       "write": ["MASTER", "ENGINEER"]
+ *     }
+ *   }
+ * }
+ *
+ * Example 5: Enumeration entity
+ * {
+ *   "name": "statuspedido",
+ *   "_conf": {
+ *     "type": "enumeration",
+ *     "enumeration": ["PENDENTE", "APROVADO", "CANCELADO", "ENTREGUE"]
+ *   }
+ * }
+ *
+ * ============================================================================
+ * CURL EXAMPLE
+ *
+ * curl -X POST "https://api.example.com/org/acme/project/erp/dataschema/tenantacme/entity" \
+ *   -H "Authorization: Bearer <token>" \
+ *   -H "Content-Type: application/json" \
+ *   -H "Accept: application/json" \
+ *   -d '{
+ *     "name": "cliente",
+ *     "_conf": {
+ *       "type": "entity",
+ *       "comment": "Cadastro de clientes",
+ *       "concurrencyControl": true
+ *     },
+ *     "attributes": [
+ *       {"name": "nome", "type": "String", "length": 100, "nullable": false},
+ *       {"name": "email", "type": "String", "length": 100, "unique": true}
+ *     ]
+ *   }'
+ *
+ * Expected response http status code 201 (Created)
+ *
+ * ============================================================================
+ * AI USAGE INSTRUCTIONS
+ *
+ * When constructing a request:
+ * 1. ALWAYS include: name (pattern: ^[a-z]+$), _conf.type
+ * 2. OPTIONALLY include: _conf properties, attributes[], associations[]
+ * 3. Use ONLY lowercase letters (a-z) in entity/attribute/association names
+ * 4. For String attributes, ALWAYS include length
+ * 5. Default values: nullable=true (attributes), nullable=false (associations)
+ * 6. Access control MUST include "MASTER" in both read and write arrays
+ * 7. Enumeration type MUST have non-empty enumeration array
+ * 8. Association type must reference existing entity name
+ *
+ * Common errors to avoid:
+ * - Missing length for String type attributes
+ * - Uppercase letters in names
+ * - Numbers or special characters in names
+ * - Missing MASTER role in accessControl
+ * - Empty enumeration array for type=enumeration
+ * - Referencing non-existent entities in associations
+ * - Including attributes in uniqueKey/indexKey that don't exist
+ *
+ * Best practices:
+ * - Use concurrencyControl: true for entities with frequent updates
+ * - Add meaningful comments for documentation
+ * - Use unique constraints for natural keys (e.g., codigo, email)
+ * - Set nullable: false for required business fields
+ * - Use associations instead of storing IDs as Integer attributes
+ *
+ * Field mutability:
+ * - IMMUTABLE: name, _conf.type, _conf.superEntity, _conf.superEntityStrategy,
+ *              _conf.partition, _conf.enumeration, attribute.name, attribute.type,
+ *              association.name, association.type
+ * - UPDATABLE: _conf.comment, _conf.concurrencyControl, _conf.uniqueKey,
+ *              _conf.indexKey, _conf.accessControl, attribute properties,
+ *              association properties
+ *
+ */

@@ -1,0 +1,63 @@
+openapi: 3.1.0
+info:
+  title: auth — emissão de token (login)
+  version: "1.0"
+  description: >
+    Autentica credenciais e emite o token de acesso (com claims de identidade: usuário, papéis,
+    organizações, tenants). Dois domínios: /up (plataforma) e /ua (externo). Não valida token (cada
+    serviço consumidor valida). Detalhe: README.md, endpoints/*.md.
+servers:
+  - url: /
+    description: Acesso via gateway da plataforma (host omitido por política).
+tags:
+  - { name: login }
+paths:
+  /up/sign-in:
+    post:
+      tags: [login]
+      summary: Login (plataforma) — emite token
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/LoginRequest' } } } }
+      responses:
+        '200': { description: Autenticado, content: { application/json: { schema: { $ref: '#/components/schemas/JwtResponse' } } } }
+        '401': { description: Credenciais inválidas }
+        '403': { description: Conta pendente (em validação) }
+        '417': { description: Falha de serviço dependente }
+  /ua/sign-in:
+    post:
+      tags: [login]
+      summary: Login (externo) — emite token (inclui tenants)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/LoginRequest' } } } }
+      responses:
+        '200': { description: Autenticado, content: { application/json: { schema: { $ref: '#/components/schemas/JwtResponse' } } } }
+        '401': { description: Credenciais inválidas }
+        '417': { description: Falha de serviço dependente }
+  /up/sign-in/renew:
+    get:
+      tags: [login]
+      summary: Renovar token (a partir do token atual)
+      security: [{ bearerAuth: [] }]
+      responses:
+        '200': { description: Token renovado, content: { application/json: { schema: { $ref: '#/components/schemas/JwtResponse' } } } }
+        '401': { description: Token ausente/inválido/expirado }
+        '417': { description: Falha de serviço dependente }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+  schemas:
+    LoginRequest:
+      type: object
+      required: [username, password]
+      properties:
+        username: { type: string }
+        password: { type: string }
+    JwtResponse:
+      type: object
+      properties:
+        token: { type: string, description: "Token de acesso (usar em Authorization: Bearer)" }
+        type: { type: string, example: Bearer }
+        id: { type: integer }
+        username: { type: string }
+        name: { type: string }
+        email: { type: string }
+        roles: { type: array, items: { type: string } }
+        sessionId: { type: string, format: uuid }

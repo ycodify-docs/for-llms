@@ -1,0 +1,211 @@
+/**
+ * BNF Grammar for createAttribute Request Body
+ * Endpoint: POST /org/{org}/project/{project}/dataschema/{dataschema}/entity/{entity}/attribute
+ *
+ * This grammar defines the JSON structure required to add a new attribute (column) to an existing entity.
+ *
+ * IMPORTANT: This endpoint executes:
+ * 1. ALTER TABLE ADD COLUMN in SQL
+ * 2. Updates metadata in yc_db.resource.entity
+ *
+ * Send ONLY the attribute definition, NOT the complete entity.
+ */
+
+<attribute-request> ::= "{" <required-fields> [ "," <optional-fields> ] "}"
+
+<required-fields> ::= <name> "," <type>
+
+<optional-fields> ::= <length> [ "," <more-optional> ]
+                    | <nullable> [ "," <more-optional> ]
+                    | <unique> [ "," <more-optional> ]
+                    | <comment> [ "," <more-optional> ]
+                    | <default> [ "," <more-optional> ]
+
+<more-optional> ::= <length>
+                  | <nullable>
+                  | <unique>
+                  | <comment>
+                  | <default>
+                  | <length> "," <more-optional>
+                  | <nullable> "," <more-optional>
+                  | <unique> "," <more-optional>
+                  | <comment> "," <more-optional>
+                  | <default> "," <more-optional>
+
+/* Required Fields */
+
+<name> ::= "\"name\"" ":" <quoted-attribute-name>
+
+<type> ::= "\"type\"" ":" ( "\"String\"" | "\"Text\"" | "\"Integer\"" | "\"Long\"" | "\"Double\"" | "\"Float\"" | "\"Boolean\"" | "\"Date\"" | "\"Timestamp\"" | "\"Json\"" | "\"Jsonb\"" )
+
+/* Optional Fields */
+
+<length> ::= "\"length\"" ":" <positive-integer>
+
+<nullable> ::= "\"nullable\"" ":" <boolean>
+
+<unique> ::= "\"unique\"" ":" <boolean>
+
+<comment> ::= "\"comment\"" ":" <quoted-string>
+
+<default> ::= "\"default\"" ":" <value>
+
+/* Primitives */
+
+<quoted-attribute-name> ::= "\"" <attribute-name> "\""
+
+<attribute-name> ::= <lowercase-letter> { <lowercase-letter> }
+
+<lowercase-letter> ::= "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m"
+                     | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z"
+
+<quoted-string> ::= "\"" { <string-char> } "\""
+
+<string-char> ::= <letter> | <digit> | <special-char> | <space>
+
+<letter> ::= <lowercase-letter> | <uppercase-letter>
+
+<uppercase-letter> ::= "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M"
+                     | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
+
+<digit> ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+
+<special-char> ::= "-" | "_" | "@" | "." | "," | ":" | ";" | "!" | "?"
+
+<space> ::= " "
+
+<boolean> ::= "true" | "false"
+
+<positive-integer> ::= <nonzero-digit> { <digit> }
+
+<nonzero-digit> ::= "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+
+<value> ::= <quoted-string> | <positive-integer> | <boolean> | "null"
+
+/* ============================================================================
+ * CONSTRAINTS (enforced by endpoint validation)
+ *
+ * 1. name: REQUIRED, pattern ^[a-z]+$ (lowercase only, 1-64 chars)
+ *    - Must NOT already exist in entity
+ *    - IMMUTABLE after creation
+ *
+ * 2. type: REQUIRED, enum (String, Text, Integer, Long, Double, Float, Boolean, Date, Timestamp, Json, Jsonb)
+ *    - IMMUTABLE after creation
+ *
+ * 3. length: REQUIRED for type=String, integer >= 1
+ *    - UPDATABLE via PUT (careful: may require data migration)
+ *
+ * 4. nullable: OPTIONAL, boolean, default true
+ *    - UPDATABLE via PUT
+ *
+ * 5. unique: OPTIONAL, boolean, default false
+ *    - UPDATABLE via PUT
+ *
+ * 6. comment: OPTIONAL, string, default ""
+ *    - UPDATABLE via PUT
+ *
+ * 7. default: OPTIONAL, value type depends on attribute type
+ *    - UPDATABLE via PUT
+ *
+ * ============================================================================
+ * POST BODY EXAMPLES
+ *
+ * Example 1: String attribute with length
+ * {
+ *   "name": "email",
+ *   "type": "String",
+ *   "length": 100,
+ *   "nullable": true,
+ *   "unique": true,
+ *   "comment": "Email do cliente"
+ * }
+ *
+ * Example 2: Integer attribute
+ * {
+ *   "name": "idade",
+ *   "type": "Integer",
+ *   "nullable": true,
+ *   "comment": "Idade em anos"
+ * }
+ *
+ * Example 3: Boolean attribute with default
+ * {
+ *   "name": "ativo",
+ *   "type": "Boolean",
+ *   "nullable": false,
+ *   "default": true
+ * }
+ *
+ * Example 4: Date attribute
+ * {
+ *   "name": "datacadastro",
+ *   "type": "Date",
+ *   "nullable": false
+ * }
+ *
+ * Example 5: Text attribute (no length required)
+ * {
+ *   "name": "observacoes",
+ *   "type": "Text",
+ *   "nullable": true
+ * }
+ *
+ * ============================================================================
+ * CURL EXAMPLE
+ *
+ * curl -X POST "https://api.example.com/org/acme/project/erp/dataschema/tenantacme/entity/cliente/attribute" \
+ *   -H "Authorization: Bearer <token>" \
+ *   -H "Content-Type: application/json" \
+ *   -H "Accept: application/json" \
+ *   -d '{
+ *     "name": "telefone",
+ *     "type": "String",
+ *     "length": 20,
+ *     "nullable": true,
+ *     "comment": "Telefone de contato"
+ *   }'
+ *
+ * Expected response http status code 201 (Created)
+ *
+ * ============================================================================
+ * AI USAGE INSTRUCTIONS
+ *
+ * When constructing a request:
+ * 1. ALWAYS include: name (pattern: ^[a-z]+$), type
+ * 2. For type=String, ALWAYS include length
+ * 3. OPTIONALLY include: nullable, unique, comment, default
+ * 4. Use ONLY lowercase letters (a-z) in attribute name
+ * 5. Ensure the target entity exists before creating attribute
+ *
+ * Common errors to avoid:
+ * - Missing length for String type
+ * - Uppercase letters in name
+ * - Numbers or special characters in name
+ * - Duplicate attribute name in same entity
+ * - Invalid type value
+ *
+ * Best practices:
+ * - Add meaningful comments for documentation
+ * - Set nullable: false for required business fields
+ * - Use unique: true for natural keys (e.g., email, codigo)
+ * - Choose appropriate type (String vs Text for long content)
+ * - Use Date for date-only fields, Timestamp for date+time
+ *
+ * Type-specific notes:
+ * - String: Requires length parameter
+ * - Text: No length parameter (unlimited)
+ * - Integer: 32-bit signed integer
+ * - Long: 64-bit signed integer
+ * - Double: Double-precision floating point
+ * - Float: Single-precision floating point
+ * - Boolean: true/false values
+ * - Date: Date only (no time component)
+ * - Timestamp: Date and time
+ * - Json: JSON object (stored as text, not validated)
+ * - Jsonb: JSON object (stored as binary, validated and indexed)
+ *
+ * Field mutability:
+ * - IMMUTABLE: name, type
+ * - UPDATABLE: length, nullable, unique, comment, default
+ *
+ */

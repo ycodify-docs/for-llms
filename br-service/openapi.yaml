@@ -1,0 +1,43 @@
+openapi: 3.1.0
+info:
+  title: br-service — regras de negócio e coordenação
+  version: "1.0"
+  description: >
+    Executa o processador (função) identificado por uma rota. Chamado pelo persistence-crs (não pelo
+    cliente). Resposta = objeto direto do processador (sem envelope). Detalhe: README.md, endpoints/br.md.
+servers:
+  - url: /
+    description: Acesso interno entre serviços (host omitido por política).
+paths:
+  /br:
+    post:
+      summary: Executar o processador da rota
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [route]
+              properties:
+                route:
+                  type: string
+                  description: "Rota canônica totalmente qualificada: <org>/<project>/<bc>/<aggregate>/<comando> | .../coordination/<nome> | .../projection/<nome>."
+                data:
+                  type: object
+                  description: "Dados passados ao processador (se ausente, o corpo inteiro é usado)."
+      responses:
+        '200':
+          description: "Objeto retornado diretamente pelo processador (sem envelope)."
+          content: { application/json: { schema: { type: object } } }
+        '400':
+          description: "Validação, rota inexistente, ou exceção do processador."
+          content: { application/json: { schema: { $ref: '#/components/schemas/BrError' } } }
+components:
+  schemas:
+    BrError:
+      type: object
+      properties:
+        status: { type: string, example: error }
+        mensagem: { type: string }
+        tipo: { type: string }

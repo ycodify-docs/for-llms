@@ -1,0 +1,94 @@
+openapi: 3.1.0
+info:
+  title: filer — arquivos (anexos de agregados)
+  version: "1.0"
+  description: >
+    Upload, download, listagem e remoção de arquivos vinculados a agregados. O arquivo é identificado
+    por uma chave hierárquica {org}-{project}-{entity}-{entityId}-{attribute}.{ext} (entity = tipo do
+    agregado, entityId = id do agregado, attribute = atributo). Armazenamento de objetos abstraído.
+    Detalhe: README.md, endpoints/*.md.
+servers:
+  - url: /
+    description: Acesso via gateway da plataforma (host omitido por política).
+security:
+  - bearerAuth: []
+tags:
+  - { name: arquivo }
+paths:
+  /api/file/upload:
+    post:
+      tags: [arquivo]
+      summary: Enviar arquivo (escrita no agregado)
+      parameters:
+        - { $ref: '#/components/parameters/tenant' }
+        - { name: filename, in: query, required: true, schema: { type: string }, description: "Chave completa {org}-{project}-{entity}-{entityId}-{attribute}.{ext}" }
+      requestBody:
+        required: true
+        content:
+          application/octet-stream:
+            schema: { type: string, format: binary }
+      responses:
+        '200': { description: Enviado, content: { text/plain: { schema: { type: string } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { description: Não autenticado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '413': { description: Arquivo acima do limite (~10 MB) }
+        '500': { description: Falha de armazenamento }
+  /api/file/download:
+    get:
+      tags: [arquivo]
+      summary: Baixar arquivo (leitura no agregado)
+      parameters:
+        - { $ref: '#/components/parameters/tenant' }
+        - { name: filename, in: query, required: true, schema: { type: string }, description: "Chave completa com extensão" }
+      responses:
+        '200': { description: Conteúdo binário, content: { application/octet-stream: { schema: { type: string, format: binary } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { description: Não autenticado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Arquivo inexistente }
+        '500': { description: Falha de armazenamento }
+  /api/file/list:
+    get:
+      tags: [arquivo]
+      summary: Listar arquivos por prefixo (leitura no agregado)
+      parameters:
+        - { $ref: '#/components/parameters/tenant' }
+        - { name: filename, in: query, required: true, schema: { type: string }, description: "Prefixo parcial (mín. {org}-{project}-{entity}-)" }
+      responses:
+        '200': { description: "Array de referências (ou [])", content: { application/json: { schema: { type: array, items: { type: string } } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { description: Não autenticado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '500': { description: Falha de armazenamento }
+  /api/file/delete:
+    delete:
+      tags: [arquivo]
+      summary: Remover arquivo ou lote por prefixo (escrita no agregado)
+      parameters:
+        - { $ref: '#/components/parameters/tenant' }
+        - { name: filename, in: query, required: true, schema: { type: string }, description: "Chave completa (um arquivo) ou prefixo parcial (lote)" }
+      responses:
+        '200':
+          description: Relatório de remoção
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted: { type: integer }
+                  prefix: { type: string }
+                  files: { type: array, items: { type: string } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '401': { description: Não autenticado }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { description: Arquivo específico inexistente (não em lote) }
+        '500': { description: Falha de armazenamento }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+  parameters:
+    tenant: { name: X-Tenant-Id, in: header, required: true, schema: { type: string, format: uuid }, description: "Cabeçalho de tenant (isolamento)." }
+  responses:
+    BadRequest: { description: "Chave/corpo inválido (padrão, extensão, tamanho)", content: { text/plain: { schema: { type: string } } } }
+    Forbidden: { description: "Sem permissão (leitura/escrita) no agregado", content: { text/plain: { schema: { type: string } } } }

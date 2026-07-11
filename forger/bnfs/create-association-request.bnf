@@ -1,0 +1,207 @@
+/**
+ * BNF Grammar for createAssociation Request Body
+ * Endpoint: POST /org/{org}/project/{project}/dataschema/{dataschema}/entity/{entity}/association
+ *
+ * This grammar defines the JSON structure required to add a new association (FK) to an existing entity.
+ *
+ * IMPORTANT: This endpoint executes:
+ * 1. ALTER TABLE ADD COLUMN with FOREIGN KEY constraint in SQL
+ * 2. Updates metadata in yc_db.resource.entity
+ *
+ * Send ONLY the association definition, NOT the complete entity.
+ */
+
+<association-request> ::= "{" <required-fields> [ "," <optional-fields> ] "}"
+
+<required-fields> ::= <name> "," <type>
+
+<optional-fields> ::= <nullable> [ "," <more-optional> ]
+                    | <unique> [ "," <more-optional> ]
+                    | <comment> [ "," <more-optional> ]
+
+<more-optional> ::= <nullable>
+                  | <unique>
+                  | <comment>
+                  | <nullable> "," <more-optional>
+                  | <unique> "," <more-optional>
+                  | <comment> "," <more-optional>
+
+/* Required Fields */
+
+<name> ::= "\"name\"" ":" <quoted-association-name>
+
+<type> ::= "\"type\"" ":" <quoted-entity-name>
+
+/* Optional Fields */
+
+<nullable> ::= "\"nullable\"" ":" <boolean>
+
+<unique> ::= "\"unique\"" ":" <boolean>
+
+<comment> ::= "\"comment\"" ":" <quoted-string>
+
+/* Primitives */
+
+<quoted-association-name> ::= "\"" <association-name> "\""
+
+<association-name> ::= <lowercase-letter> { <lowercase-letter> }
+
+<quoted-entity-name> ::= "\"" <entity-name> "\""
+
+<entity-name> ::= <lowercase-letter> { <lowercase-letter> }
+
+<lowercase-letter> ::= "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m"
+                     | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z"
+
+<quoted-string> ::= "\"" { <string-char> } "\""
+
+<string-char> ::= <letter> | <digit> | <special-char> | <space>
+
+<letter> ::= <lowercase-letter> | <uppercase-letter>
+
+<uppercase-letter> ::= "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M"
+                     | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
+
+<digit> ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+
+<special-char> ::= "-" | "_" | "@" | "." | "," | ":" | ";" | "!" | "?"
+
+<space> ::= " "
+
+<boolean> ::= "true" | "false"
+
+/* ============================================================================
+ * CONSTRAINTS (enforced by endpoint validation)
+ *
+ * 1. name: REQUIRED, pattern ^[a-z]+$ (lowercase only, 1-64 chars)
+ *    - Becomes the FK column name in SQL
+ *    - Must NOT already exist in entity (as attribute or association)
+ *    - IMMUTABLE after creation
+ *
+ * 2. type: REQUIRED, pattern ^[a-z]+$ (target entity name, lowercase)
+ *    - Target entity MUST exist in the same dataschema
+ *    - Creates FK constraint referencing target entity's id
+ *    - IMMUTABLE after creation
+ *
+ * 3. nullable: OPTIONAL, boolean, default false
+ *    - false = mandatory relationship (NOT NULL)
+ *    - true = optional relationship (NULL allowed)
+ *    - UPDATABLE via PUT
+ *
+ * 4. unique: OPTIONAL, boolean, default false
+ *    - false = many-to-one relationship (default)
+ *    - true = one-to-one relationship (UNIQUE constraint)
+ *    - UPDATABLE via PUT
+ *
+ * 5. comment: OPTIONAL, string, default ""
+ *    - Column comment in SQL
+ *    - UPDATABLE via PUT
+ *
+ * ============================================================================
+ * POST BODY EXAMPLES
+ *
+ * Example 1: Many-to-one association (mandatory)
+ * {
+ *   "name": "cliente",
+ *   "type": "cliente",
+ *   "nullable": false,
+ *   "comment": "Cliente dono do pedido"
+ * }
+ *
+ * Example 2: Many-to-one association (optional)
+ * {
+ *   "name": "vendedor",
+ *   "type": "funcionario",
+ *   "nullable": true,
+ *   "comment": "Vendedor responsável pela venda"
+ * }
+ *
+ * Example 3: One-to-one association
+ * {
+ *   "name": "endereco",
+ *   "type": "endereco",
+ *   "nullable": false,
+ *   "unique": true,
+ *   "comment": "Endereço principal do cliente"
+ * }
+ *
+ * Example 4: Self-referencing association
+ * {
+ *   "name": "superior",
+ *   "type": "funcionario",
+ *   "nullable": true,
+ *   "comment": "Funcionário superior hierárquico"
+ * }
+ *
+ * Example 5: Minimal association
+ * {
+ *   "name": "categoria",
+ *   "type": "categoria"
+ * }
+ *
+ * ============================================================================
+ * CURL EXAMPLE
+ *
+ * curl -X POST "https://api.example.com/org/acme/project/erp/dataschema/tenantacme/entity/pedido/association" \
+ *   -H "Authorization: Bearer <token>" \
+ *   -H "Content-Type: application/json" \
+ *   -H "Accept: application/json" \
+ *   -d '{
+ *     "name": "cliente",
+ *     "type": "cliente",
+ *     "nullable": false,
+ *     "comment": "Cliente que realizou o pedido"
+ *   }'
+ *
+ * Expected response http status code 201 (Created)
+ *
+ * ============================================================================
+ * AI USAGE INSTRUCTIONS
+ *
+ * When constructing a request:
+ * 1. ALWAYS include: name (pattern: ^[a-z]+$), type (target entity name)
+ * 2. OPTIONALLY include: nullable, unique, comment
+ * 3. Use ONLY lowercase letters (a-z) in name and type
+ * 4. Ensure the target entity exists in the same dataschema
+ * 5. Default behavior: nullable=false (mandatory), unique=false (many-to-one)
+ *
+ * Common errors to avoid:
+ * - Uppercase letters in name or type
+ * - Numbers or special characters in name or type
+ * - Duplicate association name in same entity
+ * - Referencing non-existent entity in type
+ * - Type referencing entity in different dataschema (not supported)
+ *
+ * Best practices:
+ * - Use meaningful names (e.g., "cliente" instead of "clienteid")
+ * - Add comments to explain the relationship
+ * - Set nullable: false for mandatory business relationships
+ * - Set nullable: true for optional relationships
+ * - Use unique: true for one-to-one relationships
+ * - Consider self-referencing for hierarchical structures (e.g., "superior" in funcionario)
+ *
+ * Relationship types:
+ * - Many-to-one (default): nullable=false, unique=false
+ *   Example: Pedido -> Cliente (many pedidos, one cliente)
+ *
+ * - Many-to-one (optional): nullable=true, unique=false
+ *   Example: Pedido -> Vendedor (many pedidos, one vendedor, but vendedor can be null)
+ *
+ * - One-to-one (mandatory): nullable=false, unique=true
+ *   Example: Cliente -> Endereco (one cliente, one endereco)
+ *
+ * - One-to-one (optional): nullable=true, unique=true
+ *   Example: Cliente -> Foto (one cliente, one foto, but foto can be null)
+ *
+ * SQL implementation:
+ * - Creates column: {name}_id BIGINT
+ * - Creates FK constraint: FOREIGN KEY ({name}_id) REFERENCES {type}(id)
+ * - Adds NOT NULL constraint if nullable=false
+ * - Adds UNIQUE constraint if unique=true
+ * - Adds COMMENT if comment provided
+ *
+ * Field mutability:
+ * - IMMUTABLE: name, type
+ * - UPDATABLE: nullable, unique, comment
+ *
+ */

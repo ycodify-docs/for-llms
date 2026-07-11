@@ -1,0 +1,83 @@
+# Plataforma — documentação para agentes
+
+> Plataforma que transforma modelos declarativos (contextos, agregados, comandos, eventos, projeções)
+> num sistema operante, via oito serviços: auth emite o token (login); orgid gerencia identidade/acesso
+> (organizações, contas, papéis); forger implanta os recursos; persistence-crs executa comandos
+> (CQRS-ES); es-n despacha eventos; persistence-q consulta projeções; br-service aplica regras de
+> negócio e coordenação; filer guarda arquivos anexos a agregados.
+> Documentação independente de tecnologia, focada em contratos e no ciclo de vida de cada requisição.
+>
+> **Como usar este índice (primário):** este `llms.txt` é o **ponto de entrada canônico**. Cada link é
+> um **documento autônomo** — carregue **só os que a tarefa exigir** (não baixe tudo). Ordem sugerida:
+> conceitos → arquitetura → o serviço/endpoint da tarefa. **Fallback:** [`llms-full.txt`](llms-full.txt)
+> traz o corpus inteiro num único arquivo, **apenas** para agentes de contexto pequeno que preferem um
+> fetch só — prefira **este** índice (mais preciso, menos tokens).
+
+## Caminho rápido (construir um sistema)
+- **Modelar o domínio:** [model-format.md](persistence-crs/spec/model-format.md) ⟶ exemplo [examples/](examples/README.md) ⟶ validar com [model.schema.json](persistence-crs/spec/model.schema.json).
+- **Implantar do zero → consultar:** [walkthrough](04-walkthrough.md) (jornada única ponta a ponta).
+- **Navegação por objetivo:** [README — "Por tarefa"](README.md).
+
+## Fundamentos (leia primeiro)
+- [Conceitos e vocabulário](02-conceitos.md): **base** — DDD + CQRS-ES, glossário, isolamento por tenant, topologia padrão, agregado→projeção, vocabulário abstrato. **Leia primeiro.**
+- [Arquitetura ponta a ponta](01-arquitetura.md): deploy → comando → despacho → projeção → consulta; de onde vêm as filas; fatos canônicos.
+- [Composição da plataforma](00-plataforma.md): papéis dos oito serviços e como se compõem.
+- [Fluxo de deploy](03-fluxo-de-deploy.md): ordem obrigatória para implantar um sistema do zero.
+- [Autenticação e tenant](06-autenticacao.md): cabeçalho Authorization e como obter o tenant-id.
+- [Coordenação entre serviços](coordenacao.md): pontos de articulação (CP-1…CP-12) + os 4 pontos de hook do br-service + uso ideal (advisory).
+- [Antipadrões](05-antipatterns.md): o que mais quebra, por serviço (sintoma → causa → correção).
+- [Isolamento dos agentes + entrega de código](07-isolamento-e-entrega.md): sala trancada por cliente (multi-tenant), a "janela" de 4 destinos, e como o código sai (GEN vs CUSTOM, PR + humano + build + estático).
+
+## auth (emissão de token / login) — porta de entrada de identidade
+- [Guia](auth/README.md): papel (emite→valida), domínios `/up`/`/ua`, fluxo de login, claims do token.
+- [login (sign-in)](auth/endpoints/sign-in.md) · [renovar](auth/endpoints/renovar.md) · [Erros](auth/erros.md) · [Exemplos](auth/exemplos.md) · [OpenAPI](auth/openapi.yaml)
+
+## orgid (identidade e acesso) — pré-requisito de identidade
+- [Guia](orgid/README.md): papel (IAM), domínios `/up`/`/ua`/`/open`, RBAC por organização, ciclo de vida.
+- `/up`: [organização](orgid/endpoints/up-organizacao.md) · [conta](orgid/endpoints/up-conta.md) · [associação conta-papel-org](orgid/endpoints/up-associacao.md) · [contrato ⚠️ ignorar por ora](orgid/endpoints/up-contrato.md)
+- `/ua`: [conta](orgid/endpoints/ua-conta.md) · [papel](orgid/endpoints/ua-papel.md) · [associação conta-papel](orgid/endpoints/ua-associacao.md)
+- `/open`: [público (existência, registro, hash, e-mail)](orgid/endpoints/publico.md)
+- [Erros](orgid/erros.md) · [Exemplos](orgid/exemplos.md) · [OpenAPI](orgid/openapi.yaml)
+
+## persistence-crs (comandos, CQRS-ES) — núcleo da modelagem
+- [Gramática do modelo de domínio (.model.json)](persistence-crs/spec/model-format.md): **essencial** — agregado, comando, evento, tipos, identidade, value objects.
+- [Guia](persistence-crs/README.md): pré-requisitos, ciclo do comando, estados/concorrência (regra do `status`), regras de payload.
+- [comando](persistence-crs/endpoints/comando.md) · [leitura de agregado](persistence-crs/endpoints/agregado-leitura.md) · [escrita de projeção](persistence-crs/endpoints/projecao.md)
+- [Erros](persistence-crs/erros.md) · [Exemplos](persistence-crs/exemplos.md) · [OpenAPI](persistence-crs/openapi.yaml)
+
+## forger (implanta recursos) — primeiro serviço usado
+- [Guia](forger/README.md): papel, regras de nome/limites, atributos reservados, ciclo de vida.
+- [dbconn](forger/endpoints/dbconn.md) · [database](forger/endpoints/database.md) · [project](forger/endpoints/project.md) · [dataschema](forger/endpoints/dataschema.md) · [entity](forger/endpoints/entity.md) · [model](forger/endpoints/model.md) · [process (filas)](forger/endpoints/process.md) · [email](forger/endpoints/email.md)
+- [Erros](forger/erros.md) · [Exemplos](forger/exemplos.md) · [Gramáticas BNF dos payloads](forger/bnfs/README.md) · [OpenAPI](forger/openapi.yaml)
+
+## persistence-q (consultas)
+- [Guia](persistence-q/README.md): pré-requisitos, ciclo da consulta, DSL, consistência eventual.
+- [consulta](persistence-q/endpoints/consulta.md) · [controles de consulta (DSL: operadores, paging, sorting, cache)](persistence-q/query-controls.md) · [Erros](persistence-q/erros.md) · [Exemplos](persistence-q/exemplos.md) · [OpenAPI](persistence-q/openapi.yaml)
+
+## es-n (despacho de eventos)
+- [Guia](es-n/README.md): pipeline, três despachos, ordenação, topologia de filas (fixa).
+- [acionar processamento](es-n/endpoints/processar-eventos.md) · [Erros](es-n/erros.md) · [Exemplos](es-n/exemplos.md)
+
+## br-service (regras e coordenação)
+- [Guia](br-service/README.md): posição no fluxo, três categorias de processador, forma canônica da rota, contrato de resposta.
+- [executar função (/br)](br-service/endpoints/br.md) · [Erros](br-service/erros.md) · [Exemplos](br-service/exemplos.md) · [OpenAPI](br-service/openapi.yaml)
+
+## filer (arquivos anexos a agregados) — serviço transversal
+- [Guia](filer/README.md): convenção de nome (arquivo↔agregado), RBAC por entidade, limites/tipos.
+- [upload](filer/endpoints/upload.md) · [download](filer/endpoints/download.md) · [listar](filer/endpoints/listar.md) · [remover](filer/endpoints/remover.md)
+- [Erros](filer/erros.md) · [Exemplos](filer/exemplos.md) · [OpenAPI](filer/openapi.yaml)
+
+## shell (casca universal + BFF) — camada de aplicação
+- [Guia](shell/README.md): a aplicação única para todos os clientes; casca fixa + BFF; fronteira casca↔miolo; consome os oito serviços via BFF.
+- [Contrato casca↔miolo](shell/contrato-miolo.md): `MioloModule`, `hostContext`, modelo de capacidade.
+- [Injeção do miolo](shell/injecao.md): federação de módulos, resolução tenant→remoto, de onde vem o build do miolo.
+- [Estilo](shell/estilo.md): tokens semânticos, tema claro/escuro, marca sobrescrevível por tenant.
+- [Segurança](shell/seguranca.md): segredo só no BFF; capacidade = UX; revalidação no servidor.
+- [BFF](shell/bff.md): endpoints e contratos.
+
+## Exemplos
+- [Modelos de domínio](examples/README.md): 6 modelos `.model.json` (1 curado + 5 reais sanitizados), com fluxo ponta a ponta.
+
+## Optional
+- [Schema do .model.json (JSON Schema)](persistence-crs/spec/model.schema.json): validação machine-readable; valida os 6 exemplos.
+- [CHANGELOG](CHANGELOG.md): histórico de revisões desta documentação.

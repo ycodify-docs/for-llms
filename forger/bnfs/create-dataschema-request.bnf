@@ -1,0 +1,220 @@
+/**
+ * BNF Grammar for createDataSchema Request Body
+ * Endpoint: POST /org/{org}/project/{projectId}/database/{databaseId}/dataschema
+ *
+ * This grammar defines the JSON structure required to create a DataSchema (tenant schema).
+ *
+ * IMPORTANT: DataSchemas represent logical schemas within a physical database for multi-tenancy.
+ * Each DataSchema is isolated per tenant and manages connection pooling independently.
+ *
+ * Schema naming convention:
+ * - Input: "tenantacme"
+ * - Output: SQL schema within the physical database
+ * - Connection pool: Configured with dbsqlminimumconnidle and dbsqlmaximumpoolsize
+ */
+
+<dataschema-request> ::= "{" <required-fields> [ "," <optional-fields> ] "}"
+
+<required-fields> ::= <name>
+
+<optional-fields> ::= <alias> [ "," <more-optional-fields> ]
+                    | <description> [ "," <more-optional-fields> ]
+                    | <status> [ "," <more-optional-fields> ]
+                    | <dbsqlminimumconnidle> [ "," <more-optional-fields> ]
+                    | <dbsqlmaximumpoolsize> [ "," <more-optional-fields> ]
+
+<more-optional-fields> ::= <alias>
+                         | <description>
+                         | <status>
+                         | <dbsqlminimumconnidle>
+                         | <dbsqlmaximumpoolsize>
+                         | <alias> "," <more-optional-fields>
+                         | <description> "," <more-optional-fields>
+                         | <status> "," <more-optional-fields>
+                         | <dbsqlminimumconnidle> "," <more-optional-fields>
+                         | <dbsqlmaximumpoolsize> "," <more-optional-fields>
+
+/* Required Fields */
+
+<name> ::= "\"name\"" ":" <quoted-schema-name>
+
+/* Optional Fields */
+
+<alias> ::= "\"alias\"" ":" <quoted-string>
+
+<description> ::= "\"description\"" ":" <quoted-string>
+
+<status> ::= "\"status\"" ":" <quoted-string>
+
+<dbsqlminimumconnidle> ::= "\"dbsqlminimumconnidle\"" ":" <non-negative-integer>
+
+<dbsqlmaximumpoolsize> ::= "\"dbsqlmaximumpoolsize\"" ":" <positive-integer>
+
+/* Primitives */
+
+<quoted-schema-name> ::= "\"" <schema-name> "\""
+
+<schema-name> ::= <lowercase-letter> { <lowercase-letter> }
+
+<lowercase-letter> ::= "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m"
+                     | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z"
+
+<quoted-string> ::= "\"" { <string-char> } "\""
+
+<string-char> ::= <letter> | <digit> | <special-char> | <space>
+
+<letter> ::= <lowercase-letter> | <uppercase-letter>
+
+<uppercase-letter> ::= "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M"
+                     | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
+
+<digit> ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+
+<special-char> ::= "-" | "_" | "@" | "." | "," | ":" | ";" | "!" | "?"
+
+<space> ::= " "
+
+<non-negative-integer> ::= "0" | <positive-integer>
+
+<positive-integer> ::= <nonzero-digit> { <digit> }
+
+<nonzero-digit> ::= "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+
+/* ============================================================================
+ * CONSTRAINTS (enforced by endpoint validation)
+ *
+ * 1. name: REQUIRED, must be non-empty ONLY lowercase letters (a-z)
+ *    - Pattern: ^[a-z]+$
+ *    - minLength: 1
+ *    - NO numbers, NO underscores, NO hyphens, NO special characters, NO uppercase, NO accents
+ *    - Validation: if (!name.matches("^[a-z]+$"))
+ *    - Examples: "tenantacme", "cliente", "financeiro", "producao"
+ *    - IMPORTANT: This field is IMMUTABLE after creation
+ *
+ * 2. alias: OPTIONAL, defaults to empty string
+ *    - minLength: 0
+ *    - Can contain any characters (letters, numbers, spaces, special chars)
+ *    - Examples: "ACME Corporation", "Client 001 - Production", ""
+ *    - Default: ""
+ *    - UPDATABLE via PUT endpoint
+ *
+ * 3. description: OPTIONAL, defaults to empty string
+ *    - minLength: 0
+ *    - Can contain any characters
+ *    - Examples: "Production schema for ACME Corp", "Testing environment", ""
+ *    - Default: ""
+ *    - UPDATABLE via PUT endpoint
+ *
+ * 4. status: OPTIONAL, defaults to "MODELING"
+ *    - minLength: 6
+ *    - Possible values: "MODELING", "ACTIVE", "INACTIVE", "RUNNING"
+ *    - Examples: "MODELING", "ACTIVE", "INACTIVE"
+ *    - Default: "MODELING"
+ *    - UPDATABLE via PUT endpoint
+ *
+ * 5. dbsqlminimumconnidle: OPTIONAL, defaults to 0
+ *    - Type: integer
+ *    - Minimum: 0
+ *    - Examples: 0, 2, 5
+ *    - Default: 0
+ *    - UPDATABLE via PUT endpoint
+ *
+ * 6. dbsqlmaximumpoolsize: OPTIONAL, defaults to 2
+ *    - Type: integer
+ *    - Minimum: 1
+ *    - Examples: 2, 10, 20
+ *    - Default: 2
+ *    - UPDATABLE via PUT endpoint
+ *
+ * ============================================================================
+ * POST BODY EXAMPLES
+ *
+ * Example 1: Minimal valid request (required field only)
+ * {
+ *   "name": "tenantacme"
+ * }
+ * Result: Creates DataSchema with name="tenantacme", default values for all optional fields
+ *
+ * Example 2: With alias and status
+ * {
+ *   "name": "cliente",
+ *   "alias": "Client - Production",
+ *   "description": "Production environment for Client",
+ *   "status": "ACTIVE"
+ * }
+ * Result: Creates DataSchema with custom alias and ACTIVE status
+ *
+ * Example 3: With connection pool configuration
+ * {
+ *   "name": "financeiro",
+ *   "alias": "Financeiro - Produção",
+ *   "description": "Schema para sistema financeiro",
+ *   "status": "MODELING",
+ *   "dbsqlminimumconnidle": 2,
+ *   "dbsqlmaximumpoolsize": 10
+ * }
+ * Result: Creates DataSchema with custom pool configuration (2 min idle, 10 max)
+ *
+ * ============================================================================
+ * CURL EXAMPLE
+ *
+ * curl -X POST "https://api.example.com/org/acme/project/1/database/2/dataschema" \
+ *   -H "Authorization: Bearer <token>" \
+ *   -H "Content-Type: application/json" \
+ *   -H "Accept: application/json" \
+ *   -d '{
+ *     "name": "financeiro",
+ *     "alias": "Financeiro - Produção",
+ *     "description": "Schema para sistema financeiro",
+ *     "status": "MODELING",
+ *     "dbsqlminimumconnidle": 2,
+ *     "dbsqlmaximumpoolsize": 10
+ *   }'
+ *
+ * Expected response http status code 201 (Created)
+ *
+ * ============================================================================
+ * AI USAGE INSTRUCTIONS
+ *
+ * When constructing a request:
+ * 1. ALWAYS include: name (REQUIRED)
+ * 2. OPTIONALLY include: alias, description, status, dbsqlminimumconnidle, dbsqlmaximumpoolsize
+ * 3. Use ONLY lowercase letters (a-z) in name field
+ *    - NO numbers, NO underscores, NO hyphens, NO special characters, NO uppercase, NO accents
+ * 4. Choose descriptive single-word names that reflect the tenant/schema purpose
+ * 5. Use alias for human-readable names (can contain spaces, special chars)
+ * 6. Set appropriate connection pool values based on expected load:
+ *    - Light load: dbsqlminimumconnidle=0, dbsqlmaximumpoolsize=2 (default)
+ *    - Medium load: dbsqlminimumconnidle=2, dbsqlmaximumpoolsize=10
+ *    - Heavy load: dbsqlminimumconnidle=5, dbsqlmaximumpoolsize=20
+ * 7. No additional fields are accepted (additionalProperties: false)
+ *
+ * Common errors to avoid:
+ * - Uppercase letters in name (use lowercase only)
+ * - Numbers in name (only letters allowed)
+ * - Underscores in name (not allowed)
+ * - Hyphens in name (not allowed)
+ * - Spaces in name (not allowed)
+ * - Accented letters in name (use canonical alphabet only)
+ * - Empty or missing name
+ * - Invalid characters in name (ONLY a-z allowed)
+ * - dbsqlmaximumpoolsize less than 1
+ * - dbsqlminimumconnidle negative
+ * - Including extra fields not defined in schema
+ *
+ * Best practices:
+ * - Use meaningful single-word names: "tenantacme", "cliente", "financeiro", "vendas"
+ * - Use Portuguese or English words without accents or special characters
+ * - Keep names concise but descriptive (single word)
+ * - Use alias field for display names with spaces/special chars
+ * - Set status="MODELING" during development, "ACTIVE" for production
+ * - Configure connection pools based on expected concurrent users
+ * - Use description field to document the schema purpose
+ *
+ * Field mutability:
+ * - IMMUTABLE (cannot be updated): name, tenantid
+ * - UPDATABLE (can be updated via PUT): alias, description, status,
+ *   dbsqlminimumconnidle, dbsqlmaximumpoolsize
+ * - All updates require 'logversion' for optimistic locking
+ *
+ */

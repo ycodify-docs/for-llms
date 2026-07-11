@@ -1,0 +1,204 @@
+openapi: 3.1.0
+info:
+  title: forger — API de implantação de recursos
+  version: "1.0"
+  description: >
+    Implanta os recursos de um sistema (dbconn, database, project, dataschema, entity, model, process,
+    email). Independente de tecnologia. Detalhe e ciclo de vida: README.md e endpoints/. Gramáticas de
+    payload: bnfs/. Apenas endpoints autenticados; endpoints internos/sem-auth não constam.
+servers:
+  - url: /
+    description: Acesso via gateway da plataforma (host omitido por política).
+security:
+  - bearerAuth: []
+tags:
+  - { name: dbconn }
+  - { name: database }
+  - { name: project }
+  - { name: dataschema }
+  - { name: entity }
+  - { name: model }
+  - { name: process }
+  - { name: email }
+paths:
+  /org/{org}/dbconn:
+    parameters: [{ $ref: '#/components/parameters/org' }]
+    post:
+      tags: [dbconn]
+      summary: Criar conexão a banco relacional
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/DbConnCreate' } } } }
+      responses:
+        '201': { description: Criado, content: { application/json: { schema: { $ref: '#/components/schemas/IdMessage' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+    get:
+      tags: [dbconn]
+      summary: Listar conexões
+      responses: { '200': { description: OK }, '204': { description: Vazio } }
+  /org/{org}/dbconn/{id}:
+    parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/id' }]
+    get: { tags: [dbconn], summary: Ler conexão, responses: { '200': { description: OK }, '204': { description: Não encontrado } } }
+    put:
+      tags: [dbconn]
+      summary: Atualizar conexão (versão otimista)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Versioned' } } } }
+      responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/BadRequest' }, '409': { $ref: '#/components/responses/Conflict' } }
+    delete: { tags: [dbconn], summary: Remover (bloqueado se houver database), responses: { '200': { description: OK }, '204': { description: Sem conteúdo } } }
+  /org/{org}/dbconn/{dbconnId}/database:
+    parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/dbconnId' }]
+    post:
+      tags: [database]
+      summary: Criar banco de leitura (materializa o banco físico)
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/DatabaseCreate' } } } }
+      responses: { '201': { description: Criado }, '400': { $ref: '#/components/responses/BadRequest' } }
+    get: { tags: [database], summary: Listar bancos, responses: { '200': { description: OK }, '204': { description: Vazio } } }
+  /org/{org}/dbconn/{dbconnId}/database/{id}:
+    parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/dbconnId' }, { $ref: '#/components/parameters/id' }]
+    get: { tags: [database], summary: Ler banco, responses: { '200': { description: OK }, '204': { description: Não encontrado } } }
+    put: { tags: [database], summary: Atualizar banco, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Versioned' } } } }, responses: { '200': { description: OK }, '409': { $ref: '#/components/responses/Conflict' } } }
+    delete: { tags: [database], summary: Remover (bloqueado se houver dataschema), responses: { '200': { description: OK }, '204': { description: Sem conteúdo } } }
+  /org/{org}/dbconn/{dbconnId}/database/name/{name}:
+    parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/dbconnId' }, { name: name, in: path, required: true, schema: { type: string } }]
+    get: { tags: [database], summary: Buscar banco por nome, responses: { '200': { description: OK }, '204': { description: Não encontrado } } }
+  /org/{org}/project:
+    parameters: [{ $ref: '#/components/parameters/org' }]
+    post:
+      tags: [project]
+      summary: Criar project (bounded context); gera identificadores de tenant
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ProjectCreate' } } } }
+      responses: { '201': { description: Criado, content: { application/json: { schema: { $ref: '#/components/schemas/ProjectCreated' } } } }, '400': { $ref: '#/components/responses/BadRequest' } }
+    get: { tags: [project], summary: Listar projects, responses: { '200': { description: OK }, '204': { description: Vazio } } }
+  /org/{org}/project/{project}:
+    parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/project' }]
+    get: { tags: [project], summary: Ler project, responses: { '200': { description: OK }, '204': { description: Não encontrado } } }
+    put: { tags: [project], summary: Atualizar project, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Versioned' } } } }, responses: { '200': { description: OK }, '409': { $ref: '#/components/responses/Conflict' } } }
+    delete: { tags: [project], summary: Remover (bloqueado se houver dataschema), responses: { '200': { description: OK }, '204': { description: Sem conteúdo } } }
+  /org/{org}/project/{project}/database/{databaseId}/dataschema:
+    parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/project' }, { name: databaseId, in: path, required: true, schema: { type: integer } }]
+    post:
+      tags: [dataschema]
+      summary: Criar dataschema; gera o tenant-id e o esquema físico de leitura
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/DataschemaCreate' } } } }
+      responses: { '201': { description: Criado, content: { application/json: { schema: { $ref: '#/components/schemas/IdMessage' } } } }, '400': { $ref: '#/components/responses/BadRequest' } }
+    get: { tags: [dataschema], summary: Listar dataschemas, responses: { '200': { description: OK }, '204': { description: Vazio } } }
+  /org/{org}/project/{project}/database/{databaseId}/dataschema/{dataSchema}:
+    parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/project' }, { name: databaseId, in: path, required: true, schema: { type: integer } }, { $ref: '#/components/parameters/dataSchema' }]
+    get: { tags: [dataschema], summary: Ler dataschema, responses: { '200': { description: OK }, '204': { description: Não encontrado } } }
+    put: { tags: [dataschema], summary: Atualizar dataschema, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Versioned' } } } }, responses: { '200': { description: OK }, '409': { $ref: '#/components/responses/Conflict' } } }
+    delete: { tags: [dataschema], summary: Remover (bloqueado se o esquema físico existir), responses: { '200': { description: OK }, '204': { description: Sem conteúdo } } }
+  /org/{org}/project/{project}/dataschema/{dataSchema}/entity/validate:
+    parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/project' }, { $ref: '#/components/parameters/dataSchema' }]
+    post: { tags: [entity], summary: Validar definição de entity (dry-run, não persiste), requestBody: { required: true, content: { application/json: { schema: { type: object } } } }, responses: { '200': { description: Válido }, '400': { $ref: '#/components/responses/BadRequest' } } }
+  /org/{org}/project/{project}/dataschema/{dataSchema}/entity:
+    parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/project' }, { $ref: '#/components/parameters/dataSchema' }]
+    post: { tags: [entity], summary: Criar entity (compila e aplica CREATE TABLE), requestBody: { required: true, content: { application/json: { schema: { type: object } } } }, responses: { '201': { description: Criado }, '400': { $ref: '#/components/responses/BadRequest' } } }
+  /org/{org}/project/{project}/dataschema/{dataSchema}/entities:
+    parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/project' }, { $ref: '#/components/parameters/dataSchema' }]
+    get: { tags: [entity], summary: Listar entities do esquema, responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /org/{org}/project/{project}/dataschema/{dataSchema}/entity/{entity}:
+    parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/project' }, { $ref: '#/components/parameters/dataSchema' }, { $ref: '#/components/parameters/entity' }]
+    get: { tags: [entity], summary: Ler estado atual da entity, responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/NotFound' } } }
+    put: { tags: [entity], summary: Atualizar entity (aplica ChangeSet), requestBody: { required: true, content: { application/json: { schema: { type: object } } } }, responses: { '200': { description: OK }, '409': { $ref: '#/components/responses/Conflict' } } }
+    delete: { tags: [entity], summary: Remover entity (DROP da tabela), responses: { '200': { description: OK } } }
+  /org/{org}/project/{project}/dataschema/{dataSchema}/entity/{entity}/attribute:
+    parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/project' }, { $ref: '#/components/parameters/dataSchema' }, { $ref: '#/components/parameters/entity' }]
+    post: { tags: [entity], summary: Adicionar atributo, requestBody: { required: true, content: { application/json: { schema: { type: object } } } }, responses: { '200': { description: OK }, '201': { description: Criado } } }
+  /org/{org}/project/{project}/dataschema/{dataSchema}/entity/{entity}/attribute/{attribute}:
+    parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/project' }, { $ref: '#/components/parameters/dataSchema' }, { $ref: '#/components/parameters/entity' }, { name: attribute, in: path, required: true, schema: { type: string } }]
+    delete: { tags: [entity], summary: Remover atributo, responses: { '200': { description: OK } } }
+  /org/{org}/project/{project}/dataschema/{dataSchema}/entity/{entity}/association:
+    parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/project' }, { $ref: '#/components/parameters/dataSchema' }, { $ref: '#/components/parameters/entity' }]
+    post: { tags: [entity], summary: Adicionar associação, requestBody: { required: true, content: { application/json: { schema: { type: object } } } }, responses: { '200': { description: OK }, '201': { description: Criado } } }
+  /org/{org}/project/{project}/dataschema/{dataSchema}/entity/{entity}/association/{association}:
+    parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/project' }, { $ref: '#/components/parameters/dataSchema' }, { $ref: '#/components/parameters/entity' }, { name: association, in: path, required: true, schema: { type: string } }]
+    delete: { tags: [entity], summary: Remover associação, responses: { '200': { description: OK } } }
+  /org/{org}/project/{project}/dataschema/{dataSchema}/entity/{entity}/analyze:
+    parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/project' }, { $ref: '#/components/parameters/dataSchema' }, { $ref: '#/components/parameters/entity' }]
+    post: { tags: [entity], summary: Analisar impacto de mudança (relatório, não aplica), responses: { '200': { description: Relatório } } }
+  /org/{org}/project/{project}/tenant/{tenantId}/model:
+    parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/project' }, { $ref: '#/components/parameters/tenantId' }]
+    post:
+      tags: [model]
+      summary: Publicar modelo de domínio (.model.json) no cache (sobrescreve)
+      requestBody: { required: true, content: { multipart/form-data: { schema: { type: object, properties: { file: { type: string, format: binary } } } } } }
+      responses: { '201': { description: Publicado, content: { application/json: { schema: { type: object, properties: { key: { type: string } } } } } }, '400': { $ref: '#/components/responses/BadRequest' }, '404': { $ref: '#/components/responses/NotFound' } }
+    get: { tags: [model], summary: Ler modelo publicado, responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/NotFound' } } }
+    delete: { tags: [model], summary: Remover modelo publicado, responses: { '200': { description: OK } } }
+  /org/{org}/project/{project}/model:
+    parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/project' }]
+    get: { tags: [model], summary: Listar modelos do project (inclui tenantId, dataschema, status), responses: { '200': { description: OK } } }
+  /org/{org}/project/{project}/process:
+    parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/project' }]
+    post:
+      tags: [process]
+      summary: Publicar processo (BPMN); provisiona topologia de filas
+      requestBody: { required: true, content: { multipart/form-data: { schema: { type: object, properties: { file: { type: string, format: binary } } } } } }
+      responses: { '201': { description: Publicado }, '422': { description: Problemas críticos — não publica }, '409': { $ref: '#/components/responses/Conflict' }, '400': { $ref: '#/components/responses/BadRequest' } }
+    get: { tags: [process], summary: Ler processo publicado, responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/NotFound' } } }
+    delete: { tags: [process], summary: Remover processo publicado, responses: { '200': { description: OK } } }
+  /org/{org}/project/{project}/email:
+    parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/project' }]
+    post: { tags: [email], summary: Criar configuração de e-mail, requestBody: { required: true, content: { application/json: { schema: { type: object } } } }, responses: { '201': { description: Criado }, '400': { $ref: '#/components/responses/BadRequest' } } }
+    get: { tags: [email], summary: Listar configurações, responses: { '200': { description: OK } } }
+  /org/{org}/project/{project}/email/{id}:
+    parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/project' }, { $ref: '#/components/parameters/id' }]
+    get: { tags: [email], summary: Ler configuração, responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/NotFound' } } }
+    put: { tags: [email], summary: Atualizar configuração, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Versioned' } } } }, responses: { '200': { description: OK }, '409': { $ref: '#/components/responses/Conflict' } } }
+    delete: { tags: [email], summary: Remover configuração, responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/NotFound' } } }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+  parameters:
+    org: { name: org, in: path, required: true, schema: { type: string } }
+    project: { name: project, in: path, required: true, schema: { type: string } }
+    dataSchema: { name: dataSchema, in: path, required: true, schema: { type: string } }
+    entity: { name: entity, in: path, required: true, schema: { type: string } }
+    id: { name: id, in: path, required: true, schema: { type: integer } }
+    dbconnId: { name: dbconnId, in: path, required: true, schema: { type: integer } }
+    tenantId: { name: tenantId, in: path, required: true, schema: { type: string, format: uuid } }
+  responses:
+    BadRequest: { description: Requisição inválida, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Forbidden: { description: Acesso negado, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    NotFound: { description: Não encontrado, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Conflict: { description: Conflito de versão (logversion) ou dependentes, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  schemas:
+    Error: { type: object, properties: { error: { type: string } } }
+    IdMessage: { type: object, properties: { id: { type: integer }, message: { type: string } } }
+    Versioned: { type: object, required: [logversion], properties: { logversion: { type: integer, description: "versão otimista atual" } }, additionalProperties: true }
+    DbConnCreate:
+      type: object
+      required: [dbsqlserveraddress, dbsqlname, dbsqlserverport, dbsqlusername]
+      properties:
+        dbsqlserveraddress: { type: string }
+        dbsqlname: { type: string }
+        dbsqlserverport: { type: integer }
+        dbsqlusername: { type: string }
+        dbsqluserpassword: { type: string }
+    DatabaseCreate:
+      type: object
+      required: [dbsqlname]
+      properties:
+        dbsqlname: { type: string, pattern: '^[a-z]+$' }
+        dbsqlversion: { type: string }
+    ProjectCreate:
+      type: object
+      required: [name, alias, envtype]
+      properties:
+        name: { type: string, pattern: '^[a-z]+$', maxLength: 16 }
+        alias: { type: string }
+        envtype: { type: string }
+        email: { type: string }
+        description: { type: string }
+        status: { type: string }
+    ProjectCreated:
+      type: object
+      properties: { id: { type: integer }, tenantSecret: { type: string, format: uuid }, tenantPid: { type: string, format: uuid }, message: { type: string } }
+    DataschemaCreate:
+      type: object
+      required: [name]
+      properties:
+        name: { type: string, pattern: '^[a-z][a-z0-9_]*$', maxLength: 12 }
+        alias: { type: string }
+        description: { type: string }
+        dbsqlminimumconnidle: { type: integer }
+        dbsqlmaximumpoolsize: { type: integer }

@@ -1,0 +1,236 @@
+/**
+ * BNF Grammar for createProject Request Body
+ * Endpoint: POST /org/{org}/project
+ *
+ * This grammar defines the JSON structure required to create a Project.
+ *
+ * IMPORTANT: Projects represent logical groupings for organizing resources (DataSchemas, Emails, etc).
+ * Each Project belongs to an organization and manages its own resources.
+ *
+ * Project naming convention:
+ * - Input: "erp" (only lowercase letters)
+ * - Storage: Stored as provided in resource.project table
+ * - Uniqueness: UNIQUE constraint on (owner, name)
+ */
+
+<project-request> ::= "{" <required-fields> [ "," <optional-fields> ] "}"
+
+<required-fields> ::= <name> "," <alias> "," <envtype>
+
+<optional-fields> ::= <email> [ "," <more-optional-fields> ]
+                    | <description> [ "," <more-optional-fields> ]
+                    | <status> [ "," <more-optional-fields> ]
+
+<more-optional-fields> ::= <email>
+                         | <description>
+                         | <status>
+                         | <email> "," <more-optional-fields>
+                         | <description> "," <more-optional-fields>
+                         | <status> "," <more-optional-fields>
+
+/* Required Fields */
+
+<name> ::= "\"name\"" ":" <quoted-project-name>
+
+<alias> ::= "\"alias\"" ":" <quoted-string>
+
+<envtype> ::= "\"envtype\"" ":" <quoted-envtype>
+
+/* Optional Fields */
+
+<email> ::= "\"email\"" ":" <quoted-email>
+
+<description> ::= "\"description\"" ":" <quoted-string>
+
+<status> ::= "\"status\"" ":" <quoted-status>
+
+/* Primitives */
+
+<quoted-project-name> ::= "\"" <project-name> "\""
+
+<project-name> ::= <lowercase-letter> { <lowercase-letter> }
+
+<lowercase-letter> ::= "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m"
+                     | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z"
+
+<quoted-envtype> ::= "\"" <envtype-value> "\""
+
+<envtype-value> ::= "DEVELOPMENT" | "STAGING" | "PRODUCTION" | "TEST" | "QA"
+
+<quoted-status> ::= "\"" <status-value> "\""
+
+<status-value> ::= "MODELING" | "ACTIVE" | "INACTIVE" | "ARCHIVED"
+
+<quoted-email> ::= "\"" <email-value> "\""
+
+<email-value> ::= { <email-char> }
+
+<email-char> ::= <letter> | <digit> | "@" | "." | "-" | "_"
+
+<quoted-string> ::= "\"" { <string-char> } "\""
+
+<string-char> ::= <letter> | <digit> | <special-char> | <space>
+
+<letter> ::= <lowercase-letter> | <uppercase-letter>
+
+<uppercase-letter> ::= "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M"
+                     | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
+
+<digit> ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+
+<special-char> ::= "-" | "_" | "@" | "." | "," | ":" | ";" | "!" | "?"
+
+<space> ::= " "
+
+/* ============================================================================
+ * CONSTRAINTS (enforced by endpoint validation)
+ *
+ * 1. name: REQUIRED, must be non-empty ONLY lowercase letters (a-z)
+ *    - Pattern: ^[a-z]+$
+ *    - minLength: 1
+ *    - maxLength: 16
+ *    - NO numbers, NO underscores, NO hyphens, NO special characters, NO uppercase, NO accents
+ *    - Validation: if (!name.matches("^[a-z]+$") || name.length() > 16)
+ *    - Examples: "erp", "crm", "vendas", "financeiro"
+ *    - IMPORTANT: This field is IMMUTABLE after creation
+ *
+ * 2. alias: REQUIRED, must be non-empty
+ *    - minLength: 1
+ *    - maxLength: 128
+ *    - Can contain any characters (letters, numbers, spaces, special chars)
+ *    - Examples: "ERP System", "CRM Platform", "Financial Module"
+ *    - UPDATABLE via PUT endpoint
+ *
+ * 3. envtype: REQUIRED, must be valid environment type
+ *    - minLength: 1
+ *    - maxLength: 16
+ *    - Possible values: "DEV", "STAGING", "PROD", "TEST", "QA"
+ *    - Examples: "DEV", "PROD", "STAGING"
+ *    - UPDATABLE via PUT endpoint
+ *
+ * 4. email: OPTIONAL, defaults to empty string
+ *    - minLength: 0
+ *    - maxLength: 128
+ *    - Should be valid email format (not enforced by regex, but recommended)
+ *    - Examples: "admin@company.com", "project-admin@example.com", ""
+ *    - Default: ""
+ *    - UPDATABLE via PUT endpoint
+ *
+ * 5. description: OPTIONAL, defaults to empty string
+ *    - minLength: 0
+ *    - maxLength: 1024
+ *    - Can contain any characters
+ *    - Examples: "Main ERP system for company", "CRM for sales team", ""
+ *    - Default: ""
+ *    - UPDATABLE via PUT endpoint
+ *
+ * 6. status: OPTIONAL, defaults to "MODELING"
+ *    - minLength: 1
+ *    - maxLength: 16
+ *    - Possible values: "MODELING", "ACTIVE", "INACTIVE", "ARCHIVED"
+ *    - Examples: "MODELING", "ACTIVE", "INACTIVE"
+ *    - Default: "MODELING"
+ *    - UPDATABLE via PUT endpoint
+ *
+ * 7. secret: AUTO-GENERATED (UUID), cannot be provided in request
+ *    - System generates unique UUID for each project
+ *    - Used for authentication/authorization
+ *    - IMMUTABLE (cannot be updated)
+ *
+ * ============================================================================
+ * POST BODY EXAMPLES
+ *
+ * Example 1: Minimal valid request (required fields only)
+ * {
+ *   "name": "erp",
+ *   "alias": "ERP System",
+ *   "envtype": "DEV"
+ * }
+ * Result: Creates Project with name="erp", alias="ERP System", envtype="DEV",
+ *         status="MODELING", auto-generated secret, empty email and description
+ *
+ * Example 2: With optional email and description
+ * {
+ *   "name": "crm",
+ *   "alias": "CRM Platform",
+ *   "envtype": "PROD",
+ *   "email": "admin@acme.com",
+ *   "description": "Customer Relationship Management system"
+ * }
+ * Result: Creates Project with all specified fields
+ *
+ * Example 3: Full request with all fields
+ * {
+ *   "name": "financeiro",
+ *   "alias": "Sistema Financeiro",
+ *   "envtype": "PROD",
+ *   "email": "financeiro@company.com",
+ *   "description": "Sistema completo de gestão financeira",
+ *   "status": "ACTIVE"
+ * }
+ * Result: Creates Project with all specified fields and ACTIVE status
+ *
+ * ============================================================================
+ * CURL EXAMPLE
+ *
+ * curl -X POST "https://api.example.com/org/acme/project" \
+ *   -H "Authorization: Bearer <token>" \
+ *   -H "Content-Type: application/json" \
+ *   -H "Accept: application/json" \
+ *   -d '{
+ *     "name": "erp",
+ *     "alias": "ERP System",
+ *     "envtype": "PROD",
+ *     "email": "admin@acme.com",
+ *     "description": "Enterprise Resource Planning system",
+ *     "status": "ACTIVE"
+ *   }'
+ *
+ * Expected response http status code 201 (Created)
+ *
+ * ============================================================================
+ * AI USAGE INSTRUCTIONS
+ *
+ * When constructing a request:
+ * 1. ALWAYS include: name, alias, envtype (REQUIRED)
+ * 2. OPTIONALLY include: email, description, status
+ * 3. Use ONLY lowercase letters (a-z) in name field, max 16 characters
+ *    - NO numbers, NO underscores, NO hyphens, NO special characters, NO uppercase, NO accents
+ * 4. Choose descriptive single-word names that reflect the project purpose
+ * 5. Use alias for human-readable names (can contain spaces, special chars)
+ * 6. Set appropriate envtype: DEV (development), STAGING (pre-production), PROD (production)
+ * 7. Set status="MODELING" during setup, "ACTIVE" for production use
+ * 8. Do NOT include 'secret' field - it's auto-generated
+ * 9. No additional fields are accepted (additionalProperties: false)
+ *
+ * Common errors to avoid:
+ * - Uppercase letters in name (use lowercase only)
+ * - Numbers in name (only letters allowed)
+ * - Underscores in name (not allowed)
+ * - Hyphens in name (not allowed)
+ * - Spaces in name (not allowed)
+ * - Accented letters in name (use canonical alphabet only)
+ * - Name longer than 16 characters (max 16)
+ * - Empty or missing name
+ * - Empty or missing alias
+ * - Empty or missing envtype
+ * - Invalid envtype value (must be DEV, STAGING, PROD, TEST, or QA)
+ * - Including 'secret' field in request (auto-generated)
+ * - Including extra fields not defined in schema
+ *
+ * Best practices:
+ * - Use meaningful single-word names: "erp", "crm", "vendas", "financeiro"
+ * - Use Portuguese or English words without accents or special characters
+ * - Keep names concise but descriptive (single word, max 16 chars)
+ * - Use alias field for display names with spaces/special chars
+ * - Set envtype according to environment: DEV for development, PROD for production
+ * - Set status="MODELING" during development, "ACTIVE" for production
+ * - Use description field to document the project purpose
+ * - Provide email for project contact/admin
+ *
+ * Field mutability:
+ * - IMMUTABLE (cannot be updated): name, owner, secret
+ * - UPDATABLE (can be updated via PUT): alias, email, description, status, envtype
+ * - All updates require 'logversion' for optimistic locking
+ *
+ */

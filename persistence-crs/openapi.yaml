@@ -1,0 +1,84 @@
+openapi: 3.1.0
+info:
+  title: persistence-crs — comandos (CQRS-ES)
+  version: "1.0"
+  description: >
+    Lado de escrita: executa comandos de agregados, lê estado/histórico, aplica projeção (serviço).
+    Detalhe e ciclo de vida: README.md, endpoints/, spec/model-format.md. Apenas endpoints autenticados.
+servers:
+  - url: /
+    description: Acesso via gateway da plataforma (host omitido por política).
+security:
+  - bearerAuth: []
+paths:
+  /a/{boundedContext}/{aggregateType}:
+    post:
+      summary: Executar comando sobre um agregado
+      parameters:
+        - { $ref: '#/components/parameters/boundedContext' }
+        - { $ref: '#/components/parameters/aggregateType' }
+        - { $ref: '#/components/parameters/tenant' }
+      requestBody:
+        required: true
+        description: "O comando pelo seu nome. Em transições, inclua status = estado atual (exceto criação). Ver spec/model-format.md."
+        content: { application/json: { schema: { type: object, additionalProperties: { type: object } } } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { type: object, properties: { id: { type: string }, status: { type: string } } } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '510': { $ref: '#/components/responses/StateOrProcessing' }
+  /a/{boundedContext}/{aggregateType}/{uuid}:
+    get:
+      summary: Ler estado atual do agregado
+      parameters:
+        - { $ref: '#/components/parameters/boundedContext' }
+        - { $ref: '#/components/parameters/aggregateType' }
+        - { $ref: '#/components/parameters/uuid' }
+        - { $ref: '#/components/parameters/tenant' }
+      responses: { '200': { description: Estado atual }, '204': { description: Não encontrado }, '510': { $ref: '#/components/responses/StateOrProcessing' } }
+  /a/{boundedContext}/{aggregateType}/{uuid}/history:
+    get:
+      summary: Ler histórico de eventos do agregado
+      parameters:
+        - { $ref: '#/components/parameters/boundedContext' }
+        - { $ref: '#/components/parameters/aggregateType' }
+        - { $ref: '#/components/parameters/uuid' }
+        - { $ref: '#/components/parameters/tenant' }
+      responses: { '200': { description: Lista de eventos }, '204': { description: Sem eventos } }
+  /e:
+    post:
+      summary: Escrever projeção (serviço autorizado)
+      parameters: [{ $ref: '#/components/parameters/tenant' }]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              oneOf:
+                - { $ref: '#/components/schemas/ProjectionOp' }
+                - { type: array, items: { $ref: '#/components/schemas/ProjectionOp' } }
+      responses:
+        '201': { description: Criado (action CREATE) }
+        '200': { description: OK (action UPDATE/DELETE) }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '510': { $ref: '#/components/responses/StateOrProcessing' }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+  parameters:
+    boundedContext: { name: boundedContext, in: path, required: true, schema: { type: string } }
+    aggregateType: { name: aggregateType, in: path, required: true, schema: { type: string } }
+    uuid: { name: uuid, in: path, required: true, schema: { type: string, format: uuid } }
+    tenant: { name: X-Tenant-Id, in: header, required: true, schema: { type: string, format: uuid }, description: "Cabeçalho de tenant (isolamento)." }
+  responses:
+    BadRequest: { description: Requisição inválida, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Forbidden: { description: Tenant não autorizado, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    StateOrProcessing: { description: "Falha de transição/concorrência/processamento", content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  schemas:
+    Error: { type: object, properties: { error: { type: string } } }
+    ProjectionOp:
+      type: object
+      required: [action, data]
+      properties:
+        action: { type: string, enum: [CREATE, UPDATE, DELETE] }
+        data: { type: array, items: { type: object } }

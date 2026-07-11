@@ -1,0 +1,134 @@
+openapi: 3.1.0
+info:
+  title: orgid — identidade e acesso (IAM)
+  version: "1.0"
+  description: >
+    Gerencia organizações, contas, papéis (RBAC) e contratos. Dois domínios: /up (plataforma) e
+    /ua (externo); /open é público (registro, recuperação). Valida o token de acesso (não o emite).
+    Detalhe e ciclo de vida: README.md, endpoints/*.md. Apenas endpoints autenticados ou públicos por
+    design; internos/ofuscados/observabilidade não constam.
+servers:
+  - url: /
+    description: Acesso via gateway da plataforma (host omitido por política).
+tags:
+  - { name: organizacao }
+  - { name: conta }
+  - { name: papel }
+  - { name: associacao }
+  - { name: contrato }
+  - { name: publico }
+paths:
+  # ---- organização (/up/org) ----
+  /up/org:
+    post:
+      tags: [organizacao]
+      summary: Criar organização (papel administrador)
+      security: [{ bearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object, required: [name, client, alias], properties: { name: { type: string }, client: { type: string, maxLength: 12, description: "nome da empresa cliente (obrigatório)" }, alias: { type: string }, email: { type: string }, status: { type: string }, cardIdentifier: { type: string } } } } } }
+      responses: { '200': { description: Criada }, '400': { $ref: '#/components/responses/BadRequest' }, '403': { $ref: '#/components/responses/Forbidden' } }
+    put:
+      tags: [organizacao]
+      summary: Atualizar organização (administrador na org)
+      security: [{ bearerAuth: [] }]
+      requestBody: { required: true, content: { application/json: { schema: { type: object } } } }
+      responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Forbidden' } }
+  /up/org/by/name/{orgName}:
+    get: { tags: [organizacao], summary: Ler org por nome, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/orgName' }], responses: { '200': { description: OK }, '204': { description: Não encontrado } } }
+  /up/org/by/name/{orgName}/owner/{orgOwner}:
+    get: { tags: [organizacao], summary: Ler org por nome e dono, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/orgName' }, { $ref: '#/components/parameters/orgOwner' }], responses: { '200': { description: OK }, '204': { description: Não encontrado } } }
+  /up/org/by/name/{orgName}/owner/{orgOwner}/exists:
+    get: { tags: [organizacao], summary: Verifica existência da org, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/orgName' }, { $ref: '#/components/parameters/orgOwner' }], responses: { '200': { description: Existe }, '204': { description: Não existe } } }
+  /up/org/by/owner/{orgOwner}:
+    get: { tags: [organizacao], summary: Listar orgs do dono, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/orgOwner' }], responses: { '200': { description: Lista }, '204': { description: Vazio } } }
+  /up/org/by/org/{orgName}/org-owner/{orgOwner}:
+    delete: { tags: [organizacao], summary: Remover org (administrador na org), security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/orgName' }, { $ref: '#/components/parameters/orgOwner' }], responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Forbidden' } } }
+
+  # ---- conta (/up/account, /ua/account) ----
+  /up/account/by/jwt:
+    get: { tags: [conta], summary: Conta autenticada (plataforma), security: [{ bearerAuth: [] }], responses: { '200': { description: Conta }, '204': { description: Não encontrada } } }
+    delete: { tags: [conta], summary: Remover a própria conta, security: [{ bearerAuth: [] }], responses: { '200': { description: OK } } }
+  /up/account:
+    put: { tags: [conta], summary: Atualizar perfil, security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { type: object } } } }, responses: { '200': { description: OK } } }
+  /up/account/password:
+    put: { tags: [conta], summary: Atualizar senha, security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { password: { type: string } } } } } }, responses: { '200': { description: OK } } }
+  /up/account/by/org/{orgName}:
+    get: { tags: [conta], summary: Listar contas da org, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/orgName' }], responses: { '200': { description: Lista }, '204': { description: Vazio } } }
+  /ua/account/by/jwt:
+    get: { tags: [conta], summary: Conta autenticada (externo), security: [{ bearerAuth: [] }], responses: { '200': { description: Conta }, '204': { description: Não encontrada } } }
+  /ua/account:
+    put: { tags: [conta], summary: Atualizar perfil (externo), security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { type: object } } } }, responses: { '200': { description: OK } } }
+  /ua/account/password:
+    put: { tags: [conta], summary: Atualizar senha (externo), security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { type: object } } } }, responses: { '200': { description: OK } } }
+
+  # ---- papel (/ua/role) ----
+  /ua/role:
+    post: { tags: [papel], summary: Criar papel, security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { type: object, required: [name, owner], properties: { name: { type: string }, owner: { type: string }, label: { type: string }, ispublic: { type: boolean } } } } } }, responses: { '200': { description: "{ id }" } } }
+    put: { tags: [papel], summary: Atualizar papel, security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { type: object } } } }, responses: { '200': { description: OK } } }
+  /ua/role/by/name/{roleName}/owner/{roleOwner}:
+    get: { tags: [papel], summary: Ler papel, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/roleName' }, { $ref: '#/components/parameters/roleOwner' }], responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/BadRequest' } } }
+    delete: { tags: [papel], summary: Remover papel, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/roleName' }, { $ref: '#/components/parameters/roleOwner' }], responses: { '200': { description: OK } } }
+  /ua/role/by/owner/{roleOwner}:
+    get: { tags: [papel], summary: Listar papéis do dono, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/roleOwner' }], responses: { '200': { description: Lista } } }
+  /ua/open/role/owner/{roleOwner}:
+    get: { tags: [papel], summary: Listar papéis públicos (sem auth), parameters: [{ $ref: '#/components/parameters/roleOwner' }], responses: { '200': { description: "Lista (ispublic=true)" } } }
+  /ua/account-role/using/authority:
+    post: { tags: [associacao], summary: "Associar papel a conta (objeto ou array; role exige owner)", security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/UaAccountRoleOrList' } } } }, responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/BadRequest' } } }
+  /ua/account-role/role-owner/{roleOwner}/using/authority:
+    put: { tags: [associacao], summary: "Atualizar associações em lote (corpo é ARRAY; objeto único → 400)", security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/roleOwner' }], requestBody: { required: true, content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/UaAccountRole' } } } } }, responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/BadRequest' } } }
+  /ua/account-role/status/using/authority:
+    put: { tags: [associacao], summary: "Alterar status da associação (objeto único)", security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { allOf: [{ $ref: '#/components/schemas/UaAccountRole' }, { required: [status] }] } } } }, responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/BadRequest' } } }
+  /ua/account/by/username/{username}/role-name/{roleName}/role-owner/{roleOwner}/using/authority:
+    delete: { tags: [associacao], summary: "Desassociar papel da conta (sem corpo; tudo em path)", security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/username' }, { $ref: '#/components/parameters/roleName' }, { $ref: '#/components/parameters/roleOwner' }], responses: { '200': { description: OK } } }
+
+  # ---- associação conta-papel-org (/up/account-role-org) ----
+  /up/account-role-org:
+    post: { tags: [associacao], summary: Criar vínculo conta-papel-org, security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { account: { type: object }, role: { type: object }, org: { type: object } } } } } }, responses: { '201': { description: Criado }, '403': { $ref: '#/components/responses/Forbidden' } } }
+  /up/account-role-org/account-status:
+    put: { tags: [associacao], summary: Atualizar status do vínculo, security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { type: object } } } }, responses: { '200': { description: OK } } }
+  /up/account-role-org/by/org/{orgName}:
+    delete: { tags: [associacao], summary: Desassociar conta da org (administrador), security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/orgName' }], responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Forbidden' } } }
+
+  # ---- contrato (/up/contract) ----
+  /up/contract:
+    post: { tags: [contrato], summary: Criar contrato (administrador), security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { type: object, required: [orgName], properties: { orgName: { type: string }, plan: { type: object }, ttl: { type: string }, threshold: { type: string } } } } } }, responses: { '200': { description: Criado }, '403': { $ref: '#/components/responses/Forbidden' } } }
+    put: { tags: [contrato], summary: Atualizar contrato, security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { type: object } } } }, responses: { '200': { description: OK } } }
+  /up/contract/by/uuid/{uuid}/org/{orgName}:
+    get: { tags: [contrato], summary: Ler contrato por uuid+org, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/uuid' }, { $ref: '#/components/parameters/orgName' }], responses: { '200': { description: OK }, '204': { description: Não encontrado } } }
+
+  # ---- público (/open/*) ----
+  /open/up/account:
+    post: { tags: [publico], summary: "Registro: conta + organização (público)", requestBody: { required: true, content: { application/json: { schema: { type: object, required: [account, org], properties: { account: { type: object }, org: { type: object, required: [name, client, alias], properties: { name: { type: string }, client: { type: string, maxLength: 12 }, alias: { type: string } } } } } } } }, responses: { '201': { description: Criado }, '400': { $ref: '#/components/responses/BadRequest' } } }
+  /open/ua/account-role:
+    post: { tags: [publico], summary: "Registro externo: conta + papel (público)", requestBody: { required: true, content: { application/json: { schema: { type: object } } } }, responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/BadRequest' } } }
+  /open/up/account/by/username/{username}/exists:
+    get: { tags: [publico], summary: Verifica existência da conta (público), parameters: [{ $ref: '#/components/parameters/username' }], responses: { '200': { description: Existe }, '204': { description: Não existe } } }
+  /open/up/hash/for/{action}/by/{username}:
+    get: { tags: [publico], summary: Solicitar hash (ativação/recuperação) (público), parameters: [{ name: action, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/username' }], responses: { '200': { description: "{}" } } }
+  /open/up/account/{username}/{action}/hash/{hash}:
+    put: { tags: [publico], summary: Executar ação por hash (público), parameters: [{ $ref: '#/components/parameters/username' }, { name: action, in: path, required: true, schema: { type: string } }, { name: hash, in: path, required: true, schema: { type: string } }], requestBody: { content: { application/json: { schema: { type: object, properties: { password: { type: string } } } } } }, responses: { '200': { description: OK } } }
+components:
+  securitySchemes:
+    bearerAuth: { type: http, scheme: bearer }
+  parameters:
+    orgName: { name: orgName, in: path, required: true, schema: { type: string } }
+    orgOwner: { name: orgOwner, in: path, required: true, schema: { type: string } }
+    roleName: { name: roleName, in: path, required: true, schema: { type: string } }
+    roleOwner: { name: roleOwner, in: path, required: true, schema: { type: string } }
+    username: { name: username, in: path, required: true, schema: { type: string } }
+    uuid: { name: uuid, in: path, required: true, schema: { type: string } }
+  responses:
+    BadRequest: { description: Requisição inválida, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Forbidden: { description: Acesso negado (papel/posse), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+  schemas:
+    Error: { type: object, properties: { error: { type: string } } }
+    UaAccountRole:
+      type: object
+      required: [account, role]
+      properties:
+        account: { type: object, required: [username], properties: { username: { type: string } } }
+        role: { type: object, required: [name, owner], properties: { name: { type: string }, owner: { type: string } } }
+        status: { type: string, description: "ACTIVE | SUSPENDED | CANCELED" }
+    UaAccountRoleOrList:
+      oneOf:
+        - { $ref: '#/components/schemas/UaAccountRole' }
+        - { type: array, items: { $ref: '#/components/schemas/UaAccountRole' } }

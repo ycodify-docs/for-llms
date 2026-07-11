@@ -1,0 +1,186 @@
+{
+  "acme.vendas": {
+    "aggregate": {
+      "vendas.pedido": {
+        "type": "pedido",
+        "org": {
+          "name": "acme"
+        },
+        "project": {
+          "name": "vendas"
+        },
+        "boundedContext": {
+          "name": "vendas",
+          "comment": "Gestão de pedidos"
+        },
+        "schema": {
+          "forWriteModel.name": "wdb.client",
+          "forReadModel.name": "vendas"
+        },
+        "tenantId": {
+          "forWriteModel": "00000000-0000-4000-8000-000000000010",
+          "forReadModel": "00000000-0000-4000-8000-000000000010"
+        },
+        "identity": {
+          "strategy": "uuid",
+          "fields": []
+        },
+        "concurrency": {
+          "version": "version",
+          "strategy": "optimistic"
+        },
+        "command": {
+          "criar": {
+            "data": {
+              "attribute": {
+                "cliente": {
+                  "type": "String",
+                  "length": 100,
+                  "nullable": false,
+                  "comment": "Identificador do cliente"
+                },
+                "total": {
+                  "type": "Long",
+                  "length": 0,
+                  "nullable": false,
+                  "comment": "Valor total em centavos"
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "fromState": [],
+            "endState": "criada",
+            "roles": [
+              "MASTER",
+              "VENDEDOR"
+            ],
+            "coordination": {},
+            "br": {
+              "route": "acme/vendas/vendas/pedido/criar"
+            }
+          },
+          "confirmar": {
+            "data": {
+              "attribute": {},
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "fromState": [
+              "criada"
+            ],
+            "endState": "confirmada",
+            "roles": [
+              "MASTER",
+              "VENDEDOR"
+            ],
+            "coordination": {}
+          },
+          "faturar": {
+            "data": {
+              "attribute": {
+                "notafiscal": {
+                  "type": "String",
+                  "length": 60,
+                  "nullable": false,
+                  "comment": "Número da nota fiscal"
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "fromState": [
+              "confirmada"
+            ],
+            "endState": "faturada",
+            "roles": [
+              "MASTER"
+            ],
+            "coordination": {}
+          },
+          "cancelar": {
+            "data": {
+              "attribute": {
+                "motivo": {
+                  "type": "Text",
+                  "nullable": true,
+                  "comment": "Motivo do cancelamento"
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "fromState": [
+              "criada",
+              "confirmada"
+            ],
+            "endState": "cancelada",
+            "roles": [
+              "MASTER"
+            ],
+            "coordination": {}
+          }
+        },
+        "event": {
+          "criada": {
+            "type": "criada",
+            "whenAttribute": "criadaem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "orderingMode": "per-aggregate",
+              "triggerProjection": [],
+              "triggerCoordination": []
+            }
+          },
+          "confirmada": {
+            "type": "confirmada",
+            "whenAttribute": "confirmadaem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "orderingMode": "per-aggregate",
+              "triggerProjection": [],
+              "triggerCoordination": []
+            }
+          },
+          "faturada": {
+            "type": "faturada",
+            "whenAttribute": "faturadaem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "orderingMode": "per-aggregate",
+              "triggerProjection": [],
+              "triggerCoordination": [
+                {
+                  "name": "abrir_cobranca",
+                  "targetTenantId": "00000000-0000-4000-8000-000000000020",
+                  "br": {
+                    "route": "acme/financeiro/financeiro/conta/coordination/abrir_cobranca"
+                  }
+                }
+              ]
+            }
+          },
+          "cancelada": {
+            "type": "cancelada",
+            "whenAttribute": "canceladaem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "orderingMode": "per-aggregate",
+              "triggerProjection": [],
+              "triggerCoordination": []
+            }
+          }
+        }
+      }
+    }
+  },
+  "_comment": ""
+}

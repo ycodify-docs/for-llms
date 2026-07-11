@@ -1,0 +1,472 @@
+{
+  "acme.engenharia": {
+    "aggregate": {
+      "engenharia.demanda": {
+        "org": {
+          "name": "acme"
+        },
+        "project": {
+          "name": "engenharia"
+        },
+        "schema": {
+          "forWriteModel.name": "wdb.client",
+          "forReadModel.name": "engenharia"
+        },
+        "boundedContext": {
+          "name": "engenharia",
+          "comment": "Ciclo de vida de Demandas com nova hierarquia (criar → deferir/recusar/indeferir → ghissuing → ghconfirmissue). Estados terminais: indeferida (negativo) e issued (positivo)."
+        },
+        "tenantId": {
+          "forWriteModel": "00000000-0000-4000-8000-000000000005",
+          "forReadModel": "00000000-0000-4000-8000-000000000005"
+        },
+        "type": "demanda",
+        "identity": {
+          "strategy": "uuid",
+          "fields": []
+        },
+        "concurrency": {
+          "version": "version",
+          "strategy": "optimistic"
+        },
+        "command": {
+          "criar": {
+            "event": "criada",
+            "data": {
+              "attribute": {
+                "contaid": {
+                  "type": "String",
+                  "length": 36,
+                  "nullable": false,
+                  "comment": "FK obrigatória para crm.conta. Vínculo estritamente pós-venda."
+                },
+                "oportunidadeid": {
+                  "type": "String",
+                  "length": 36,
+                  "nullable": true,
+                  "comment": "FK opcional para crm.oportunidade."
+                },
+                "descricao": {
+                  "type": "Text",
+                  "nullable": false,
+                  "comment": "Descrição completa da demanda."
+                },
+                "origem": {
+                  "type": "String",
+                  "length": 15,
+                  "nullable": false,
+                  "comment": "Canal de origem: GC | INTERFACE | WHATSAPP | TELEGRAM."
+                },
+                "situacaodecontrato": {
+                  "type": "String",
+                  "length": 10,
+                  "nullable": false,
+                  "comment": "Situação do contrato no momento da criação. Enum {ATIVO, SUSPENSO, CANCELADO} — enforced pelo processador de regra criar."
+                },
+                "registradoporid": {
+                  "type": "String",
+                  "length": 36,
+                  "nullable": true,
+                  "comment": "UUID do usuário registrante. NULL se canal externo sem usuário CRM."
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "endState": "criada",
+            "fromState": [],
+            "roles": [
+              "MASTER",
+              "GERENTECOMERCIAL"
+            ],
+            "coordination": {},
+            "br": {
+              "route": "acme/engenharia/engenharia/criar"
+            }
+          },
+          "recusar": {
+            "event": "recusada",
+            "data": {
+              "attribute": {
+                "parecer": {
+                  "type": "Text",
+                  "nullable": false,
+                  "comment": "Justificativa textual da recusa. Obrigatório."
+                },
+                "motivorecusa": {
+                  "type": "Text",
+                  "nullable": false,
+                  "comment": "Motivo da recusa. Obrigatório (BR processor enforce non-empty)."
+                },
+                "status": {
+                  "type": "String",
+                  "length": 32,
+                  "nullable": false,
+                  "comment": "Estado atual do agregado, não o estado pretendido após exec do comando."
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "endState": "recusada",
+            "fromState": [
+              "criada"
+            ],
+            "roles": [
+              "MASTER",
+              "GERENTECOMERCIAL",
+              "ENGENHEIRO"
+            ],
+            "coordination": {},
+            "br": {
+              "route": "acme/engenharia/engenharia/recusar"
+            }
+          },
+          "deferir": {
+            "event": "deferida",
+            "data": {
+              "attribute": {
+                "parecer": {
+                  "type": "Text",
+                  "nullable": false,
+                  "comment": "Justificativa textual do deferimento. Obrigatório."
+                },
+                "prioridade": {
+                  "type": "String",
+                  "length": 10,
+                  "nullable": true,
+                  "comment": "alta | media | baixa. Opcional."
+                },
+                "esforcoestimado": {
+                  "type": "Integer",
+                  "nullable": true,
+                  "comment": "Estimativa em horas. Opcional."
+                },
+                "prazoestimado": {
+                  "type": "Date",
+                  "nullable": true,
+                  "comment": "Data estimada de entrega. Opcional."
+                },
+                "status": {
+                  "type": "String",
+                  "length": 32,
+                  "nullable": false,
+                  "comment": "Estado atual do agregado, não o estado pretendido após exec do comando."
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "endState": "deferida",
+            "fromState": [
+              "criada"
+            ],
+            "roles": [
+              "MASTER",
+              "ENGENHEIRO"
+            ],
+            "coordination": {},
+            "br": {
+              "route": "acme/engenharia/engenharia/deferir"
+            }
+          },
+          "deferirpelocomercial": {
+            "event": "deferida",
+            "data": {
+              "attribute": {
+                "parecercomercial": {
+                  "type": "Text",
+                  "nullable": false,
+                  "comment": "Parecer/justificativa específica do GC (motivo do override, eg cliente VIP). Obrigatório."
+                },
+                "prioridade": {
+                  "type": "String",
+                  "length": 10,
+                  "nullable": true,
+                  "comment": "alta | media | baixa. Opcional."
+                },
+                "status": {
+                  "type": "String",
+                  "length": 32,
+                  "nullable": false,
+                  "comment": "Estado atual do agregado, não o estado pretendido após exec do comando."
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "endState": "deferida",
+            "fromState": [
+              "recusada"
+            ],
+            "roles": [
+              "GERENTECOMERCIAL"
+            ],
+            "coordination": {},
+            "br": {}
+          },
+          "indeferir": {
+            "event": "indeferida",
+            "data": {
+              "attribute": {
+                "parecer": {
+                  "type": "Text",
+                  "nullable": false,
+                  "comment": "Justificativa textual do indeferimento. Obrigatório."
+                },
+                "motivoindeferimento": {
+                  "type": "Text",
+                  "nullable": false,
+                  "comment": "Motivo do indeferimento. Obrigatório."
+                },
+                "status": {
+                  "type": "String",
+                  "length": 32,
+                  "nullable": false,
+                  "comment": "Estado atual do agregado, não o estado pretendido após exec do comando."
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "endState": "indeferida",
+            "fromState": [
+              "criada"
+            ],
+            "roles": [
+              "MASTER",
+              "GERENTECOMERCIAL",
+              "ENGENHEIRO"
+            ],
+            "coordination": {},
+            "br": {
+              "route": "acme/engenharia/engenharia/indeferir"
+            }
+          },
+          "ghissuing": {
+            "event": "issuing",
+            "data": {
+              "attribute": {
+                "issuenumber": {
+                  "type": "Integer",
+                  "nullable": false,
+                  "comment": "Número da issue do sistema externo em criação — hash temporário recebido pelo processador de integracao na chamada síncrona chamada ao sistema externo de issues."
+                },
+                "status": {
+                  "type": "String",
+                  "length": 32,
+                  "nullable": false,
+                  "comment": "Estado atual do agregado, não o estado pretendido após exec do comando."
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "endState": "issuing",
+            "fromState": [
+              "deferida"
+            ],
+            "roles": [
+              "MASTER"
+            ],
+            "coordination": {},
+            "br": {
+              "route": "acme/engenharia/engenharia/ghissuing"
+            }
+          },
+          "ghconfirmissue": {
+            "event": "issued",
+            "data": {
+              "attribute": {
+                "issuenumber": {
+                  "type": "Integer",
+                  "nullable": false,
+                  "comment": "Número final confirmado da issue do sistema externo recebido via callback assíncrono (endpoint dedicado da plataforma)."
+                },
+                "issuedem": {
+                  "type": "Timestamp",
+                  "nullable": false,
+                  "comment": "whenAttribute do event issued — auto-injetado pelo engine."
+                },
+                "status": {
+                  "type": "String",
+                  "length": 32,
+                  "nullable": false,
+                  "comment": "Estado atual do agregado, não o estado pretendido após exec do comando."
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "endState": "issued",
+            "fromState": [
+              "issuing"
+            ],
+            "roles": [
+              "MASTER"
+            ],
+            "coordination": {},
+            "br": {
+              "route": "acme/engenharia/engenharia/ghconfirmissue"
+            }
+          }
+        },
+        "event": {
+          "criada": {
+            "type": "criada",
+            "whenAttribute": "criadaem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "triggerProjection": [],
+              "orderingMode": "per-aggregate"
+            }
+          },
+          "recusada": {
+            "type": "recusada",
+            "whenAttribute": "recusadaem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "triggerProjection": [
+                {
+                  "name": "demandadecisao",
+                  "targetTenantId": "00000000-0000-4000-8000-000000000005",
+                  "targetSchema": "engenharia",
+                  "br": {
+                    "route": "acme/engenharia/engenharia/projection/demandadecisao_from_demanda"
+                  }
+                }
+              ],
+              "orderingMode": "per-aggregate"
+            }
+          },
+          "deferida": {
+            "type": "deferida",
+            "whenAttribute": "deferidaem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "triggerProjection": [],
+              "orderingMode": "per-aggregate"
+            }
+          },
+          "indeferida": {
+            "type": "indeferida",
+            "whenAttribute": "indeferidaem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "triggerProjection": [],
+              "orderingMode": "per-aggregate"
+            }
+          },
+          "issuing": {
+            "type": "issuing",
+            "whenAttribute": "issuingem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "triggerProjection": [],
+              "orderingMode": "per-aggregate"
+            }
+          },
+          "issued": {
+            "type": "issued",
+            "whenAttribute": "issuedem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "triggerProjection": [],
+              "orderingMode": "per-aggregate"
+            }
+          }
+        }
+      },
+      "engenharia.projeto": {
+        "org": {
+          "name": "acme"
+        },
+        "project": {
+          "name": "engenharia"
+        },
+        "schema": {
+          "forWriteModel.name": "wdb.client",
+          "forReadModel.name": "engenharia"
+        },
+        "boundedContext": {
+          "name": "engenharia",
+          "comment": "Projetos técnicos derivados de contas financeiras pós-fechamento de oportunidade comercial."
+        },
+        "tenantId": {
+          "forWriteModel": "00000000-0000-4000-8000-000000000005",
+          "forReadModel": "00000000-0000-4000-8000-000000000005"
+        },
+        "type": "projeto",
+        "identity": {
+          "strategy": "uuid",
+          "fields": []
+        },
+        "concurrency": {
+          "version": "version",
+          "strategy": "optimistic"
+        },
+        "command": {
+          "criar": {
+            "data": {
+              "attribute": {
+                "contafinanceiroaggregateid": {
+                  "type": "String",
+                  "length": 36,
+                  "nullable": false,
+                  "comment": "FK soft para financeiro.conta (cross-BC). Sem enforcement; vínculo lógico."
+                },
+                "razaosocial": {
+                  "type": "String",
+                  "length": 300,
+                  "nullable": false,
+                  "comment": "Replicado de crm.conta / financeiro.conta."
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "endState": "criado",
+            "fromState": [],
+            "roles": [
+              "MASTER",
+              "ENGENHEIRO"
+            ],
+            "coordination": {},
+            "br": {
+              "route": "acme/engenharia/engenharia/projeto/criar"
+            }
+          }
+        },
+        "event": {
+          "criado": {
+            "type": "criado",
+            "whenAttribute": "criadoem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "triggerProjection": [],
+              "triggerCoordination": [],
+              "orderingMode": "per-aggregate"
+            }
+          }
+        }
+      }
+    }
+  },
+  "_comment": ""
+}

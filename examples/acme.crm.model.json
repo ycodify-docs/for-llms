@@ -1,0 +1,663 @@
+{
+  "acme.crm": {
+    "aggregate": {
+      "crm.conta": {
+        "org": {
+          "name": "acme"
+        },
+        "project": {
+          "name": "crm"
+        },
+        "schema": {
+          "forWriteModel.name": "wdb.client",
+          "forReadModel.name": "crm"
+        },
+        "boundedContext": {
+          "name": "crm",
+          "comment": "Representacao de empresa cliente no CRM da plataforma"
+        },
+        "tenantId": {
+          "forWriteModel": "00000000-0000-4000-8000-000000000003",
+          "forReadModel": "00000000-0000-4000-8000-000000000003"
+        },
+        "type": "conta",
+        "identity": {
+          "strategy": "uuid",
+          "fields": []
+        },
+        "concurrency": {
+          "version": "version",
+          "strategy": "optimistic"
+        },
+        "command": {
+          "criar": {
+            "data": {
+              "attribute": {
+                "razaosocial": {
+                  "type": "String",
+                  "length": 300,
+                  "nullable": false,
+                  "comment": "Razao social ou nome da empresa. Nao pode ser nulo ou vazio."
+                },
+                "cnpj": {
+                  "type": "String",
+                  "length": 20,
+                  "nullable": true,
+                  "comment": "CNPJ opcional"
+                },
+                "segmento": {
+                  "type": "String",
+                  "length": 100,
+                  "nullable": true
+                },
+                "website": {
+                  "type": "String",
+                  "length": 300,
+                  "nullable": true
+                },
+                "vendedorresponsavelid": {
+                  "type": "String",
+                  "length": 36,
+                  "nullable": false,
+                  "comment": "UUID do Vendedor responsavel"
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "endState": "criada",
+            "fromState": [],
+            "roles": [
+              "MASTER",
+              "GERENTECOMERCIAL",
+              "VENDEDOR"
+            ],
+            "coordination": {},
+            "br": {
+              "route": "acme/crm/crm/conta/criar"
+            }
+          },
+          "editar": {
+            "data": {
+              "attribute": {
+                "razaosocial": {
+                  "type": "String",
+                  "length": 300,
+                  "nullable": true
+                },
+                "cnpj": {
+                  "type": "String",
+                  "length": 20,
+                  "nullable": true
+                },
+                "segmento": {
+                  "type": "String",
+                  "length": 100,
+                  "nullable": true
+                },
+                "website": {
+                  "type": "String",
+                  "length": 300,
+                  "nullable": true
+                },
+                "status": {
+                  "type": "String",
+                  "length": 32,
+                  "nullable": false,
+                  "comment": "Estado atual do agregado, não o estado pretendido após exec do comando."
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "endState": "editada",
+            "fromState": [
+              "criada",
+              "editada"
+            ],
+            "roles": [
+              "MASTER",
+              "GERENTECOMERCIAL",
+              "VENDEDOR"
+            ],
+            "coordination": {},
+            "br": {
+              "route": "acme/crm/crm/conta/editar"
+            }
+          },
+          "adicionarcontato": {
+            "data": {
+              "attribute": {
+                "status": {
+                  "type": "String",
+                  "length": 32,
+                  "nullable": false,
+                  "comment": "Estado atual do agregado, não o estado pretendido após exec do comando."
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {
+                  "contatos": {
+                    "nome": {
+                      "type": "String",
+                      "length": 200,
+                      "nullable": false,
+                      "comment": "Nome do contato"
+                    },
+                    "email": {
+                      "type": "String",
+                      "length": 200,
+                      "nullable": true
+                    },
+                    "telefone": {
+                      "type": "String",
+                      "length": 40,
+                      "nullable": true
+                    },
+                    "principal": {
+                      "type": "Boolean",
+                      "nullable": false,
+                      "comment": "Exatamente 1 contato deve ter principal=true (invariante BC-01)"
+                    }
+                  }
+                }
+              }
+            },
+            "endState": "contatoadicionado",
+            "fromState": [
+              "criada",
+              "editada",
+              "contatoadicionado"
+            ],
+            "roles": [
+              "MASTER",
+              "GERENTECOMERCIAL",
+              "VENDEDOR"
+            ],
+            "coordination": {},
+            "br": {
+              "route": "acme/crm/crm/conta/adicionarcontato"
+            }
+          },
+          "agendarprimeiromeet": {
+            "br": {
+              "route": "acme/crm/crm/conta/agendarprimeiromeet"
+            },
+            "fromState": [
+              "criada",
+              "editada",
+              "contatoadicionado"
+            ],
+            "data": {
+              "attribute": {
+                "dataagendada": {
+                  "type": "Timestamp",
+                  "nullable": false,
+                  "comment": "Data/hora agendada para o primeiro meet de onboarding."
+                },
+                "observacao": {
+                  "type": "Text",
+                  "nullable": true,
+                  "comment": "Observacoes do agendamento."
+                },
+                "meetagendadoem": {
+                  "type": "Timestamp",
+                  "nullable": true,
+                  "comment": "whenAttribute do event meetagendado — auto-injetado pelo engine."
+                },
+                "status": {
+                  "type": "String",
+                  "length": 32,
+                  "nullable": false,
+                  "comment": "Estado atual do agregado, não o estado pretendido após exec do comando."
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "endState": "meetagendado",
+            "roles": [
+              "MASTER",
+              "GERENTECOMERCIAL",
+              "VENDEDOR"
+            ],
+            "coordination": {}
+          }
+        },
+        "event": {
+          "criada": {
+            "type": "criada",
+            "whenAttribute": "criadaem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "triggerProjection": [],
+              "triggerCoordination": [],
+              "comment": {
+                "_": "restaurar triggerCoordination em caso o coreografia",
+                "triggerCoordination": [
+                  {
+                    "name": "conta_from_comercial_criada",
+                    "targetTenantId": "00000000-0000-4000-8000-000000000002",
+                    "br": {
+                      "route": "acme/crm/crm/conta/coordination/conta_from_comercial_criada"
+                    }
+                  }
+                ]
+              },
+              "orderingMode": "per-aggregate"
+            }
+          },
+          "editada": {
+            "type": "editada",
+            "whenAttribute": "editadaem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "triggerProjection": [],
+              "orderingMode": "per-aggregate"
+            }
+          },
+          "contatoadicionado": {
+            "type": "contatoadicionado",
+            "whenAttribute": "contatoadicionadoem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "triggerProjection": [],
+              "orderingMode": "per-aggregate"
+            }
+          },
+          "meetagendado": {
+            "type": "meetagendado",
+            "whenAttribute": "meetagendadoem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "triggerProjection": [],
+              "orderingMode": "per-aggregate"
+            }
+          }
+        }
+      },
+      "crm.oportunidade": {
+        "org": {
+          "name": "acme"
+        },
+        "project": {
+          "name": "crm"
+        },
+        "schema": {
+          "forWriteModel.name": "wdb.client",
+          "forReadModel.name": "crm"
+        },
+        "boundedContext": {
+          "name": "crm",
+          "comment": "Pipeline de vendas e ciclo de vida de oportunidades comerciais da plataforma"
+        },
+        "tenantId": {
+          "forWriteModel": "00000000-0000-4000-8000-000000000003",
+          "forReadModel": "00000000-0000-4000-8000-000000000003"
+        },
+        "type": "oportunidade",
+        "identity": {
+          "strategy": "uuid",
+          "fields": []
+        },
+        "concurrency": {
+          "version": "version",
+          "strategy": "optimistic"
+        },
+        "command": {
+          "criar": {
+            "br": {
+              "route": "acme/crm/crm/oportunidade/criar"
+            },
+            "fromState": [],
+            "data": {
+              "attribute": {
+                "titulo": {
+                  "type": "String",
+                  "length": 300,
+                  "nullable": false,
+                  "comment": "Descricao curta da oportunidade."
+                },
+                "vendedorresponsavelid": {
+                  "type": "String",
+                  "length": 36,
+                  "nullable": false,
+                  "comment": "UUID do Vendedor responsavel."
+                },
+                "valorestimado": {
+                  "type": "Long",
+                  "nullable": false,
+                  "comment": "Valor estimado (Long centavos). Obrigatorio > 0 (invariante PRD)."
+                },
+                "criadaem": {
+                  "type": "Timestamp",
+                  "nullable": true,
+                  "comment": "whenAttribute do event criada (auto-injetado pelo engine)."
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "endState": "criada",
+            "roles": [
+              "MASTER",
+              "GERENTECOMERCIAL",
+              "VENDEDOR"
+            ],
+            "coordination": {}
+          },
+          "reatribuir": {
+            "br": {
+              "route": "acme/crm/crm/oportunidade/reatribuir"
+            },
+            "fromState": [
+              "criada",
+              "reatribuida",
+              "estagioavancado"
+            ],
+            "data": {
+              "attribute": {
+                "vendedornovoid": {
+                  "type": "String",
+                  "length": 36,
+                  "nullable": false,
+                  "comment": "UUID do Vendedor substituto."
+                },
+                "motivonovadistribuicao": {
+                  "type": "Text",
+                  "nullable": false,
+                  "comment": "Motivo da reatribuicao."
+                },
+                "reatribuidaem": {
+                  "type": "Timestamp",
+                  "nullable": true,
+                  "comment": "whenAttribute do event reatribuida — auto-injetado pelo engine."
+                },
+                "status": {
+                  "type": "String",
+                  "length": 32,
+                  "nullable": false,
+                  "comment": "Estado atual do agregado, não o estado pretendido após exec do comando."
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "endState": "reatribuida",
+            "roles": [
+              "MASTER",
+              "GERENTECOMERCIAL"
+            ],
+            "coordination": {}
+          },
+          "avancarestagio": {
+            "br": {
+              "route": "acme/crm/crm/oportunidade/avancarestagio"
+            },
+            "fromState": [
+              "criada",
+              "reatribuida",
+              "estagioavancado"
+            ],
+            "data": {
+              "attribute": {
+                "novoestagio": {
+                  "type": "String",
+                  "length": 30,
+                  "nullable": false,
+                  "comment": "PropostaEnviada | Negociacao | Fechamento."
+                },
+                "estagioavancadoem": {
+                  "type": "Timestamp",
+                  "nullable": true,
+                  "comment": "whenAttribute do event estagioavancado — auto-injetado pelo engine."
+                },
+                "status": {
+                  "type": "String",
+                  "length": 32,
+                  "nullable": false,
+                  "comment": "Estado atual do agregado, não o estado pretendido após exec do comando."
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "endState": "estagioavancado",
+            "roles": [
+              "MASTER",
+              "GERENTECOMERCIAL",
+              "VENDEDOR"
+            ],
+            "coordination": {}
+          },
+          "encerrar": {
+            "br": {
+              "route": "acme/crm/crm/oportunidade/encerrar"
+            },
+            "fromState": [
+              "criada",
+              "reatribuida",
+              "estagioavancado"
+            ],
+            "data": {
+              "attribute": {
+                "motivoencerramento": {
+                  "type": "Text",
+                  "nullable": false,
+                  "comment": "Motivo do encerramento do esforco comercial."
+                },
+                "status": {
+                  "type": "String",
+                  "length": 32,
+                  "nullable": false,
+                  "comment": "Estado atual do agregado, não o estado pretendido após exec do comando."
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "endState": "encerrado",
+            "roles": [
+              "MASTER",
+              "GERENTECOMERCIAL",
+              "VENDEDOR"
+            ],
+            "coordination": {}
+          },
+          "concluir": {
+            "br": {
+              "route": "acme/crm/crm/oportunidade/concluir"
+            },
+            "fromState": [
+              "encerrado"
+            ],
+            "data": {
+              "attribute": {
+                "valorfinalfechado": {
+                  "type": "Long",
+                  "nullable": true,
+                  "comment": "Valor final fechado (Long centavos). Opcional."
+                },
+                "status": {
+                  "type": "String",
+                  "length": 32,
+                  "nullable": false,
+                  "comment": "Estado atual do agregado, não o estado pretendido após exec do comando."
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "endState": "fechada",
+            "roles": [
+              "MASTER",
+              "GERENTECOMERCIAL",
+              "VENDEDOR"
+            ],
+            "coordination": {}
+          }
+        },
+        "event": {
+          "criada": {
+            "type": "criada",
+            "whenAttribute": "criadaem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "triggerProjection": [],
+              "orderingMode": "per-aggregate"
+            }
+          },
+          "reatribuida": {
+            "type": "reatribuida",
+            "whenAttribute": "reatribuidaem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "triggerProjection": [],
+              "orderingMode": "per-aggregate"
+            }
+          },
+          "estagioavancado": {
+            "type": "estagioavancado",
+            "whenAttribute": "estagioavancadoem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "triggerProjection": [],
+              "orderingMode": "per-aggregate"
+            }
+          },
+          "encerrado": {
+            "type": "encerrado",
+            "whenAttribute": "encerradoem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "triggerProjection": [],
+              "orderingMode": "per-aggregate"
+            }
+          },
+          "fechada": {
+            "type": "fechada",
+            "whenAttribute": "fechadaem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "triggerProjection": [],
+              "triggerCoordination": [
+                {
+                  "name": "conta_from_oportunidade_fechada",
+                  "targetTenantId": "00000000-0000-4000-8000-000000000003",
+                  "br": {
+                    "route": "acme/crm/crm/oportunidade/coordination/conta_from_fechada"
+                  }
+                }
+              ],
+              "comment": {},
+              "orderingMode": "per-aggregate"
+            }
+          }
+        }
+      },
+      "crm.decisao": {
+        "org": {
+          "name": "acme"
+        },
+        "project": {
+          "name": "crm"
+        },
+        "schema": {
+          "forWriteModel.name": "wdb.client",
+          "forReadModel.name": "crm"
+        },
+        "boundedContext": {
+          "name": "crm",
+          "comment": "Decisões off-system do GC sobre demandas. Write-once (sem ciclo de vida)."
+        },
+        "tenantId": {
+          "forWriteModel": "00000000-0000-4000-8000-000000000003",
+          "forReadModel": "00000000-0000-4000-8000-000000000003"
+        },
+        "type": "decisao",
+        "identity": {
+          "strategy": "uuid",
+          "fields": []
+        },
+        "concurrency": {
+          "version": "version",
+          "strategy": "optimistic"
+        },
+        "command": {
+          "decidir": {
+            "data": {
+              "attribute": {
+                "demandaid": {
+                  "type": "String",
+                  "length": 36,
+                  "nullable": false,
+                  "comment": "FK soft para engenharia.demanda. Sem enforcement cross-BC; vínculo lógico."
+                },
+                "decisao": {
+                  "type": "String",
+                  "length": 30,
+                  "nullable": false,
+                  "comment": "Enum: deferir | confirmar-recusa"
+                },
+                "parecercomercial": {
+                  "type": "Text",
+                  "nullable": false,
+                  "comment": "Justificativa textual da decisão comercial. Obrigatório."
+                },
+                "status": {
+                  "type": "String",
+                  "length": 32,
+                  "nullable": false,
+                  "comment": "Estado atual do agregado, não o estado pretendido após exec do comando."
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "endState": "decidida",
+            "fromState": [],
+            "roles": [
+              "GERENTECOMERCIAL",
+              "MASTER"
+            ],
+            "coordination": {},
+            "br": {
+              "route": "acme/crm/crm/decisao/decidir"
+            }
+          }
+        },
+        "event": {
+          "decidida": {
+            "whenAttribute": "decididaem",
+            "type": "decidida",
+            "payloadInherit": "event-data",
+            "domainBus": {
+              "triggerProjection": [],
+              "orderingMode": "per-aggregate"
+            }
+          }
+        }
+      }
+    }
+  },
+  "_comment": "Domain Model — produto/BC comercial — DERIVADO de ANEXO_B v1.0 (autoritativo). 5 aggregate roots: Lead, Negocio, Proposta, Contrato, Cliente. 3 entities (Onboard, Handoff, Atividade) modeladas como valueObject.multiple sob seus agregados pais. Schema: references/model.schema.json. Tipos suportados: String/Text/Integer/Long/Boolean/Date/Timestamp/Json (NUNCA Decimal — valores monetários em centavos como Long). tenantId/triggerCoordination com placeholder [A DEFINIR] resolvido em Dostoiévski PV. Gerado por guimaraes [CA:DM] re-exec após Poe RED 2026-06-22."
+}

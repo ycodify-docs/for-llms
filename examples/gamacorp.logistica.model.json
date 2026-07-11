@@ -1,0 +1,336 @@
+{
+  "gamacorp.armazem": {
+    "aggregate": {
+      "armazem.pedido": {
+        "org": {
+          "name": "gamacorp"
+        },
+        "project": {
+          "name": "logistica"
+        },
+        "schema": {
+          "forWriteModel.name": "wdb.client",
+          "forReadModel.name": "armazem"
+        },
+        "boundedContext": {
+          "name": "armazem"
+        },
+        "tenantId": {
+          "forWriteModel": "00000000-0000-4000-8000-000000000001",
+          "forReadModel": "00000000-0000-4000-8000-000000000001"
+        },
+        "type": "pedido",
+        "identity": {
+          "strategy": "uuid",
+          "fields": []
+        },
+        "concurrency": {
+          "version": "version",
+          "strategy": "optimistic"
+        },
+        "command": {
+          "solicitar": {
+            "event": "solicitado",
+            "data": {
+              "attribute": {
+                "pedidointerno": {
+                  "type": "String",
+                  "length": 64,
+                  "nullable": false
+                },
+                "pedidosistema": {
+                  "type": "String",
+                  "length": 64,
+                  "nullable": false
+                },
+                "codigopagamento": {
+                  "type": "String",
+                  "length": 128,
+                  "nullable": false
+                },
+                "previsaodeentrega": {
+                  "type": "Date",
+                  "nullable": true
+                },
+                "erpdatapedido": {
+                  "type": "Date",
+                  "nullable": true
+                },
+                "grades": {
+                  "type": "Json",
+                  "nullable": true
+                },
+                "rateios": {
+                  "type": "Json",
+                  "nullable": false
+                },
+                "fornecedors": {
+                  "type": "Json",
+                  "nullable": true
+                },
+                "produtos": {
+                  "type": "Json",
+                  "nullable": false
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "endState": "solicitado",
+            "roles": [
+              "ADMINISTRADOR",
+              "GERENTE"
+            ],
+            "fromState": [],
+            "coordination": {},
+            "br": {
+              "route": "gamacorp/armazem/armazem/pedido/solicitar"
+            }
+          },
+          "ajustar": {
+            "event": "ajustado",
+            "data": {
+              "attribute": {
+                "pedidointerno": {
+                  "type": "String",
+                  "length": 64,
+                  "nullable": false
+                },
+                "pedidosistema": {
+                  "type": "String",
+                  "length": 64,
+                  "nullable": false
+                },
+                "codigopagamento": {
+                  "type": "String",
+                  "length": 128,
+                  "nullable": false
+                },
+                "previsaodeentrega": {
+                  "type": "Date",
+                  "nullable": true
+                },
+                "grades": {
+                  "type": "Json",
+                  "nullable": false
+                },
+                "rateios": {
+                  "type": "Json",
+                  "nullable": false
+                },
+                "fornecedors": {
+                  "type": "Json",
+                  "nullable": true
+                },
+                "produtos": {
+                  "type": "Json",
+                  "nullable": false
+                },
+                "status": {
+                  "type": "String",
+                  "length": 32,
+                  "nullable": false,
+                  "comment": "Estado atual do agregado"
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "endState": "ajustado",
+            "roles": [
+              "ADMINISTRADOR",
+              "GERENTE"
+            ],
+            "fromState": [
+              "solicitado",
+              "ajustado"
+            ],
+            "coordination": {},
+            "br": {
+              "route": "gamacorp/armazem/armazem/pedido/ajustar"
+            }
+          },
+          "entregarcomajuste": {
+            "event": "entreguecomajuste",
+            "data": {
+              "attribute": {
+                "pedidointerno": {
+                  "type": "String",
+                  "length": 64,
+                  "nullable": false
+                },
+                "pedidosistema": {
+                  "type": "String",
+                  "length": 64,
+                  "nullable": false
+                },
+                "codigopagamento": {
+                  "type": "String",
+                  "length": 128,
+                  "nullable": false
+                },
+                "previsaodeentrega": {
+                  "type": "Date",
+                  "nullable": true
+                },
+                "grades": {
+                  "type": "Json",
+                  "nullable": false
+                },
+                "rateios": {
+                  "type": "Json",
+                  "nullable": false
+                },
+                "fornecedors": {
+                  "type": "Json",
+                  "nullable": true
+                },
+                "produtos": {
+                  "type": "Json",
+                  "nullable": false
+                },
+                "status": {
+                  "type": "String",
+                  "length": 32,
+                  "nullable": false,
+                  "comment": "Estado atual do agregado"
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "endState": "entreguecomajuste",
+            "roles": [
+              "ADMINISTRADOR",
+              "GERENTE",
+              "VALIDADOR"
+            ],
+            "fromState": [
+              "solicitado",
+              "ajustado"
+            ],
+            "coordination": {},
+            "br": {
+              "route": "gamacorp/armazem/armazem/pedido/entregarcomajuste"
+            }
+          },
+          "entregar": {
+            "event": "entregue",
+            "data": {
+              "attribute": {
+                "status": {
+                  "type": "String",
+                  "length": 32,
+                  "nullable": false,
+                  "comment": "Estado atual do agregado"
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "endState": "entregue",
+            "roles": [
+              "ADMINISTRADOR",
+              "GERENTE",
+              "VALIDADOR"
+            ],
+            "fromState": [
+              "solicitado",
+              "ajustado"
+            ],
+            "coordination": {},
+            "br": {
+              "route": "gamacorp/armazem/armazem/pedido/entregar"
+            }
+          },
+          "cancelar": {
+            "event": "cancelado",
+            "data": {
+              "attribute": {
+                "status": {
+                  "type": "String",
+                  "length": 32,
+                  "nullable": false,
+                  "comment": "Estado atual do agregado"
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "endState": "cancelado",
+            "roles": [
+              "ADMINISTRADOR",
+              "GERENTE"
+            ],
+            "fromState": [
+              "solicitado",
+              "ajustado"
+            ],
+            "coordination": {},
+            "br": {
+              "route": "gamacorp/armazem/armazem/pedido/cancelar"
+            }
+          }
+        },
+        "event": {
+          "solicitado": {
+            "type": "solicitado",
+            "whenAttribute": "solicitadoem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "triggerProjection": [],
+              "orderingMode": "per-aggregate"
+            }
+          },
+          "ajustado": {
+            "type": "ajustado",
+            "whenAttribute": "ajustadoem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "triggerProjection": [],
+              "orderingMode": "per-aggregate"
+            }
+          },
+          "entreguecomajuste": {
+            "type": "entreguecomajuste",
+            "whenAttribute": "entreguecomajusteem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "triggerProjection": [],
+              "orderingMode": "per-aggregate"
+            }
+          },
+          "entregue": {
+            "type": "entregue",
+            "whenAttribute": "entregueem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "triggerProjection": [],
+              "orderingMode": "per-aggregate"
+            }
+          },
+          "cancelado": {
+            "type": "cancelado",
+            "whenAttribute": "canceladoem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "triggerProjection": [],
+              "orderingMode": "per-aggregate"
+            }
+          }
+        }
+      }
+    }
+  },
+  "_comment": ""
+}

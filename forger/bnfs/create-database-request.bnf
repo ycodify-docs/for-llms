@@ -1,0 +1,139 @@
+/**
+ * BNF Grammar for createDatabase Request Body
+ * Endpoint: POST /org/{org}/dbconn/{dbconnId}/database
+ *
+ * This grammar defines the JSON structure required to create a physical database.
+ *
+ * IMPORTANT: This endpoint creates BOTH:
+ * 1. Metadata record in yc_db.resource.database
+ * 2. Physical SQL database and role on the server
+ *
+ * Database naming convention (automatic normalization):
+ * - Input: "erp"
+ * - Output: "acme_erp" (orgName_dbsqlname)
+ * - Username: "admin_acme_erp" (admin_orgName_dbsqlname)
+ * - Password: Uses DbConn password or generates new one
+ */
+
+<database-request> ::= "{" <required-fields> [ "," <optional-fields> ] "}"
+
+<required-fields> ::= <dbsqlname>
+
+<optional-fields> ::= <dbsqlversion>
+
+/* Required Fields */
+
+<dbsqlname> ::= "\"dbsqlname\"" ":" <quoted-database-name>
+
+/* Optional Fields */
+
+<dbsqlversion> ::= "\"dbsqlversion\"" ":" <quoted-string>
+
+/* Primitives */
+
+<quoted-database-name> ::= "\"" <database-name> "\""
+
+<database-name> ::= <lowercase-letter> { <lowercase-letter> }
+
+<lowercase-letter> ::= "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m"
+                     | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z"
+
+<quoted-string> ::= "\"" { <string-char> } "\""
+
+<string-char> ::= <lowercase-letter>
+
+/* ============================================================================
+ * CONSTRAINTS (enforced by endpoint validation)
+ *
+ * 1. dbsqlname: REQUIRED, must be non-empty ONLY lowercase letters (a-z)
+ *    - Pattern: ^[a-z]+$
+ *    - minLength: 1
+ *    - NO numbers, NO underscores, NO hyphens, NO special characters, NO uppercase
+ *    - Validation: if (!dbsqlnameInput.matches("^[a-z]+$"))
+ *    - Will be normalized to: orgName_dbsqlname
+ *    - Examples: "erp" → "acme_erp", "crm" → "acme_crm"
+ *
+ * 2. dbsqlversion: OPTIONAL, defaults to empty string
+ *    - minLength: 0
+ *    - Examples: "16", "15.4", "14", ""
+ *    - Default: json.optString("dbsqlversion", "")
+ *    - For documentation purposes only
+ *
+ * ============================================================================
+ * AUTOMATIC PROCESSING (done by endpoint)
+ *
+ * The endpoint automatically:
+ *
+ * 1. Fetches DbConn data (server address, port, admin credentials)
+ * 2. Normalizes database name: orgName_dbsqlname
+ * 3. Generates database username: admin_orgName_dbsqlname
+ * 4. Uses DbConn password or generates new 16-char password
+ * 5. Checks if database/role already exist in SQL
+ * 6. Creates metadata record in yc_db.resource.database with ALL required fields
+ * 7. Executes physical creation in SQL
+ * 8. Rolls back metadata if physical creation fails
+ *
+ * ============================================================================
+ * POST BODY EXAMPLES
+ *
+ * Example 1: Minimal valid request (required field only)
+ * {
+ *   "dbsqlname": "erp"
+ * }
+ * Result: Creates database "acme_erp" with user "admin_acme_erp"
+ *
+ * Example 2: With SQL version
+ * {
+ *   "dbsqlname": "crm",
+ *   "dbsqlversion": "16"
+ * }
+ * Result: Creates database "acme_crm" with SQL 16 metadata
+ *
+ * ============================================================================
+ * CURL EXAMPLE
+ *
+ * curl -X POST "https://api.example.com/org/acme/dbconn/1/database" \
+ *   -H "Authorization: Bearer <token>" \
+ *   -H "Content-Type: application/json" \
+ *   -H "Accept: application/json" \
+ *   -d '{
+ *     "dbsqlname": "erp",
+ *     "dbsqlversion": "16"
+ *   }'
+ *
+ * Expected response http status code 201 (Created)
+ *
+ * ============================================================================
+ * AI USAGE INSTRUCTIONS
+ * ============================================================================
+ *
+ * When constructing a request:
+ * 1. ALWAYS include: dbsqlname (REQUIRED)
+ * 2. OPTIONALLY include: dbsqlversion
+ * 3. Use ONLY lowercase letters (a-z) in dbsqlname
+ *    - NO numbers, NO underscores, NO hyphens, NO special characters, NO uppercase
+ * 4. Choose descriptive single-word names that reflect the database purpose
+ * 5. Remember: the actual database will be prefixed with orgName_
+ * 6. Do NOT include username/password (generated automatically)
+ * 7. Ensure the DbConn referenced in URL exists and is valid
+ * 8. No additional fields are accepted (additionalProperties: false)
+ *
+ * Common errors to avoid:
+ * - Uppercase letters in dbsqlname (use lowercase only)
+ * - Numbers in dbsqlname (only letters allowed)
+ * - Underscores in dbsqlname (not allowed)
+ * - Hyphens in dbsqlname (not allowed)
+ * - Spaces in dbsqlname (not allowed)
+ * - Empty or missing dbsqlname
+ * - Invalid characters (ONLY a-z allowed, nothing else)
+ * - Trying to create same database twice (check existence first)
+ * - Including extra fields not defined in schema
+ *
+ * Best practices:
+ * - Use meaningful single-word names: "erp", "crm", "vendas", "financeiro"
+ * - Avoid multi-word names (no underscores allowed)
+ * - Use Portuguese or English words without accents or special characters
+ * - Keep names concise but descriptive (single word)
+ * - Specify dbsqlversion if you need to document the SQL version
+ *
+ */

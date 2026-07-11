@@ -1,0 +1,142 @@
+/**
+ * BNF Grammar for createDbConn Request Body
+ * Endpoint: POST /org/{org}/dbconn
+ *
+ * This grammar defines the JSON structure required to create a database connection (DbConn).
+ *
+ * Usage by AI:
+ * Use this grammar to construct valid JSON payloads for creating DbConn resources.
+ */
+
+<dbconn-request> ::= "{" <required-fields> "}"
+
+<required-fields> ::= <dbsqlserveraddress> "," <dbsqlserverport> "," <dbsqlusername> "," <dbsqluserpassword>
+
+/* Required Fields */
+
+<dbsqlserveraddress> ::= "\"dbsqlserveraddress\"" ":" <quoted-hostname>
+
+<dbsqlserverport> ::= "\"dbsqlserverport\"" ":" <positive-integer>
+
+<dbsqlusername> ::= "\"dbsqlusername\"" ":" <quoted-nonempty-string>
+
+<dbsqluserpassword> ::= "\"dbsqluserpassword\"" ":" <quoted-string>
+
+/* Primitives */
+
+<quoted-hostname> ::= "\"" <hostname> "\""
+
+<hostname> ::= <domain-name> | <ip-address>
+
+<domain-name> ::= <label> { "." <label> }
+
+<label> ::= <alphanumeric> { <alphanumeric> | "-" }
+
+<ip-address> ::= <octet> "." <octet> "." <octet> "." <octet>
+
+<octet> ::= <digit> | <digit> <digit> | "1" <digit> <digit> | "2" <digit> <digit>
+
+<positive-integer> ::= <nonzero-digit> { <digit> }
+
+<nonzero-digit> ::= "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+
+<digit> ::= "0" | <nonzero-digit>
+
+<quoted-nonempty-string> ::= "\"" <nonempty-string> "\""
+
+<nonempty-string> ::= <string-char> { <string-char> }
+
+<quoted-string> ::= "\"" { <string-char> } "\""
+
+<string-char> ::= <alphanumeric> | <special-char> | <escaped-char>
+
+<alphanumeric> ::= <letter> | <digit>
+
+<letter> ::= "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m"
+           | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z"
+           | "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M"
+           | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
+
+<special-char> ::= " " | "_" | "-" | "@" | "." | "!" | "#" | "$" | "%" | "&" | "*" | "+" | "="
+
+<escaped-char> ::= "\\" "\"" | "\\" "\\" | "\\" "/" | "\\" "b" | "\\" "f" | "\\" "n" | "\\" "r" | "\\" "t"
+
+/* ============================================================================
+ * CONSTRAINTS (enforced by endpoint validation)
+ *
+ * 1. dbsqlserveraddress: REQUIRED, must be non-empty string
+ *    - Pattern: ^(?!\\s*$).+
+ *    - Examples: "db.example.internal", "db.example.internal", "db.example.internal"
+ *
+ * 2. dbsqlserverport: REQUIRED, must be integer between 1 and 65535
+ *    - Default: <porta> (if not provided)
+ *
+ * 3. dbsqlusername: REQUIRED, must be non-empty string
+ *    - Pattern: ^(?!\\s*$).+
+ *    - Examples: "admin_example", "admin_example"
+ *
+ * 4. dbsqluserpassword: REQUIRED, can be empty string
+ *    - minLength: 12
+ *    - Examples: "MySecureP@ssw0rd!", "ComplexPass123", ""
+ *
+ * ============================================================================
+ * POST BODY EXAMPLES
+ *
+ * Example 1: Valid request with strong password
+ * {
+ *   "dbsqlserveraddress": "db.example.internal",
+ *   "dbsqlserverport": <porta>,
+ *   "dbsqlusername": "admin_example",
+ *   "dbsqluserpassword": "MySecureP@ssw0rd!"
+ * }
+ *
+ * Example 2: Local SQL server
+ * {
+ *   "dbsqlserveraddress": "db.example.internal",
+ *   "dbsqlserverport": 5433,
+ *   "dbsqlusername": "admin_example",
+ *   "dbsqluserpassword": "SecretPass123!"
+ * }
+ *
+ *
+ * ============================================================================
+ * CURL EXAMPLE
+ *
+ * curl -X POST "https://api.example.com/org/acme/dbconn" \
+ *   -H "Authorization: Bearer <token>" \
+ *   -H "Content-Type: application/json" \
+ *   -H "Accept: application/json" \
+ *   -d '{
+ *     "dbsqlserveraddress": "db.example.internal",
+ *     "dbsqlserverport": <porta>,
+ *     "dbsqlusername": "admin_example",
+ *     "dbsqluserpassword": "MySecurePassword"
+ *   }'
+ * 
+ * Expected response http status code 201 (Created)
+ *
+ * ============================================================================
+ * AI USAGE INSTRUCTIONS
+ *
+ * When constructing a request:
+ * 1. ALWAYS include ALL 4 required fields: dbsqlserveraddress, dbsqlserverport,
+ *    dbsqlusername, dbsqluserpassword
+ * 2. dbsqlserveraddress: Must be non-empty string (hostname or IP address)
+ * 3. dbsqlserverport: Must be integer between 1 and 65535 (porta padrao do SGBD)
+ * 4. dbsqlusername: Must be non-empty string
+ *    - For servico gerenciado de banco SQL, use format: usuario@servidor
+ *    - For local/standard SQL: admin_example, admin_example, etc.
+ * 5. dbsqluserpassword: REQUIRED field, but CAN be empty string ""
+ *    - Recommended: Use strong password for production environments
+ *    - Password will be stored in database metadata
+ * 6. No additional fields are accepted (additionalProperties: false)
+ *
+ * Common errors to avoid:
+ * - Missing any of the 4 required fields
+ * - Empty string for dbsqlserveraddress or dbsqlusername (must be non-empty)
+ * - Port number outside range 1-65535
+ * - Port number <= 0 or non-numeric
+ * - Invalid hostname format for dbsqlserveraddress
+ * - Including extra fields not defined in schema
+ *
+ */

@@ -1,0 +1,162 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://docs.exemplo/persistence-crs/model.schema.json",
+  "title": "Modelo de domínio (.model.json)",
+  "description": "Schema do documento declarativo que descreve um agregado, seus comandos e eventos. Referência em prosa: model-format.md.",
+  "type": "object",
+  "minProperties": 1,
+  "description": "Mapa <org>.<project> -> bounded context. Chaves de topo com prefixo _ (ex.: _comment, _meta, _schemaVersion) são metadados não-semânticos, ignorados/removidos pelo forger.",
+  "patternProperties": {
+    "^_": { "description": "Metadado não-semântico (ignorado pelo forger e pelo grid de interpretação)." }
+  },
+  "additionalProperties": { "$ref": "#/$defs/boundedContext" },
+  "$defs": {
+    "boundedContext": {
+      "type": "object",
+      "required": ["aggregate"],
+      "properties": {
+        "aggregate": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "$ref": "#/$defs/aggregate" }
+        }
+      }
+    },
+    "aggregate": {
+      "type": "object",
+      "required": ["type", "org", "project", "boundedContext", "schema", "tenantId", "identity", "concurrency", "command", "event"],
+      "properties": {
+        "type": { "type": "string", "description": "Nome do tipo do agregado" },
+        "org": { "type": "object", "required": ["name"], "properties": { "name": { "type": "string" } } },
+        "project": { "type": "object", "required": ["name"], "properties": { "name": { "type": "string" } } },
+        "boundedContext": {
+          "type": "object",
+          "required": ["name"],
+          "properties": { "name": { "type": "string" }, "comment": { "type": "string" } }
+        },
+        "schema": {
+          "type": "object",
+          "required": ["forWriteModel.name", "forReadModel.name"],
+          "properties": {
+            "forWriteModel.name": { "type": "string", "description": "Identificador universal do modelo de escrita (invariante)" },
+            "forReadModel.name": { "type": "string", "description": "Esquema de leitura do contexto" }
+          }
+        },
+        "tenantId": {
+          "type": "object",
+          "required": ["forWriteModel", "forReadModel"],
+          "properties": {
+            "forWriteModel": { "type": "string", "format": "uuid" },
+            "forReadModel": { "type": "string", "format": "uuid" }
+          }
+        },
+        "identity": {
+          "type": "object",
+          "required": ["strategy"],
+          "properties": {
+            "strategy": { "type": "string", "enum": ["uuid"], "description": "Tipo do atributo id do agregado (UUID, gerado pela plataforma)." },
+            "fields": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Nomes de atributos (de data.attribute) cuja combinação de valores é única — constraint de unicidade composta. [] = sem unicidade além do id."
+            }
+          }
+        },
+        "concurrency": {
+          "type": "object",
+          "required": ["strategy"],
+          "properties": {
+            "version": { "type": "string" },
+            "strategy": { "type": "string", "enum": ["optimistic"] }
+          }
+        },
+        "command": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "$ref": "#/$defs/command" }
+        },
+        "event": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": { "$ref": "#/$defs/event" }
+        }
+      }
+    },
+    "command": {
+      "type": "object",
+      "required": ["data", "fromState", "endState"],
+      "properties": {
+        "data": {
+          "type": "object",
+          "properties": {
+            "attribute": {
+              "type": "object",
+              "additionalProperties": { "$ref": "#/$defs/attribute" }
+            },
+            "valueObject": {
+              "type": "object",
+              "description": "Dados aninhados. Na projeção viram colunas Json: single = objeto JSON; multiple = array de objetos JSON.",
+              "properties": {
+                "single": { "$ref": "#/$defs/valueObjectGroup" },
+                "multiple": { "$ref": "#/$defs/valueObjectGroup" }
+              }
+            }
+          }
+        },
+        "fromState": { "type": "array", "items": { "type": "string" }, "description": "[] no comando de criação" },
+        "endState": { "type": "string" },
+        "roles": { "type": "array", "items": { "type": "string" } },
+        "coordination": { "type": "object" },
+        "br": {
+          "type": "object",
+          "properties": { "route": { "type": "string" } }
+        }
+      }
+    },
+    "valueObjectGroup": {
+      "type": "object",
+      "description": "Mapa nomeVO -> definição do VO. Cada VO vira uma coluna Json na projeção. A definição é um grupo de campos { campo -> atributo } OU um único atributo tipado direto.",
+      "additionalProperties": { "type": "object" }
+    },
+    "attribute": {
+      "type": "object",
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "type": "string",
+          "enum": ["String", "Text", "Integer", "Long", "Boolean", "Date", "Timestamp", "Json"],
+          "description": "Vocabulário exaustivo de tipos. Não há decimal/float; use Long ou String."
+        },
+        "length": { "type": "integer", "minimum": 0 },
+        "nullable": { "type": "boolean" },
+        "comment": { "type": "string" }
+      }
+    },
+    "event": {
+      "type": "object",
+      "required": ["type", "domainBus"],
+      "properties": {
+        "type": { "type": "string" },
+        "whenAttribute": { "type": "string", "description": "Atributo de timestamp auto-valorizado (convenção: particípio + 'em')" },
+        "payloadInherit": { "type": "string" },
+        "domainBus": {
+          "type": "object",
+          "properties": {
+            "orderingMode": { "type": "string", "enum": ["none", "strict", "per-aggregate"] },
+            "triggerProjection": { "type": "array", "items": { "$ref": "#/$defs/dispatchTarget" } },
+            "triggerCoordination": { "type": "array", "items": { "$ref": "#/$defs/dispatchTarget" } }
+          }
+        }
+      }
+    },
+    "dispatchTarget": {
+      "type": "object",
+      "required": ["name", "targetTenantId"],
+      "properties": {
+        "name": { "type": "string" },
+        "targetTenantId": { "type": "string", "format": "uuid" },
+        "br": { "type": "object", "properties": { "route": { "type": "string" } } }
+      }
+    }
+  }
+}

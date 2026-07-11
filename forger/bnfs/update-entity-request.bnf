@@ -1,0 +1,322 @@
+/**
+ * BNF Grammar for updateEntity Request Body
+ * Endpoint: PUT /org/{org}/project/{project}/dataschema/{dataschema}/entity/{entity}
+ *
+ * This grammar defines the JSON structure for PARTIAL updates to entity properties.
+ *
+ * IMPORTANT: This endpoint accepts PARTIAL JSON.
+ * - Only send properties you want to UPDATE
+ * - Missing properties are IGNORED (not deleted)
+ * - Only ONE type of update per request: entity _conf OR attribute OR association
+ *
+ * ALLOWED UPDATES:
+ * - Entity _conf properties: comment, concurrencyControl, uniqueKey, indexKey, accessControl
+ * - Attribute properties: length, nullable, unique, comment, default
+ * - Association properties: nullable, unique, comment
+ *
+ * NOT ALLOWED (use create/delete endpoints):
+ * - Create new attributes/associations
+ * - Delete attributes/associations
+ * - Change IMMUTABLE fields (name, type, etc)
+ */
+
+<update-request> ::= <update-entity-conf>
+                   | <update-attribute>
+                   | <update-association>
+
+/* Update Entity _conf Properties */
+
+<update-entity-conf> ::= "{" "\"_conf\"" ":" "{" <conf-updatable> "}" "}"
+
+<conf-updatable> ::= <comment> [ "," <more-conf-updatable> ]
+                   | <concurrency-control> [ "," <more-conf-updatable> ]
+                   | <unique-key> [ "," <more-conf-updatable> ]
+                   | <index-key> [ "," <more-conf-updatable> ]
+                   | <access-control> [ "," <more-conf-updatable> ]
+
+<more-conf-updatable> ::= <comment>
+                        | <concurrency-control>
+                        | <unique-key>
+                        | <index-key>
+                        | <access-control>
+                        | <comment> "," <more-conf-updatable>
+                        | <concurrency-control> "," <more-conf-updatable>
+                        | <unique-key> "," <more-conf-updatable>
+                        | <index-key> "," <more-conf-updatable>
+                        | <access-control> "," <more-conf-updatable>
+
+<comment> ::= "\"comment\"" ":" <quoted-string>
+
+<concurrency-control> ::= "\"concurrencyControl\"" ":" <boolean>
+
+<unique-key> ::= "\"uniqueKey\"" ":" "[" [ <attribute-name-list> ] "]"
+
+<index-key> ::= "\"indexKey\"" ":" "[" [ <attribute-name-list> ] "]"
+
+<access-control> ::= "\"accessControl\"" ":" "{" <read-roles> "," <write-roles> "}"
+
+<read-roles> ::= "\"read\"" ":" "[" <role-list> "]"
+
+<write-roles> ::= "\"write\"" ":" "[" <role-list> "]"
+
+<role-list> ::= <quoted-role> [ "," <role-list> ]
+
+<quoted-role> ::= "\"" <role-name> "\""
+
+<role-name> ::= "MASTER" | "ENGINEER" | "DEVELOPER" | <custom-role>
+
+<custom-role> ::= <uppercase-letter> { <uppercase-letter> | <digit> | "_" }
+
+<attribute-name-list> ::= <quoted-attribute-name> [ "," <attribute-name-list> ]
+
+/* Update Attribute Properties */
+
+<update-attribute> ::= "{" "\"attributes\"" ":" "[" "{" <attr-identifier> "," <attr-updatable> "}" "]" "}"
+
+<attr-identifier> ::= "\"name\"" ":" <quoted-attribute-name>
+
+<attr-updatable> ::= <attr-length> [ "," <more-attr-updatable> ]
+                   | <attr-nullable> [ "," <more-attr-updatable> ]
+                   | <attr-unique> [ "," <more-attr-updatable> ]
+                   | <attr-comment> [ "," <more-attr-updatable> ]
+                   | <attr-default> [ "," <more-attr-updatable> ]
+
+<more-attr-updatable> ::= <attr-length>
+                        | <attr-nullable>
+                        | <attr-unique>
+                        | <attr-comment>
+                        | <attr-default>
+                        | <attr-length> "," <more-attr-updatable>
+                        | <attr-nullable> "," <more-attr-updatable>
+                        | <attr-unique> "," <more-attr-updatable>
+                        | <attr-comment> "," <more-attr-updatable>
+                        | <attr-default> "," <more-attr-updatable>
+
+<attr-length> ::= "\"length\"" ":" <positive-integer>
+
+<attr-nullable> ::= "\"nullable\"" ":" <boolean>
+
+<attr-unique> ::= "\"unique\"" ":" <boolean>
+
+<attr-comment> ::= "\"comment\"" ":" <quoted-string>
+
+<attr-default> ::= "\"default\"" ":" <value>
+
+/* Update Association Properties */
+
+<update-association> ::= "{" "\"associations\"" ":" "[" "{" <assoc-identifier> "," <assoc-updatable> "}" "]" "}"
+
+<assoc-identifier> ::= "\"name\"" ":" <quoted-association-name>
+
+<assoc-updatable> ::= <assoc-nullable> [ "," <more-assoc-updatable> ]
+                    | <assoc-unique> [ "," <more-assoc-updatable> ]
+                    | <assoc-comment> [ "," <more-assoc-updatable> ]
+
+<more-assoc-updatable> ::= <assoc-nullable>
+                         | <assoc-unique>
+                         | <assoc-comment>
+                         | <assoc-nullable> "," <more-assoc-updatable>
+                         | <assoc-unique> "," <more-assoc-updatable>
+                         | <assoc-comment> "," <more-assoc-updatable>
+
+<assoc-nullable> ::= "\"nullable\"" ":" <boolean>
+
+<assoc-unique> ::= "\"unique\"" ":" <boolean>
+
+<assoc-comment> ::= "\"comment\"" ":" <quoted-string>
+
+/* Primitives */
+
+<quoted-attribute-name> ::= "\"" <attribute-name> "\""
+
+<attribute-name> ::= <lowercase-letter> { <lowercase-letter> }
+
+<quoted-association-name> ::= "\"" <association-name> "\""
+
+<association-name> ::= <lowercase-letter> { <lowercase-letter> }
+
+<lowercase-letter> ::= "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m"
+                     | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z"
+
+<uppercase-letter> ::= "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M"
+                     | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
+
+<quoted-string> ::= "\"" { <string-char> } "\""
+
+<string-char> ::= <letter> | <digit> | <special-char> | <space>
+
+<letter> ::= <lowercase-letter> | <uppercase-letter>
+
+<digit> ::= "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+
+<special-char> ::= "-" | "_" | "@" | "." | "," | ":" | ";" | "!" | "?"
+
+<space> ::= " "
+
+<boolean> ::= "true" | "false"
+
+<positive-integer> ::= <nonzero-digit> { <digit> }
+
+<nonzero-digit> ::= "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9"
+
+<value> ::= <quoted-string> | <positive-integer> | <boolean> | "null"
+
+/* ============================================================================
+ * CONSTRAINTS (enforced by endpoint validation)
+ *
+ * RESTRICTION: Only ONE type of update per request
+ * - Update entity _conf properties OR
+ * - Update ONE attribute's properties OR
+ * - Update ONE association's properties
+ *
+ * UPDATABLE FIELDS:
+ *
+ * Entity _conf:
+ * - comment: string
+ * - concurrencyControl: boolean
+ * - uniqueKey: array of attribute names
+ * - indexKey: array of attribute names
+ * - accessControl: {read: [roles], write: [roles]}
+ *
+ * Attribute properties:
+ * - length: integer (careful: may require data migration)
+ * - nullable: boolean
+ * - unique: boolean
+ * - comment: string
+ * - default: value (type depends on attribute type)
+ *
+ * Association properties:
+ * - nullable: boolean
+ * - unique: boolean
+ * - comment: string
+ *
+ * IMMUTABLE FIELDS (cannot be updated):
+ * - Entity: name, _conf.type, _conf.superEntity, _conf.superEntityStrategy,
+ *           _conf.partition, _conf.enumeration
+ * - Attribute: name, type
+ * - Association: name, type
+ *
+ * ============================================================================
+ * PUT BODY EXAMPLES
+ *
+ * Example 1: Update entity comment
+ * {
+ *   "_conf": {
+ *     "comment": "Cadastro de clientes (atualizado)"
+ *   }
+ * }
+ *
+ * Example 2: Add concurrency control
+ * {
+ *   "_conf": {
+ *     "concurrencyControl": true
+ *   }
+ * }
+ *
+ * Example 3: Update unique key constraint
+ * {
+ *   "_conf": {
+ *     "uniqueKey": ["codigo", "filial"]
+ *   }
+ * }
+ *
+ * Example 4: Update access control
+ * {
+ *   "_conf": {
+ *     "accessControl": {
+ *       "read": ["MASTER", "ENGINEER", "DEVELOPER"],
+ *       "write": ["MASTER", "ENGINEER"]
+ *     }
+ *   }
+ * }
+ *
+ * Example 5: Update attribute to make it required
+ * {
+ *   "attributes": [{
+ *     "name": "email",
+ *     "nullable": false,
+ *     "unique": true
+ *   }]
+ * }
+ *
+ * Example 6: Update attribute length
+ * {
+ *   "attributes": [{
+ *     "name": "nome",
+ *     "length": 200
+ *   }]
+ * }
+ *
+ * Example 7: Update association to make it optional
+ * {
+ *   "associations": [{
+ *     "name": "vendedor",
+ *     "nullable": true
+ *   }]
+ * }
+ *
+ * Example 8: Update association to one-to-one
+ * {
+ *   "associations": [{
+ *     "name": "endereco",
+ *     "unique": true
+ *   }]
+ * }
+ *
+ * ============================================================================
+ * CURL EXAMPLE
+ *
+ * curl -X PUT "https://api.example.com/org/acme/project/erp/dataschema/tenantacme/entity/cliente" \
+ *   -H "Authorization: Bearer <token>" \
+ *   -H "Content-Type: application/json" \
+ *   -H "Accept: application/json" \
+ *   -d '{
+ *     "_conf": {
+ *       "comment": "Cadastro de clientes - versão atualizada",
+ *       "concurrencyControl": true
+ *     }
+ *   }'
+ *
+ * Expected response http status code 200 (OK)
+ *
+ * ============================================================================
+ * AI USAGE INSTRUCTIONS
+ *
+ * When constructing a request:
+ * 1. Send ONLY the properties you want to UPDATE
+ * 2. Only ONE type per request: _conf OR attribute OR association
+ * 3. For attributes/associations, identify by "name" field
+ * 4. Missing properties are IGNORED, not deleted
+ * 5. Cannot create new attributes/associations (use POST endpoints)
+ * 6. Cannot delete attributes/associations (use DELETE endpoints)
+ *
+ * Common errors to avoid:
+ * - Mixing update types (e.g., _conf + attributes in same request)
+ * - Trying to update IMMUTABLE fields (name, type)
+ * - Trying to create new attributes/associations via PUT
+ * - Updating multiple attributes/associations in one request
+ * - Missing "name" identifier for attribute/association updates
+ *
+ * Best practices:
+ * - Update entity comment when business meaning changes
+ * - Add concurrencyControl for entities with frequent updates
+ * - Update uniqueKey when business key changes
+ * - Add indexKey for frequently queried columns
+ * - Update access control when permission requirements change
+ * - Be careful changing nullable: false → true (data migration may be needed)
+ * - Be careful increasing length (may require ALTER TABLE)
+ *
+ * Update strategies:
+ * - For entity-level changes: Update _conf
+ * - For column-level changes: Update attributes/associations
+ * - For multiple changes: Make separate PUT requests
+ * - Test updates in development environment first
+ * - Check existing data compatibility before changing constraints
+ *
+ * Data migration considerations:
+ * - nullable: false requires all existing rows to have non-null values
+ * - unique: true requires all existing values to be unique
+ * - length reduction may truncate existing data
+ * - Adding default value only affects new rows
+ *
+ */

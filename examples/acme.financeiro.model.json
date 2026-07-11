@@ -1,0 +1,232 @@
+{
+  "acme.financeiro": {
+    "aggregate": {
+      "financeiro.conta": {
+        "org": {
+          "name": "acme",
+          "comment": ""
+        },
+        "project": {
+          "name": "financeiro",
+          "comment": ""
+        },
+        "schema": {
+          "forWriteModel.name": "wdb.client",
+          "forReadModel.name": "financeiro"
+        },
+        "boundedContext": {
+          "name": "financeiro",
+          "comment": ""
+        },
+        "tenantId": {
+          "forWriteModel": "00000000-0000-4000-8000-000000000002",
+          "forReadModel": "00000000-0000-4000-8000-000000000002"
+        },
+        "type": "conta",
+        "identity": {
+          "strategy": "uuid",
+          "fields": []
+        },
+        "concurrency": {
+          "version": "version",
+          "strategy": "optimistic"
+        },
+        "command": {
+          "criar": {
+            "event": "criada",
+            "data": {
+              "attribute": {
+                "razaosocial": {
+                  "type": "String",
+                  "length": 300,
+                  "nullable": false,
+                  "comment": ""
+                },
+                "cnpj": {
+                  "type": "String",
+                  "length": 20,
+                  "nullable": false,
+                  "comment": "CNPJ opcional"
+                },
+                "email": {
+                  "type": "String",
+                  "length": 200,
+                  "nullable": false
+                },
+                "status": {
+                  "type": "String",
+                  "length": 32,
+                  "nullable": false,
+                  "comment": "Estado atual do agregado"
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "endState": "criada",
+            "fromState": [],
+            "roles": [
+              "MASTER",
+              "GERENTEFINANCEIRO",
+              "VENDEDOR"
+            ],
+            "coordination": {},
+            "br": {
+              "route": "acme/financeiro/financeiro/conta/criar"
+            }
+          },
+          "editar": {
+            "event": "editada",
+            "data": {
+              "attribute": {
+                "razaosocial": {
+                  "type": "String",
+                  "length": 300,
+                  "nullable": true
+                },
+                "cnpj": {
+                  "type": "String",
+                  "length": 20,
+                  "nullable": true
+                },
+                "email": {
+                  "type": "String",
+                  "length": 200,
+                  "nullable": false
+                },
+                "status": {
+                  "type": "String",
+                  "length": 32,
+                  "nullable": false,
+                  "comment": "Estado atual do agregado"
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {}
+              }
+            },
+            "endState": "editada",
+            "fromState": [
+              "criada",
+              "editada"
+            ],
+            "roles": [
+              "MASTER",
+              "GERENTECOMERCIAL",
+              "VENDEDOR"
+            ],
+            "coordination": {},
+            "br": {
+              "route": "acme/financeiro/financeiro/conta/editar"
+            }
+          },
+          "editarcalendariodepagamento": {
+            "event": "calendariodepagamentoeditado",
+            "data": {
+              "attribute": {
+                "status": {
+                  "type": "String",
+                  "length": 32,
+                  "nullable": false,
+                  "comment": "Estado atual do agregado"
+                }
+              },
+              "valueObject": {
+                "single": {},
+                "multiple": {
+                  "pagamentos": {
+                    "identificador": {
+                      "type": "String",
+                      "length": 64,
+                      "nullable": false,
+                      "comment": ""
+                    },
+                    "parcela": {
+                      "type": "Integer",
+                      "nullable": false
+                    },
+                    "montante": {
+                      "type": "Integer",
+                      "nullable": false
+                    },
+                    "data": {
+                      "type": "Date",
+                      "nullable": false,
+                      "comment": ""
+                    },
+                    "status": {
+                      "type": "String",
+                      "length": 16,
+                      "nullable": false,
+                      "comment": ""
+                    }
+                  }
+                }
+              }
+            },
+            "endState": "calendariodepagamentoeditado",
+            "fromState": [
+              "criada",
+              "editada",
+              "calendariodepagamentoeditado"
+            ],
+            "roles": [
+              "MASTER",
+              "GERENTECOMERCIAL",
+              "VENDEDOR"
+            ],
+            "coordination": {},
+            "br": {
+              "route": "acme/financeiro/financeiro/conta/editarcalendariodepagamento"
+            }
+          }
+        },
+        "event": {
+          "criada": {
+            "type": "criada",
+            "whenAttribute": "criadaem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "triggerProjection": [],
+              "triggerCoordination": [
+                {
+                  "name": "projeto_from_financeiro_criada",
+                  "targetTenantId": "00000000-0000-4000-8000-000000000005",
+                  "br": {
+                    "route": "acme/financeiro/financeiro/conta/coordination/projeto_from_financeiro_criada"
+                  }
+                }
+              ],
+              "comment": {},
+              "orderingMode": "per-aggregate"
+            }
+          },
+          "editada": {
+            "type": "editada",
+            "whenAttribute": "editadaem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "triggerProjection": [],
+              "triggerCoordination": [],
+              "orderingMode": "per-aggregate"
+            }
+          },
+          "calendariodepagamentoeditado": {
+            "type": "calendariodepagamentoeditado",
+            "whenAttribute": "edicaodecalendariodepagamentoem",
+            "payloadInherit": "command-data",
+            "domainBus": {
+              "triggerProjection": [],
+              "triggerCoordination": [],
+              "orderingMode": "per-aggregate"
+            }
+          }
+        }
+      }
+    }
+  },
+  "_comment": ""
+}
