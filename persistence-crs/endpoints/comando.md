@@ -27,6 +27,19 @@ tenant (ver [forger/model](../../forger/endpoints/model.md) e [examples/](../../
 > `510` (alguém avançou o agregado antes; reenvie sobre o estado atualizado). Ver
 > [README — regra do status](../README.md#estados-transições-e-concorrência).
 
+### Transição sobre um agregado existente
+
+Mesma rota da criação — `POST /a/{boundedContext}/{aggregateType}` — **sem** `/{uuid}` no path. O agregado
+alvo é apontado pelo campo **`id` dentro do corpo** do comando, valorado com o **UUID do registro do
+agregado** (o `id` devolvido na criação / o `aggregateid` da projeção; **não** a PK numérica da projeção):
+
+```json
+{ "<nomeDoComando>": { "id": "<uuid-do-agregado>", "status": "<estado atual>", "<campo>": "<valor>" } }
+```
+
+Só a **criação** não envia `id` nem `status` (o agregado ainda não existe). O path `/{uuid}` existe apenas
+para **leitura** (`GET .../{uuid}`) e **histórico** (`GET .../{uuid}/history`), não para comandos.
+
 ## Resposta
 
 `200`:

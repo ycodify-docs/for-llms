@@ -10,7 +10,8 @@ Exigem `Authorization` e papel de administrador/engenheiro em `{org}`.
 
 `POST /org/{org}/project/{project}/tenant/{tenantId}/model`
 
-Envio: o documento de modelo (`.json`) como upload. Efeito: valida a consistência
+Envio: o documento de modelo (`.json`) como **upload `multipart/form-data`, no campo `file`** (ex.:
+`curl -F "file=@modelo.json"`). **`Content-Type: application/json` (JSON no corpo) → `415`**. Efeito: valida a consistência
 `(org, project, tenant)` — o `tenantId` deve referenciar exatamente um dataschema do contexto — e
 **publica** o modelo no cache distribuído. **Semântica de sobrescrita**: republicar substitui o anterior.
 Resposta `201`: `{ "key": "<referência de publicação>" }`.

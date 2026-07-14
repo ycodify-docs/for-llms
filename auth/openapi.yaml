@@ -53,11 +53,11 @@ components:
     JwtResponse:
       type: object
       properties:
-        token: { type: string, description: "Token de acesso (usar em Authorization: Bearer)" }
-        type: { type: string, example: Bearer }
+        accessToken: { type: string, description: "Token de acesso (usar em Authorization: Bearer)" }
+        tokenType: { type: string, example: Bearer }
         id: { type: integer }
         username: { type: string }
         name: { type: string }
         email: { type: string }
         roles: { type: array, items: { type: string } }
-        sessionId: { type: string, format: uuid }
+        mcpSessionId: { type: string, format: uuid }

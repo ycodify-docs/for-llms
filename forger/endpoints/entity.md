@@ -33,7 +33,7 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
 | entity | só letras minúsculas (sem dígitos/`_`) | `^[a-z]+$` | **24** |
 | atributo | só letras minúsculas (sem dígitos/`_`) | `^[a-z]+$` | **24** |
 | associação | só letras minúsculas (sem dígitos/`_`) | `^[a-z]+$` | **24** |
-| superentidade | só letras minúsculas | `^[a-z]+$` | **24** |
+| superentidade | só letras minúsculas | `^[a-z]+$` | **64** |
 
 **Nomes reservados** (proibidos para entity/atributo/associação): `id`, `logversion`, `logrole`,
 `loguser` — são atributos de controle injetados pela plataforma. Violar padrão/limite/reservado → `400`.
@@ -48,10 +48,11 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
       "unique": false, "comment": "string", "default": "string" }
   ],
   "associations": [
-    { "name": "string", "targetEntity": "string", "nullable": true,
+    { "name": "string", "type": "string", "nullable": true,
       "unique": false, "comment": "string" }
   ],
   "_conf": {
+    "type": "entity",
     "comment": "string", "concurrencyControl": true,
     "uniqueKey": ["string"], "indexKey": ["string"],
     "accessControl": {}, "superEntity": "string", "superEntityStrategy": "string"
@@ -60,10 +61,18 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
 ```
 
 > **⚠️ `_conf` é OBRIGATÓRIO e semântico aqui.** A definição de **entity** exige `_conf` (configuração:
-> chave única, índices, controle de concorrência, superentidade…). A convenção "chave `_`-prefixada =
+> chave única, índices, controle de concorrência, superentidade…). O único campo **obrigatório** dentro de
+> `_conf` é **`type`** (`entity` | `abstract` | `component` | `enumeration`). A convenção "chave `_`-prefixada =
 > metadado removido" vale **apenas para o `.model.json`** (publicação de modelo), **não** para a
 > definição de entity. **Não** remova `_conf` (nem outras chaves) deste payload — é outro contrato, em
 > outro endpoint. Ver [model-format — chaves de metadado](../../persistence-crs/spec/model-format.md#chaves-de-metadado-_-prefixadas).
+
+> **`_conf.accessControl` — default automático (`MASTER`).** O campo é **opcional**: se **omitido**, o
+> Forger aplica automaticamente `{ "read": ["MASTER"], "write": ["MASTER"] }` a toda entity que cria — não
+> é preciso declará-lo à mão. Se **declarado**, `MASTER` **deve** constar em `read` **e** `write` (o
+> persistence-crs grava a projeção autenticado como `MASTER`). Os papéis citados aqui são **nomes** — criar
+> o papel `MASTER` (e demais) para a organização e vincular usuários é feito no [orgid](../../orgid/README.md),
+> não aqui.
 
 ## Colunas obrigatórias de toda projeção — `aggregateid`, `status` e cada `whenAttribute` de evento (REGRA)
 

@@ -10,8 +10,8 @@
 POST /up/sign-in
 { "username": "alice", "password": "•••" }
 → 200
-{ "token": "<token>", "type": "Bearer", "id": 1, "username": "alice",
-  "name": "Alice", "email": "alice@acme.com", "roles": ["API_MASTER"], "sessionId": "<uuid>" }
+{ "accessToken": "<token>", "tokenType": "Bearer", "id": 1, "username": "alice",
+  "name": "Alice", "email": "alice@acme.com", "roles": ["API_MASTER"], "mcpSessionId": "<uuid>" }
 ```
 
 Use o token nas chamadas seguintes: `Authorization: Bearer <token>`.
@@ -21,7 +21,7 @@ Use o token nas chamadas seguintes: `Authorization: Bearer <token>`.
 ```
 POST /ua/sign-in
 { "username": "cliente1", "password": "•••" }
-→ 200  { "token": "<token>", "type": "Bearer", ... }   // token inclui os tenants do usuário
+→ 200  { "accessToken": "<token>", "tokenType": "Bearer", ... }   // accessToken inclui os tenants do usuário
 ```
 
 ## 3. Usar o token (em outro serviço)
@@ -37,7 +37,7 @@ Headers: Authorization: Bearer <token>, X-Tenant-Id: <tenant-id>
 ```
 GET /up/sign-in/renew
 Headers: Authorization: Bearer <token atual>
-→ 200  { "token": "<novo token>", ... }
+→ 200  { "accessToken": "<novo token>", ... }
 ```
 
 ## 5. Erros comuns
