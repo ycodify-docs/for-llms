@@ -17,6 +17,10 @@
 
 ## Visão geral (mapa)
 
+> **Acesso externo** aos serviços é via **API Gateway**: uma base (host) + prefixo `/v3/<svc>` que o gateway
+> remove antes de encaminhar. Colapso interno: `composer` = auth+orgid+forger; `interpreter` = crs+q+es-n.
+> Como formar a URL: [06-autenticacao — URL base](06-autenticacao.md).
+
 ```
                           ┌───────────┐
    (1) modelos+recursos   │  forger   │  publica modelos no cache distribuído
@@ -162,5 +166,6 @@ a **fonte da verdade** de cada um é:
 | Pontos de **coordenação** entre serviços (CP-n) | [coordenacao.md](coordenacao.md) |
 | **Ordem de deploy** dos recursos | [03-fluxo-de-deploy.md](03-fluxo-de-deploy.md) |
 | Vocabulário **abstrato de infraestrutura** | [02-conceitos.md](02-conceitos.md#vocabulário-de-infraestrutura-termos-abstratos) |
+| **URL base / endereçamento** (API Gateway, prefixo `/v3/<svc>`) | [06-autenticacao.md](06-autenticacao.md) |
 
 Ao corrigir um desses fatos, **edite primeiro o documento canônico** e propague.

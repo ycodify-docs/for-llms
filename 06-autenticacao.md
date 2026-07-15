@@ -1,7 +1,33 @@
 # Autenticação e identificação de tenant
 
-> Como preencher os dois itens que **toda** requisição de comando/consulta exige: o cabeçalho
-> `Authorization` e o cabeçalho de tenant `X-Tenant-Id`. Pré-requisitos: [conceitos](02-conceitos.md).
+> Como formar uma requisição válida: a **URL base** (via API Gateway, prefixo `/v3/<svc>`) + o cabeçalho
+> `Authorization` + o cabeçalho de tenant `X-Tenant-Id`. Pré-requisitos: [conceitos](02-conceitos.md).
+
+## URL base — via **API Gateway** (`/v3/<svc>`)
+
+O acesso aos serviços é por um **API Gateway**: **um host** (a base) e o serviço é escolhido pelo **prefixo do
+path `/v3/<svc>`**. A base é env-specific:
+
+| Ambiente | Base (host do gateway) |
+|---|---|
+| produção | `https://api.ycodify.com` |
+| dev local | `http://localhost:8080` |
+
+Prefixo por serviço — o gateway **remove** o prefixo antes de encaminhar, então os paths documentados em cada
+serviço (`/org/...`, `/a/{bc}/{type}`, `/up/sign-in`, …) são os **downstream**: anexe-os **após** o prefixo.
+
+| Serviço | Prefixo | Exemplo (prod) |
+|---|---|---|
+| forger | `/v3/forger` | `https://api.ycodify.com/v3/forger/org/{org}/dbconn` |
+| auth | `/v3/auth` | `https://api.ycodify.com/v3/auth/up/sign-in` |
+| orgid | `/v3/orgid` | `https://api.ycodify.com/v3/orgid/open/up/account` |
+| persistence-crs | `/v3/persistence/c` | `https://api.ycodify.com/v3/persistence/c/a/{bc}/{type}` |
+| persistence-q | `/v3/persistence/q` | `https://api.ycodify.com/v3/persistence/q/` |
+
+- O gateway injeta o header **`X-Client: web`** (não é preciso enviá-lo).
+- **`br-service`** fica **fora** do gateway (endereço próprio, invocado internamente pelo persistence-crs);
+  **`es-n`** é **interno** (não alcançável pelo gateway).
+- Path fora da allowlist `/v3/{auth,orgid,forger,persistence/c,persistence/q}` → `404`; `/unsecured/**` → `404`.
 
 ## `Authorization` (token de acesso)
 

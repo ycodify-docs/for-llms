@@ -23,7 +23,7 @@
 - [Arquitetura ponta a ponta](01-arquitetura.md): deploy → comando → despacho → projeção → consulta; de onde vêm as filas; fatos canônicos.
 - [Composição da plataforma](00-plataforma.md): papéis dos oito serviços e como se compõem.
 - [Fluxo de deploy](03-fluxo-de-deploy.md): ordem obrigatória para implantar um sistema do zero.
-- [Autenticação e tenant](06-autenticacao.md): cabeçalho Authorization e como obter o tenant-id.
+- [Acesso — URL base + autenticação + tenant](06-autenticacao.md): **URL base via API Gateway** (prefixo `/v3/<svc>`), cabeçalho Authorization e como obter o tenant-id.
 - [Coordenação entre serviços](coordenacao.md): pontos de articulação (CP-1…CP-12) + os 4 pontos de hook do br-service + uso ideal (advisory).
 - [Antipadrões](05-antipatterns.md): o que mais quebra, por serviço (sintoma → causa → correção).
 - [Isolamento dos agentes + entrega de código](07-isolamento-e-entrega.md): sala trancada por cliente (multi-tenant), a "janela" de 4 destinos, e como o código sai (GEN vs CUSTOM, PR + humano + build + estático).

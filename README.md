@@ -11,6 +11,7 @@
 3. [`01-arquitetura.md`](01-arquitetura.md) — fluxo ponta a ponta entre os serviços.
 4. [`03-fluxo-de-deploy.md`](03-fluxo-de-deploy.md) — como implantar um sistema do zero.
 5. [`coordenacao.md`](coordenacao.md) — pontos de articulação entre serviços.
+6. [`06-autenticacao.md`](06-autenticacao.md) — como formar a requisição: **URL base** (API Gateway, `/v3/<svc>`) + `Authorization` + `X-Tenant-Id`.
 
 ## Documentação por serviço
 
