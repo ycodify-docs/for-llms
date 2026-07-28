@@ -27,7 +27,10 @@ serviço (`/org/...`, `/a/{bc}/{type}`, `/up/sign-in`, …) são os **downstream
 - O gateway injeta o header **`X-Client: web`** (não é preciso enviá-lo).
 - **`br-service`** fica **fora** do gateway (endereço próprio, invocado internamente pelo persistence-crs);
   **`es-n`** é **interno** (não alcançável pelo gateway).
-- Path fora da allowlist `/v3/{auth,orgid,forger,persistence/c,persistence/q}` → `404`; `/unsecured/**` → `404`.
+- **Persistência — dois contextos** (independentes da base; escolha ortogonal ao ambiente): **prod**
+  `/v3/persistence/{c,q}` → `interpreter`; **teste** `/v3/persistence/t/{c,q}` → `tinterpreter` (banco de teste
+  `t_ae_db`). Os paths downstream (`/a/{bc}/{type}`, `/`) são os **mesmos** — só muda o segmento `t`.
+- Path fora da allowlist `/v3/{auth,orgid,forger,persistence/c,persistence/q,persistence/t/c,persistence/t/q}` → `404`; `/unsecured/**` → `404`.
 
 ## `Authorization` (token de acesso)
 
