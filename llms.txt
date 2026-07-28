@@ -67,6 +67,9 @@
 - [upload](filer/endpoints/upload.md) · [download](filer/endpoints/download.md) · [listar](filer/endpoints/listar.md) · [remover](filer/endpoints/remover.md)
 - [Erros](filer/erros.md) · [Exemplos](filer/exemplos.md) · [OpenAPI](filer/openapi.yaml)
 
+## cache (modelo publicado em cache) — INTERNO, sem endpoint público
+- [Guia](cache/README.md): guarda o modelo publicado do tenant (write/read-model); o **forger** grava ao publicar `.model.json`, persistence-crs/q leem; **atrás do gateway, sem rota** (acesso só interno/plataforma).
+
 ## shell (casca universal + BFF) — camada de aplicação
 - [Guia](shell/README.md): a aplicação única para todos os clientes; casca fixa + BFF; fronteira casca↔miolo; consome os oito serviços via BFF.
 - [Contrato casca↔miolo](shell/contrato-miolo.md): `MioloModule`, `hostContext`, modelo de capacidade.

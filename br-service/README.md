@@ -83,6 +83,14 @@ Aninhando os escopos, o **path completo é globalmente único** → duas organiz
 > (1 project = 1 bounded context), os segmentos `project` e `boundedContext` costumam **coincidir** —
 > ex.: `acme/vendas/vendas/pedido/criar`. Não é erro: são escopos distintos que, por padrão, têm o mesmo nome.
 
+### Deploy de um processador (por sistema de arquivos — NÃO via gateway)
+
+Um processador é um **arquivo `.js`** cujo **caminho na pasta de processadores do serviço** é a **rota**
+(`<org>/<project>/<bc>/<aggregate>/<função>.js`). **Não há endpoint/API para publicar um processador** — o
+br-service é **interno** (sem rota no gateway). O deploy é por **sistema de arquivos**: coloca-se o `.js` na pasta
+de processadores e o serviço o carrega (na inicialização; recarregar torna a rota viva). Uma rota sem processador
+correspondente → **erro de rota** quando o persistence-crs a aciona.
+
 ## Contrato de resposta
 
 - Sucesso (`200`): o serviço devolve **diretamente** o objeto retornado pelo processador (sem envelope).
