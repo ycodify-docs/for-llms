@@ -25,8 +25,10 @@ serviço (`/org/...`, `/a/{bc}/{type}`, `/up/sign-in`, …) são os **downstream
 | persistence-q | `/v3/persistence/q` | `https://api.ycodify.com/v3/persistence/q/` |
 
 - O gateway injeta o header **`X-Client: web`** (não é preciso enviá-lo).
-- **`br-service`** fica **fora** do gateway (endereço próprio, invocado internamente pelo persistence-crs);
-  **`es-n`** é **interno** (não alcançável pelo gateway).
+- **Serviços internos** (atrás do gateway, **sem rota** — não alcançáveis de fora; invocados internamente pela
+  plataforma): **`es-n`** (despacho de eventos, acionado pelo crs), **`br-service`** (regras/coordenação `br.route`,
+  invocado pelo crs) e **`cache`** (redis — o **forger** o usa: publicar o `.model.json` grava no cache, e criar
+  dataschemas para as entidades/projeções é via forger). Não há endpoint público para eles.
 - **Persistência — dois contextos** (independentes da base; escolha ortogonal ao ambiente): **prod**
   `/v3/persistence/{c,q}` → `interpreter`; **teste** `/v3/persistence/t/{c,q}` → `tinterpreter` (banco de teste
   `t_ae_db`). Os paths downstream (`/a/{bc}/{type}`, `/`) são os **mesmos** — só muda o segmento `t`.
