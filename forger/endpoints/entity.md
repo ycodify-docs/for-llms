@@ -4,10 +4,12 @@
 > alterar uma entity passa pela **compilação** (léxica → sintática → semântica → representação
 > intermediária → DDL) e aplica a DDL de forma **transacional** no banco de leitura. Guia: [../README.md](../README.md).
 >
-> A entity é a **projeção de um agregado**: suas colunas **derivam dos atributos do agregado** —
-> escalares (`data.attribute`) **e** value objects (`valueObject.single` → coluna `Json` objeto;
+> No **caso comum**, a entity é a **projeção de um agregado**: suas colunas **derivam dos atributos do agregado**
+> — escalares (`data.attribute`) **e** value objects (`valueObject.single` → coluna `Json` objeto;
 > `valueObject.multiple` → coluna `Json` array) — e ela é criada **sob o dataschema** cujo nome = o do
-> bounded context. Cadeia completa:
+> bounded context. (Uma entity **pode não** ser projeção de agregado — ex.: tabela de referência/lookup; nesse
+> caso **não** carrega `aggregateid`/`status`/`whenAttribute`, ver §"Colunas obrigatórias de toda projeção".)
+> Cadeia completa:
 > [conceitos — do agregado à projeção](../../02-conceitos.md#do-agregado-à-projeção-derivação-e-implantação).
 
 Exigem `Authorization` e papel de administrador/engenheiro em `{org}`.
@@ -79,8 +81,10 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
 Além das colunas derivadas de `data.attribute` + valueObjects, **toda entity que é projeção de um
 agregado DEVE declarar** as colunas de projeção abaixo — em **todo** agregado, sem exceção:
 
-- **`aggregateid`** — `String`, `length` **36**, `nullable: false`: o **UUID do agregado**; **identifica
-  a linha** da projeção (ver [identificação na projeção](../../persistence-crs/spec/model-format.md#identificação-na-projeção-leitura)).
+- **`aggregateid`** — `String`, `length` **36**, `nullable: false`, **`unique: true`**: o **UUID do agregado**;
+  **identifica a linha** da projeção (ver [identificação na projeção](../../persistence-crs/spec/model-format.md#identificação-na-projeção-leitura)).
+  A projeção default é **1:1** (uma linha por instância de agregado), então `aggregateid` é **único** na tabela —
+  declare `unique: true` para tornar a invariante uma constraint (o gerador determinístico já o faz).
 - **`status`** — `String`, `nullable: false`: o **estado atual** do agregado (campo de filtro típico em
   [persistence-q](../../persistence-q/README.md)).
 - **cada `whenAttribute` de evento** — `Timestamp`, `nullable: true`: o **carimbo de tempo do evento**
@@ -96,6 +100,11 @@ qualquer um deles, a projeção do agregado não é materializável**: o fluxo d
 linha por `aggregateid`, registra `status` e escreve o carimbo em cada `whenAttribute` — se a coluna
 correspondente não existir, o consumidor de projeção falha (atributo/componente desconhecido) e a linha
 **nunca** é materializada (consultas em [persistence-q](../../persistence-q/README.md) retornam vazio).
+
+> **⚠️ Escopo — SÓ projeção de agregado.** `aggregateid` (incl. `unique: true`), `status` e os
+> `whenAttribute` são colunas do **contrato de projeção de um agregado**. Uma entity que **NÃO** é projeção de
+> agregado (ex.: tabela de **referência/lookup** ou entity criada direto, fora do fluxo comando→evento→projeção)
+> **NÃO** declara nenhuma delas — não tem `aggregateid`. Aplicar essas colunas a uma entity não-projeção é **erro**.
 
 ## Endpoints (exaustivo)
 

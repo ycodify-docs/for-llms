@@ -18,8 +18,7 @@
 ## Visão geral (mapa)
 
 > **Acesso externo** aos serviços é via **API Gateway**: uma base (host) + prefixo `/v3/<svc>` que o gateway
-> remove antes de encaminhar. Colapso interno: `composer` = auth+orgid+forger; `interpreter` = crs+q+es-n.
-> Como formar a URL: [06-autenticacao — URL base](06-autenticacao.md).
+> remove antes de encaminhar. Como formar a URL: [06-autenticacao — URL base](06-autenticacao.md).
 
 ```
                           ┌───────────┐

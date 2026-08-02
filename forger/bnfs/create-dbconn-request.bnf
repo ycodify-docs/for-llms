@@ -8,13 +8,15 @@
  * Use this grammar to construct valid JSON payloads for creating DbConn resources.
  */
 
-<dbconn-request> ::= "{" <required-fields> "}"
+<dbconn-request> ::= "{" <required-fields> [ "," <dbsqluserpassword> ] "}"
 
-<required-fields> ::= <dbsqlserveraddress> "," <dbsqlserverport> "," <dbsqlusername> "," <dbsqluserpassword>
+<required-fields> ::= <dbsqlserveraddress> "," <dbsqlname> "," <dbsqlserverport> "," <dbsqlusername>
 
-/* Required Fields */
+/* Required Fields (4) — dbsqluserpassword é OPCIONAL (ver §5) */
 
 <dbsqlserveraddress> ::= "\"dbsqlserveraddress\"" ":" <quoted-hostname>
+
+<dbsqlname> ::= "\"dbsqlname\"" ":" <quoted-nonempty-string>
 
 <dbsqlserverport> ::= "\"dbsqlserverport\"" ":" <positive-integer>
 
@@ -68,6 +70,11 @@
  *    - Pattern: ^(?!\\s*$).+
  *    - Examples: "db.example.internal", "db.example.internal", "db.example.internal"
  *
+ * 1b. dbsqlname: REQUIRED, non-empty string — nome do banco de CONEXÃO/bootstrap no SGDB ao qual conectar
+ *    (o DB que JÁ EXISTE no servidor:porta, ex.: "postgres"). É o "nome lógico da conexão" (ver dbconn.md).
+ *    ⚠️ NÃO confundir com database.dbsqlname (POST .../dbconn/{id}/database), que é o banco da APLICAÇÃO que
+ *    a plataforma CRIA (^[a-z]+$). São DOIS bancos distintos: conexão/bootstrap (já existe) vs app (criado).
+ *
  * 2. dbsqlserverport: REQUIRED, must be integer between 1 and 65535
  *    - Default: <porta> (if not provided)
  *
@@ -75,9 +82,9 @@
  *    - Pattern: ^(?!\\s*$).+
  *    - Examples: "admin_example", "admin_example"
  *
- * 4. dbsqluserpassword: REQUIRED, can be empty string
- *    - minLength: 12
- *    - Examples: "MySecureP@ssw0rd!", "ComplexPass123", ""
+ * 4. dbsqluserpassword: OPTIONAL — senha de conexão ao SGDB; pode ser omitida (conexão sem senha).
+ *    - Sem minLength (string livre). NÃO está em `required` (ver forger/openapi.yaml DbConnCreate).
+ *    - Examples: "MySecureP@ssw0rd!", "" (ou omitir o campo)
  *
  * ============================================================================
  * POST BODY EXAMPLES
@@ -85,6 +92,7 @@
  * Example 1: Valid request with strong password
  * {
  *   "dbsqlserveraddress": "db.example.internal",
+ *   "dbsqlname": "postgres",
  *   "dbsqlserverport": <porta>,
  *   "dbsqlusername": "admin_example",
  *   "dbsqluserpassword": "MySecureP@ssw0rd!"
@@ -93,6 +101,7 @@
  * Example 2: Local SQL server
  * {
  *   "dbsqlserveraddress": "db.example.internal",
+ *   "dbsqlname": "postgres",
  *   "dbsqlserverport": 5433,
  *   "dbsqlusername": "admin_example",
  *   "dbsqluserpassword": "SecretPass123!"
@@ -108,6 +117,7 @@
  *   -H "Accept: application/json" \
  *   -d '{
  *     "dbsqlserveraddress": "db.example.internal",
+ *     "dbsqlname": "postgres",
  *     "dbsqlserverport": <porta>,
  *     "dbsqlusername": "admin_example",
  *     "dbsqluserpassword": "MySecurePassword"
@@ -119,20 +129,22 @@
  * AI USAGE INSTRUCTIONS
  *
  * When constructing a request:
- * 1. ALWAYS include ALL 4 required fields: dbsqlserveraddress, dbsqlserverport,
- *    dbsqlusername, dbsqluserpassword
+ * 1. ALWAYS include the 4 REQUIRED fields: dbsqlserveraddress, dbsqlname, dbsqlserverport,
+ *    dbsqlusername. (dbsqluserpassword é OPCIONAL — ver item 5.)
+ * 1b. dbsqlname: banco de CONEXÃO/bootstrap existente no SGDB (ex.: "postgres") — NÃO é o banco da app
+ *    (esse é criado depois via POST .../database, campo database.dbsqlname, ^[a-z]+$). Dois bancos distintos.
  * 2. dbsqlserveraddress: Must be non-empty string (hostname or IP address)
  * 3. dbsqlserverport: Must be integer between 1 and 65535 (porta padrao do SGBD)
  * 4. dbsqlusername: Must be non-empty string
  *    - For servico gerenciado de banco SQL, use format: usuario@servidor
  *    - For local/standard SQL: admin_example, admin_example, etc.
- * 5. dbsqluserpassword: REQUIRED field, but CAN be empty string ""
- *    - Recommended: Use strong password for production environments
- *    - Password will be stored in database metadata
+ * 5. dbsqluserpassword: OPTIONAL — pode ser omitida (conexão sem senha) ou "" ou uma senha.
+ *    - Sem minLength. Password armazenada nos metadados da conexão.
+ *    - NÃO está em `required` (forger/openapi.yaml DbConnCreate.required = os 4 do item 1).
  * 6. No additional fields are accepted (additionalProperties: false)
  *
  * Common errors to avoid:
- * - Missing any of the 4 required fields
+ * - Missing any of the 4 required fields (dbsqluserpassword é opcional, não conta)
  * - Empty string for dbsqlserveraddress or dbsqlusername (must be non-empty)
  * - Port number outside range 1-65535
  * - Port number <= 0 or non-numeric

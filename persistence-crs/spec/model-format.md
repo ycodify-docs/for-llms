@@ -112,7 +112,9 @@ validação e do JSON publicado) e o grid de interpretação (persistence-crs/es
 
 Na **projeção** (banco de leitura), a linha de cada agregado é **identificada por `aggregateid`** — o
 `id` (UUID) do agregado. Consultas que buscam um agregado específico filtram por esse campo; o fluxo de
-projeção localiza/atualiza a linha por ele. O atributo **`status`** carrega o **estado atual** do
+projeção localiza/atualiza a linha por ele. Como a projeção default é **1:1** (uma linha por instância de
+agregado), `aggregateid` é **único** na tabela — a entity o declara com **`unique: true`** (ver
+[colunas obrigatórias](../../forger/endpoints/entity.md#colunas-obrigatórias-de-toda-projeção)). O atributo **`status`** carrega o **estado atual** do
 agregado (ver [regra do `status`](../README.md#estados-transições-e-concorrência)). Em consultas
 ([persistence-q](../../persistence-q/README.md)), `aggregateid` e `status` são campos típicos de filtro.
 
