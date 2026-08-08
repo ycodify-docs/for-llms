@@ -105,7 +105,7 @@ A cada requisição (com `X-Tenant-Id`), o serviço resolve a spec do tenant (en
 
 1. **Consulta o Forger** o status do dataschema do tenant — se **não** estiver `RUNNING` → **exceção** (o modelo não é interpretado).
 2. Usa a spec da **memória local** da instância, se presente → segue.
-3. Senão, recupera do **serviço de cache** (`../cache`; **não** Redis direto) e a carrega na memória local.
+3. Senão, recupera do **serviço de cache** (`../cache`; **não** mem-cache db direto) e a carrega na memória local.
 4. Se **não** houver no cache, **recupera do Forger e repõe no cache** (self-heal), então carrega na memória local.
 5. Se nem o Forger prover → **exceção**.
 

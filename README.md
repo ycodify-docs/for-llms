@@ -25,7 +25,7 @@
 | **persistence-q** | Consulta projeções (leitura). | [`persistence-q/`](persistence-q/README.md) |
 | **br-service** | Regras de negócio e coordenação de agregados. | [`br-service/`](br-service/README.md) |
 | **filer** | Arquivos anexos a agregados (upload/download/listar/remover). | [`filer/`](filer/README.md) |
-| **cache** | Cache distribuído (redis) do modelo publicado — **interno**, sem endpoint público. | [`cache/`](cache/README.md) |
+| **cache** | Cache distribuído (mem-cache db) do modelo publicado — **interno**, sem endpoint público. | [`cache/`](cache/README.md) |
 
 > **Camada de aplicação (não é um serviço da plataforma):** a **casca (shell) universal + BFF** — a
 > aplicação única que loga o usuário, descobre suas permissões pelo token e **injeta o miolo** por tenant.

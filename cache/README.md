@@ -1,6 +1,6 @@
 # cache — guia do serviço
 
-> **Papel:** serviço de **cache distribuído** (redis-backed) da plataforma. Guarda o **modelo publicado** de cada
+> **Papel:** serviço de **cache distribuído** (mem-cache db) da plataforma. Guarda o **modelo publicado** de cada
 > tenant (chaves de **write-model** e **read-model**) que os serviços de execução leem em runtime. É **interno** —
 > **atrás do gateway, sem rota/endpoint público**; acessado apenas pela própria plataforma (não pelo cliente).
 > Pré-requisitos: [conceitos](../02-conceitos.md), [arquitetura](../01-arquitetura.md).
@@ -17,7 +17,7 @@
 ## Acesso
 
 - **Sem endpoint público**: não é chamável via gateway (não há prefixo `/v3/cache`). Os serviços o acessam
-  **internamente** (referido como `../cache` — **não** Redis direto).
+  **internamente** (referido como `../cache` — **não** mem-cache db direto).
 - **Invalidação do modelo**: alterar um modelo em runtime exige **republicá-lo** (forger) **+ invalidar as duas
   chaves** (read-model e write-model); reiniciar o serviço sozinho não basta — ver a seção de refresh em
   [persistence-crs](../persistence-crs/README.md#carga-da-spec-do-tenant-cache-por-instância).

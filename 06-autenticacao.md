@@ -31,12 +31,12 @@ serviço (`/org/...`, `/a/{bc}/{type}`, `/up/sign-in`, …) são os **downstream
 - O gateway injeta o header **`X-Client: web`** (não é preciso enviá-lo). **`X-Forger-Credential`, ao contrário, NÃO é injetado — o chamador DEVE enviá-lo** (ver seção abaixo).
 - **Serviços internos** (atrás do gateway, **sem rota** — não alcançáveis de fora; invocados internamente pela
   plataforma): **`es-n`** (despacho de eventos, acionado pelo crs), **`br-service`** (regras/coordenação `br.route`,
-  invocado pelo crs) e **`cache`** (redis — o **forger** o usa: publicar o `.model.json` grava no cache, e criar
+  invocado pelo crs) e **`cache`** (mem-cache db — o **forger** o usa: publicar o `.model.json` grava no cache, e criar
   dataschemas para as entidades/projeções é via forger). Não há endpoint público para eles.
 - **Persistência — dois contextos** (independentes da base; escolha ortogonal ao ambiente): **prod**
   `/v3/persistence/{c,q}`; **teste** `/v3/persistence/t/{c,q}`. Os paths downstream (`/a/{bc}/{type}`, `/`) são os
   **mesmos** — só muda o segmento `t`.
-- Path fora da allowlist `/v3/{auth,orgid,forger,persistence/c,persistence/q,persistence/t/c,persistence/t/q}` → `404`; `/unsecured/**` → `404`.
+- Path fora da allowlist `/v3/{auth,orgid,forger,persistence/c,persistence/q,persistence/t/c,persistence/t/q}` → `404`; prefixos internos (sem rota pública) → `404`.
 
 ## `X-Forger-Credential` (credencial do gateway)
 

@@ -25,7 +25,7 @@
   estiver em `RUNNING`. Em `MODELING` (esquema em edição) a interpretação **não ocorre**. Ver
   [forger/dataschema — gate de status](../forger/endpoints/dataschema.md#atualizar).
 - **Spec carregada por-instância (cache):** a cada consulta o serviço resolve a spec do tenant igual ao
-  write-side — dataschema `RUNNING` via Forger → memória local → `../cache` (não Redis direto) →
+  write-side — dataschema `RUNNING` via Forger → memória local → `../cache` (não mem-cache db direto) →
   **se falta no cache, recupera do Forger e repõe** → senão exceção. Alterar o modelo só propaga após
   **invalidar o cache** (as duas chaves do modelo — read-model + write-model, valores internos) +
   republicar; **restart sozinho não resolve**. Detalhe:
