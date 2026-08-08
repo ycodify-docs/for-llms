@@ -12,6 +12,7 @@
 - Conceitos próprios
 - Índice de endpoints
 - Ciclo de vida geral
+- Autocadastro de usuário de aplicação (self-service)
 - Pontos de coordenação
 - Pitfalls (checklist do agente)
 
@@ -84,6 +85,40 @@ Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md). Contrato de f
 4. **Efeito** — cria/atualiza/remove a entidade; vínculos (conta-papel-org) e contratos podem envolver
    verificação cruzada (forger/persistência — ver coordenação).
 5. **Resposta** — `200`/`201`/`204`; erros conforme [erros.md](erros.md). Senha **nunca** é devolvida.
+
+## Autocadastro de usuário de aplicação (modo da plataforma)
+
+Padrão para um sistema deixar o **usuário final criar a própria conta** (self-service). **Conta (identidade,
+aqui no orgid)** é separada do **registro de domínio** (o agregado do próprio sistema, no persistence-crs). Duas etapas:
+
+1. **Conta na plataforma** — a tela de login oferece "autocadastrar-se"; um form **público** cria a **conta `/ua`
+   + o papel numa única transação** via [`POST /open/ua/account-role`](endpoints/publico.md) — `username`, e-mail,
+   senha + `role.name`/`role.owner`. **Qual papel** é **decisão de design do sistema** (não é fixo): um default
+   fixo, ou o usuário escolhe de um **cardápio** de papéis marcados `ispublic` — listáveis por
+   [`GET /ua/open/role/owner/{roleOwner}`](endpoints/ua-papel.md). ⚠️ **O papel precisa PRÉ-EXISTIR** (criado antes
+   via [`POST /ua/role`](endpoints/ua-papel.md)): papel inexistente → **`204` sem corpo = NADA criado** (nem a
+   conta; transação revertida); só `200` confirma. A conta mora na plataforma, **não** no banco do sistema. Login
+   depois: [`auth /ua/sign-in`](../auth/endpoints/sign-in.md) → token com `username` + papéis + tenants.
+2. **Registro de domínio** — no 1º acesso após o login (ou em **qualquer** acesso posterior, se ainda não
+   existir), o app detecta "conta com o papel, mas sem o agregado correspondente", coleta os dados que a conta
+   não cobre, e dispara o **comando de criação** do agregado
+   ([persistence-crs](../persistence-crs/endpoints/comando.md)) com o `username` **como identidade**.
+
+**`username` = chave de unicidade.** Quando o `username` é a identidade do agregado, a plataforma **recusa um
+segundo agregado com o mesmo `username`** → **1 conta = no máximo 1 registro de domínio**, sem validação manual.
+
+**Antes de transicionar o registro** vale o padrão **CQRS-ES**: consultar a projeção por `username` → ler o
+**estado atual** do agregado → só então enviar o comando (que precisa informar o estado; desatualizado →
+rejeitado). Ver [persistence-crs](../persistence-crs/README.md) (regra do `status`).
+
+**Autorização não vem do token.** Regras como "o usuário só altera o **próprio** registro" **não** são impostas
+pelo token (ele diz **quem é** e **que papéis tem**, não "que registros pode tocar") — são **regra de negócio do
+sistema** (verificar explicitamente, ex.: num processador do [br-service](../br-service/README.md)).
+
+> **Exemplos (ilustrativos, não normativos):** *conclusão adiada* — a conta existe mas o registro não; o app
+> reapresenta o formulário complementar até o agregado existir. *Pré-cadastro por papel privilegiado* — um admin
+> cria o registro **antes** de a pessoa ter conta, combinando o `username` fora do sistema; se ela se registrar
+> com outro `username`, o registro fica órfão (responsabilidade humana; a plataforma não amarra).
 
 ## Pontos de coordenação
 

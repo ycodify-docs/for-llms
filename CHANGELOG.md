@@ -2,6 +2,101 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.17 — 2026-08-08
+
+- **Autocadastro de usuário de aplicação (self-service) documentado.** Nova seção em `orgid/README.md`
+  ("Autocadastro de usuário de aplicação (modo da plataforma)"): padrão em **2 etapas** — conta `/ua` + papel via
+  `POST /open/ua/account-role` (público) → **registro de domínio** (agregado no persistence-crs) com o `username`
+  **como identidade / chave de unicidade** (1 conta = no máx. 1 registro). **Qual papel = decisão de design do
+  sistema** (default fixo OU cardápio `ispublic` via `GET /ua/open/role/owner/{roleOwner}`); o papel precisa
+  **pré-existir** (senão `204` = nada criado). Recuperação **CQRS-ES** antes de transicionar. **Autorização "só o
+  próprio registro" NÃO vem do token** — é regra de negócio (ex.: processador br-service).
+- **Descoberta**: ponteiro de topo em `06-autenticacao.md` + linha no índice orgid do `llms.txt` → a seção.
+
+## 1.16 — 2026-08-02
+
+- **orgid: `POST /open/ua/account-role` documentado por completo — e o `204` dele NÃO é sucesso.** O
+  endpoint público cria a conta externa **e** o vínculo com um papel **já existente** em **uma única
+  transação**. Papel (`name`+`owner`) inexistente → **`204` sem corpo** e **nada** é criado (nem a
+  conta): a transação é revertida. Só `200` confirma o registro.
+- **`role.owner` é o `name` da organização** dona do papel (antes descrito apenas como "espaço de
+  nomes"). E `role.label`/`role.ispublic`/`role.status`/`role.id` no corpo são **aceitos e ignorados** —
+  a doc os chamava de "metadados do papel", sugerindo um efeito que não existe: o papel vem do cadastro.
+- **Validações do registro agora na doc.** `username`: mín. 3 caracteres, só letras e dígitos, `yc`
+  reservado, normalizado para minúsculas e **único em toda a plataforma** (não por organização) —
+  duplicado → **`409`**, código antes ausente do catálogo. `password`: ao menos 1 maiúscula, 1 minúscula
+  e 1 dígito. `email`: formato `algo@algo`.
+- **Estado inicial da conta.** `account.status` aceita só `PENDING` ou `ACTIVE`; qualquer outro valor
+  vira `PENDING` **em silêncio**. `ACTIVE` cria a conta já ativa; `PENDING` exige o fluxo de hash.
+- **Chave `from` na raiz do corpo: só a presença importa.** Existindo a chave — com qualquer valor,
+  inclusive `false`/`null` — a conta nasce **ativa** e `account.status` é sobreposto. Preferir
+  `account.status`, que deixa a intenção legível.
+- **Corpo fora da forma → `510`, não `400`:** propriedade **desconhecida** dentro de `account` ou de
+  `role`, ou corpo sem `account`/`role`.
+- Atualizados: `orgid/endpoints/publico.md` (seção reescrita), `orgid/erros.md` (`409`, nota do `204`
+  enganoso, categoria "Conflito"), `orgid/exemplos.md` (exemplo #8), `orgid/openapi.yaml`
+  (`UaRegistroAccountRole`, resposta `Conflict`, path `/open/ua/account-role`), `llms-full.txt`.
+
+## 1.15 — 2026-08-02
+
+- **CORREÇÃO (persistence-q): posição dos controles de consulta e forma do `_sorting`.** A doc dizia que
+  `_paging`/`_sorting`/`_count`/`_connective`/`_cache` iam **dentro** do objeto do rótulo — **errado**. O
+  serviço lê esses controles no **nível raiz** do critério (irmãos do rótulo); postos dentro do rótulo são
+  **ignorados em silêncio** (aplica default). Além disso `_sorting` é **indexado por posição**
+  (`{ "0": { "_orderBy", "_order" } }`, até `"1"`/`"2"`), não plano. Confirmado por código
+  (`QueryServiceImpl.readByCriteria` + `ReadStatementTransformation`) + teste git-tracked
+  (`TestReadStatementJSON`).
+- **Conectivo `OR` documentado.** `_connective` (nível raiz) = `AND` (padrão) ou `OR` (maiúsculas), global
+  ao critério; não mistura AND/OR num mesmo critério; sub-condições de atributo composto são sempre AND.
+  Exemplos de `OR` (igualdade e operadores) adicionados.
+- Atualizados: `persistence-q/query-controls.md` (reescrito), `endpoints/consulta.md`, `exemplos.md`
+  (paging/sorting/OR/count), `README.md`, `openapi.yaml` (`Criterio`: controles no nível raiz, removido
+  `maxProperties:1`), `llms-full.txt`.
+- **Nota:** os controles de associação (`_associations`/`_populating`/`_level`/`_as`) permanecem **dentro**
+  do rótulo e **não têm consumidor** no código de consulta atual (provável tratamento na camada de
+  aplicação/BFF); mantidos na doc como estão, a confirmar.
+
+## 1.14 — 2026-08-01
+
+- **URL de callback do processador: endereço e path por variável de ambiente (br-service).** O
+  processador obtém o destino de rede em `PLATFORM_ENDPOINT_PERSISTENCE_C` /
+  `PLATFORM_ENDPOINT_PERSISTENCE_Q` e o path do endpoint interno em
+  `PLATFORM_ENDPOINT_PERSISTENCE_Q_UNSEC_PATH` — injetadas no ambiente do serviço e disponíveis a
+  **qualquer** processador, em qualquer nível de pasta, sem passar pelo payload. Variável ausente →
+  `400` nomeando a variável faltante. Antes a doc dizia que o path vinha "de variável de ambiente" sem
+  nomear nenhuma, o que levava o leitor a supor que a URL interna era a raiz do endereço-base.
+- **Duas superfícies espelhadas, e a escolha é ditada pelo tipo de hook.** Cada operação existe na
+  superfície **pública** (via gateway, `Authorization` + `X-Tenant-Id`) e na **interna de cluster**
+  (prefixo próprio, só `X-Tenant-Id`, negada pelo gateway). Hook síncrono tem JWT e pode as duas;
+  coordenação e projeção não têm JWT e só podem a interna. Antes o texto dizia apenas "endpoint interno,
+  path via variável de ambiente" sem nomear variável nem contrastar com a superfície pública — daí a
+  suposição frequente de que bastava apontar para o endereço-base.
+- **Contrato de resposta `400`: são duas formas, não uma.** Falha de **validação do corpo** devolve
+  `{erro}`; **rota inexistente** e **exceção no processador** devolvem `{status, mensagem, tipo}`.
+- **Ciclo de vida: o processador pode receber até três argumentos.** Com `data`, `authToken` e
+  `tenantIds` no corpo, é invocado como `(data, authToken, tenantIds)`; sem `tenantIds`, como
+  `(data, authToken)`; só com `data`, como `(data)`; sem `data`, recebe o corpo inteiro. `authToken` e
+  `tenantIds` só chegam na raiz do corpo no hook síncrono; `tenantIds` traz o `tenantId.forReadModel` do
+  modelo do agregado.
+- **JWT em hook assíncrono: oportunista, não garantido.** Parte dos fluxos de coordenação propaga o token
+  do usuário de origem em `data._meta.authToken` (para que a escrita de comando use a credencial de quem
+  originou o evento, não uma credencial de serviço fixa); outros fluxos não enviam token algum. Nunca
+  chega como argumento. Um processador assíncrono precisa funcionar sem token.
+- **Forma canônica da rota: o serviço não a valida.** A unicidade global depende da disciplina de quem
+  publica; sem o prefixo, duas organizações acabam apontando para o mesmo processador.
+  Atualizados: `br-service/README.md`, `CHANGELOG.md`.
+
+## 1.13 — 2026-07-31
+
+- **CRUD de entidade convencional (`POST /e`) documentado para o cliente.** Antes, `/e` só constava como
+  "escrita de projeção (serviço)". Agora há doc cliente para CRUD direto de **entidade convencional**
+  (tabela não-agregado, identificada por `id`/PK), distinta do caminho de **agregado** (`/a`, comando/
+  evento). Aviso: não usar `/e` em entity que é projeção de agregado event-sourced (desalinha a projeção).
+  Novo: `persistence-crs/endpoints/entidade.md`. Atualizados: `persistence-crs/endpoints/projecao.md`
+  (cross-link + enquadramento de uso interno), `persistence-crs/README.md` (índice + papel),
+  `persistence-crs/exemplos.md`, `persistence-crs/openapi.yaml` (`/e`: summary + `403`), `llms.txt`,
+  `README.md` ("Por tarefa"), `llms-full.txt` (regenerado).
+
 ## 1.12 — 2026-07-05
 
 - **Contrato de identidade `id`: projeção (Long) vs agregado (UUID).** A projeção (read model) tem DOIS

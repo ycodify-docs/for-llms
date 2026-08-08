@@ -2,7 +2,8 @@
 
 > **Papel:** executa os **comandos** definidos para um agregado num bounded context. É o **lado de
 > escrita** do CQRS-ES: valida a transição de estado, eventualmente aciona regra/coordenação e **grava
-> o evento**.
+> o evento**. Também expõe **CRUD direto de entidade convencional** (não-agregado) em `POST /e` — ver
+> [entidade](endpoints/entidade.md).
 > Pré-requisitos: [conceitos](../02-conceitos.md), [arquitetura](../01-arquitetura.md). Depende do
 > **model** publicado pelo forger (CP-1).
 
@@ -28,7 +29,7 @@
 
 ## Índice de endpoints
 
-> Base do serviço: `/a` (agregados). Apenas endpoints autenticados são documentados. Endpoints internos
+> Base do serviço: `/a` (agregados) e `/e` (entidade convencional). Apenas endpoints autenticados são documentados. Endpoints internos
 > sem autenticação e endpoints de observabilidade/administração **não** constam aqui.
 
 | Operação | Método · Path | Documento |
@@ -36,7 +37,8 @@
 | Executar comando | `POST /a/{boundedContext}/{aggregateType}` | [endpoints/comando.md](endpoints/comando.md) |
 | Ler estado do agregado | `GET /a/{boundedContext}/{aggregateType}/{id}` | [endpoints/agregado-leitura.md](endpoints/agregado-leitura.md) |
 | Ler histórico de eventos | `GET /a/{boundedContext}/{aggregateType}/{id}/history` | [endpoints/agregado-leitura.md](endpoints/agregado-leitura.md) |
-| Escrever projeção (serviço) | `POST /e` | [endpoints/projecao.md](endpoints/projecao.md) |
+| CRUD de entidade convencional (não-agregado) | `POST /e` | [endpoints/entidade.md](endpoints/entidade.md) |
+| Escrever projeção (uso interno do mesmo `/e`) | `POST /e` | [endpoints/projecao.md](endpoints/projecao.md) |
 
 Gramática do modelo de domínio: **[spec/model-format.md](spec/model-format.md)** (estrutura do
 `.model.json`: agregado, comando, evento, tipos). Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md).

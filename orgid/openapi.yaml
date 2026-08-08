@@ -99,7 +99,7 @@ paths:
   /open/up/account:
     post: { tags: [publico], summary: "Registro: conta + organização (público)", requestBody: { required: true, content: { application/json: { schema: { type: object, required: [account, org], properties: { account: { type: object }, org: { type: object, required: [name, client, alias], properties: { name: { type: string }, client: { type: string, maxLength: 12 }, alias: { type: string } } } } } } } }, responses: { '201': { description: Criado }, '400': { $ref: '#/components/responses/BadRequest' } } }
   /open/ua/account-role:
-    post: { tags: [publico], summary: "Registro externo: conta + papel (público)", requestBody: { required: true, content: { application/json: { schema: { type: object } } } }, responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/BadRequest' } } }
+    post: { tags: [publico], summary: "Registro externo: conta + papel JÁ EXISTENTE (público, transacional)", requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/UaRegistroAccountRole' } } } }, responses: { '200': { description: "OK — conta criada e associada (sem corpo)" }, '204': { description: "Papel (name+owner) inexistente — NADA é criado; não é sucesso" }, '400': { $ref: '#/components/responses/BadRequest' }, '409': { $ref: '#/components/responses/Conflict' }, '510': { description: "Corpo fora da forma: propriedade desconhecida em account/role, ou account/role ausente" } } }
   /open/up/account/by/username/{username}/exists:
     get: { tags: [publico], summary: Verifica existência da conta (público), parameters: [{ $ref: '#/components/parameters/username' }], responses: { '200': { description: Existe }, '204': { description: Não existe } } }
   /open/up/hash/for/{action}/by/{username}:
@@ -119,6 +119,7 @@ components:
   responses:
     BadRequest: { description: Requisição inválida, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
     Forbidden: { description: Acesso negado (papel/posse), content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Conflict: { description: "Conflito — identificador único já em uso (ex.: username no registro público)", content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
   schemas:
     Error: { type: object, properties: { error: { type: string } } }
     UaAccountRole:
@@ -132,3 +133,32 @@ components:
       oneOf:
         - { $ref: '#/components/schemas/UaAccountRole' }
         - { type: array, items: { $ref: '#/components/schemas/UaAccountRole' } }
+    UaRegistroAccountRole:
+      type: object
+      required: [account, role]
+      description: >
+        Registro público (sem autenticação): cria a conta externa E a associa a um papel JÁ EXISTENTE,
+        em uma única transação. Papel inexistente resulta em 204 sem corpo, sem criar nada. Propriedade
+        desconhecida dentro de account ou de role resulta em 510.
+      properties:
+        account:
+          type: object
+          required: [username, password, email]
+          description: "aceita também os demais campos da conta /ua; propriedade desconhecida -> 510"
+          properties:
+            username: { type: string, minLength: 3, pattern: '^[A-Za-z0-9]+$', description: "único em toda a plataforma (duplicado -> 409); valor 'yc' é reservado; normalizado para minúsculas" }
+            password: { type: string, description: "não branco; ao menos 1 maiúscula, 1 minúscula e 1 dígito" }
+            email: { type: string, format: email }
+            status: { type: string, enum: [PENDING, ACTIVE], default: PENDING, description: "valor fora do enum é trocado por PENDING em silêncio" }
+        role:
+          type: object
+          required: [name, owner]
+          additionalProperties: false
+          properties:
+            name: { type: string, description: "papel já cadastrado" }
+            owner: { type: string, description: "name da organização dona do papel" }
+            id: { type: integer, description: "aceito e IGNORADO" }
+            label: { type: string, description: "aceito e IGNORADO" }
+            ispublic: { type: boolean, description: "aceito e IGNORADO" }
+            status: { type: string, description: "aceito e IGNORADO" }
+        from: { description: "opcional; a PRESENÇA da chave (qualquer valor, inclusive false/null) faz a conta nascer ACTIVE, sobrepondo account.status" }

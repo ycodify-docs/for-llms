@@ -37,12 +37,13 @@
 - `/up`: [organização](orgid/endpoints/up-organizacao.md) · [conta](orgid/endpoints/up-conta.md) · [associação conta-papel-org](orgid/endpoints/up-associacao.md) · [contrato ⚠️ ignorar por ora](orgid/endpoints/up-contrato.md)
 - `/ua`: [conta](orgid/endpoints/ua-conta.md) · [papel](orgid/endpoints/ua-papel.md) · [associação conta-papel](orgid/endpoints/ua-associacao.md)
 - `/open`: [público (existência, registro, hash, e-mail)](orgid/endpoints/publico.md)
+- **Autocadastro de usuário de aplicação** (modo próprio da plataforma — self-service em 2 etapas: conta → registro de domínio): [orgid/README.md](orgid/README.md)
 - [Erros](orgid/erros.md) · [Exemplos](orgid/exemplos.md) · [OpenAPI](orgid/openapi.yaml)
 
 ## persistence-crs (comandos, CQRS-ES) — núcleo da modelagem
 - [Gramática do modelo de domínio (.model.json)](persistence-crs/spec/model-format.md): **essencial** — agregado, comando, evento, tipos, identidade, value objects.
 - [Guia](persistence-crs/README.md): pré-requisitos, ciclo do comando, estados/concorrência (regra do `status`), regras de payload.
-- [comando](persistence-crs/endpoints/comando.md) · [leitura de agregado](persistence-crs/endpoints/agregado-leitura.md) · [escrita de projeção](persistence-crs/endpoints/projecao.md)
+- [comando](persistence-crs/endpoints/comando.md) · [leitura de agregado](persistence-crs/endpoints/agregado-leitura.md) · [entidade (CRUD convencional)](persistence-crs/endpoints/entidade.md) · [escrita de projeção](persistence-crs/endpoints/projecao.md)
 - [Erros](persistence-crs/erros.md) · [Exemplos](persistence-crs/exemplos.md) · [OpenAPI](persistence-crs/openapi.yaml)
 
 ## forger (implanta recursos) — primeiro serviço usado

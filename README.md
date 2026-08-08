@@ -20,7 +20,7 @@
 | **auth** | Emissão de token (login): autentica e emite o token de acesso com a identidade. | [`auth/`](auth/README.md) |
 | **orgid** | Identidade e acesso (IAM): organizações, contas, papéis, contratos. Pré-requisito de identidade. | [`orgid/`](orgid/README.md) |
 | **forger** | Implanta os recursos do sistema (sob a organização). | [`forger/`](forger/README.md) |
-| **persistence-crs** | Executa comandos de agregados (escrita). | [`persistence-crs/`](persistence-crs/README.md) |
+| **persistence-crs** | Executa comandos de agregados (escrita) e CRUD de entidade convencional. | [`persistence-crs/`](persistence-crs/README.md) |
 | **es-n** | Despacha eventos para projeção e coordenação. | [`es-n/`](es-n/README.md) |
 | **persistence-q** | Consulta projeções (leitura). | [`persistence-q/`](persistence-q/README.md) |
 | **br-service** | Regras de negócio e coordenação de agregados. | [`br-service/`](br-service/README.md) |
@@ -44,6 +44,7 @@
 | Criar as projeções (tabelas de leitura) | [`forger/endpoints/entity.md`](forger/endpoints/entity.md) |
 | Executar/disparar um comando de domínio | [`persistence-crs/endpoints/comando.md`](persistence-crs/endpoints/comando.md) |
 | Ler o estado ou o histórico de um agregado | [`persistence-crs/endpoints/agregado-leitura.md`](persistence-crs/endpoints/agregado-leitura.md) |
+| Fazer CRUD simples de uma entidade convencional (não-agregado) | [`persistence-crs/endpoints/entidade.md`](persistence-crs/endpoints/entidade.md) |
 | Consultar projeções (query) | [`persistence-q/endpoints/consulta.md`](persistence-q/endpoints/consulta.md) |
 | Escrever uma regra de negócio ou coordenação | [`br-service/README.md`](br-service/README.md) |
 | Entender quando/como os serviços se chamam | [`coordenacao.md`](coordenacao.md) |

@@ -26,15 +26,19 @@ O corpo tem **dois modos**, detectados pelo primeiro caractere:
 ```
 
 ### Regras
-- Cada item do array tem **exatamente um** par no nível raiz: o **rótulo** → objeto de **predicados**.
+- Cada item do array tem **um rótulo** no nível raiz (nome da projeção → objeto de **predicados**),
+  **mais** os controles opcionais (`_paging`/`_sorting`/`_count`/`_connective`/`_cache`) como **irmãos** do rótulo.
 - ⚠️ **O rótulo NÃO é livre**: DEVE ser o **nome da projeção (entidade) provisionada** para o tenant
   (ex.: `pedido`) — é a projeção sobre a qual a consulta roda. Um rótulo arbitrário **falha** (`510`,
   projeção de nome `<rótulo>` inexistente). O rótulo também nomeia a chave correspondente na resposta.
 - Cada predicado é `{ "<atributo>": "<valor>" }` (igualdade) ou `{ "<atributo>": { "<op>": "<valor>" } }`
   (operadores: `eq/neq/gt/gte/lt/lte/like/ilike/in`).
-- Múltiplos predicados combinam por **`_connective`** (padrão **AND**, ou **OR**).
-- Há **controles** por critério: `_paging`, `_sorting`, `_count`, `_cache`, associações. Detalhe e
-  operadores em **[query-controls.md](../query-controls.md)**.
+- Múltiplos predicados combinam por **`_connective`** no **nível raiz** (irmão do rótulo): **`AND`**
+  (padrão) ou **`OR`** (maiúsculas), global ao critério.
+- **Controles** ficam no **nível raiz** (irmãos do rótulo, **fora** do objeto de predicados): `_paging`,
+  `_sorting` (indexado por `"0"`), `_count`, `_connective`, `_cache`. Já os de **associação**
+  (`_associations`/`_populating`/`_level`/`_as`) ficam **dentro** do rótulo. Detalhe, operadores e
+  exemplos (inclusive `OR`) em **[query-controls.md](../query-controls.md)**.
 - O **vocabulário** de atributos é o do modelo provisionado para o tenant; nome desconhecido → erro.
 - Como o rótulo é o **nome da projeção**, consultar projeções distintas já dá rótulos únicos; para
   múltiplos critérios sobre a **mesma** projeção, envie um critério por requisição (rótulos repetiriam o

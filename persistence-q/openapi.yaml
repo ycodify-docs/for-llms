@@ -17,7 +17,7 @@ paths:
       parameters: [{ $ref: '#/components/parameters/tenant' }]
       requestBody:
         required: true
-        description: "Modo detectado pelo 1º caractere: '[' array (multi-critério) ou '{' object (critério único). Cada critério: { rótulo: { predicado: valor } }."
+        description: "Modo detectado pelo 1º caractere: '[' array (multi-critério) ou '{' object (critério único). Cada critério: { rótulo: { predicados } } MAIS controles opcionais (_paging/_sorting/_count/_connective/_cache) no MESMO nível (irmãos do rótulo)."
         content:
           application/json:
             schema:
@@ -45,6 +45,11 @@ components:
     Criterio:
       type: object
       minProperties: 1
-      maxProperties: 1
-      description: "Um rótulo (escolhido pelo cliente) → objeto de predicados (combinados por E)."
+      description: "Um rótulo (= nome da projeção) → objeto de predicados; MAIS controles opcionais no MESMO nível (irmãos do rótulo). Predicados combinam por _connective (AND padrão | OR)."
+      properties:
+        _connective: { type: string, enum: [AND, OR], description: "Combina os predicados; padrão AND; global ao critério." }
+        _paging: { type: object, properties: { _maxRegisters: { type: integer }, _firstRegister: { type: integer } } }
+        _sorting: { type: object, description: "Indexado por posição \"0\",\"1\",\"2\"; cada um { _orderBy, _order }.", additionalProperties: { type: object, properties: { _orderBy: { type: string }, _order: { type: string, enum: [ASC, DESC] } } } }
+        _count: { type: boolean, description: "true devolve totalRegisters." }
+        _cache: { type: object, properties: { _behavior: { type: string, enum: [use, evict, ignore] }, _ttl: {} } }
       additionalProperties: { type: object, additionalProperties: true }

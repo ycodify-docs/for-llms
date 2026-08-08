@@ -47,7 +47,7 @@ paths:
       responses: { '200': { description: Lista de eventos }, '204': { description: Sem eventos } }
   /e:
     post:
-      summary: Escrever projeção (serviço autorizado)
+      summary: Entidade convencional (CRUD direto) — mesmo endpoint da escrita de projeção interna
       parameters: [{ $ref: '#/components/parameters/tenant' }]
       requestBody:
         required: true
@@ -61,6 +61,7 @@ paths:
         '201': { description: Criado (action CREATE) }
         '200': { description: OK (action UPDATE/DELETE) }
         '400': { $ref: '#/components/responses/BadRequest' }
+        '403': { $ref: '#/components/responses/Forbidden' }
         '510': { $ref: '#/components/responses/StateOrProcessing' }
 components:
   securitySchemes:

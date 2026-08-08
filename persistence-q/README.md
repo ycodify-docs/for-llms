@@ -69,8 +69,11 @@ A consulta é **idempotente** e **não** modifica estado.
 
 ## Linguagem de consulta (resumo)
 
-- Cada **critério** é um objeto com **um** identificador de consulta (rótulo escolhido pelo cliente)
-  mapeando para um conjunto de **predicados** (pares chave-valor, combinados por "E").
+- Cada **critério** é um objeto com **um** identificador de consulta (o rótulo = nome da projeção)
+  mapeando para um conjunto de **predicados** (pares chave-valor). A combinação é dada por `_connective`
+  (**`AND`** padrão, ou **`OR`**), declarado no **nível raiz** do critério (irmão do rótulo).
+- **Controles** (`_paging`, `_sorting` indexado por `"0"`, `_count`, `_connective`, `_cache`) ficam no
+  **nível raiz** — **não** dentro do objeto de predicados. Detalhe: [query-controls.md](query-controls.md).
 - O rótulo aparece **literalmente na resposta**, agrupando os registros encontrados.
 - O **vocabulário** de predicados é definido pelo modelo do tenant; nome desconhecido → erro de
   tradução de critério.

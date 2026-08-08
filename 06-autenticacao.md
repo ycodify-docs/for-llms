@@ -4,6 +4,9 @@
 > **`X-Forger-Credential`** (credencial do gateway) + o cabeçalho `Authorization` + o cabeçalho de tenant
 > `X-Tenant-Id`. Pré-requisitos: [conceitos](02-conceitos.md).
 
+> **Autocadastro de conta de usuário final (self-service):** a plataforma tem um **modo próprio** (conta na
+> plataforma → registro de domínio) — ver [orgid — Autocadastro de usuário de aplicação](orgid/README.md).
+
 ## URL base — via **API Gateway** (`/v3/<svc>`)
 
 O acesso aos serviços é por um **API Gateway**: **um host** (a base) e o serviço é escolhido pelo **prefixo do

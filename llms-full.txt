@@ -3,7 +3,6 @@
 > ⚠️ FALLBACK: corpus inteiro num arquivo (contexto pequeno). Caminho primário: `llms.txt`.
 > Delimitador por documento: `<!-- ===== <path> ===== -->`. OpenAPI (`*/openapi.yaml`) não concatenado.
 
-
 <!-- ===== README.md ===== -->
 
 # Documentação da plataforma (para agentes)
@@ -19,6 +18,7 @@
 3. [`01-arquitetura.md`](01-arquitetura.md) — fluxo ponta a ponta entre os serviços.
 4. [`03-fluxo-de-deploy.md`](03-fluxo-de-deploy.md) — como implantar um sistema do zero.
 5. [`coordenacao.md`](coordenacao.md) — pontos de articulação entre serviços.
+6. [`06-autenticacao.md`](06-autenticacao.md) — como formar a requisição: **URL base** (API Gateway, `/v3/<svc>`) + `Authorization` + `X-Tenant-Id`.
 
 ## Documentação por serviço
 
@@ -27,11 +27,12 @@
 | **auth** | Emissão de token (login): autentica e emite o token de acesso com a identidade. | [`auth/`](auth/README.md) |
 | **orgid** | Identidade e acesso (IAM): organizações, contas, papéis, contratos. Pré-requisito de identidade. | [`orgid/`](orgid/README.md) |
 | **forger** | Implanta os recursos do sistema (sob a organização). | [`forger/`](forger/README.md) |
-| **persistence-crs** | Executa comandos de agregados (escrita). | [`persistence-crs/`](persistence-crs/README.md) |
+| **persistence-crs** | Executa comandos de agregados (escrita) e CRUD de entidade convencional. | [`persistence-crs/`](persistence-crs/README.md) |
 | **es-n** | Despacha eventos para projeção e coordenação. | [`es-n/`](es-n/README.md) |
 | **persistence-q** | Consulta projeções (leitura). | [`persistence-q/`](persistence-q/README.md) |
 | **br-service** | Regras de negócio e coordenação de agregados. | [`br-service/`](br-service/README.md) |
 | **filer** | Arquivos anexos a agregados (upload/download/listar/remover). | [`filer/`](filer/README.md) |
+| **cache** | Cache distribuído (redis) do modelo publicado — **interno**, sem endpoint público. | [`cache/`](cache/README.md) |
 
 > **Camada de aplicação (não é um serviço da plataforma):** a **casca (shell) universal + BFF** — a
 > aplicação única que loga o usuário, descobre suas permissões pelo token e **injeta o miolo** por tenant.
@@ -50,6 +51,7 @@
 | Criar as projeções (tabelas de leitura) | [`forger/endpoints/entity.md`](forger/endpoints/entity.md) |
 | Executar/disparar um comando de domínio | [`persistence-crs/endpoints/comando.md`](persistence-crs/endpoints/comando.md) |
 | Ler o estado ou o histórico de um agregado | [`persistence-crs/endpoints/agregado-leitura.md`](persistence-crs/endpoints/agregado-leitura.md) |
+| Fazer CRUD simples de uma entidade convencional (não-agregado) | [`persistence-crs/endpoints/entidade.md`](persistence-crs/endpoints/entidade.md) |
 | Consultar projeções (query) | [`persistence-q/endpoints/consulta.md`](persistence-q/endpoints/consulta.md) |
 | Escrever uma regra de negócio ou coordenação | [`br-service/README.md`](br-service/README.md) |
 | Entender quando/como os serviços se chamam | [`coordenacao.md`](coordenacao.md) |
@@ -60,6 +62,7 @@
 | Injetar o miolo de um tenant em runtime | [`shell/injecao.md`](shell/injecao.md) |
 | Entender o contrato casca↔miolo | [`shell/contrato-miolo.md`](shell/contrato-miolo.md) |
 | Evitar erros comuns | [`05-antipatterns.md`](05-antipatterns.md) |
+| Entender o isolamento multi-tenant dos agentes + entrega de código | [`07-isolamento-e-entrega.md`](07-isolamento-e-entrega.md) |
 
 ## Exemplos concretos
 
@@ -250,6 +253,9 @@ infraestrutura são referidos por papéis abstratos:
 
 ## Visão geral (mapa)
 
+> **Acesso externo** aos serviços é via **API Gateway**: uma base (host) + prefixo `/v3/<svc>` que o gateway
+> remove antes de encaminhar. Como formar a URL: [06-autenticacao — URL base](06-autenticacao.md).
+
 ```
                           ┌───────────┐
    (1) modelos+recursos   │  forger   │  publica modelos no cache distribuído
@@ -395,6 +401,7 @@ a **fonte da verdade** de cada um é:
 | Pontos de **coordenação** entre serviços (CP-n) | [coordenacao.md](coordenacao.md) |
 | **Ordem de deploy** dos recursos | [03-fluxo-de-deploy.md](03-fluxo-de-deploy.md) |
 | Vocabulário **abstrato de infraestrutura** | [02-conceitos.md](02-conceitos.md#vocabulário-de-infraestrutura-termos-abstratos) |
+| **URL base / endereçamento** (API Gateway, prefixo `/v3/<svc>`) | [06-autenticacao.md](06-autenticacao.md) |
 
 Ao corrigir um desses fatos, **edite primeiro o documento canônico** e propague.
 
@@ -668,8 +675,54 @@ Tolere a breve defasagem de propagação (reconsulte se necessário). Ver
 
 # Autenticação e identificação de tenant
 
-> Como preencher os dois itens que **toda** requisição de comando/consulta exige: o cabeçalho
-> `Authorization` e o cabeçalho de tenant `X-Tenant-Id`. Pré-requisitos: [conceitos](02-conceitos.md).
+> Como formar uma requisição válida: a **URL base** (via API Gateway, prefixo `/v3/<svc>`) + o cabeçalho
+> **`X-Forger-Credential`** (credencial do gateway) + o cabeçalho `Authorization` + o cabeçalho de tenant
+> `X-Tenant-Id`. Pré-requisitos: [conceitos](02-conceitos.md).
+
+> **Autocadastro de conta de usuário final (self-service):** a plataforma tem um **modo próprio** (conta na
+> plataforma → registro de domínio) — ver [orgid — Autocadastro de usuário de aplicação](orgid/README.md).
+
+## URL base — via **API Gateway** (`/v3/<svc>`)
+
+O acesso aos serviços é por um **API Gateway**: **um host** (a base) e o serviço é escolhido pelo **prefixo do
+path `/v3/<svc>`**. A base é env-specific:
+
+| Ambiente | Base (host do gateway) |
+|---|---|
+| produção | `https://api.ycodify.com` |
+| dev local | `http://localhost:8080` |
+
+Prefixo por serviço — o gateway **remove** o prefixo antes de encaminhar, então os paths documentados em cada
+serviço (`/org/...`, `/a/{bc}/{type}`, `/up/sign-in`, …) são os **downstream**: anexe-os **após** o prefixo.
+
+| Serviço | Prefixo | Exemplo (prod) |
+|---|---|---|
+| forger | `/v3/forger` | `https://api.ycodify.com/v3/forger/org/{org}/dbconn` |
+| auth | `/v3/auth` | `https://api.ycodify.com/v3/auth/up/sign-in` |
+| orgid | `/v3/orgid` | `https://api.ycodify.com/v3/orgid/open/up/account` |
+| persistence-crs | `/v3/persistence/c` | `https://api.ycodify.com/v3/persistence/c/a/{bc}/{type}` |
+| persistence-q | `/v3/persistence/q` | `https://api.ycodify.com/v3/persistence/q/` |
+
+- O gateway injeta o header **`X-Client: web`** (não é preciso enviá-lo). **`X-Forger-Credential`, ao contrário, NÃO é injetado — o chamador DEVE enviá-lo** (ver seção abaixo).
+- **Serviços internos** (atrás do gateway, **sem rota** — não alcançáveis de fora; invocados internamente pela
+  plataforma): **`es-n`** (despacho de eventos, acionado pelo crs), **`br-service`** (regras/coordenação `br.route`,
+  invocado pelo crs) e **`cache`** (redis — o **forger** o usa: publicar o `.model.json` grava no cache, e criar
+  dataschemas para as entidades/projeções é via forger). Não há endpoint público para eles.
+- **Persistência — dois contextos** (independentes da base; escolha ortogonal ao ambiente): **prod**
+  `/v3/persistence/{c,q}`; **teste** `/v3/persistence/t/{c,q}`. Os paths downstream (`/a/{bc}/{type}`, `/`) são os
+  **mesmos** — só muda o segmento `t`.
+- Path fora da allowlist `/v3/{auth,orgid,forger,persistence/c,persistence/q,persistence/t/c,persistence/t/q}` → `404`; `/unsecured/**` → `404`.
+
+## `X-Forger-Credential` (credencial do gateway)
+
+- **Obrigatório em TODA requisição ao gateway** — auth, orgid, forger e persistence (c/q, prod/teste).
+  O API Gateway rejeita a requisição sem ele.
+- Valor: um **UUID** — a credencial do gateway, **fornecida no onboarding** (não é derivável nem escolhida
+  pelo chamador). Trate-a como segredo (não commitar; redação em logs).
+- ⚠️ **Necessário ANTES do login**: como o próprio `POST /up/sign-in` (ou `/ua/sign-in`) passa pelo gateway,
+  ele já exige `X-Forger-Credential`. **Sem esse header não se obtém o token** — logo ele precede a obtenção
+  do `Authorization: Bearer`.
+- Envie em cada requisição: `-H "X-Forger-Credential: <uuid>"`.
 
 ## `Authorization` (token de acesso)
 
@@ -684,6 +737,25 @@ Tolere a breve defasagem de propagação (reconsulte se necessário). Ver
 > Obtenha o token autenticando no **[auth](auth/endpoints/sign-in.md)**; depois use-o em
 > `Authorization: Bearer <token>` nos demais serviços.
 
+## Autorização (RBAC por papéis)
+
+Autenticação diz **quem é** o portador; a **autorização** diz **o que ele pode** — por **papéis** (roles).
+São **dois eixos**, ambos resolvidos comparando os **papéis do JWT** contra uma lista permitida (interseção
+vazia → **`403`**):
+
+| Eixo | Onde a lista é declarada | Controla |
+|---|---|---|
+| **WRITE** (comando no agregado) | `.model.json` → `command.<X>.roles[]` ([model-format](persistence-crs/spec/model-format.md#comandos)) | executar comando via **persistence-crs** |
+| **READ** (projeção) | entity `_conf.accessControl.read[]` ([forger/entity](forger/endpoints/entity.md)) | consultar projeção via **persistence-q** |
+| **WRITE na projeção** | entity `_conf.accessControl.write[]` | **só a plataforma** (a persistence-crs grava a projeção como `MASTER`; o app **nunca** escreve o read-model direto) |
+
+- **Papéis: UPPERCASE**, **sem** prefixo `ROLE_` (o runtime compara case-sensitive; adiciona o prefixo se
+  precisar). Vale em `command.roles[]`, em `accessControl.{read,write}` e na criação de papel.
+- **`accessControl` é opcional**: o Forger aplica o default `{read:[MASTER],write:[MASTER]}` em toda entity; se
+  **declarado**, `MASTER` deve constar em `read` e `write` (ver [forger/entity](forger/endpoints/entity.md)).
+- Os **papéis** (criar `MASTER` e os demais na organização, vincular usuários) são geridos no **[orgid](orgid/README.md)**
+  (`POST /ua/role`) — sem isso, ninguém tem authority para operar.
+
 ## `X-Tenant-Id` (identificação do tenant)
 
 - O **`tenant-id`** isola o processamento de comandos, eventos e projeções (ver [conceitos](02-conceitos.md)).
@@ -695,13 +767,14 @@ Tolere a breve defasagem de propagação (reconsulte se necessário). Ver
 
 ## Resumo por requisição
 
-| Serviço · operação | `Authorization` | `X-Tenant-Id` |
-|---|---|---|
-| forger · recursos/model/process | sim | não (usa `{org}`/`{project}`/`{tenantId}` no caminho) |
-| persistence-crs · comando/leitura/projeção | sim | **sim** |
-| persistence-q · consulta | sim | **sim** |
-| br-service · `/br` | (chamado pelo persistence-crs) | propagado pelo chamador |
-| es-n · acionar processamento | operacional/interno | tenant no caminho |
+| Serviço · operação | `X-Forger-Credential` | `Authorization` | `X-Tenant-Id` |
+|---|---|---|---|
+| auth · `up/sign-in` · `ua/sign-in` | **sim** | não (é quem emite) | não |
+| forger · recursos/model/process | **sim** | sim | não (usa `{org}`/`{project}`/`{tenantId}` no caminho) |
+| persistence-crs · comando/leitura/projeção | **sim** | sim | **sim** |
+| persistence-q · consulta | **sim** | sim | **sim** |
+| br-service · `/br` | (interno) | (chamado pelo persistence-crs) | propagado pelo chamador |
+| es-n · acionar processamento | (interno) | operacional/interno | tenant no caminho |
 
 <!-- ===== coordenacao.md ===== -->
 
@@ -890,6 +963,12 @@ Os pontos de br-service são **hooks de código** (funções **JavaScript** inje
 - **Esquecer cabeçalhos** → comando/consulta sem `Authorization` **e** `X-Tenant-Id` → `403`/rejeição.
 - **Achar que o `.model.json` cria filas/tabelas** → não cria: tabelas vêm de `entity`; filas, de
   `process`/es-n. Ver [arquitetura — de onde vêm as filas](01-arquitetura.md#origem-das-filas).
+- **Papel (role) em lowercase** ou com prefixo `ROLE_` → o runtime compara **case-sensitive** e sem prefixo:
+  declare **UPPERCASE** e **sem** `ROLE_` em `command.roles[]`, em `accessControl.{read,write}` e na criação de papel.
+- **App cliente escrever direto na projeção (read-model)** → o read-model só é gravado pela plataforma
+  (persistence-crs, como `MASTER`); o app **envia comando** e a projeção é materializada. Ver [autorização](06-autenticacao.md#autorização-rbac-por-papéis).
+- **Declarar `accessControl` e esquecer `MASTER`** → o campo é **opcional** (default `MASTER`); **se** declarado,
+  `MASTER` deve constar em `read` **e** `write`. Ver [forger/entity](forger/endpoints/entity.md).
 
 ## forger
 
@@ -1014,9 +1093,9 @@ Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md). Contrato de f
 Resposta de sucesso (`200`):
 
 ```jsonc
-{ "token": "<token de acesso>", "type": "Bearer",
+{ "accessToken": "<token de acesso>", "tokenType": "Bearer",
   "id": 0, "username": "...", "name": "...", "email": "...",
-  "roles": ["..."], "sessionId": "<uuid da sessão>" }
+  "roles": ["..."], "mcpSessionId": "<uuid da sessão>" }
 ```
 
 O **token de acesso** é o que vai em `Authorization: Bearer <token>`. Ele embute, como atributos
@@ -1077,9 +1156,9 @@ Cabeçalhos: `Content-Type: application/json`. **Não** exige `Authorization` (�
 `200`:
 
 ```jsonc
-{ "token": "<token de acesso>", "type": "Bearer",
+{ "accessToken": "<token de acesso>", "tokenType": "Bearer",
   "id": 0, "username": "...", "name": "...", "email": "...",
-  "roles": ["..."], "sessionId": "<uuid da sessão>" }
+  "roles": ["..."], "mcpSessionId": "<uuid da sessão>" }
 ```
 
 Use `token` em `Authorization: Bearer <token>` nas chamadas seguintes. O token embute usuário, papéis,
@@ -1170,8 +1249,8 @@ Em erro, a resposta tem o **status HTTP** e um corpo com `status` + mensagem.
 POST /up/sign-in
 { "username": "alice", "password": "•••" }
 → 200
-{ "token": "<token>", "type": "Bearer", "id": 1, "username": "alice",
-  "name": "Alice", "email": "alice@acme.com", "roles": ["API_MASTER"], "sessionId": "<uuid>" }
+{ "accessToken": "<token>", "tokenType": "Bearer", "id": 1, "username": "alice",
+  "name": "Alice", "email": "alice@acme.com", "roles": ["API_MASTER"], "mcpSessionId": "<uuid>" }
 ```
 
 Use o token nas chamadas seguintes: `Authorization: Bearer <token>`.
@@ -1181,7 +1260,7 @@ Use o token nas chamadas seguintes: `Authorization: Bearer <token>`.
 ```
 POST /ua/sign-in
 { "username": "cliente1", "password": "•••" }
-→ 200  { "token": "<token>", "type": "Bearer", ... }   // token inclui os tenants do usuário
+→ 200  { "accessToken": "<token>", "tokenType": "Bearer", ... }   // accessToken inclui os tenants do usuário
 ```
 
 ## 3. Usar o token (em outro serviço)
@@ -1197,7 +1276,7 @@ Headers: Authorization: Bearer <token>, X-Tenant-Id: <tenant-id>
 ```
 GET /up/sign-in/renew
 Headers: Authorization: Bearer <token atual>
-→ 200  { "token": "<novo token>", ... }
+→ 200  { "accessToken": "<novo token>", ... }
 ```
 
 ## 5. Erros comuns
@@ -1227,6 +1306,7 @@ GET  /up/sign-in/renew   (sem token ou token expirado)             → 401
 - Conceitos próprios
 - Índice de endpoints
 - Ciclo de vida geral
+- Autocadastro de usuário de aplicação (self-service)
 - Pontos de coordenação
 - Pitfalls (checklist do agente)
 
@@ -1299,6 +1379,40 @@ Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md). Contrato de f
 4. **Efeito** — cria/atualiza/remove a entidade; vínculos (conta-papel-org) e contratos podem envolver
    verificação cruzada (forger/persistência — ver coordenação).
 5. **Resposta** — `200`/`201`/`204`; erros conforme [erros.md](erros.md). Senha **nunca** é devolvida.
+
+## Autocadastro de usuário de aplicação (modo da plataforma)
+
+Padrão para um sistema deixar o **usuário final criar a própria conta** (self-service). **Conta (identidade,
+aqui no orgid)** é separada do **registro de domínio** (o agregado do próprio sistema, no persistence-crs). Duas etapas:
+
+1. **Conta na plataforma** — a tela de login oferece "autocadastrar-se"; um form **público** cria a **conta `/ua`
+   + o papel numa única transação** via [`POST /open/ua/account-role`](endpoints/publico.md) — `username`, e-mail,
+   senha + `role.name`/`role.owner`. **Qual papel** é **decisão de design do sistema** (não é fixo): um default
+   fixo, ou o usuário escolhe de um **cardápio** de papéis marcados `ispublic` — listáveis por
+   [`GET /ua/open/role/owner/{roleOwner}`](endpoints/ua-papel.md). ⚠️ **O papel precisa PRÉ-EXISTIR** (criado antes
+   via [`POST /ua/role`](endpoints/ua-papel.md)): papel inexistente → **`204` sem corpo = NADA criado** (nem a
+   conta; transação revertida); só `200` confirma. A conta mora na plataforma, **não** no banco do sistema. Login
+   depois: [`auth /ua/sign-in`](../auth/endpoints/sign-in.md) → token com `username` + papéis + tenants.
+2. **Registro de domínio** — no 1º acesso após o login (ou em **qualquer** acesso posterior, se ainda não
+   existir), o app detecta "conta com o papel, mas sem o agregado correspondente", coleta os dados que a conta
+   não cobre, e dispara o **comando de criação** do agregado
+   ([persistence-crs](../persistence-crs/endpoints/comando.md)) com o `username` **como identidade**.
+
+**`username` = chave de unicidade.** Quando o `username` é a identidade do agregado, a plataforma **recusa um
+segundo agregado com o mesmo `username`** → **1 conta = no máximo 1 registro de domínio**, sem validação manual.
+
+**Antes de transicionar o registro** vale o padrão **CQRS-ES**: consultar a projeção por `username` → ler o
+**estado atual** do agregado → só então enviar o comando (que precisa informar o estado; desatualizado →
+rejeitado). Ver [persistence-crs](../persistence-crs/README.md) (regra do `status`).
+
+**Autorização não vem do token.** Regras como "o usuário só altera o **próprio** registro" **não** são impostas
+pelo token (ele diz **quem é** e **que papéis tem**, não "que registros pode tocar") — são **regra de negócio do
+sistema** (verificar explicitamente, ex.: num processador do [br-service](../br-service/README.md)).
+
+> **Exemplos (ilustrativos, não normativos):** *conclusão adiada* — a conta existe mas o registro não; o app
+> reapresenta o formulário complementar até o agregado existir. *Pré-cadastro por papel privilegiado* — um admin
+> cria o registro **antes** de a pessoa ter conta, combinando o `username` fora do sistema; se ela se registrar
+> com outro `username`, o registro fica órfão (responsabilidade humana; a plataforma não amarra).
 
 ## Pontos de coordenação
 
@@ -1958,21 +2072,31 @@ Cria a **conta** (estado inicial **pendente**) **e** a **organização**, vincul
 **Resposta:** `201` — conta criada (com `id`; senha omitida). Depois: **ativar** (fluxo de hash) e seguir para o forger.
 
 ## POST /open/ua/account-role — registro (externo): conta + papel
-Cria uma conta **externa** e a associa a um **papel**.
+Cria uma conta **externa** **e** a associa a um **papel já existente**, em **uma única transação**: se
+qualquer etapa falhar, **nada** é criado. O papel **não** é criado aqui — precisa já estar cadastrado
+(ver [ua-papel.md](ua-papel.md)).
 
-**Corpo** (JSON):
+**Corpo** (JSON) — na raiz: `account` (obrigatório), `role` (obrigatório) e `from` (opcional).
 
 | Campo | Tipo | Obrig. | Significado |
 |---|---|---|---|
-| `account.username` | string | sim | Login. |
-| `account.password` | string | sim | Senha. |
-| `account.email` | string | sim | E-mail. |
-| `account.*` | — | não | Demais campos da conta externa (ver [ua-conta.md](ua-conta.md)). |
-| `role.name` | string | sim | Papel a associar. |
-| `role.owner` | string | sim | Dono (espaço de nomes) do papel. |
-| `role.label` / `role.ispublic` / `role.status` | — | não | Metadados do papel. |
+| `account.username` | string | **sim** | Login. **Mín. 3 caracteres**, **só letras e dígitos**, normalizado para minúsculas; o valor `yc` é **reservado**. **Único em toda a plataforma** (não por organização) — já em uso → `409`. Fora das regras → `400`. |
+| `account.password` | string | **sim** | Senha. Não pode ser em branco e precisa ter **ao menos 1 maiúscula, 1 minúscula e 1 dígito** — senão `400`. |
+| `account.email` | string | **sim** | E-mail no formato `algo@algo` — senão `400`. |
+| `account.status` | string | não | Só `PENDING` ou `ACTIVE`; **qualquer outro valor vira `PENDING` em silêncio**. `PENDING` (padrão) exige ativação pelo fluxo de hash antes do login. |
+| `account.*` | — | não | Demais campos da conta externa (ver [ua-conta.md](ua-conta.md)). Normalizados para minúsculas; omitidos viram string vazia. |
+| `role.name` | string | **sim** | Nome do papel — **já existente**. |
+| `role.owner` | string | **sim** | Dono do papel: o **`name` da organização** (é ele que forma o espaço de nomes dos papéis `/ua`). |
+| `from` | qualquer | não | **Basta a chave existir na raiz** — o valor é irrelevante (inclusive `false`/`null`): a conta nasce **ativa**, dispensando o fluxo de hash. **Sobrepõe `account.status`.** Prefira `account.status` para deixar a intenção legível. |
 
-**Resposta:** `200` (sem corpo).
+> ⚠️ **`204` aqui NÃO é sucesso.** Papel (`name`+`owner`) inexistente → **`204` sem corpo** e **nada é
+> criado** (nem a conta) — a transação é revertida. Só `200` confirma o registro; confirme antes que o
+> papel existe.
+> **`510`:** chave **desconhecida** dentro de `account` ou de `role`, ou corpo sem `account`/`role`.
+> **Aceitos e ignorados:** `role.label`, `role.ispublic`, `role.status`, `role.id` — o papel vem do
+> cadastro, não do corpo. A associação conta-papel nasce sempre **ativa**, seja qual for o corpo.
+
+**Resposta:** `200` (sem corpo) — conta criada e associada. Erros: `400`, `409`, `510`; e `204` (papel inexistente, nada criado).
 
 ## GET /open/up/hash/for/{action}/by/{username}
 ## GET /open/ua/hash/for/{action}/by/{username}
@@ -2032,9 +2156,10 @@ Em erro, a resposta tem o status HTTP e uma mensagem. (Internamente as mensagens
 |---|---|---|---|
 | `200` | OK | Leitura/atualização/remoção bem-sucedida; "existe" verdadeiro. | — |
 | `201` | Criado | Criação de conta/vínculo. | — |
-| `204` | Sem conteúdo | Não encontrado; "existe" falso; lista vazia. | Tratar como ausência, não erro. |
+| `204` | Sem conteúdo | Não encontrado; "existe" falso; lista vazia. **Em `POST /open/ua/account-role`: papel inexistente — e nada é criado.** | Tratar como ausência, não erro. |
 | `400` | Requisição inválida | Campo obrigatório ausente; formato inválido; recurso referenciado inexistente. | Corrigir o corpo/parâmetros. |
 | `403` | Acesso negado | Sem o **papel** exigido **na organização**; violação de posse. | Usar credencial com o papel correto na org. |
+| `409` | Conflito | Identificador **único** já em uso. No registro público `POST /open/ua/account-role`, `account.username` já existe **em toda a plataforma** — o login é único globalmente, **não** por organização. | Escolher outro `username`; checar antes com `GET /open/{up\|ua}/account/by/username/{username}/exists`. |
 | `500` | Erro interno | Falha inesperada. | Retentar; se persistir, escalar. |
 | `510` | Falha **não tratada** (catch-all) | Exceção não mapeada ao executar a operação — **não** é validação de campo (essas dão `400`/`204`). Ex.: corpo incompleto que não casa a forma exata; contexto que impede montar o objeto; falha em operação dependente (ex.: envio de e-mail). | Conferir o **corpo exato** e os **pré-requisitos** do endpoint; garantir que entidades referenciadas existem; então retentar. |
 
@@ -2044,6 +2169,11 @@ Em erro, a resposta tem o status HTTP e uma mensagem. (Internamente as mensagens
 > seja **objeto** (associar/status) ou **array** (lote) conforme o endpoint. Ver
 > [endpoints/ua-associacao.md](endpoints/ua-associacao.md).
 
+> **`204` no registro público `/open/ua/account-role` é falha, não sucesso.** Se o papel (`name`+`owner`)
+> não existir, a resposta é `204` **sem corpo** e **nada** é criado — nem a conta, nem o vínculo (a
+> transação inteira é revertida). Só `200` confirma o registro. Ver
+> [endpoints/publico.md](endpoints/publico.md).
+
 ## Categorias (diagnóstico)
 
 | Categoria | Significado |
@@ -2052,6 +2182,7 @@ Em erro, a resposta tem o status HTTP e uma mensagem. (Internamente as mensagens
 | Autorização | Papel insuficiente ou posse de organização ausente (`403`). |
 | Validação | Corpo/parâmetro malformado ou incompleto (`400`). |
 | Não encontrado | Entidade inexistente (`204`/`400`). |
+| Conflito | Identificador único já em uso (`409`) — ex.: `username` no registro público. |
 | Serviço dependente | Falha ao consultar/persistir em outro serviço (forger/persistência). |
 | Envio de e-mail | Falha na entrega de notificação (`510`). |
 
@@ -2135,6 +2266,27 @@ Headers: Authorization: ...
 > associação → `510` (falha não tratada, não validação de campo). Ver [erros.md](erros.md) e
 > [endpoints/ua-associacao.md](endpoints/ua-associacao.md).
 
+## 8. Registrar conta externa + papel de uma vez (público, sem token)
+
+Contraparte **pública** do #7: cria a conta **e** o vínculo numa transação. O papel (`name`+`owner`)
+**já precisa existir**; `owner` é o `name` da organização.
+
+```
+POST /open/ua/account-role
+{ "account": { "username": "bob", "email": "bob@acme.com", "password": "•••" },
+  "role": { "name": "cliente", "owner": "acme" } }
+→ 200   // conta criada PENDENTE + vínculo ativo; ativar pelo fluxo de hash (#2)
+
+// nascer já ativa (dispensa o hash): status ACTIVE no account
+{ "account": { "username": "bob", "email": "bob@acme.com", "password": "•••", "status": "ACTIVE" },
+  "role": { "name": "cliente", "owner": "acme" } }
+→ 200
+
+// papel "cliente"/"acme" inexistente  → 204 sem corpo e NADA criado (204 aqui não é sucesso)
+// username já usado na plataforma     → 409
+// chave desconhecida em account/role  → 510
+```
+
 > O `name` da org (`acme`) é o `{org}` dos caminhos do forger. Papéis `/up` são `API_*`; papéis `/ua`
 > têm `owner` (espaço de nomes). Ver [README](README.md) e [coordenação](../coordenacao.md).
 
@@ -2144,7 +2296,8 @@ Headers: Authorization: ...
 
 > **Papel:** executa os **comandos** definidos para um agregado num bounded context. É o **lado de
 > escrita** do CQRS-ES: valida a transição de estado, eventualmente aciona regra/coordenação e **grava
-> o evento**.
+> o evento**. Também expõe **CRUD direto de entidade convencional** (não-agregado) em `POST /e` — ver
+> [entidade](endpoints/entidade.md).
 > Pré-requisitos: [conceitos](../02-conceitos.md), [arquitetura](../01-arquitetura.md). Depende do
 > **model** publicado pelo forger (CP-1).
 
@@ -2170,7 +2323,7 @@ Headers: Authorization: ...
 
 ## Índice de endpoints
 
-> Base do serviço: `/a` (agregados). Apenas endpoints autenticados são documentados. Endpoints internos
+> Base do serviço: `/a` (agregados) e `/e` (entidade convencional). Apenas endpoints autenticados são documentados. Endpoints internos
 > sem autenticação e endpoints de observabilidade/administração **não** constam aqui.
 
 | Operação | Método · Path | Documento |
@@ -2178,7 +2331,8 @@ Headers: Authorization: ...
 | Executar comando | `POST /a/{boundedContext}/{aggregateType}` | [endpoints/comando.md](endpoints/comando.md) |
 | Ler estado do agregado | `GET /a/{boundedContext}/{aggregateType}/{id}` | [endpoints/agregado-leitura.md](endpoints/agregado-leitura.md) |
 | Ler histórico de eventos | `GET /a/{boundedContext}/{aggregateType}/{id}/history` | [endpoints/agregado-leitura.md](endpoints/agregado-leitura.md) |
-| Escrever projeção (serviço) | `POST /e` | [endpoints/projecao.md](endpoints/projecao.md) |
+| CRUD de entidade convencional (não-agregado) | `POST /e` | [endpoints/entidade.md](endpoints/entidade.md) |
+| Escrever projeção (uso interno do mesmo `/e`) | `POST /e` | [endpoints/projecao.md](endpoints/projecao.md) |
 
 Gramática do modelo de domínio: **[spec/model-format.md](spec/model-format.md)** (estrutura do
 `.model.json`: agregado, comando, evento, tipos). Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md).
@@ -2388,7 +2542,9 @@ validação e do JSON publicado) e o grid de interpretação (persistence-crs/es
 
 Na **projeção** (banco de leitura), a linha de cada agregado é **identificada por `aggregateid`** — o
 `id` (UUID) do agregado. Consultas que buscam um agregado específico filtram por esse campo; o fluxo de
-projeção localiza/atualiza a linha por ele. O atributo **`status`** carrega o **estado atual** do
+projeção localiza/atualiza a linha por ele. Como a projeção default é **1:1** (uma linha por instância de
+agregado), `aggregateid` é **único** na tabela — a entity o declara com **`unique: true`** (ver
+[colunas obrigatórias](../../forger/endpoints/entity.md#colunas-obrigatórias-de-toda-projeção)). O atributo **`status`** carrega o **estado atual** do
 agregado (ver [regra do `status`](../README.md#estados-transições-e-concorrência)). Em consultas
 ([persistence-q](../../persistence-q/README.md)), `aggregateid` e `status` são campos típicos de filtro.
 
@@ -2564,6 +2720,19 @@ tenant (ver [forger/model](../../forger/endpoints/model.md) e [examples/](../../
 > `510` (alguém avançou o agregado antes; reenvie sobre o estado atualizado). Ver
 > [README — regra do status](../README.md#estados-transições-e-concorrência).
 
+### Transição sobre um agregado existente
+
+Mesma rota da criação — `POST /a/{boundedContext}/{aggregateType}` — **sem** `/{uuid}` no path. O agregado
+alvo é apontado pelo campo **`id` dentro do corpo** do comando, valorado com o **UUID do registro do
+agregado** (o `id` devolvido na criação / o `aggregateid` da projeção; **não** a PK numérica da projeção):
+
+```json
+{ "<nomeDoComando>": { "id": "<uuid-do-agregado>", "status": "<estado atual>", "<campo>": "<valor>" } }
+```
+
+Só a **criação** não envia `id` nem `status` (o agregado ainda não existe). O path `/{uuid}` existe apenas
+para **leitura** (`GET .../{uuid}`) e **histórico** (`GET .../{uuid}/history`), não para comandos.
+
 ## Resposta
 
 `200`:
@@ -2622,6 +2791,101 @@ Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`.
 ## Erros
 `403` (tenant não autorizado), `510` (falha de processamento). Catálogo: [../erros.md](../erros.md).
 
+<!-- ===== persistence-crs/endpoints/entidade.md ===== -->
+
+# persistence-crs · endpoints · entidade (CRUD convencional)
+
+> CRUD **direto** de linhas numa **entidade convencional** — uma tabela do domínio que **não** é
+> projeção de um agregado event-sourced. Escreve/atualiza/remove o registro em uma chamada, sem comando
+> nem evento. Para agregados (event-sourced), use [comando](comando.md); para consultar, use
+> [persistence-q](../../persistence-q/README.md).
+> Pré-requisitos: [conceitos](../../02-conceitos.md), [autenticação](../../06-autenticacao.md),
+> a entity precisa existir no esquema do tenant ([forger/entity](../../forger/endpoints/entity.md)).
+> Guia: [../README.md](../README.md).
+
+## Quando usar
+
+Duas formas de escrever no domínio:
+
+| Você quer… | Use | Como identifica a linha |
+|---|---|---|
+| Gravar um **agregado** (máquina de estados, histórico de eventos) | `POST /a/...` ([comando](comando.md)) | `aggregateid` (UUID) |
+| Gravar uma **entidade convencional** (tabela simples, sem event-sourcing) | `POST /e` (este doc) | `id` (chave primária) |
+
+Uma **entidade convencional** é modelada como qualquer entity ([forger/entity](../../forger/endpoints/entity.md)),
+porém **sem** as colunas de projeção de agregado (`aggregateid`, `status`, os `whenAttribute` de evento) —
+elas só são obrigatórias quando a entity **é** projeção de um agregado.
+
+> **⚠️ Não use `/e` numa entity que é projeção de um agregado.** Essas tabelas são mantidas de forma
+> assíncrona pelo caminho comando → es-n → projeção; escrevê-las direto por `/e` **desalinha** a projeção
+> do log de eventos (quebra o invariante CQRS-ES). Esse uso interno de `/e` está descrito em
+> [escrita de projeção](projecao.md).
+
+## Requisição
+
+`POST /e`
+
+Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`; `Content-Type: application/json`.
+
+> ⚠️ Os blocos abaixo são **ilustrativos**: `<...>` são placeholders, não JSON literal pronto para envio.
+
+Corpo (operação única) — `data` é **sempre um array** de linhas:
+
+```json
+{ "action": "CREATE | UPDATE | DELETE", "data": [ { "<atributo>": "<valor>" } ] }
+```
+
+Corpo (lote) — um **array** de operações no formato acima, aplicadas na ordem:
+
+```json
+[
+  { "action": "CREATE", "data": [ { "<atributo>": "<valor>" } ] },
+  { "action": "UPDATE", "data": [ { "id": "<pk>", "<atributo>": "<novo valor>" } ] },
+  { "action": "DELETE", "data": [ { "id": "<pk>" } ] }
+]
+```
+
+## Operações
+
+O verbo é escolhido pelo campo `action` (não pelo método HTTP — sempre `POST`):
+
+- **CREATE** — insere as linhas de `data`. A chave primária **`id`** é **gerada pela plataforma**
+  (omita-a). Devolve as linhas criadas com o `id` preenchido.
+- **UPDATE** — atualiza as linhas; cada objeto de `data` **deve conter `id`** (a linha a alterar) mais
+  os atributos a mudar.
+- **DELETE** — remove as linhas; cada objeto de `data` identifica a linha por **`id`**.
+
+> Conforme o **controle de acesso** declarado na entity (`_conf.accessControl`), atributos de controle
+> podem ser exigidos no corpo. Ver [forger/entity](../../forger/endpoints/entity.md).
+
+## Respostas
+
+| Ação | Sucesso | Corpo |
+|---|---|---|
+| `CREATE` | `201` | linhas criadas, com `id` gerado |
+| `UPDATE` | `200` | vazio |
+| `DELETE` | `200` | vazio |
+| lote (array) | `200` | vazio |
+
+Ação desconhecida → `400`. Falha de aplicação → `510`.
+
+## Comportamento
+
+A operação é aplicada **diretamente** à tabela da entity no banco do tenant, na requisição — **sem**
+comando, **sem** evento e **sem** validação de transição de estado. Não há reconstituição de agregado:
+é escrita de estado (linha), identificada pela chave primária `id`.
+
+## Ler (R)
+
+A leitura **não** é feita por `/e`. Para ler entidades (por chave, por critério, paginado), use
+[persistence-q — consulta](../../persistence-q/endpoints/consulta.md).
+
+## Erros
+
+`400` (ação/corpo inválido; identificador ausente), `403` (tenant não autorizado), `510` (falha de
+aplicação — ex.: violação de restrição, dado inconsistente; categoria **Aplicação de projeção**).
+Catálogo: [../erros.md](../erros.md).
+
 <!-- ===== persistence-crs/endpoints/projecao.md ===== -->
 
 # persistence-crs · endpoints · escrita de projeção
@@ -2629,6 +2893,9 @@ Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`.
 > Escrita direta numa **projeção** (criar/atualizar/remover linhas no banco de leitura). Endpoint de
 > **serviço autorizado** — no fluxo normal, projeções são mantidas de forma assíncrona pelo caminho
 > es-n → projeção (CP-5); este endpoint é o ponto de aplicação dessa escrita. Guia: [../README.md](../README.md).
+>
+> **Cliente:** para CRUD de uma **entidade convencional** (tabela não-agregado), veja
+> [entidade (CRUD convencional)](entidade.md) — mesmo `POST /e`, enquadrado para uso do cliente.
 
 ## Requisição
 
@@ -2749,6 +3016,45 @@ GET /a/vendas/pedido/<uuid>
 GET /a/vendas/pedido/<uuid>/history
 → 200 [ {evento1}, {evento2}, ... ]
 ```
+
+## CRUD de entidade convencional (`POST /e`)
+
+Entidade `contato` — tabela simples (**não** é projeção de agregado). O verbo vem do campo `action`; a
+chave primária `id` é gerada na criação e identifica a linha em update/delete.
+
+```
+POST /e
+Headers: Authorization: ..., X-Tenant-Id: <tenant-id>
+{ "action": "CREATE", "data": [ { "nome": "Ana", "email": "ana@ex" } ] }   // id é gerado; omita
+
+→ 201 [ { "id": 1, "nome": "Ana", "email": "ana@ex" } ]
+```
+
+```
+POST /e
+{ "action": "UPDATE", "data": [ { "id": 1, "email": "ana@novo" } ] }   // id localiza a linha
+
+→ 200   (vazio)
+```
+
+```
+POST /e
+{ "action": "DELETE", "data": [ { "id": 1 } ] }
+
+→ 200   (vazio)
+```
+
+Lote (várias operações numa chamada, aplicadas na ordem):
+
+```
+POST /e
+[ { "action": "CREATE", "data": [ { "nome": "Beto" } ] },
+  { "action": "DELETE", "data": [ { "id": 2 } ] } ]
+
+→ 200   (vazio)
+```
+
+Detalhe do contrato: [endpoints/entidade.md](endpoints/entidade.md).
 
 ## Observação sobre leitura após comando
 Depois de um comando bem-sucedido, **consultar a projeção** ([persistence-q](../persistence-q/README.md))
@@ -3095,10 +3401,12 @@ Habilita criar **entity** ([entity.md](entity.md)) e publicar **model** ([model.
 > alterar uma entity passa pela **compilação** (léxica → sintática → semântica → representação
 > intermediária → DDL) e aplica a DDL de forma **transacional** no banco de leitura. Guia: [../README.md](../README.md).
 >
-> A entity é a **projeção de um agregado**: suas colunas **derivam dos atributos do agregado** —
-> escalares (`data.attribute`) **e** value objects (`valueObject.single` → coluna `Json` objeto;
+> No **caso comum**, a entity é a **projeção de um agregado**: suas colunas **derivam dos atributos do agregado**
+> — escalares (`data.attribute`) **e** value objects (`valueObject.single` → coluna `Json` objeto;
 > `valueObject.multiple` → coluna `Json` array) — e ela é criada **sob o dataschema** cujo nome = o do
-> bounded context. Cadeia completa:
+> bounded context. (Uma entity **pode não** ser projeção de agregado — ex.: tabela de referência/lookup; nesse
+> caso **não** carrega `aggregateid`/`status`/`whenAttribute`, ver §"Colunas obrigatórias de toda projeção".)
+> Cadeia completa:
 > [conceitos — do agregado à projeção](../../02-conceitos.md#do-agregado-à-projeção-derivação-e-implantação).
 
 Exigem `Authorization` e papel de administrador/engenheiro em `{org}`.
@@ -3124,7 +3432,7 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
 | entity | só letras minúsculas (sem dígitos/`_`) | `^[a-z]+$` | **24** |
 | atributo | só letras minúsculas (sem dígitos/`_`) | `^[a-z]+$` | **24** |
 | associação | só letras minúsculas (sem dígitos/`_`) | `^[a-z]+$` | **24** |
-| superentidade | só letras minúsculas | `^[a-z]+$` | **24** |
+| superentidade | só letras minúsculas | `^[a-z]+$` | **64** |
 
 **Nomes reservados** (proibidos para entity/atributo/associação): `id`, `logversion`, `logrole`,
 `loguser` — são atributos de controle injetados pela plataforma. Violar padrão/limite/reservado → `400`.
@@ -3139,10 +3447,11 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
       "unique": false, "comment": "string", "default": "string" }
   ],
   "associations": [
-    { "name": "string", "targetEntity": "string", "nullable": true,
+    { "name": "string", "type": "string", "nullable": true,
       "unique": false, "comment": "string" }
   ],
   "_conf": {
+    "type": "entity",
     "comment": "string", "concurrencyControl": true,
     "uniqueKey": ["string"], "indexKey": ["string"],
     "accessControl": {}, "superEntity": "string", "superEntityStrategy": "string"
@@ -3151,18 +3460,28 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
 ```
 
 > **⚠️ `_conf` é OBRIGATÓRIO e semântico aqui.** A definição de **entity** exige `_conf` (configuração:
-> chave única, índices, controle de concorrência, superentidade…). A convenção "chave `_`-prefixada =
+> chave única, índices, controle de concorrência, superentidade…). O único campo **obrigatório** dentro de
+> `_conf` é **`type`** (`entity` | `abstract` | `component` | `enumeration`). A convenção "chave `_`-prefixada =
 > metadado removido" vale **apenas para o `.model.json`** (publicação de modelo), **não** para a
 > definição de entity. **Não** remova `_conf` (nem outras chaves) deste payload — é outro contrato, em
 > outro endpoint. Ver [model-format — chaves de metadado](../../persistence-crs/spec/model-format.md#chaves-de-metadado-_-prefixadas).
+
+> **`_conf.accessControl` — default automático (`MASTER`).** O campo é **opcional**: se **omitido**, o
+> Forger aplica automaticamente `{ "read": ["MASTER"], "write": ["MASTER"] }` a toda entity que cria — não
+> é preciso declará-lo à mão. Se **declarado**, `MASTER` **deve** constar em `read` **e** `write` (o
+> persistence-crs grava a projeção autenticado como `MASTER`). Os papéis citados aqui são **nomes** — criar
+> o papel `MASTER` (e demais) para a organização e vincular usuários é feito no [orgid](../../orgid/README.md),
+> não aqui.
 
 ## Colunas obrigatórias de toda projeção — `aggregateid`, `status` e cada `whenAttribute` de evento (REGRA)
 
 Além das colunas derivadas de `data.attribute` + valueObjects, **toda entity que é projeção de um
 agregado DEVE declarar** as colunas de projeção abaixo — em **todo** agregado, sem exceção:
 
-- **`aggregateid`** — `String`, `length` **36**, `nullable: false`: o **UUID do agregado**; **identifica
-  a linha** da projeção (ver [identificação na projeção](../../persistence-crs/spec/model-format.md#identificação-na-projeção-leitura)).
+- **`aggregateid`** — `String`, `length` **36**, `nullable: false`, **`unique: true`**: o **UUID do agregado**;
+  **identifica a linha** da projeção (ver [identificação na projeção](../../persistence-crs/spec/model-format.md#identificação-na-projeção-leitura)).
+  A projeção default é **1:1** (uma linha por instância de agregado), então `aggregateid` é **único** na tabela —
+  declare `unique: true` para tornar a invariante uma constraint (o gerador determinístico já o faz).
 - **`status`** — `String`, `nullable: false`: o **estado atual** do agregado (campo de filtro típico em
   [persistence-q](../../persistence-q/README.md)).
 - **cada `whenAttribute` de evento** — `Timestamp`, `nullable: true`: o **carimbo de tempo do evento**
@@ -3178,6 +3497,11 @@ qualquer um deles, a projeção do agregado não é materializável**: o fluxo d
 linha por `aggregateid`, registra `status` e escreve o carimbo em cada `whenAttribute` — se a coluna
 correspondente não existir, o consumidor de projeção falha (atributo/componente desconhecido) e a linha
 **nunca** é materializada (consultas em [persistence-q](../../persistence-q/README.md) retornam vazio).
+
+> **⚠️ Escopo — SÓ projeção de agregado.** `aggregateid` (incl. `unique: true`), `status` e os
+> `whenAttribute` são colunas do **contrato de projeção de um agregado**. Uma entity que **NÃO** é projeção de
+> agregado (ex.: tabela de **referência/lookup** ou entity criada direto, fora do fluxo comando→evento→projeção)
+> **NÃO** declara nenhuma delas — não tem `aggregateid`. Aplicar essas colunas a uma entity não-projeção é **erro**.
 
 ## Endpoints (exaustivo)
 
@@ -3244,7 +3568,8 @@ Exigem `Authorization` e papel de administrador/engenheiro em `{org}`.
 
 `POST /org/{org}/project/{project}/tenant/{tenantId}/model`
 
-Envio: o documento de modelo (`.json`) como upload. Efeito: valida a consistência
+Envio: o documento de modelo (`.json`) como **upload `multipart/form-data`, no campo `file`** (ex.:
+`curl -F "file=@modelo.json"`). **`Content-Type: application/json` (JSON no corpo) → `415`**. Efeito: valida a consistência
 `(org, project, tenant)` — o `tenantId` deve referenciar exatamente um dataschema do contexto — e
 **publica** o modelo no cache distribuído. **Semântica de sobrescrita**: republicar substitui o anterior.
 Resposta `201`: `{ "key": "<referência de publicação>" }`.
@@ -3595,8 +3920,11 @@ A consulta é **idempotente** e **não** modifica estado.
 
 ## Linguagem de consulta (resumo)
 
-- Cada **critério** é um objeto com **um** identificador de consulta (rótulo escolhido pelo cliente)
-  mapeando para um conjunto de **predicados** (pares chave-valor, combinados por "E").
+- Cada **critério** é um objeto com **um** identificador de consulta (o rótulo = nome da projeção)
+  mapeando para um conjunto de **predicados** (pares chave-valor). A combinação é dada por `_connective`
+  (**`AND`** padrão, ou **`OR`**), declarado no **nível raiz** do critério (irmão do rótulo).
+- **Controles** (`_paging`, `_sorting` indexado por `"0"`, `_count`, `_connective`, `_cache`) ficam no
+  **nível raiz** — **não** dentro do objeto de predicados. Detalhe: [query-controls.md](query-controls.md).
 - O rótulo aparece **literalmente na resposta**, agrupando os registros encontrados.
 - O **vocabulário** de predicados é definido pelo modelo do tenant; nome desconhecido → erro de
   tradução de critério.
@@ -3647,15 +3975,19 @@ O corpo tem **dois modos**, detectados pelo primeiro caractere:
 ```
 
 ### Regras
-- Cada item do array tem **exatamente um** par no nível raiz: o **rótulo** → objeto de **predicados**.
+- Cada item do array tem **um rótulo** no nível raiz (nome da projeção → objeto de **predicados**),
+  **mais** os controles opcionais (`_paging`/`_sorting`/`_count`/`_connective`/`_cache`) como **irmãos** do rótulo.
 - ⚠️ **O rótulo NÃO é livre**: DEVE ser o **nome da projeção (entidade) provisionada** para o tenant
   (ex.: `pedido`) — é a projeção sobre a qual a consulta roda. Um rótulo arbitrário **falha** (`510`,
   projeção de nome `<rótulo>` inexistente). O rótulo também nomeia a chave correspondente na resposta.
 - Cada predicado é `{ "<atributo>": "<valor>" }` (igualdade) ou `{ "<atributo>": { "<op>": "<valor>" } }`
   (operadores: `eq/neq/gt/gte/lt/lte/like/ilike/in`).
-- Múltiplos predicados combinam por **`_connective`** (padrão **AND**, ou **OR**).
-- Há **controles** por critério: `_paging`, `_sorting`, `_count`, `_cache`, associações. Detalhe e
-  operadores em **[query-controls.md](../query-controls.md)**.
+- Múltiplos predicados combinam por **`_connective`** no **nível raiz** (irmão do rótulo): **`AND`**
+  (padrão) ou **`OR`** (maiúsculas), global ao critério.
+- **Controles** ficam no **nível raiz** (irmãos do rótulo, **fora** do objeto de predicados): `_paging`,
+  `_sorting` (indexado por `"0"`), `_count`, `_connective`, `_cache`. Já os de **associação**
+  (`_associations`/`_populating`/`_level`/`_as`) ficam **dentro** do rótulo. Detalhe, operadores e
+  exemplos (inclusive `OR`) em **[query-controls.md](../query-controls.md)**.
 - O **vocabulário** de atributos é o do modelo provisionado para o tenant; nome desconhecido → erro.
 - Como o rótulo é o **nome da projeção**, consultar projeções distintas já dá rótulos únicos; para
   múltiplos critérios sobre a **mesma** projeção, envie um critério por requisição (rótulos repetiriam o
@@ -3688,12 +4020,13 @@ Catálogo: [../erros.md](../erros.md).
 
 # persistence-q · controles de consulta (DSL)
 
-> Operadores de predicado e **controles** (`_paging`, `_sorting`, `_count`, `_cache`, `_connective`,
-> associação) de um critério de consulta. Complementa [endpoints/consulta.md](endpoints/consulta.md)
+> Operadores de predicado e **controles** (`_paging`, `_sorting`, `_count`, `_connective`, `_cache`,
+> associações) de um critério de consulta. Complementa [endpoints/consulta.md](endpoints/consulta.md)
 > (modos array/object) e [README](README.md). Guia do serviço: [README.md](README.md).
 
 ## Contents
 - Predicados e operadores
+- Onde vão os controles (nível raiz × dentro do rótulo)
 - Conectivo (AND/OR)
 - Paginação · ordenação · contagem
 - Cache
@@ -3703,8 +4036,8 @@ Catálogo: [../erros.md](../erros.md).
 
 ## Predicados e operadores
 
-Dentro de um critério (`{ "<rótulo>": { ...predicados } }`), cada predicado é um atributo com um valor
-ou com um **operador**:
+Dentro do objeto do **rótulo** (`{ "<rótulo>": { ...predicados } }`), cada predicado é um atributo com um
+valor ou com um **operador**:
 
 ```jsonc
 { "<atributo>": "<valor>" }                 // igualdade simples
@@ -3722,40 +4055,105 @@ Operadores (exaustivo): `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `like`, `ilike`, 
 | `ilike` | como `like`, **case-insensitive** |
 | `in` | pertence a um conjunto (lista de valores) |
 
-Exemplo:
+Exemplo (só predicados, dentro do rótulo):
 ```jsonc
-{ "pedidos": { "total": { "gte": 1000 }, "cor": { "ilike": "%verm%" } } }
+{ "pedido": { "total": { "gte": 1000 }, "cor": { "ilike": "%verm%" } } }
 ```
+
+## Onde vão os controles (nível raiz × dentro do rótulo)
+
+⚠️ **REGRA DE NÍVEL — dois lugares distintos:**
+
+- **No nível RAIZ do critério** (irmãos do rótulo, **fora** do objeto do rótulo): `_paging`, `_sorting`,
+  `_count`, `_connective`, `_cache`.
+- **Dentro do objeto do rótulo** (junto dos predicados): os **predicados** e os controles de associação
+  (`_associations`, `_populating`, `_level`, `_as`).
+
+Forma geral de um critério (modo object):
+```jsonc
+{
+  "<rótulo>": { "<predicado>": "<valor>", "...": "..." },   // rótulo = nome da projeção; predicados aqui dentro
+  "_connective": "AND",                                      // \_
+  "_paging":  { "_maxRegisters": 50, "_firstRegister": 0 },  //  |— controles: nível RAIZ (irmãos do rótulo)
+  "_sorting": { "0": { "_orderBy": "criadaem", "_order": "DESC" } },
+  "_count":   false                                          // _/
+}
+```
+
+> ⚠️ Controle **no lugar errado** não gera erro: se `_paging`/`_sorting`/`_count`/`_connective` forem postos
+> **dentro** do objeto do rótulo, o serviço **não os enxerga** e aplica o **default** silenciosamente
+> (página 1000/0, ordem por `id` ASC, `_count=false`, conectivo AND) — e ainda tenta interpretá-los como
+> predicados. Mantenha-os no **nível raiz**.
 
 ## Conectivo (AND/OR)
 
-Múltiplos predicados num critério são combinados por `_connective` (padrão **`AND`**):
+`_connective` (nível **raiz**) define como **todos** os predicados do rótulo se combinam. Valores:
+**`AND`** (padrão) ou **`OR`** — **maiúsculas**. É **global ao critério**: ou tudo AND, ou tudo OR.
 
+Padrão (AND) — omitir `_connective`:
 ```jsonc
-{ "pedidos": { "_connective": "OR", "status": "criada", "cor": "azul" } }
+{ "pedido": { "status": "criada", "cor": "azul" } }
+// registros com status = criada  E  cor = azul
 ```
+
+OR (igualdades):
+```jsonc
+{ "pedido": { "status": "criada", "cor": "azul" }, "_connective": "OR" }
+// registros com status = criada  OU  cor = azul
+```
+
+OR com operadores:
+```jsonc
+{ "pedido": { "total": { "gte": 1000 }, "cor": { "ilike": "%verm%" } }, "_connective": "OR" }
+// registros com total ≥ 1000  OU  cor casando "%verm%" (case-insensitive)
+```
+
+OR + paginação + ordenação (critério completo):
+```jsonc
+{
+  "pedido": { "status": "criada", "cor": "azul" },
+  "_connective": "OR",
+  "_paging":  { "_maxRegisters": 50, "_firstRegister": 0 },
+  "_sorting": { "0": { "_orderBy": "criadaem", "_order": "DESC" } }
+}
+```
+
+Notas:
+- **Não é possível misturar** AND e OR no mesmo critério (o conectivo é único e global). Para lógica mista,
+  emita critérios separados no **modo array** (cada um vira um resultado próprio; a combinação fica no cliente).
+- Sub-condições **dentro de um mesmo atributo** (ex.: filtro composto sobre atributo do tipo objeto) são
+  sempre combinadas por **AND**, independentemente do `_connective` do critério.
 
 ## Paginação · ordenação · contagem
 
-Controles (chaves reservadas, prefixo `_`) dentro do critério:
+Todos no nível **raiz**:
 
 ```jsonc
-{ "pedidos": {
-    "status": "criada",
-    "_paging":  { "_maxRegisters": 50, "_firstRegister": 0 },   // tamanho da página, deslocamento
-    "_sorting": { "_orderBy": "criadaem", "_order": "DESC" },    // _order: ASC | DESC
-    "_count":   false                                            // true → retorna a contagem (totalRegisters)
-} }
+{
+  "pedido": { "status": "criada" },
+  "_paging":  { "_maxRegisters": 50, "_firstRegister": 0 },
+  "_sorting": { "0": { "_orderBy": "criadaem", "_order": "DESC" } },
+  "_count":   false
+}
 ```
 
 - **`_paging`** — `_maxRegisters` = nº máximo de registros; `_firstRegister` = registro inicial (deslocamento).
-- **`_sorting`** — `_orderBy` = campo; `_order` = `ASC`|`DESC`. Padrão: `_orderBy: id`, `_order: ASC`.
+  Default: `_maxRegisters` 1000, `_firstRegister` 0.
+- **`_sorting`** — objeto **indexado por posição** (`"0"`, depois `"1"`, `"2"` — até 3 chaves de ordenação,
+  aplicadas nessa ordem). Cada uma: `_orderBy` = campo; `_order` = `ASC`|`DESC`.
+  ⚠️ A forma **plana** (`{ "_orderBy": ..., "_order": ... }`, sem o índice `"0"`) é **ignorada em silêncio**
+  (sem ordenação). Default (quando `_sorting` ausente): `_orderBy: id`, `_order: ASC`.
+  Duas chaves:
+  ```jsonc
+  "_sorting": { "0": { "_orderBy": "criadaem", "_order": "DESC" }, "1": { "_orderBy": "id", "_order": "ASC" } }
+  ```
 - **`_count`** — `true` devolve a **contagem** (`totalRegisters`) em vez das linhas.
 
 ## Cache
 
+`_cache` no nível **raiz**:
 ```jsonc
-{ "pedidos": { "status": "criada", "_cache": { "_behavior": "use", "_ttl": <tempo> } } }
+{ "pedido": { "status": "criada" }, "_cache": { "_behavior": "use", "_ttl": "<tempo>" } }
 ```
 
 - **`_behavior`**: `use` (usa/popula o cache), `evict` (invalida), `ignore` (não usa).
@@ -3763,11 +4161,11 @@ Controles (chaves reservadas, prefixo `_`) dentro do critério:
 
 ## Associações (popular relacionados)
 
-Para trazer entidades **associadas** junto do resultado, use os controles de população, limitando a
-profundidade por `_level`:
+Para trazer entidades **associadas** junto do resultado, use os controles de população **dentro do objeto
+do rótulo** (junto dos predicados), limitando a profundidade por `_level`:
 
 ```jsonc
-{ "pedidos": { "status": "criada", "_associations": [...], "_populating": true, "_level": 1 } }
+{ "pedido": { "status": "criada", "_associations": [], "_populating": true, "_level": 1 } }
 ```
 
 - **`_associations`** / **`_populating`** — quais associações popular e se popula.
@@ -3847,6 +4245,55 @@ POST /
   { "pedidoPorId":   [ { "id": 42, "aggregateid": "<uuid>", "status": "confirmada" } ] },
   { "clientesAtivos": [ { "id": 7, "aggregateid": "<uuid>" }, { "id": 9, "aggregateid": "<uuid>" } ] }
 ]
+```
+
+## Paginação, ordenação e contagem
+
+Controles no **nível raiz** (irmãos do rótulo). `_sorting` é **indexado por `"0"`**.
+
+```
+POST /
+{
+  "pedido": { "status": "criada" },
+  "_paging":  { "_maxRegisters": 50, "_firstRegister": 0 },
+  "_sorting": { "0": { "_orderBy": "criadaem", "_order": "DESC" } },
+  "_count":   false
+}
+
+→ 200
+[ { "pedido": [ { "id": 42, "aggregateid": "<uuid>", "status": "criada" } ] } ]
+```
+
+## Conectivo OR
+
+`_connective` (nível raiz) combina os predicados: `OR` (senão `AND`, padrão). Maiúsculas.
+
+```
+POST /
+{ "pedido": { "status": "criada", "cor": "azul" }, "_connective": "OR" }
+
+→ 200   // registros com status = criada OU cor = azul
+[ { "pedido": [ { "id": 7, "aggregateid": "<uuid>", "status": "criada" } ] } ]
+```
+
+OR com operadores:
+
+```
+POST /
+{ "pedido": { "total": { "gte": 1000 }, "cor": { "ilike": "%verm%" } }, "_connective": "OR" }
+
+→ 200   // total ≥ 1000 OU cor casando "%verm%"
+[ { "pedido": [ •••registros••• ] } ]
+```
+
+## Contagem (`_count`)
+
+```
+POST /
+{ "pedido": { "status": "criada" }, "_count": true }
+
+→ 200   // devolve a contagem em totalRegisters
+[ { "pedido": [ { "totalRegisters": 128 } ] } ]
 ```
 
 ## Sem resultados
@@ -4129,7 +4576,7 @@ comandos** automaticamente (saga), visíveis como novos eventos no histórico do
 - Roteamento de processadores
 - Contrato de resposta
 - Ciclo de vida de uma requisição
-- Autoria de processadores
+- Três categorias de processador (inclui **Callback do processador** — qual endpoint usar e como montar a URL)
 - Pontos de coordenação
 - Pitfalls
 
@@ -4141,9 +4588,10 @@ Durante a execução de um comando, se o **model** do comando (ou de um evento d
 uma **rota** de regra/coordenação, o persistence-crs chama o br-service nessa rota, passando os dados.
 O br-service executa a **função** correspondente e devolve o resultado, que o persistence-crs incorpora
 ao processamento (CP-6/CP-7). O br-service **não é chamado diretamente pelo cliente** (só pelo
-persistence-crs). Um processor **pode ler de volta** persistence-q/crs para enriquecimento (via **endpoints
-internos de cluster**, ver abaixo) e — quando o caso de uso exigir — chamar integrações externas nos hooks de
-coordenação (async); no caminho **crítico do comando** (síncrono), evite escrita/efeitos externos.
+persistence-crs). Um processador **pode ler de volta** persistence-q/crs para enriquecimento — ver
+[Callback do processador](#callback-do-processador), que define **qual** endpoint é utilizável em cada
+tipo de hook — e, quando o caso de uso exigir, chamar integrações externas nos hooks de coordenação
+(assíncronos); no caminho **crítico do comando** (síncrono), evite escrita/efeitos externos.
 
 ## Índice de endpoints
 
@@ -4200,20 +4648,54 @@ Aninhando os escopos, o **path completo é globalmente único** → duas organiz
 > (1 project = 1 bounded context), os segmentos `project` e `boundedContext` costumam **coincidir** —
 > ex.: `acme/vendas/vendas/pedido/criar`. Não é erro: são escopos distintos que, por padrão, têm o mesmo nome.
 
+> **O serviço NÃO valida a forma da rota.** Ele apenas casa a `route` recebida com o caminho do
+> processador publicado — qualquer caminho funciona. A unicidade global descrita acima é garantida
+> **pela disciplina de quem publica**, não por checagem em tempo de execução. Consequência concreta de
+> abrir mão do prefixo: duas organizações que publiquem `pedido/criar` acabam apontando para o **mesmo
+> caminho** e, portanto, para o **mesmo processador** — a regra de uma passa a valer, silenciosamente,
+> para a outra.
+
+### Deploy de um processador (por sistema de arquivos — NÃO via gateway)
+
+Um processador é um **arquivo `.js`** cujo **caminho na pasta de processadores do serviço** é a **rota**
+(`<org>/<project>/<bc>/<aggregate>/<função>.js`). **Não há endpoint/API para publicar um processador** — o
+br-service é **interno** (sem rota no gateway). O deploy é por **sistema de arquivos**: coloca-se o `.js` na pasta
+de processadores e o serviço o carrega (na inicialização; recarregar torna a rota viva). Uma rota sem processador
+correspondente → **erro de rota** quando o persistence-crs a aciona.
+
 ## Contrato de resposta
 
 - Sucesso (`200`): o serviço devolve **diretamente** o objeto retornado pelo processador (sem envelope).
   Esse objeto é o que o persistence-crs usa para enriquecer/validar/coordenar o comando.
-- Falha (`400`): objeto com `status`, mensagem e tipo do erro.
+- Falha (`400`): **duas formas distintas**, conforme o ponto em que falhou:
+
+| Falha | Corpo da resposta |
+|---|---|
+| **Validação do corpo** (corpo vazio/não-objeto/sem `route`) | `{ "erro": "<mensagem>" }` |
+| **Rota inexistente** ou **exceção no processador** | `{ "status": "error", "mensagem": "<mensagem>", "tipo": "<tipo do erro>" }` |
 
 ## Ciclo de vida de uma requisição
 
 `POST /br`:
 
-1. **Validação** — corpo não-nulo, objeto, com `route`. Falha → `400`.
-2. **Roteamento** — localiza o processador pela `route`. Não encontrado → `400` (lista rotas disponíveis).
-3. **Execução** — invoca o processador com `data` (ou o corpo inteiro, se `data` ausente). Pode ser
-   assíncrono; o resultado é aguardado.
+1. **Validação** — corpo não-nulo, objeto, com `route`. Falha → `400` (forma `{erro}`).
+2. **Roteamento** — localiza o processador pela `route`. Não encontrado → `400` (a mensagem lista as
+   rotas disponíveis).
+3. **Execução** — o processador recebe **de um a três argumentos**, conforme o que veio no corpo:
+
+   | Corpo recebido | Argumentos entregues ao processador |
+   |---|---|
+   | `data` **+** `authToken` **+** `tenantIds` | `(data, authToken, tenantIds)` |
+   | `data` **+** `authToken` | `(data, authToken)` |
+   | `data` | `(data)` |
+   | **sem** `data` | `(corpo inteiro)` |
+
+   `authToken` e `tenantIds` só aparecem na raiz do corpo no hook **síncrono** (regra de negócio) — é o
+   motor de comandos que os coloca lá. `tenantIds` é um **array** com o `tenantId.forReadModel` declarado
+   no modelo do agregado (ver [model-format](../persistence-crs/spec/model-format.md)); um `authToken`
+   nulo (comando sem credencial) não conta — nesse caso o processador cai no modo de um argumento.
+
+   O processador pode ser assíncrono; o resultado é aguardado.
 4. **Resposta** — `200` com o resultado **direto** do processador; exceção no processador → `400` com
    `{ status, mensagem, tipo }`.
 
@@ -4250,26 +4732,69 @@ correspondem aos três pontos onde o modelo referencia uma rota de br:
 - A rota usada é a mesma referenciada no **model** do comando/evento (ver
   [model-format](../persistence-crs/spec/model-format.md#eventos-e-domainbus)).
 
-### Callback do processor → persistence-q / persistence-crs (endpoint interno de cluster)
+<a id="callback-do-processador"></a>
+### Callback do processador → persistence-q / persistence-crs
 
-O br-service roda **intra-cluster** (atrás da DMZ). Quando um processor precisa **ler** uma projeção
-(enriquecimento) ou **escrever** de volta, usa os **endpoints internos de cluster** da persistence-q/crs
-— sem controle de acesso por conta de usuário, feitos para **chamadas internas** (**nunca expostos fora
-do cluster**). O **path exato é sensível e injetado pela plataforma no deploy** → o processor o lê de
-**variável de ambiente**; **NUNCA hardcodar** o path. Header obrigatório: **`X-Tenant-Id`** (o tenant vem
-do payload: `targetTenantId`/`sourceTenantId`). **Sem `Authorization`/JWT.**
+O br-service roda **intra-cluster** (atrás da DMZ). Quando um processador precisa **ler** uma projeção
+(enriquecimento), **ler** o estado de um agregado ou **escrever** um comando de volta, ele chama a
+persistence-q/crs diretamente.
 
-| Ação | Endpoint interno de cluster | Corpo |
+Ponto de partida: **só o hook síncrono (regra de negócio) recebe JWT de forma garantida** — ele chega em
+`authToken` na raiz do corpo e é entregue ao processador como **argumento**.
+
+Nos hooks **assíncronos** (coordenação/projeção, por fila) o JWT **nunca** chega como argumento. Parte
+dos fluxos de coordenação **propaga** o token do usuário de origem **dentro do payload**, em
+`data._meta.authToken` — a intenção é que a escrita de comando subsequente use a credencial de quem
+originou o evento, e não uma credencial de serviço fixa. Mas **outros fluxos assíncronos não enviam token
+algum**. Um processador assíncrono, portanto, **não pode depender** de ter JWT: trate `_meta.authToken`
+como oportunista e tenha sempre o caminho sem token.
+
+Cada operação existe em **duas superfícies espelhadas**, com as mesmas rotas e o mesmo corpo:
+
+| Superfície | Path | Headers | Utilizável em |
+|---|---|---|---|
+| **Pública** (via gateway) | o path documentado do serviço | `Authorization` **+** `X-Tenant-Id` | hook **síncrono**; num assíncrono, **só** se o token tiver vindo em `_meta.authToken` |
+| **Interna de cluster** | **prefixo próprio** + o mesmo path | **só** `X-Tenant-Id` — **sem** `Authorization` | qualquer hook — é a única opção que **sempre** funciona no assíncrono |
+
+O tenant sai do próprio payload (`targetTenantId`/`sourceTenantId`).
+
+A superfície interna não tem controle de acesso por conta de usuário: é feita para **chamadas internas**,
+o gateway **nega** esses paths, e ela só é alcançável de dentro do cluster. O prefixo é **sensível** e por
+isso **não consta desta documentação** — a plataforma o injeta no ambiente do serviço (ver abaixo).
+
+> **Erro comum:** supor que basta apontar para o endereço-base do serviço. **Não basta.** O endereço-base
+> leva à superfície **pública**, que exige `Authorization` — e um hook assíncrono pode muito bem não ter
+> token nenhum. A superfície interna fica sob um **prefixo próprio**, obtido conforme a seção seguinte.
+
+| Ação | Serviço · path (o mesmo nas duas superfícies) | Corpo |
 |---|---|---|
-| **Ler projeção** (persistence-q) | endpoint interno de **leitura** da persistence-q | `{"<projeção>":{<predicado>}}` → `200` array · `204` vazio |
-| **Ler estado do agregado** (persistence-crs) | endpoint interno de **leitura de agregado** (`…/a/<bc>/<aggType>/<uuid>` [+ `/history`]) | — |
-| **Escrever comando** (persistence-crs) | endpoint interno de **comando** (`…/a/<bc>/<aggType>`) | `{"<comando>":{...}}` |
+| **Ler projeção** | persistence-q · endpoint de execução de consulta | `{"<projeção>":{<predicado>}}` → `200` array · `204` vazio |
+| **Ler estado do agregado** | persistence-crs · `…/a/<bc>/<aggType>/<uuid>` [+ `/history`] | — |
+| **Escrever comando** | persistence-crs · `…/a/<bc>/<aggType>` | `{"<comando>":{...}}` |
 
-> **JWT — regra síncrono vs assíncrono:** no hook **síncrono** (regra de negócio `/br`, caminho do
-> comando) o corpo carrega `authToken` (JWT do usuário) — o processor **pode** usar endpoints seguros
-> com esse token. Nos hooks **assíncronos** (coordenação/projeção, via fila) **NÃO há JWT** → **usar o
-> endpoint interno de cluster** (path via env, `X-Tenant-Id`, sem `Authorization`). ⛔ **NUNCA hardcodar
-> um JWT nem o path do endpoint interno** no processor — ambos vêm do ambiente injetado no deploy.
+### Como o processador obtém a URL (variáveis de ambiente)
+
+Endereço e path são injetados pela plataforma no **ambiente do serviço** e ficam disponíveis a
+**qualquer** processador, em qualquer nível de pasta. Nada disso vem no payload:
+
+| Variável de ambiente | Conteúdo |
+|---|---|
+| `PLATFORM_ENDPOINT_PERSISTENCE_C` | endereço-base do persistence-crs (terminado em `/`) |
+| `PLATFORM_ENDPOINT_PERSISTENCE_Q` | endereço-base do persistence-q (terminado em `/`) |
+| `PLATFORM_ENDPOINT_PERSISTENCE_Q_UNSEC_PATH` | **path da superfície interna** do persistence-q — o endpoint de execução de consulta, sem `Authorization` |
+
+- Montagem da URL interna de leitura de projeção: `PLATFORM_ENDPOINT_PERSISTENCE_Q` +
+  `PLATFORM_ENDPOINT_PERSISTENCE_Q_UNSEC_PATH`, com exatamente uma `/` entre os dois.
+- Variável **ausente** → o processador falha com `400`, e a mensagem **nomeia a variável faltante**.
+- Para o persistence-crs **não há**, hoje, variável com o prefixo da superfície interna. Um hook
+  assíncrono que precise escrever comando usa a superfície **pública** com um **token de serviço vindo do
+  ambiente** — nunca um token escrito no processador.
+- ⛔ **Nunca hardcodar** endereço, prefixo interno nem token no processador: todos mudam por ambiente, e o
+  valor gravado no arquivo fica errado no deploy seguinte.
+
+> ⛔ **Nunca hardcodar um JWT** no processador. O único JWT legítimo é o `authToken` que chega no corpo
+> do hook **síncrono**. Hook assíncrono não tem JWT — e a resposta para isso é o endpoint interno acima,
+> **nunca** um token gravado no arquivo.
 
 ## Pontos de coordenação
 - **CP-6** — o persistence-crs chama o br-service quando o modelo do comando exige regra/coordenação.
@@ -4283,7 +4808,9 @@ Ver [coordenação](../coordenacao.md).
 - [ ] Manter o processador **idempotente**; leituras de enriquecimento são aceitáveis, mas **evite
       escrita/efeitos externos** no caminho crítico do comando.
 - [ ] A resposta de sucesso é o objeto **direto** do processador (sem envelope) — modelar de acordo.
-- [ ] Callback a persistence-q/crs: **hook async → endpoint interno de cluster + `X-Tenant-Id`, SEM JWT**; hook síncrono pode usar `body.authToken`. ⛔ **NUNCA hardcodar JWT nem o path do endpoint interno** (vêm de env injetada no deploy).
+- [ ] Escolher a superfície pelo **tipo de hook**: assíncrono (coordenação/projeção) → superfície **interna** (`X-Tenant-Id`, sem `Authorization`); síncrono → pode usar a **pública** com o `authToken` do corpo.
+- [ ] **Não** apontar para o endereço-base puro num hook assíncrono — isso cai na superfície **pública**, que exige `Authorization`.
+- [ ] Endereço e path saem de `PLATFORM_ENDPOINT_PERSISTENCE_C` / `PLATFORM_ENDPOINT_PERSISTENCE_Q` / `PLATFORM_ENDPOINT_PERSISTENCE_Q_UNSEC_PATH`. ⛔ **Nunca** gravar destino de rede, path interno ou JWT no processador.
 
 <!-- ===== br-service/endpoints/br.md ===== -->
 
@@ -4840,6 +5367,90 @@ real.
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.16 — 2026-08-02
+
+- **orgid: `POST /open/ua/account-role` documentado por completo — e o `204` dele NÃO é sucesso.** O
+  endpoint público cria a conta externa **e** o vínculo com um papel **já existente** em **uma única
+  transação**. Papel (`name`+`owner`) inexistente → **`204` sem corpo** e **nada** é criado (nem a
+  conta): a transação é revertida. Só `200` confirma o registro.
+- **`role.owner` é o `name` da organização** dona do papel (antes descrito apenas como "espaço de
+  nomes"). E `role.label`/`role.ispublic`/`role.status`/`role.id` no corpo são **aceitos e ignorados** —
+  a doc os chamava de "metadados do papel", sugerindo um efeito que não existe: o papel vem do cadastro.
+- **Validações do registro agora na doc.** `username`: mín. 3 caracteres, só letras e dígitos, `yc`
+  reservado, normalizado para minúsculas e **único em toda a plataforma** (não por organização) —
+  duplicado → **`409`**, código antes ausente do catálogo. `password`: ao menos 1 maiúscula, 1 minúscula
+  e 1 dígito. `email`: formato `algo@algo`.
+- **Estado inicial da conta.** `account.status` aceita só `PENDING` ou `ACTIVE`; qualquer outro valor
+  vira `PENDING` **em silêncio**. `ACTIVE` cria a conta já ativa; `PENDING` exige o fluxo de hash.
+- **Chave `from` na raiz do corpo: só a presença importa.** Existindo a chave — com qualquer valor,
+  inclusive `false`/`null` — a conta nasce **ativa** e `account.status` é sobreposto. Preferir
+  `account.status`, que deixa a intenção legível.
+- **Corpo fora da forma → `510`, não `400`:** propriedade **desconhecida** dentro de `account` ou de
+  `role`, ou corpo sem `account`/`role`.
+- Atualizados: `orgid/endpoints/publico.md` (seção reescrita), `orgid/erros.md` (`409`, nota do `204`
+  enganoso, categoria "Conflito"), `orgid/exemplos.md` (exemplo #8), `orgid/openapi.yaml`
+  (`UaRegistroAccountRole`, resposta `Conflict`, path `/open/ua/account-role`), `llms-full.txt`.
+
+## 1.15 — 2026-08-02
+
+- **CORREÇÃO (persistence-q): posição dos controles de consulta e forma do `_sorting`.** A doc dizia que
+  `_paging`/`_sorting`/`_count`/`_connective`/`_cache` iam **dentro** do objeto do rótulo — **errado**. O
+  serviço lê esses controles no **nível raiz** do critério (irmãos do rótulo); postos dentro do rótulo são
+  **ignorados em silêncio** (aplica default). Além disso `_sorting` é **indexado por posição**
+  (`{ "0": { "_orderBy", "_order" } }`, até `"1"`/`"2"`), não plano. Confirmado por código
+  (`QueryServiceImpl.readByCriteria` + `ReadStatementTransformation`) + teste git-tracked
+  (`TestReadStatementJSON`).
+- **Conectivo `OR` documentado.** `_connective` (nível raiz) = `AND` (padrão) ou `OR` (maiúsculas), global
+  ao critério; não mistura AND/OR num mesmo critério; sub-condições de atributo composto são sempre AND.
+  Exemplos de `OR` (igualdade e operadores) adicionados.
+- Atualizados: `persistence-q/query-controls.md` (reescrito), `endpoints/consulta.md`, `exemplos.md`
+  (paging/sorting/OR/count), `README.md`, `openapi.yaml` (`Criterio`: controles no nível raiz, removido
+  `maxProperties:1`), `llms-full.txt`.
+- **Nota:** os controles de associação (`_associations`/`_populating`/`_level`/`_as`) permanecem **dentro**
+  do rótulo e **não têm consumidor** no código de consulta atual (provável tratamento na camada de
+  aplicação/BFF); mantidos na doc como estão, a confirmar.
+
+## 1.14 — 2026-08-01
+
+- **URL de callback do processador: endereço e path por variável de ambiente (br-service).** O
+  processador obtém o destino de rede em `PLATFORM_ENDPOINT_PERSISTENCE_C` /
+  `PLATFORM_ENDPOINT_PERSISTENCE_Q` e o path do endpoint interno em
+  `PLATFORM_ENDPOINT_PERSISTENCE_Q_UNSEC_PATH` — injetadas no ambiente do serviço e disponíveis a
+  **qualquer** processador, em qualquer nível de pasta, sem passar pelo payload. Variável ausente →
+  `400` nomeando a variável faltante. Antes a doc dizia que o path vinha "de variável de ambiente" sem
+  nomear nenhuma, o que levava o leitor a supor que a URL interna era a raiz do endereço-base.
+- **Duas superfícies espelhadas, e a escolha é ditada pelo tipo de hook.** Cada operação existe na
+  superfície **pública** (via gateway, `Authorization` + `X-Tenant-Id`) e na **interna de cluster**
+  (prefixo próprio, só `X-Tenant-Id`, negada pelo gateway). Hook síncrono tem JWT e pode as duas;
+  coordenação e projeção não têm JWT e só podem a interna. Antes o texto dizia apenas "endpoint interno,
+  path via variável de ambiente" sem nomear variável nem contrastar com a superfície pública — daí a
+  suposição frequente de que bastava apontar para o endereço-base.
+- **Contrato de resposta `400`: são duas formas, não uma.** Falha de **validação do corpo** devolve
+  `{erro}`; **rota inexistente** e **exceção no processador** devolvem `{status, mensagem, tipo}`.
+- **Ciclo de vida: o processador pode receber até três argumentos.** Com `data`, `authToken` e
+  `tenantIds` no corpo, é invocado como `(data, authToken, tenantIds)`; sem `tenantIds`, como
+  `(data, authToken)`; só com `data`, como `(data)`; sem `data`, recebe o corpo inteiro. `authToken` e
+  `tenantIds` só chegam na raiz do corpo no hook síncrono; `tenantIds` traz o `tenantId.forReadModel` do
+  modelo do agregado.
+- **JWT em hook assíncrono: oportunista, não garantido.** Parte dos fluxos de coordenação propaga o token
+  do usuário de origem em `data._meta.authToken` (para que a escrita de comando use a credencial de quem
+  originou o evento, não uma credencial de serviço fixa); outros fluxos não enviam token algum. Nunca
+  chega como argumento. Um processador assíncrono precisa funcionar sem token.
+- **Forma canônica da rota: o serviço não a valida.** A unicidade global depende da disciplina de quem
+  publica; sem o prefixo, duas organizações acabam apontando para o mesmo processador.
+  Atualizados: `br-service/README.md`, `CHANGELOG.md`.
+
+## 1.13 — 2026-07-31
+
+- **CRUD de entidade convencional (`POST /e`) documentado para o cliente.** Antes, `/e` só constava como
+  "escrita de projeção (serviço)". Agora há doc cliente para CRUD direto de **entidade convencional**
+  (tabela não-agregado, identificada por `id`/PK), distinta do caminho de **agregado** (`/a`, comando/
+  evento). Aviso: não usar `/e` em entity que é projeção de agregado event-sourced (desalinha a projeção).
+  Novo: `persistence-crs/endpoints/entidade.md`. Atualizados: `persistence-crs/endpoints/projecao.md`
+  (cross-link + enquadramento de uso interno), `persistence-crs/README.md` (índice + papel),
+  `persistence-crs/exemplos.md`, `persistence-crs/openapi.yaml` (`/e`: summary + `403`), `llms.txt`,
+  `README.md` ("Por tarefa"), `llms-full.txt` (regenerado).
 
 ## 1.12 — 2026-07-05
 
