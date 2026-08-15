@@ -75,6 +75,10 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
 > persistence-crs grava a projeção autenticado como `MASTER`). Os papéis citados aqui são **nomes** — criar
 > o papel `MASTER` (e demais) para a organização e vincular usuários é feito no [orgid](../../orgid/README.md),
 > não aqui.
+>
+> **`accessControl.read` e `accessControl.write` — papéis adicionais além de `MASTER`.**
+> Declare em `read` os papéis de usuário-final que podem **consultar** a projeção via persistence-q (ex.: `["MASTER", "INSTRUTOR", "ASSOCIADO"]`).
+> Declare em `write` os papéis que podem **escrever na projeção** além da plataforma (ex.: serviços internos autorizados). O app-cliente **nunca** escreve diretamente na projeção — a projeção é materializada pelo fluxo comando → evento → consumidor de fila (ver [coordenação CP-5](../../coordenacao.md#cp-5--consumidor-da-fila-de-projeção-atualiza-o-banco-de-leitura)). `accessControl.write` com papéis além de `MASTER` é portanto para casos específicos de serviços intra-infraestrutura autorizados — **não** para o cliente.
 
 ## Colunas obrigatórias de toda projeção — `aggregateid`, `status` e cada `whenAttribute` de evento (REGRA)
 
