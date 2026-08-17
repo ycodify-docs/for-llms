@@ -129,7 +129,8 @@ correspondente → **erro de rota** quando o persistence-crs a aciona.
    `authToken` e `tenantIds` só aparecem na raiz do corpo no hook **síncrono** (regra de negócio) — é o
    motor de comandos que os coloca lá. `tenantIds` é um **array** com o `tenantId.forReadModel` declarado
    no modelo do agregado (ver [model-format](../persistence-crs/spec/model-format.md)); um `authToken`
-   nulo (comando sem credencial) não conta — nesse caso o processador cai no modo de um argumento.
+   nulo (comando sem credencial) não conta — nesse caso o processador cai no modo de **um argumento**
+   (`data` apenas), e `tenantIds` **não é entregue** mesmo que presente no corpo.
 
    O processador pode ser assíncrono; o resultado é aguardado.
 4. **Resposta** — `200` com o resultado **direto** do processador; exceção no processador → `400` com
@@ -150,6 +151,47 @@ correspondem aos três pontos onde o modelo referencia uma rota de br:
 | **Projeção cross-contexto** | `event.domainBus.triggerProjection[].br.route` | `…/<aggregate>/projection/<alvo_from_origem>` (segmento **`projection`**) | dados do evento (estado do agregado de origem) | a **linha da projeção destino** `{ "<projeção>": { …campos } }` — aplicada na projeção do outro contexto |
 
 **Convenção de nome** (coordenação/projeção): `<alvo>_from_<origem>` (ex.: `conta_from_pedido`).
+
+### Forma do `data` por tipo de hook
+
+O campo `data` entregue ao processador tem **forma diferente** em cada categoria. Misturar as formas
+causa `undefined` silencioso (ex.: `data._meta.targetTenantId` num hook de coordenação retorna `undefined`).
+
+**1) Regra de negócio — síncrono (`command.br.route`)**
+
+`data` = payload bruto do comando (campos de `command.<cmd>.data.attribute[]` do `.model.json`).
+`authToken` e `tenantIds` chegam como **argumentos separados** — não dentro de `data`.
+
+**2) Coordenação saga — assíncrono (`triggerCoordination`)**
+
+```js
+data = {
+  "<entityName>": { ...eventData },   // dados do evento de origem
+  aggregateState: { ...fullState },   // estado completo do agregado de origem (carregado pelo crs)
+  targetTenantId: "<uuid>",           // tenant destino — top-level em data (NÃO em _meta)
+  sourceTenantId: "<uuid>"            // tenant origem  — top-level em data (NÃO em _meta)
+}
+// authToken chega na raiz do corpo → entregue como segundo argumento se não nulo
+```
+
+`aggregateState` é a **única** forma de ler o estado atual do agregado de origem dentro do processador.
+
+**3) Projeção cross-contexto — assíncrono (`triggerProjection`)**
+
+```js
+data = {
+  "<entityName>": { ...eventData },   // dados do evento de origem
+  _meta: {
+    targetTenantId: "<uuid>",         // tenant destino — dentro de _meta (≠ coordenação)
+    sourceTenantId: "<uuid>",         // tenant origem  — dentro de _meta
+    authToken?: "<jwt>"               // JWT de origem quando propagado; pode estar ausente
+  }
+}
+// authToken NÃO chega como argumento — leia de data._meta.authToken (oportunista)
+```
+
+⚠️ **Assimetria crítica:** em coordenação `targetTenantId`/`sourceTenantId` são **top-level** em `data`;
+em projeção cross-contexto ficam em **`data._meta`**. `aggregateState` **só existe** no hook de coordenação.
 
 > **⚠️ Regra de negócio — o merge de volta é whitelist (chaves novas são descartadas):** os dados
 > retornados pelo processor são mesclados no comando **apenas nas chaves que já existem** no
@@ -178,12 +220,15 @@ persistence-q/crs diretamente.
 Ponto de partida: **só o hook síncrono (regra de negócio) recebe JWT de forma garantida** — ele chega em
 `authToken` na raiz do corpo e é entregue ao processador como **argumento**.
 
-Nos hooks **assíncronos** (coordenação/projeção, por fila) o JWT **nunca** chega como argumento. Parte
-dos fluxos de coordenação **propaga** o token do usuário de origem **dentro do payload**, em
-`data._meta.authToken` — a intenção é que a escrita de comando subsequente use a credencial de quem
-originou o evento, e não uma credencial de serviço fixa. Mas **outros fluxos assíncronos não enviam token
-algum**. Um processador assíncrono, portanto, **não pode depender** de ter JWT: trate `_meta.authToken`
-como oportunista e tenha sempre o caminho sem token.
+Nos hooks **assíncronos** o comportamento do JWT difere por categoria:
+
+- **Coordenação (`triggerCoordination`):** o token do usuário de origem é propagado na **raiz do corpo**
+  (`authToken`) → o processador o recebe como **segundo argumento**, igual ao hook síncrono. Trate-o como
+  oportunista: quando o evento de origem não carregou JWT, o campo virá nulo e o processador cairá no modo
+  de um argumento.
+- **Projeção cross-contexto (`triggerProjection`):** o token — quando propagado — chega **dentro** de
+  `data._meta.authToken` (não como argumento separado). Nem toda projeção recebe token. Um processador de
+  projeção **não pode depender** de ter JWT: sempre tenha o caminho sem token.
 
 Cada operação existe em **duas superfícies espelhadas**, com as mesmas rotas e o mesmo corpo:
 
@@ -218,9 +263,20 @@ Endereço e path são injetados pela plataforma no **ambiente do serviço** e fi
 | `PLATFORM_ENDPOINT_PERSISTENCE_C` | endereço-base do persistence-crs (terminado em `/`) |
 | `PLATFORM_ENDPOINT_PERSISTENCE_Q` | endereço-base do persistence-q (terminado em `/`) |
 | `PLATFORM_ENDPOINT_PERSISTENCE_Q_UNSEC_PATH` | **path da superfície interna** do persistence-q — o endpoint de execução de consulta, sem `Authorization` |
+| `PLATFORM_ENDPOINT_ORGID` | endereço-base do orgid (para verificar/criar conta de usuário de app via `ENDPOINTS.ORGID`) |
 
 - Montagem da URL interna de leitura de projeção: `PLATFORM_ENDPOINT_PERSISTENCE_Q` +
   `PLATFORM_ENDPOINT_PERSISTENCE_Q_UNSEC_PATH`, com exatamente uma `/` entre os dois.
+- Acesso ao orgid: `ENDPOINTS.ORGID` → `GET .../open/ua/account/by/username/{username}/exists` (`200` = conta existe, `204` = não existe). Ver `orgid/endpoints/publico.md`.
+- **Helper recomendado — `lib/platform-endpoints.js`:** em vez de ler `process.env.PLATFORM_ENDPOINT_*`
+  diretamente, use o módulo `lib/platform-endpoints` (disponível em qualquer processador, independente de
+  profundidade de pasta):
+  ```js
+  const ENDPOINTS = require('../../../lib/platform-endpoints'); // ajuste ../ à profundidade
+  // ENDPOINTS.PERSISTENCE_C, ENDPOINTS.PERSISTENCE_Q, ENDPOINTS.PERSISTENCE_Q_UNSEC, ENDPOINTS.ORGID
+  ```
+  O módulo usa **getters lazy** — a variável ausente lança erro nomeado na requisição (não no `require`),
+  mantendo o processador no mapa de rotas mesmo com env incompleto.
 - Variável **ausente** → o processador falha com `400`, e a mensagem **nomeia a variável faltante**.
 - Para o persistence-crs **não há**, hoje, variável com o prefixo da superfície interna. Um hook
   assíncrono que precise escrever comando usa a superfície **pública** com um **token de serviço vindo do
@@ -247,3 +303,6 @@ Ver [coordenação](../coordenacao.md).
 - [ ] Escolher a superfície pelo **tipo de hook**: assíncrono (coordenação/projeção) → superfície **interna** (`X-Tenant-Id`, sem `Authorization`); síncrono → pode usar a **pública** com o `authToken` do corpo.
 - [ ] **Não** apontar para o endereço-base puro num hook assíncrono — isso cai na superfície **pública**, que exige `Authorization`.
 - [ ] Endereço e path saem de `PLATFORM_ENDPOINT_PERSISTENCE_C` / `PLATFORM_ENDPOINT_PERSISTENCE_Q` / `PLATFORM_ENDPOINT_PERSISTENCE_Q_UNSEC_PATH`. ⛔ **Nunca** gravar destino de rede, path interno ou JWT no processador.
+- [ ] Usar `lib/platform-endpoints` (`ENDPOINTS.*`) em vez de ler `process.env` diretamente — getters lazy nomeiam a variável faltante no erro.
+- [ ] Em hook síncrono com `authToken` nulo: o processador cai em modo de **um argumento** — `tenantIds` **não** é entregue. Não assuma que `tenantIds` chegou se o comando não carregou JWT.
+- [ ] Em hook de coordenação: `targetTenantId`/`sourceTenantId` são **top-level** em `data` (não em `_meta`). Em projeção cross-contexto: ficam em `data._meta`. Não trocar os dois.

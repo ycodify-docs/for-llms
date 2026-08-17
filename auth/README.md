@@ -67,6 +67,20 @@ O **token de acesso** é o que vai em `Authorization: Bearer <token>`. Ele embut
 **curta duração** — renove pelo endpoint de renovação. (A plataforma também usa um token de renovação
 de duração maior, internamente.) Trate o token como **opaco**; não dependa de sua estrutura interna.
 
+## Claims do JWT de acesso (para integrações avançadas)
+
+> Uso padrão: repasse o token opaco via `Authorization: Bearer`. Esta seção é para quem precisar decodificar (ex.: processor que lê tenant ou username do token).
+
+| Claim | Tipo | Formato | Exemplo |
+|---|---|---|---|
+| `username` | string | login direto | `"alice"` |
+| `roles` | **string JSON-encoded** | `["nome:owner:status:label", ...]` — campos ausentes = `"--"` | `["cliente:acme:ACTIVE:Cliente"]` |
+| `tenants` | **string JSON-encoded** | `["projectOwner:projectName:dataschema:tenantId:tenantSecret", ...]` | `["acme:loja:vendas:uuid:secret"]` |
+| `tenantIds` | **string JSON-encoded** | array de UUIDs | `["uuid1"]` |
+| `authorities` | **string JSON-encoded** | `["ROLE_<nome>", ...]` | `["ROLE_cliente"]` |
+
+⚠️ `roles`, `tenants`, `tenantIds` e `authorities` são **strings JSON-encoded** — use `JSON.parse(claim)`, não trate como array nativo JWT.
+
 ## Fluxo de login (ciclo de vida)
 
 1. **Recebe** `{ username, password }` em `/up/sign-in` ou `/ua/sign-in`.
