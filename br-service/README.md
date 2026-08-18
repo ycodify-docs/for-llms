@@ -258,14 +258,28 @@ isso **não consta desta documentação** — a plataforma o injeta no ambiente 
 Endereço e path são injetados pela plataforma no **ambiente do serviço** e ficam disponíveis a
 **qualquer** processador, em qualquer nível de pasta. Nada disso vem no payload:
 
+O br-service acessa persistence **diretamente no cluster** (não via gateway). Existem duas instâncias
+físicas, diferenciadas pela **porta**:
+
+| Instância | Modo | Endereço (intra-cluster) |
+|---|---|---|
+| `tinterpreter` | **teste** | `concriz:8061` |
+| `interpreter` | **produção** | `concriz:8060` |
+
+Caminhos e superfícies (segura / interna) são **idênticos** nas duas instâncias — só a porta muda.
+
+O developer escolhe **explicitamente** qual instância acessar no código do processor:
+- `ENDPOINTS.PERSISTENCE_T_*` → tinterpreter (teste)
+- `ENDPOINTS.PERSISTENCE_*` → interpreter (produção)
+
 | Variável de ambiente | Conteúdo |
 |---|---|
-| `PLATFORM_ENDPOINT_PERSISTENCE_C` | endereço-base do persistence-crs (terminado em `/`) |
-| `PLATFORM_ENDPOINT_PERSISTENCE_Q` | endereço-base do persistence-q (terminado em `/`) |
-| `PLATFORM_ENDPOINT_PERSISTENCE_Q_UNSEC_PATH` | **path da superfície interna** do persistence-q — o endpoint de execução de consulta, sem `Authorization` |
+| `PLATFORM_ENDPOINT_PERSISTENCE_T` | base do tinterpreter (**teste**, concriz:8061), terminado em `/` |
+| `PLATFORM_ENDPOINT_PERSISTENCE` | base do interpreter (**produção**, concriz:8060), terminado em `/` |
+| `PLATFORM_ENDPOINT_PERSISTENCE_Q_UNSEC_PATH` | **path da superfície interna** — mesmo valor em ambas as instâncias |
 | `PLATFORM_ENDPOINT_ORGID` | endereço-base do orgid (para verificar/criar conta de usuário de app via `ENDPOINTS.ORGID`) |
 
-- Montagem da URL interna de leitura de projeção: `PLATFORM_ENDPOINT_PERSISTENCE_Q` +
+- Montagem da URL interna de leitura de projeção (teste): `PLATFORM_ENDPOINT_PERSISTENCE_T` +
   `PLATFORM_ENDPOINT_PERSISTENCE_Q_UNSEC_PATH`, com exatamente uma `/` entre os dois.
 - Acesso ao orgid: `ENDPOINTS.ORGID` → `GET .../open/ua/account/by/username/{username}/exists` (`200` = conta existe, `204` = não existe). Ver `orgid/endpoints/publico.md`.
 - **Helper recomendado — `lib/platform-endpoints.js`:** em vez de ler `process.env.PLATFORM_ENDPOINT_*`
@@ -273,7 +287,9 @@ Endereço e path são injetados pela plataforma no **ambiente do serviço** e fi
   profundidade de pasta):
   ```js
   const ENDPOINTS = require('../../../lib/platform-endpoints'); // ajuste ../ à profundidade
-  // ENDPOINTS.PERSISTENCE_C, ENDPOINTS.PERSISTENCE_Q, ENDPOINTS.PERSISTENCE_Q_UNSEC, ENDPOINTS.ORGID
+  // Teste:     ENDPOINTS.PERSISTENCE_T_C   ENDPOINTS.PERSISTENCE_T_Q   ENDPOINTS.PERSISTENCE_T_Q_UNSEC
+  // Produção:  ENDPOINTS.PERSISTENCE_C     ENDPOINTS.PERSISTENCE_Q     ENDPOINTS.PERSISTENCE_Q_UNSEC
+  // Comum:     ENDPOINTS.ORGID
   ```
   O módulo usa **getters lazy** — a variável ausente lança erro nomeado na requisição (não no `require`),
   mantendo o processador no mapa de rotas mesmo com env incompleto.
@@ -302,7 +318,8 @@ Ver [coordenação](../coordenacao.md).
 - [ ] A resposta de sucesso é o objeto **direto** do processador (sem envelope) — modelar de acordo.
 - [ ] Escolher a superfície pelo **tipo de hook**: assíncrono (coordenação/projeção) → superfície **interna** (`X-Tenant-Id`, sem `Authorization`); síncrono → pode usar a **pública** com o `authToken` do corpo.
 - [ ] **Não** apontar para o endereço-base puro num hook assíncrono — isso cai na superfície **pública**, que exige `Authorization`.
-- [ ] Endereço e path saem de `PLATFORM_ENDPOINT_PERSISTENCE_C` / `PLATFORM_ENDPOINT_PERSISTENCE_Q` / `PLATFORM_ENDPOINT_PERSISTENCE_Q_UNSEC_PATH`. ⛔ **Nunca** gravar destino de rede, path interno ou JWT no processador.
+- [ ] Escolher a instância correta: `ENDPOINTS.PERSISTENCE_T_*` para sistemas de **teste**, `ENDPOINTS.PERSISTENCE_*` para **produção**. Escolha feita **no código** — a diferença é a porta da instância.
+- [ ] Endereço e path saem de `PLATFORM_ENDPOINT_PERSISTENCE_T` / `PLATFORM_ENDPOINT_PERSISTENCE` / `PLATFORM_ENDPOINT_PERSISTENCE_Q_UNSEC_PATH`. ⛔ **Nunca** gravar destino de rede, path interno ou JWT no processador.
 - [ ] Usar `lib/platform-endpoints` (`ENDPOINTS.*`) em vez de ler `process.env` diretamente — getters lazy nomeiam a variável faltante no erro.
 - [ ] Em hook síncrono com `authToken` nulo: o processador cai em modo de **um argumento** — `tenantIds` **não** é entregue. Não assuma que `tenantIds` chegou se o comando não carregou JWT.
 - [ ] Em hook de coordenação: `targetTenantId`/`sourceTenantId` são **top-level** em `data` (não em `_meta`). Em projeção cross-contexto: ficam em `data._meta`. Não trocar os dois.

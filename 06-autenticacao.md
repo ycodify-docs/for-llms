@@ -100,3 +100,17 @@ vazia → **`403`**):
 | persistence-q · consulta | **sim** | sim | **sim** |
 | br-service · `/br` | (interno) | (chamado pelo persistence-crs) | propagado pelo chamador |
 | es-n · acionar processamento | (interno) | operacional/interno | tenant no caminho |
+
+## Instâncias físicas de persistence (diagnóstico — não usar em código de processor)
+
+> ⛔ Esta seção é para **troubleshooting manual** (curl direto, observabilidade). Processors **nunca**
+> referenciam estes endereços — usam `ENDPOINTS.PERSISTENCE_T_*` (teste) ou `ENDPOINTS.PERSISTENCE_*`
+> (produção) via `lib/platform-endpoints.js`. A diferença entre instâncias é **só a porta**.
+
+| Instância | Modo | Porta (intra-cluster) | Acessado via |
+|---|---|---|---|
+| `tinterpreter` | **teste** | `concriz:8061` | `PLATFORM_ENDPOINT_PERSISTENCE_T` |
+| `interpreter` | **produção** | `concriz:8060` | `PLATFORM_ENDPOINT_PERSISTENCE` |
+
+Agentes (se-agents) acessam persistence **via gateway** (`/v3/persistence/{t/}c` e `/v3/persistence/{t/}q`) —
+nunca os endereços diretos acima. Processors do br-service acessam **diretamente** (intra-cluster, sem gateway).
