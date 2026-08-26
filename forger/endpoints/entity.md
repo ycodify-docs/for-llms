@@ -62,6 +62,36 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
 }
 ```
 
+> **⚠️ `attributes[].comment` com `;` FALHA a criação (defeito conhecido).** Um `comment` cujo texto
+> contenha ponto-e-vírgula faz o `POST .../entity` retornar
+> **`510 "DDL execution failed ... Unterminated string literal ... in SQL COMMENT ON COLUMN <t>.<col>"`**.
+> Causa provável: o executor de DDL divide o lote de `COMMENT ON COLUMN ...;` por `;` **sem respeitar
+> aspas**, cortando a string no meio. `;` dentro de literal aspado é SQL válido — o defeito é do
+> executor, não do texto.
+>
+> **Contorno**: substituir `;` por `,` **apenas no corpo do POST**, preservando o texto original na
+> fonte de design. Comentários **sem `;`** passam intactos, inclusive com parênteses, vírgulas,
+> dois-pontos e barra vertical — não há necessidade de descartar todos os comentários.
+> *(Isolado experimentalmente em 2026-08-26: remover só o travessão `—` NÃO resolve — travessão
+> descartado como causa; trocar `;` resolve. 11 de 16 atributos sem `;` sempre passaram.)*
+
+> **ℹ️ Coluna `String` recebe `DEFAULT ''` automático (comportamento intencional).** Toda coluna de tipo
+> `String` declarada em `attributes[]` é criada com `DEFAULT ''::character varying` — **independente de
+> `nullable`** e **mesmo sem `default` no payload**. As colunas que a plataforma auto-injeta
+> (`logrole`, `loguser`) **não** recebem esse default.
+>
+> **Consequência para quem chama** — `nullable: false` **não garante conteúdo**: a restrição impede
+> `NULL` explícito, mas um `INSERT` que **omita** a coluna grava **string vazia** e satisfaz o
+> `NOT NULL`. Para exigir conteúdo de fato (ex.: `nome` não pode ser em branco), **valide na regra de
+> negócio** (`command.br.route`) — não conte com o `NOT NULL` do banco.
+>
+> **Assimetria por tipo**: `Integer`/`Long`/`Date`/`Timestamp`/`Text`/`Json` **não** recebem default;
+> com `nullable: false` viram `NOT NULL` sem default e **rejeitam** o `INSERT` que os omitir. Ou seja,
+> a garantia de obrigatoriedade é **forte** nesses tipos e **fraca** em `String`.
+>
+> *(Verificado em Postgres — `clubflow`, 2026-08-26; os `.model.json` de origem não declaram `default`
+> algum.)*
+
 > **⚠️ `_conf` é OBRIGATÓRIO e semântico aqui.** A definição de **entity** exige `_conf` (configuração:
 > chave única, índices, controle de concorrência, superentidade…). O único campo **obrigatório** dentro de
 > `_conf` é **`type`** (`entity` | `abstract` | `component` | `enumeration`). A convenção "chave `_`-prefixada =
