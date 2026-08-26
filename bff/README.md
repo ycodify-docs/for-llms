@@ -22,6 +22,7 @@
 |---|---|---|---|
 | Login | `POST /session/login` | `{ username, password }` | identidade + **árvore de tenants** + papéis; **cookie httpOnly** (token). **Sem token no corpo.** |
 | Sessão atual | `GET /session/me` | — | mesma projeção segura, ou `401` sem sessão |
+| Papel ativo | `PUT /session/active-role` | `{ org, role }` | mesma projeção segura, com `activeRole` · `403` se o papel não for do usuário naquela org |
 | Encerrar | `POST /session/logout` | — | limpa o cookie |
 
 `POST /session/login` chama o [auth](../auth/README.md) (`/ua/sign-in`), guarda o token e devolve **só a
@@ -33,9 +34,16 @@ projeção segura**:
   "orgs":       [ { "owner": "...", "name": "...", "alias": "...", "status": "..." } ],
   "roles":      [ { "role": "...", "org": "...", "status": "...", "alias": "..." } ],
   "tenants":    [ /* tuplas org:project:boundedContext:dataschema:tenant */ ],
-  "tenantTree": [ { "org": "...", "projects": [ { "project": "...", "boundedContexts": [ { "boundedContext": "...", "tenantId": "..." } ] } ] } ]
+  "tenantTree": [ { "org": "...", "projects": [ { "project": "...", "boundedContexts": [ { "boundedContext": "...", "tenantId": "..." } ] } ] } ],
+  "activeRole": null
 }
 ```
+
+**`activeRole`** é o papel que o usuário escolheu **para esta sessão** — serve a quem tem mais de um
+papel na org e entra por um portal específico. É **filtro de apresentação, não autorização**: o BFF
+aceita apenas um papel que o portador de fato tenha **ativo naquela org**, e comando/consulta seguem
+revalidando o conjunto **completo** de papéis a cada chamada. Guardá-lo não restringe o que o usuário
+pode fazer.
 
 ## Capacidade
 
@@ -53,6 +61,10 @@ forger é quem **grava** ali ao publicar o `.model.json`) — e cruza com os **p
 > `RUNNING`**. Não é falha do BFF: é o modelo que saiu do cache. Remediação: **republicar** o
 > `.model.json` (`POST forger .../tenant/<id>/model`, sobrescrita idempotente). Vale para **qualquer**
 > consumidor — casca ou cliente sem UI.
+>
+> Quem define esse TTL é **o forger, no momento da publicação** (é ele que grava a chave com prazo); o
+> cache apenas honra o que recebeu. O prazo é **configuração de deploy** do forger — em ambiente de
+> desenvolvimento, um sistema que fica dias sem republicar perde a capacidade sozinho.
 
 ## Miolo
 
@@ -64,10 +76,51 @@ Resolve `tenant → URL` do miolo (ver [injecao](../shell/injecao.md)). Só para
 
 ## Proxy de domínio
 
-O BFF expõe o caminho de **comando** e **consulta** ao miolo (via `api` do hostContext), fazendo **proxy**
-ao [persistence-crs](../persistence-crs/README.md) (escrita) e ao [persistence-q](../persistence-q/README.md)
-(leitura) — **injetando `Authorization` + `X-Tenant-Id` no servidor**. O miolo **não** compõe esses
-cabeçalhos nem conhece o token.
+O BFF expõe escrita e leitura de domínio ao consumidor (no caso da casca, via `api` do hostContext),
+fazendo **proxy** ao [persistence-crs](../persistence-crs/README.md) e ao
+[persistence-q](../persistence-q/README.md) — **injetando `Authorization` + `X-Tenant-Id` no servidor**.
+O consumidor **não** compõe esses cabeçalhos nem conhece o token.
+
+| Operação | Método · Path | Corpo | Vai para |
+|---|---|---|---|
+| Executar comando | `POST /session/command` | `{ tenantId, aggregate, command, data, id?, status? }` | persistence-crs (escrita) |
+| Consultar projeção | `POST /session/query` | `{ tenantId, aggregate, predicates? }` | persistence-q (leitura) |
+| Estado atual do agregado | `POST /session/aggregate` | `{ tenantId, aggregate, id }` | persistence-crs (leitura) |
+| Histórico do agregado | `POST /session/history` | `{ tenantId, aggregate, id }` | persistence-crs (`/history`) |
+
+- `aggregate` é `"<boundedContext>.<tipo>"`; `id` é o **UUID do agregado** (`aggregateid` da projeção),
+  nunca a PK `Long` da linha — ver [antipadrões](../05-antipatterns.md).
+- O BFF **re-deriva a capacidade** antes de encaminhar um comando e recusa (`403`) o que não estiver
+  autorizado ao papel; o persistence-crs revalida de novo. Ver [seguranca](../shell/seguranca.md).
+- `/session/aggregate` existe porque a **projeção é assíncrona**: para carregar o estado autoritativo de
+  um agregado (ex.: preencher um form de transição) não se deve ler o read model.
+
+## Autocadastro (`/ua/*`)
+
+Fluxo público de **auto-registro de conta externa**, proxy dos endpoints `/open/ua/*` e `/ua/open/*` do
+[orgid](../orgid/README.md). Sem `Authorization` — o BFF injeta `X-Forger-Credential` no servidor.
+Contrato de origem: [orgid/publico](../orgid/endpoints/publico.md) e [orgid/ua-papel](../orgid/endpoints/ua-papel.md).
+
+| Operação | Método · Path | Corpo / Query | Resposta |
+|---|---|---|---|
+| Papéis oferecíveis | `GET /ua/roles?owner={org}` | — | `{ roles: [{ name, label }] }` — só `ispublic=true` |
+| Conta já existe? | `GET /ua/exists?username={u}` | — | `{ exists: true\|false }` |
+| Registrar | `POST /ua/register` | `{ account: {username,password,email,name?}, role: {name,owner} }` | `200` criado · `403` papel fora do cardápio · `409` papel inexistente |
+| Pedir hash (e-mail) | `GET /ua/hash?action={R\|PR}&username={u}` | — | repassa o orgid |
+| Ativar / recuperar | `PUT /ua/activate` | `{ username, action: R\|PR, hash, password? }` | repassa o orgid |
+
+> ⚠️ **Duas travas ficam no BFF, porque o orgid não as faz.**
+> 1. **O papel é validado contra o cardápio público** (`GET /ua/roles`, que lista só `ispublic=true`).
+>    O orgid **ignora** `role.ispublic` no corpo e associa **qualquer papel existente** — sem esta
+>    checagem, um registro público pediria um papel privilegiado e o receberia. Fora do cardápio → `403`.
+> 2. **A conta nasce sempre `PENDING`.** O contrato do orgid aceita `account.status: ACTIVE` (e a chave
+>    `from` na raiz) para pular a ativação; o BFF força `PENDING` e não repassa `from`, de modo que só o
+>    fluxo de hash por e-mail ativa a conta.
+>
+> O `204` do orgid **não é sucesso** (significa papel inexistente e nada criado, transação revertida) —
+> o BFF o converte em `409` para não ser lido como ok.
+
+Monte a tela de cadastro a partir de `GET /ua/roles`: são exatamente os papéis que o servidor aceita.
 
 ## Preferências da organização (org-scoped)
 
@@ -90,18 +143,47 @@ BFF. Leitura por qualquer membro **ativo**; escrita **só por MASTER-na-org** (r
 - O catálogo de `colorScheme` é **contrato** — espelhado no shell (catálogo/UI) e no BFF (validação).
   Ver [estilo](../shell/estilo.md#esquemas-de-cor-nomeados-paleta-completa-por-organização).
 
+## Cabeçalhos que o BFF injeta (contrato de saída)
+
+Tudo composto **no servidor**. Nenhum deles é montado — nem visto — pelo browser ou pelo miolo.
+
+| Cabeçalho | Em quê | De onde vem |
+|---|---|---|
+| `Authorization: Bearer …` | comando, consulta, agregado, histórico, capacidade | token da sessão (no store server-side) |
+| `X-Tenant-Id` | comando, consulta, agregado, histórico | tenant da requisição, conferido contra os tenants do token |
+| `X-Forger-Credential` | **login** (`/ua/sign-in`) e **autocadastro** (`/ua/*`) | credencial de gateway, de configuração de deploy |
+
+> **`X-Forger-Credential` é pré-autenticação.** O gateway a exige **antes** de existir token — o próprio
+> `sign-in` passa por ele (ver [06-autenticacao](../06-autenticacao.md)). Por isso o BFF precisa dela em
+> configuração: **sem ela, o login falha com `401` no gateway**, e não por credencial de usuário inválida.
+> É segredo: nunca vai ao browser, nunca em código, nunca em doc.
+
+## Operação
+
+| Operação | Método · Path | Resposta |
+|---|---|---|
+| Health | `GET /health` | `{ "ok": true, "service": "yc-app-bff" }` |
+
+Sem autenticação e sem estado — serve ao healthcheck do container e ao balanceador. Não é caminho de
+consumo: um cliente não precisa dele.
+
 ## Erros
 
 | HTTP | Quando |
 |---|---|
-| `400` | falta parâmetro (ex.: `username`/`password`, `tenant`) |
+| `400` | falta parâmetro (ex.: `username`/`password`, `tenant`), ou campo obrigatório do comando ausente |
 | `401` | sem sessão / sessão inválida / credencial inválida |
-| `404` | tenant não pertence ao usuário / miolo não registrado |
+| `403` | comando não autorizado ao papel · papel fora do cardápio público no autocadastro · papel que não é do usuário na org (`active-role`) |
+| `404` | tenant não pertence ao usuário / miolo não registrado / **modelo do tenant ausente ou expirado no cache** |
+| `409` | autocadastro: papel inexistente — nada foi criado (o `204` do orgid, traduzido) |
+| `500` | configuração ausente no servidor (ex.: o path do endpoint de cache não configurado) |
 | `502` | falha ao falar com um serviço da plataforma |
 
 ## Checklist do agente
 
 - [ ] O browser fala **só** com o BFF — nunca com a plataforma direto.
 - [ ] O token **nunca** vai no corpo — só em **cookie httpOnly**.
-- [ ] `Authorization`/`X-Tenant-Id` são compostos **no BFF** (ver [seguranca](../shell/seguranca.md)).
+- [ ] `Authorization`, `X-Tenant-Id` **e `X-Forger-Credential`** são compostos **no BFF**
+      (ver [seguranca](../shell/seguranca.md)).
+- [ ] No autocadastro, ofereça só o que `GET /ua/roles` devolve — o servidor recusa o resto.
 - [ ] Endereços de serviço = **config de deploy**, nunca hardcode nem em doc pública.
