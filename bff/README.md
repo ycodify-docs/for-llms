@@ -43,9 +43,16 @@ projeção segura**:
 |---|---|---|
 | Capacidade do tenant | `GET /session/capabilities?tenant={tenantId}` | **modelo de capacidade** (ver [contrato-miolo](../shell/contrato-miolo.md#modelo-de-capacidade)) |
 
-O BFF lê o **modelo publicado** do tenant no [forger](../forger/endpoints/model.md) e cruza com os
-**papéis org-scoped** do token → devolve **só** os comandos autorizados. Só para tenant que **consta no
-token**; senão `404`.
+O BFF lê o **modelo publicado** do tenant no **[cache](../cache/README.md)** — **não** no forger (o
+forger é quem **grava** ali ao publicar o `.model.json`) — e cruza com os **papéis org-scoped** do token
+→ devolve **só** os comandos autorizados. Só para tenant que **consta no token**; senão `404`.
+
+> ⚠️ **A capacidade depende do modelo estar VIVO no cache.** O modelo publicado tem **TTL**: ao expirar,
+> o cache não devolve mais (204) e a capacidade do bounded context **some** — `GET /session/capabilities`
+> deixa de listar os comandos daquele tenant, **mesmo com o sistema provisionado e o dataschema
+> `RUNNING`**. Não é falha do BFF: é o modelo que saiu do cache. Remediação: **republicar** o
+> `.model.json` (`POST forger .../tenant/<id>/model`, sobrescrita idempotente). Vale para **qualquer**
+> consumidor — casca ou cliente sem UI.
 
 ## Miolo
 
