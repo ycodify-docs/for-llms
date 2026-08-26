@@ -42,5 +42,5 @@ casca ──registra + carrega + mount(hostContext)──▶ MIOLO renderiza no 
 
 - **Dependências comuns** (framework de UI, runtime de tema) são **compartilhadas** entre casca e miolo,
   para evitar duplicação e divergência de versão.
-- A resolução `tenant → URL` é responsabilidade do **BFF** (ver [bff](bff.md)) — nunca do browser.
+- A resolução `tenant → URL` é responsabilidade do **BFF** (ver [bff](../bff/README.md)) — nunca do browser.
 - Só se resolve o miolo de um tenant que **pertence ao usuário** (consta no token) — ver [seguranca](seguranca.md).

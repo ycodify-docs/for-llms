@@ -2,7 +2,7 @@
 
 > As invariantes de segurança da casca + BFF. Regra-mãe: **todo segredo vive no BFF; o browser nunca vê
 > token nem chave**. A casca é a interface; o **BFF** é o guardião. Pré: [README](README.md),
-> [bff](bff.md), [autenticação](../06-autenticacao.md).
+> [bff](../bff/README.md), [autenticação](../06-autenticacao.md).
 >
 > _(Documento **público**: descreve o **modelo**, não valores. Nenhuma credencial, chave, senha ou
 > endereço sensível deve constar aqui — isso é operacional e fica **fora** desta documentação.)_

@@ -77,7 +77,7 @@
 - [Injeção do miolo](shell/injecao.md): federação de módulos, resolução tenant→remoto, de onde vem o build do miolo.
 - [Estilo](shell/estilo.md): tokens semânticos, tema claro/escuro, marca sobrescrevível por tenant.
 - [Segurança](shell/seguranca.md): segredo só no BFF; capacidade = UX; revalidação no servidor.
-- [BFF](shell/bff.md): endpoints e contratos.
+- [BFF](bff/README.md): endpoints e contratos (serviço próprio — serve à casca E a cliente sem UI).
 
 ## Exemplos
 - [Modelos de domínio](examples/README.md): 6 modelos `.model.json` (1 curado + 5 reais sanitizados), com fluxo ponta a ponta.

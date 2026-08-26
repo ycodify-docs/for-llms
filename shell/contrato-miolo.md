@@ -32,7 +32,7 @@ O contrato **mínimo obrigatório** é `mount` (e o `dispose` que ele devolve). 
 - **`capability`** — o **modelo de capacidade** (abaixo): o que o usuário pode fazer ali.
 - **`identity`** — dados **não-sensíveis** do usuário. **Sem token, sem senha.**
 - **`api`** — cliente HTTP que fala **só com o BFF**. O miolo **não** compõe `Authorization` nem
-  `X-Tenant-Id` — o BFF injeta isso no servidor (ver [seguranca](seguranca.md), [bff](bff.md)).
+  `X-Tenant-Id` — o BFF injeta isso no servidor (ver [seguranca](seguranca.md), [bff](../bff/README.md)).
 
 ## Modelo de capacidade
 

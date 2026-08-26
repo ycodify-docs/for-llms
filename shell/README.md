@@ -60,7 +60,7 @@ browser ──▶ casca (app) ──▶ BFF ──▶ plataforma (gateway: auth/
 | [injecao](injecao.md) | como/quando injetar; resolução tenant→remoto; **de onde vem o build** do miolo |
 | [estilo](estilo.md) | guia-mestre de estilo: tokens semânticos, tema claro/escuro, **marca sobrescrevível** |
 | [seguranca](seguranca.md) | segredo só no BFF; cookie; capacidade = UX; revalidação no servidor |
-| [bff](bff.md) | endpoints do BFF (contratos) |
+| [bff](../bff/README.md) | endpoints do BFF (contratos) — **serviço próprio**, fora de `shell/`: serve à casca **e** a cliente sem UI |
 
 ## Invariantes
 
