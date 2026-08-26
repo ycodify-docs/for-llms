@@ -71,13 +71,15 @@
 ## cache (modelo publicado em cache) — INTERNO, sem endpoint público
 - [Guia](cache/README.md): guarda o modelo publicado do tenant (write/read-model); o **forger** grava ao publicar `.model.json`, persistence-crs/q leem; **atrás do gateway, sem rota** (acesso só interno/plataforma).
 
-## shell (casca universal + BFF) — camada de aplicação
-- [Guia](shell/README.md): a aplicação única para todos os clientes; casca fixa + BFF; fronteira casca↔miolo; consome os oito serviços via BFF.
+## bff (borda de consumo) — camada de aplicação
+- [Guia](bff/README.md): sessão (login/cookie httpOnly), **capacidade** do tenant, **proxy** ao gateway e resolução do miolo. **Serviço próprio**: a casca é o consumidor mais comum, mas atende igualmente **cliente sem UI** (sistema backend/API-only, app móvel, integração) — nesse caso a resolução de miolo não é usada.
+
+## shell (casca universal) — camada de aplicação
+- [Guia](shell/README.md): a aplicação única para todos os clientes; casca fixa; fronteira casca↔miolo; consome os oito serviços via BFF.
 - [Contrato casca↔miolo](shell/contrato-miolo.md): `MioloModule`, `hostContext`, modelo de capacidade.
 - [Injeção do miolo](shell/injecao.md): federação de módulos, resolução tenant→remoto, de onde vem o build do miolo.
 - [Estilo](shell/estilo.md): tokens semânticos, tema claro/escuro, marca sobrescrevível por tenant.
 - [Segurança](shell/seguranca.md): segredo só no BFF; capacidade = UX; revalidação no servidor.
-- [BFF](bff/README.md): endpoints e contratos (serviço próprio — serve à casca E a cliente sem UI).
 
 ## Exemplos
 - [Modelos de domínio](examples/README.md): 6 modelos `.model.json` (1 curado + 5 reais sanitizados), com fluxo ponta a ponta.
