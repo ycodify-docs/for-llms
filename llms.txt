@@ -72,7 +72,7 @@
 - [Guia](cache/README.md): guarda o modelo publicado do tenant (write/read-model); o **forger** grava ao publicar `.model.json`, persistence-crs/q leem; **atrás do gateway, sem rota** (acesso só interno/plataforma).
 
 ## bff (borda de consumo) — camada de aplicação
-- [Guia](bff/README.md): sessão (login/cookie httpOnly, papel ativo), **capacidade** do tenant, **proxy** de domínio (comando/consulta/estado/histórico), **autocadastro** `/ua/*` e resolução do miolo. Injeta `Authorization`, `X-Tenant-Id` e `X-Forger-Credential` no servidor. **Serviço próprio**: a casca é o consumidor mais comum, mas atende igualmente **cliente sem UI** (sistema backend/API-only, app móvel, integração) — nesse caso a resolução de miolo não é usada.
+- [Guia](bff/README.md): **não fica atrás do gateway** — endereço próprio por instalação, paths na raiz, sem prefixo `/v3/` (ver "Como alcançar o BFF"); sessão (login/cookie httpOnly, papel ativo), **capacidade** do tenant, **proxy** de domínio (comando/consulta/estado/histórico), **autocadastro** `/ua/*` e resolução do miolo. Injeta `Authorization`, `X-Tenant-Id` e `X-Forger-Credential` no servidor. **Serviço próprio**: a casca é o consumidor mais comum, mas atende igualmente **cliente sem UI** (sistema backend/API-only, app móvel, integração) — nesse caso a resolução de miolo não é usada.
 
 ## shell (casca universal) — camada de aplicação
 - [Guia](shell/README.md): a aplicação única para todos os clientes; casca fixa; fronteira casca↔miolo; consome os oito serviços via BFF.

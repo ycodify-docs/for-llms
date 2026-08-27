@@ -12,9 +12,50 @@
 >
 > Pré: [06-autenticacao](../06-autenticacao.md). Para o uso com casca+miolo:
 > [shell/README](../shell/README.md), [shell/seguranca](../shell/seguranca.md).
->
-> _(Contratos abaixo. Os **endereços** dos serviços da plataforma são **configuração de deploy** — não
-> constam aqui; ver operacional em `yc.app/docs`.)_
+
+## Como alcançar o BFF
+
+**O BFF não segue a regra de endereçamento dos oito serviços.** Aqueles ficam atrás do API Gateway e
+se resolvem por uma base + o prefixo `/v3/<svc>` ([06-autenticacao](../06-autenticacao.md)). O BFF
+**não**:
+
+| | oito serviços da plataforma | BFF |
+|---|---|---|
+| atrás do gateway | sim | **não** |
+| prefixo `/v3/<svc>` | sim | **não** — os paths ficam na raiz |
+| registro no service discovery | sim | **não** |
+| quantos existem | um de cada, para todos | **um por instalação** |
+
+O motivo é o que a introdução diz: o BFF é **camada de aplicação**, não serviço da plataforma. Cada
+instalação sobe o seu, com domínio próprio. Procurá-lo no gateway ou na configuração da plataforma
+**não encontra nada** — e isso é o esperado, não um defeito.
+
+**Onde ele está, então:** o endereço é **informado por quem publica a instalação**. Não há como
+derivá-lo, nem convenção a adivinhar.
+
+| instalação | endereço |
+|---|---|
+| `yc.app` (casca universal "Stager") | `https://bff.stager.ycodify.com` |
+
+**Como confirmar que é o BFF e está no ar:**
+
+```
+GET https://<endereço-do-bff>/health   →   200  {"ok":true,"service":"yc-app-bff"}
+```
+
+**Como chamar** — os paths deste documento vão **na raiz**, sem prefixo nenhum:
+
+```
+POST https://bff.stager.ycodify.com/session/login     ✅
+POST https://api.ycodify.com/v3/bff/session/login     ❌ não existe
+```
+
+E **toda** chamada precisa mandar o cookie de sessão (`credentials: 'include'` no browser, jar de
+cookies fora dele): a sessão vive num cookie httpOnly, não num cabeçalho. Sem isso, tudo depois do
+login responde `401`.
+
+> Os endereços dos **serviços da plataforma** que o BFF consome continuam sendo configuração de deploy
+> e não constam aqui — ver o operacional em `yc.app/docs`.
 
 ## Sessão
 
