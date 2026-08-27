@@ -3,6 +3,10 @@
 > **Como e quando** a casca carrega o miolo de um tenant **em runtime**, e **de onde vem o build**.
 > Mecanismo: **federação de módulos** (a casca é o **host**; o miolo é um **remoto**). O browser nunca
 > conhece o mapa de miolos — quem resolve é o BFF. Pré: [README](README.md), [contrato-miolo](contrato-miolo.md).
+>
+> **⚠️ Exclusivo de quem usa a casca.** Este é o **único** trilho do BFF que não serve a consumidor sem
+> UI — não há miolo a injetar. As demais operações do BFF (sessão, capacidade, proxy) são transversais:
+> [bff/README.md](../bff/README.md).
 
 ## Quando
 

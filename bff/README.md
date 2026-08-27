@@ -74,6 +74,10 @@ forger é quem **grava** ali ao publicar o `.model.json`) — e cruza com os **p
 
 Resolve `tenant → URL` do miolo (ver [injecao](../shell/injecao.md)). Só para tenant do usuário.
 
+> **Única operação exclusiva de quem usa a casca.** Consumidor **sem UI** (app móvel, integração,
+> serviço) **não** chama este endpoint — não há miolo a injetar. Sessão, capacidade e proxy valem
+> integralmente para ele.
+
 ## Proxy de domínio
 
 O BFF expõe escrita e leitura de domínio ao consumidor (no caso da casca, via `api` do hostContext),

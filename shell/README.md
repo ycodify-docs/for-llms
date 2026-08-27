@@ -1,11 +1,16 @@
-# shell — guia da casca universal + BFF
+# shell — guia da casca universal (e do BFF **como a casca o usa**)
 
-> **Papel:** a **aplicação única e universal** — uma **casca (shell)** fixa e um **BFF** que servem
-> **todos os clientes**. Após o login, a casca descobre pelo **token** (via BFF) as organizações, os
-> **bounded contexts** (tenants) e os **comandos autorizados** do usuário, monta o menu e **injeta em
-> runtime**, por tenant, o **miolo** — a UI específica daquele cliente. **Não é um serviço da
-> plataforma**; é a **camada de aplicação** que consome os oito serviços (via BFF).
+> **Papel:** a **aplicação única e universal** — uma **casca (shell)** fixa, servida a **todos os
+> clientes**. Após o login, a casca descobre pelo **token** (via BFF) as organizações, os **bounded
+> contexts** (tenants) e os **comandos autorizados** do usuário, monta o menu e **injeta em runtime**,
+> por tenant, o **miolo** — a UI específica daquele cliente. **Não é um serviço da plataforma**; é a
+> **camada de aplicação** que consome os oito serviços **através do BFF**.
 > Pré-requisitos: [conceitos](../02-conceitos.md), [autenticação](../06-autenticacao.md).
+>
+> **⚠️ Escopo deste guia:** descreve o BFF **como a casca o usa**. O **BFF é transversal** — atende
+> **qualquer tenant, use ou não a casca** (cliente sem UI: app móvel, integração, serviço). Contrato
+> completo e independente: **[bff/README.md](../bff/README.md)**. Se você **não** está construindo
+> frontend, vá direto para lá — nada deste guia é pré-requisito.
 
 ## Contents
 - Papel e a fronteira casca ↔ miolo
@@ -43,6 +48,11 @@ browser ──▶ casca (app) ──▶ BFF ──▶ plataforma (gateway: auth/
 | L2 | **Capacidade** (derivada) | `papéis-do-token-na-org × modelo` → comandos autorizados + esqueleto de formulário | dado varia |
 | L3 | **Miolo** | apresentação (telas/widgets/estilo) de um bounded context | **sim** |
 | L4 | **BFF** | custódia do token, login, derivação de capacidade, resolução tenant→miolo, proxy | serve todos |
+
+> **L4 é a borda, não uma peça interna da casca.** Nesta topologia o BFF aparece como a camada que a
+> casca usa — e é assim mesmo. Mas **essa é uma das formas de usá-lo**, não a única: um consumidor **sem
+> casca** fala com o mesmo BFF (sessão, capacidade, proxy), só não usa a **resolução tenant→miolo**
+> (L3). As camadas L1–L3 são da casca; **L4 é transversal**.
 
 ## Fluxo (login → menu → injeção)
 
