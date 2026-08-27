@@ -27,6 +27,7 @@
 - [Coordenação entre serviços](coordenacao.md): pontos de articulação (CP-1…CP-12) + os 4 pontos de hook do br-service + uso ideal (advisory).
 - [Antipadrões](05-antipatterns.md): o que mais quebra, por serviço (sintoma → causa → correção).
 - [Isolamento dos agentes + entrega de código](07-isolamento-e-entrega.md): sala trancada por cliente (multi-tenant), a "janela" de 4 destinos, e como o código sai (GEN vs CUSTOM, PR + humano + build + estático).
+- [Pré-visualização do frontend](08-preview-de-frontend.md): onde pôr o app (`application/`), o que ele precisa ter p/ ser montado, e por que ele fala com o BFF em **caminho relativo** (`/api/...`) — sessão e origem dependem disso. Quem dispara é o usuário, não o agente.
 
 ## auth (emissão de token / login) — porta de entrada de identidade
 - [Guia](auth/README.md): papel (emite→valida), domínios `/up`/`/ua`, fluxo de login, claims do token.

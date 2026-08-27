@@ -127,8 +127,12 @@ Três travas de segurança no "enviar código":
 - **credencial temporária** — só existe enquanto a sala existe;
 - **só branch/PR** — o agente **propõe**; um humano **aprova** antes de virar oficial.
 
-A sala **nunca** faz build nem publica — só guarda o código e empurra o PR. Build, publicação e atualização do mapa
-acontecem **fora**, disparados pela **aprovação humana**.
+A sala **nunca** publica — só guarda o código e empurra o PR. Publicação e atualização do mapa acontecem **fora**,
+disparadas pela **aprovação humana**.
+
+> **Precisão:** a sala **pode** montar o app localmente, para o agente **verificar o próprio trabalho** e para o
+> usuário **testar** antes de aprovar — ver [`08-preview-de-frontend.md`](08-preview-de-frontend.md). Isso não
+> publica nada: o build de publicação continua sendo o de fora, após aprovação humana.
 
 ## 8. Visão completa
 

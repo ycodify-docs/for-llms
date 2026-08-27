@@ -2,6 +2,24 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.18 — 2026-08-27
+
+- **Pré-visualização do frontend documentada** (novo `08-preview-de-frontend.md`). O frontend que o agente
+  constrói pode ser **visto e testado pelo usuário** antes de qualquer publicação. Contrato para o agente:
+  o app vai em **`application/`** na raiz do sistema (**nome fixo**, não configurável); precisa de manifesto de
+  dependências + rotina de build produzindo **`application/dist/`**; bibliotecas podem ser instaladas
+  livremente (registro público é destino autorizado da "janela", e há **depósito compartilhado** entre sistemas).
+- **A regra que mais quebra na prática:** o app deve chamar o BFF em **caminho relativo** (`/api/...`), nunca pelo
+  endereço dele. **Sessão** (o cookie só é guardado se a chamada for da mesma origem) e **permissão de origem**
+  (o BFF não conhece a origem da pré-visualização) dependem disso.
+- **Quem dispara é o usuário**, por um botão no painel — o agente não aciona nem comanda a pré-visualização;
+  só deixa o app pronto para ser montado. Preview é **teste**, não publicação: o caminho de publicação segue o
+  de `07` §7 (proposta → revisão humana → build fora → armazenamento estático).
+- **Precisão em `07-isolamento-e-entrega.md` §7:** "a sala nunca faz build" valia para o caminho de **publicação**
+  e continua valendo. A sala **pode** montar o app localmente para o agente **verificar o próprio trabalho** —
+  isso não publica nada.
+- **Descoberta**: entrada em `llms.txt` (Fundamentos) + linha na tabela "Por tarefa" do `README.md`.
+
 ## 1.17 — 2026-08-08
 
 - **Autocadastro de usuário de aplicação (self-service) documentado.** Nova seção em `orgid/README.md`

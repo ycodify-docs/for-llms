@@ -56,6 +56,7 @@
 | Entender o contrato casca↔miolo | [`shell/contrato-miolo.md`](shell/contrato-miolo.md) |
 | Evitar erros comuns | [`05-antipatterns.md`](05-antipatterns.md) |
 | Entender o isolamento multi-tenant dos agentes + entrega de código | [`07-isolamento-e-entrega.md`](07-isolamento-e-entrega.md) |
+| Construir um frontend que o usuário possa **ver e testar** antes de publicar | [`08-preview-de-frontend.md`](08-preview-de-frontend.md) |
 
 ## Exemplos concretos
 
