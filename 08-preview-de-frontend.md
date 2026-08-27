@@ -87,6 +87,16 @@ dependem disso, e as duas quebram se você chamar o BFF pelo endereço dele:
 
 Então: `fetch('/api/session/login', …)`, não `fetch('https://<endereço-do-bff>/session/login', …)`.
 
+> ⚠️ **O host do BFF precisa estar liberado na janela** ([`07`](07-isolamento-e-entrega.md) §4) para você
+> exercitar a integração **de dentro da sala** (teste, diagnóstico, `curl`). Se não estiver, a chamada morre
+> no proxy de saída e o sintoma é enganoso: parece o BFF fora do ar. A liberação é por **host**, e o match é
+> exato ou por sufixo de domínio — liberar o host do gateway **não** cobre o do BFF quando são irmãos
+> (`api.…` não cobre `bff.…`). Isso é configuração de deploy: se der bloqueio, reporte em vez de contornar
+> com dado falso.
+>
+> Nada disso vale para o app rodando no navegador: ali a chamada é `/api` na própria origem e não passa pela
+> janela. É só para o que você executa **dentro da sala**.
+
 O que o BFF oferece — sessão, capacidade, comando, consulta, agregado, histórico, autocadastro — está em
 [`bff/README.md`](bff/README.md). **Nenhum segredo vai para o navegador**: o token vive no servidor.
 
