@@ -5900,7 +5900,7 @@ O consumidor **não** compõe esses cabeçalhos nem conhece o token.
 | Operação | Método · Path | Corpo | Vai para |
 |---|---|---|---|
 | Executar comando | `POST /session/command` | `{ tenantId, aggregate, command, data, id?, status? }` | persistence-crs (escrita) |
-| Consultar projeção | `POST /session/query` | `{ tenantId, aggregate, predicates? }` | persistence-q (leitura) |
+| Consultar projeção | `POST /session/query` | `{ tenantId, aggregate, predicates?, paging?, sorting? }` | persistence-q (leitura) |
 | Estado atual do agregado | `POST /session/aggregate` | `{ tenantId, aggregate, id }` | persistence-crs (leitura) |
 | Histórico do agregado | `POST /session/history` | `{ tenantId, aggregate, id }` | persistence-crs (`/history`) |
 
@@ -5910,6 +5910,36 @@ O consumidor **não** compõe esses cabeçalhos nem conhece o token.
   autorizado ao papel; o persistence-crs revalida de novo. Ver [seguranca](../shell/seguranca.md).
 - `/session/aggregate` existe porque a **projeção é assíncrona**: para carregar o estado autoritativo de
   um agregado (ex.: preencher um form de transição) não se deve ler o read model.
+
+### `predicates` é a forma do persistence-q — não há dialeto do BFF
+
+`predicates` é o **objeto de predicados** do
+[persistence-q](../persistence-q/endpoints/consulta.md), repassado como está. O BFF só acrescenta o
+**rótulo** (o nome da entity, derivado de `aggregate`) e os controles; ele **não traduz** nada.
+
+```json
+{
+  "tenantId": "…", "aggregate": "pessoal.associado",
+  "predicates": { "status": { "neq": "encerrado" } },
+  "paging":  { "_maxRegisters": 50, "_firstRegister": 0 },
+  "sorting": { "_orderBy": "criadaem", "_order": "DESC" }
+}
+```
+
+- Cada predicado é `{ "<atributo>": "<valor>" }` (igualdade) ou `{ "<atributo>": { "<op>": "<valor>" } }`,
+  com `<op>` em `eq/neq/gt/gte/lt/lte/like/ilike/in` — **minúsculas**. O vocabulário de atributos é o do
+  modelo provisionado; nome desconhecido é rejeitado pelo persistence-q (`510`).
+- ⚠️ **`predicates` é objeto. Array é recusado com `400`** e mensagem dizendo a forma esperada. Uma
+  lista de descritores (`[{attribute, operator, value}]`) **não** é aceita: espalhá-la geraria a chave
+  `"0"`, que o persistence-q leria como atributo do modelo — rejeição indecifrável no melhor caso,
+  filtro silenciosamente diferente do pedido no pior.
+- `paging`/`sorting` são conveniências do BFF, que os coloca no **nível raiz** do critério (irmãos do
+  rótulo) e indexa `sorting` por posição, como exige
+  [query-controls](../persistence-q/query-controls.md). O consumidor envia a forma plana acima.
+- **Erro do upstream chega inteiro.** Em `/session/query`, `/session/aggregate` e `/session/history`, um
+  não-2xx do persistence-q/-crs é repassado com **o status e o corpo de erro reais**. O consumidor
+  **nunca** recebe status de erro com corpo em forma de sucesso — `{ records: [] }`, `{ state }` e
+  `{ events }` só existem no caminho de sucesso, e `204` (vazio) continua virando `200` com lista vazia.
 
 ## Autocadastro (`/ua/*`)
 
