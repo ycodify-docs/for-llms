@@ -34,6 +34,17 @@ Erros: `400`, `403`, `500`.
 `PUT .../dataschema/{dataSchema}` — corpo: `logversion` + editáveis (`alias`, `description`, `status`,
 `dbsqlminimumconnidle`, `dbsqlmaximumpoolsize`). `200`; conflito → `409`.
 
+> **Sempre leia antes de atualizar.** `logversion` é **versão otimista**: precisa ser o valor **atual**
+> do recurso, obtido no `GET` acima. Chutar `0` (ou reusar um valor antigo) responde **`409`** e **nada
+> acontece** — nem a gravação, nem o efeito no cache descrito abaixo. Receita: `GET` → pegue
+> `logversion` → `PUT` com esse valor.
+>
+> **`status` inválido não é rejeitado.** O campo **não** é validado contra a lista de valores: um erro
+> de digitação (`RUNNIG`, `RUNING`) é **gravado como veio** e responde `200`. Como a transição é
+> comparada contra `MODELING`/`RUNNING`, o efeito é **falha silenciosa**: nada é publicado nem removido
+> do cache, e o dataschema fica num status que **não** libera edição de entity (só `MODELING` libera)
+> **nem** habilita operação. Confira a grafia; para sair do estado, faça outro `PUT` com o valor certo.
+
 > **Campo `status` — gate operacional (`MODELING` ↔ `RUNNING`).** O `status` do dataschema **não** é um
 > rótulo passivo: ele **controla** o que pode ser feito sobre o esquema e sobre o tenant, e **é o gatilho
 > da publicação do modelo de entidades**. Defina/transite o `status` pelo `PUT` acima.
