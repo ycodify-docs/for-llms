@@ -139,6 +139,12 @@ Todos no nível **raiz**:
 - **`_behavior`**: `use` (usa/popula o cache), `evict` (invalida), `ignore` (não usa).
 - **`_ttl`**: tempo de vida da entrada em cache.
 
+> **⚠️ Não use `_cache: use` por ora — o resultado vem errado.** Há um defeito conhecido, em conserto: na
+> **primeira** chamada (nada em cache ainda) a consulta **não chega a ser executada** e a resposta vem com
+> um objeto de controle no lugar dos registros; nas **seguintes**, o dado vem **embrulhado**, em formato
+> diferente do que a mesma consulta devolve sem cache. Enquanto este aviso estiver aqui, prefira
+> `_behavior: ignore` (ou simplesmente **omita** o `_cache`) — a consulta sem cache funciona normalmente.
+
 ## Associações (popular relacionados)
 
 Para trazer entidades **associadas** junto do resultado, use os controles de população **dentro do objeto

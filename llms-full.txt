@@ -58,6 +58,7 @@
 | Ler o estado ou o histórico de um agregado | [`persistence-crs/endpoints/agregado-leitura.md`](persistence-crs/endpoints/agregado-leitura.md) |
 | Fazer CRUD simples de uma entidade convencional (não-agregado) | [`persistence-crs/endpoints/entidade.md`](persistence-crs/endpoints/entidade.md) |
 | Consultar projeções (query) | [`persistence-q/endpoints/consulta.md`](persistence-q/endpoints/consulta.md) |
+| Recuperar logs de uma operação (diagnóstico) | [`persistence-crs/endpoints/logs.md`](persistence-crs/endpoints/logs.md) |
 | Escrever uma regra de negócio ou coordenação | [`br-service/README.md`](br-service/README.md) |
 | Entender quando/como os serviços se chamam | [`coordenacao.md`](coordenacao.md) |
 | Entender o despacho de eventos (projeção, saga) | [`es-n/README.md`](es-n/README.md) |
@@ -68,6 +69,7 @@
 | Entender o contrato casca↔miolo | [`shell/contrato-miolo.md`](shell/contrato-miolo.md) |
 | Evitar erros comuns | [`05-antipatterns.md`](05-antipatterns.md) |
 | Entender o isolamento multi-tenant dos agentes + entrega de código | [`07-isolamento-e-entrega.md`](07-isolamento-e-entrega.md) |
+| Construir um frontend que o usuário possa **ver e testar** antes de publicar | [`08-preview-de-frontend.md`](08-preview-de-frontend.md) |
 
 ## Exemplos concretos
 
@@ -866,7 +868,7 @@ cache, ou fila assíncrona) e a **dependência** (o que precisa existir antes).
 ### CP-5 — consumidor da fila de projeção atualiza o banco de leitura
 - **Origem → destino:** (fila de projeção) → persistence-crs → banco de leitura
 - **Gatilho:** mensagem na fila de projeção (CP-4).
-- **Meio:** **fila assíncrona**; aplicação idempotente com deduplicação por evento e ordenação configurável.
+- **Meio:** **fila assíncrona**; aplicação idempotente com deduplicação por evento e ordenação configurável. A escrita no banco de leitura é feita com `X-Tenant-Id` (sem `Authorization` — chamada intra-infraestrutura, não originada pelo cliente).
 - **Por quê:** materializa o estado atual do agregado para leitura por persistence-q.
 
 ### CP-6 — persistence-crs chama br-service (regra/coordenação)
@@ -1578,8 +1580,8 @@ Remove a org. **Papel:** administrador **na org**.
 - PUT /up/account — atualizar perfil
 - PUT /up/account/password — atualizar senha
 - DELETE /up/account/by/jwt — remover a própria conta
-- GET /up/account/by/org/{orgName} — listar contas da org
-- GET /up/account/by/org/{orgName}/org-owner/{orgOwner} — listar contas da org (com dono)
+- GET /up/account/by/org/{orgName} — conta do próprio chamador (NÃO lista a org)
+- GET /up/account/by/org/{orgName}/org-owner/{orgOwner} — **listar os membros da org**
 - POST /up/account/e-mail/send — enviar e-mail
 
 ---
@@ -1619,23 +1621,42 @@ Troca a senha da própria conta.
 Remove a conta do portador do token. Sem parâmetros/corpo. **Resposta:** `200`.
 
 ## GET /up/account/by/org/{orgName}
-Lista as contas de uma org. **Papéis:** administrador / engenheiro / analista (na org).
+⚠️ **Apesar do nome, NÃO lista os membros da organização.** O dono da org é deduzido do token e o
+resultado é filtrado pela conta de quem chama: devolve **apenas o próprio chamador**. Para os membros,
+use a rota com `org-owner`, abaixo. **Papéis:** administrador / engenheiro / analista (na org) — os
+demais recebem `403`, mesmo o resultado sendo a própria conta.
 
 | Path-var | Significado |
 |---|---|
 | `orgName` | nome da organização |
 
-**Resposta:** `200` array de contas (senha nula); `204` se vazio.
+**Resposta:** `200` — array com **uma** conta, a do portador do token (mesma forma da rota abaixo);
+`204` sem corpo se não houver vínculo. Sem `Authorization` → `401`.
 
 ## GET /up/account/by/org/{orgName}/org-owner/{orgOwner}
-Igual ao anterior, qualificando o dono.
+**Esta é a rota de listagem:** devolve os **membros** da organização, cada conta com os seus **vínculos**
+(papel e status). **Papéis:** administrador / engenheiro / analista **na própria organização**; os demais
+recebem `403`. Sem `Authorization` → `401`.
 
 | Path-var | Significado |
 |---|---|
 | `orgName` | nome da organização |
 | `orgOwner` | dono da organização |
 
-**Resposta:** `200` array de contas (senha nula); `204` se vazio.
+**Resposta:** `200` — array de contas. Por conta: `username`, `name`, `email`, `status` e
+`accountRoleOrgs[]`; a senha **nunca** é devolvida. Cada item de `accountRoleOrgs` traz `role.name`,
+`org` (`name` e `owner`), `accountStatus` e `orgStatus`. Sem membro → `204` **sem corpo** (não é `[]`).
+
+> ⚠️ **A lista mistura vínculos ativos e suspensos — e nada os distingue à vista.** O serviço descarta
+> somente o que estiver **cancelado**; vínculos **suspensos** e contas **pendentes** vêm na resposta.
+> Além disso, `status` é o estado **global** da conta e **não diz nada sobre esta organização**: a mesma
+> pessoa pode estar suspensa aqui e ativa em outra org. Considere alguém **membro ativo nesta
+> organização** apenas quando `status`, `accountStatus` e `orgStatus` forem **todos** `ACTIVE` — o filtro
+> é responsabilidade do consumidor.
+
+> Não há rota autenticada que resolva **uma** conta por `username` (só a verificação de existência, sem
+> dados, e a conta do próprio token). Para saber se alguém pertence a uma org, liste por esta rota e
+> procure — aplicando o filtro de status acima.
 
 ## POST /up/account/e-mail/send
 Envia uma notificação por e-mail (usuário autenticado).
@@ -2366,6 +2387,7 @@ POST /open/ua/account-role
 | Ler histórico de eventos | `GET /a/{boundedContext}/{aggregateType}/{id}/history` | [endpoints/agregado-leitura.md](endpoints/agregado-leitura.md) |
 | CRUD de entidade convencional (não-agregado) | `POST /e` | [endpoints/entidade.md](endpoints/entidade.md) |
 | Escrever projeção (uso interno do mesmo `/e`) | `POST /e` | [endpoints/projecao.md](endpoints/projecao.md) |
+| Consultar logs (diagnóstico; chave própria, não o token) | `GET /logs/service/{crs\|q}/query/{term}/from/{from}/to/{to}` | [endpoints/logs.md](endpoints/logs.md) |
 
 Gramática do modelo de domínio: **[spec/model-format.md](spec/model-format.md)** (estrutura do
 `.model.json`: agregado, comando, evento, tipos). Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md).
@@ -2435,6 +2457,14 @@ A cada requisição (com `X-Tenant-Id`), o serviço resolve a spec do tenant (en
 3. Senão, recupera do **serviço de cache** (`../cache`; **não** mem-cache db direto) e a carrega na memória local.
 4. Se **não** houver no cache, **recupera do Forger e repõe no cache** (self-heal), então carrega na memória local.
 5. Se nem o Forger prover → **exceção**.
+
+> **⚠️ Mudança em implantação — o passo 4 deixa de existir.** O serviço passará a **apenas ler** o modelo do
+> cache; quem o publica passa a ser **exclusivamente o Forger**, no momento em que o dataschema transita
+> para `RUNNING`. **Efeito para quem integra:** um tenant cujo modelo não tenha sido publicado por essa via
+> **não é mais recuperado sozinho** — a consulta falha (ver [erros](erros.md)) até que o modelo seja
+> republicado (`MODELING` → `RUNNING`, ver [forger/dataschema](../forger/endpoints/dataschema.md#atualizar)).
+> Enquanto esta nota estiver aqui, o comportamento **em produção continua sendo o descrito acima**, com
+> self-heal.
 
 A spec fica **stale na memória local** e **não** refresca sozinha. Após alterar entity/model, o refresh exige
 **invalidar as DUAS chaves de cache do modelo** — a do **read-model** **e** a do **write-model** (valores
@@ -2963,6 +2993,156 @@ agregado), conforme o despacho do [es-n](../../es-n/README.md).
 `400` (ação/corpo inválido), `403` (tenant), `510` (falha de aplicação — ex.: violação de restrição).
 Catálogo: [../erros.md](../erros.md).
 
+<!-- ===== persistence-crs/endpoints/logs.md ===== -->
+
+# persistence-crs · endpoints · consulta de logs
+
+> Recupera os **registros de log** produzidos pelo próprio serviço, filtrados por **serviço** (`crs` ou `q`),
+> **termo** e **recorte temporal**. Serve para diagnóstico de uma operação já executada — não é endpoint de
+> domínio e **não** usa o token de acesso: a autorização é uma **chave própria**, em cabeçalho.
+> O mesmo endpoint atende os dois lados da persistência; o serviço desejado vai no path.
+> Guia: [../README.md](../README.md).
+
+> ⚠️ Blocos abaixo são **ilustrativos**: `<...>` são placeholders, não valores literais.
+
+## Requisição
+
+```
+GET /logs/service/{service}/query/{term}/from/{from}/to/{to}
+```
+
+| Item | Valor |
+|---|---|
+| Cabeçalhos | **`X-Logs-Key`** — a chave que autoriza a consulta (**não** é o `Authorization` do domínio) · **`X-Tenant-Id`** — **obrigatório**: delimita o resultado ao tenant |
+| `{service}` | `crs` (lado de escrita) ou `q` (lado de leitura) — seleciona de quais registros se trata |
+| `{term}` | texto a procurar no registro. Vale `*` para "qualquer" (pode ir literal). Só precisa de URL-encoding se contiver caractere que quebra o path — barra, espaço, `:` ou `%` |
+| `{from}` / `{to}` | início e fim do recorte temporal (ver formatos aceitos abaixo) |
+
+> **Isolamento por tenant.** O `X-Tenant-Id` **não é opcional**: a resposta traz **apenas** registros
+> daquele tenant. É o que impede um chamador de enxergar operação de outro cliente — a chave de consulta
+> sozinha não faz essa separação.
+
+> ⚠️ **Mande `X-Tenant-Id` sozinho — nunca junto com `X-Forger-Credential`.** O gateway recusa qualquer
+> requisição que traga os dois cabeçalhos ao mesmo tempo, com **`400`** e corpo vazio, **antes** de chegar
+> a este serviço (violação `multiple_headers`). Como o caminho fica sob `/v3/persistence/`, ele é
+> rota-de-engine: identifica-se pelo tenant, não pela credencial. É um erro fácil de cometer, porque a
+> credencial é o que se usa em outras rotas da plataforma — e o `400` resultante **não** vem deste
+> endpoint, então não corresponde a nenhuma linha da tabela de erros abaixo.
+
+**Formatos aceitos em `{from}`/`{to}`** (os dois podem usar formatos diferentes):
+
+| Forma | Exemplo |
+|---|---|
+| epoch em milissegundos | `1756607400000` |
+| data-hora com fuso | `2026-08-31T01:30:00.000-03:00` |
+| data-hora sem fuso (assume o fuso do serviço) | `2026-08-31T01:30:00.000` |
+| só a data (início do dia) | `2026-08-31` |
+
+### URL externa — teste e produção
+
+O endpoint vive nos dois ambientes; o que muda é o prefixo, como em toda a persistência
+(ver [autenticação — URL base](../../06-autenticacao.md)):
+
+| Ambiente | URL |
+|---|---|
+| **Teste** | `/v3/persistence/**t**/logs/service/{service}/query/{term}/from/{from}/to/{to}` |
+| **Produção** | `/v3/persistence/logs/service/{service}/query/{term}/from/{from}/to/{to}` |
+
+> **Disponibilidade:** o ambiente de **teste** está **publicado e em uso desde 2026-08-31**. A rota de
+> **produção** segue o mesmo contrato, mas **ainda não está publicada** — e, quando estiver, devolverá bem
+> menos: o nível de log em produção é mais restritivo que o de teste, então a maior parte dos registros de
+> detalhe não existe lá.
+>
+> **A rota de produção ainda não está publicada.** Publicá-la não é só declarar o caminho: a borda da
+> plataforma só encaminha caminhos **explicitamente liberados**, em mais de uma camada, e um caminho novo
+> sob um prefixo já existente **também** precisa ser liberado. Enquanto isso não for feito, chamar a URL de
+> produção devolve `403` — e esse `403` vem da borda, não deste endpoint (ver a tabela em `## Erros`).
+
+### Exemplo (ambiente de teste)
+
+Substitua `<chave>` e `<tenant>` pelos valores do seu ambiente. Note: **só** `X-Tenant-Id`, sem credencial.
+
+```bash
+curl -s "https://api.ycodify.com/v3/persistence/t/logs/service/crs/query/*/from/2026-08-31T00:00:00Z/to/2026-08-31T23:59:59Z" \
+  -H "X-Tenant-Id: <tenant>" \
+  -H "X-Logs-Key: <chave>"
+```
+
+Respostas que se deve esperar deste comando, e o que cada uma significa:
+
+| Resposta | Leitura |
+|---|---|
+| `200` + corpo | há registros no recorte |
+| `204` sem corpo | consulta válida, nada casou — ver a nota abaixo antes de suspeitar de falha |
+| `403` | chave ausente ou errada |
+| `400` **com corpo** | algo no path: serviço inválido, data irreconhecível, `to` antes de `from`, tenant malformado |
+| `400` **sem corpo** | mandou credencial junto com o tenant — tire o `X-Forger-Credential` |
+
+## Resposta
+
+`200` — objeto com o recorte e os registros encontrados:
+
+```json
+{
+  "service":  "crs",
+  "tenantId": "<tenant consultado>",
+  "term":     "<termo procurado>",
+  "from":     "<início do recorte>",
+  "to":       "<fim do recorte>",
+  "matched":  128,
+  "returned": 128,
+  "truncated": false,
+  "records": [ "<registro>", "<registro>" ]
+}
+```
+
+- **`matched`** — quantos registros casaram o filtro.
+- **`returned`** — quantos vieram nesta resposta.
+- **`truncated`** — `true` quando `matched` passou do teto por resposta; refine o recorte ou o termo.
+
+`204` — nenhum registro casou o filtro (não é erro).
+
+> **Serviço recém-implantado devolve `204` com frequência**, e isso não indica defeito: logo após um
+> reinício só existem registros de inicialização, que **não** carregam tenant e por isso ficam de fora (ver
+> `## Comportamento`). Para ver resultado, consulte um recorte que contenha atividade real — uma operação
+> autenticada de `crs`/`q` — e lembre que o nível de log do ambiente limita o que chega a ser gravado.
+
+## Comportamento
+
+- Um **registro** pode ocupar várias linhas (por exemplo, quando traz o rastro de uma falha). O endpoint
+  devolve o registro **inteiro** como um item, não linha a linha.
+- O filtro é conjuntivo: o registro precisa ser **do tenant informado**, estar **dentro do recorte**,
+  pertencer ao **serviço** pedido **e** conter o **termo**.
+- **Registro sem tenant não é devolvido.** Nem todo registro carrega a marca do tenant — os produzidos fora
+  de uma requisição (processamento de fila da projeção, inicialização do serviço, mensagens de framework)
+  não a têm. Esses **ficam de fora**, por segurança: é preferível omitir a arriscar devolver operação de
+  outro cliente. Consequência prática: **o que acontece no caminho assíncrono da projeção não aparece nesta
+  consulta**.
+- A consulta é **somente leitura** e não altera estado.
+- O alcance é o do **próprio serviço**: registros anteriores ao início do serviço em execução podem não estar
+  disponíveis.
+
+## Erros
+
+| Código | Quando |
+|---|---|
+| `400` | `X-Tenant-Id` ausente ou malformado; `{service}` diferente de `crs`/`q`; data em formato não reconhecido; `to` anterior a `from` |
+| `403` | `X-Logs-Key` ausente ou inválida |
+| `503` | o serviço não tem registros acessíveis para consultar |
+
+**Respostas que não vêm deste endpoint** — úteis para não procurar defeito no lugar errado:
+
+| Código | De onde vem | Quando |
+|---|---|---|
+| `400` **com corpo vazio** | gateway | `X-Tenant-Id` e `X-Forger-Credential` enviados juntos (ver aviso no topo). O `400` deste endpoint sempre traz corpo. |
+| `403` **com `{"error":"Forbidden","message":"Access denied."}`** | borda da plataforma | o caminho não está publicado no ambiente consultado (típico ao tentar a URL de produção antes de ela existir) |
+| `404` | fallback do gateway | a rota não casou — caminho digitado errado, ou ambiente sem a rota |
+
+Catálogo: [../erros.md](../erros.md).
+
+> **A chave é secreta.** Não a coloque em repositório, em exemplo copiado nem em log de cliente. Sem a chave
+> configurada no serviço, o endpoint **nega todas** as chamadas — não existe modo aberto por omissão.
+
 <!-- ===== persistence-crs/erros.md ===== -->
 
 # persistence-crs · catálogo de erros
@@ -3002,6 +3182,12 @@ As falhas são classificadas em categorias que ajudam o agente a decidir a corre
 ## Nota
 Um erro de **transição** ou de **concorrência** não é falha de rede: é resposta de domínio. O agente
 deve tratá-los como sinais de fluxo (ajustar o comando ou reenviar), não como indisponibilidade.
+
+## Nota — `510` dizendo "X-Tenant-Id não reconhecido" nem sempre é o tenant
+
+Vale o mesmo que em [persistence-q/erros.md](../persistence-q/erros.md): a mensagem também aparece quando o
+**tenant é válido** mas o **modelo dele não está no cache** (tenant novo sem modelo publicado, ou entrada
+expirada). Confirme a publicação do modelo e o dataschema em `RUNNING` antes de suspeitar do cabeçalho.
 
 <!-- ===== persistence-crs/exemplos.md ===== -->
 
@@ -3088,6 +3274,30 @@ POST /e
 ```
 
 Detalhe do contrato: [endpoints/entidade.md](endpoints/entidade.md).
+
+## Consultar logs de uma operação
+
+Diagnóstico: recupera os registros do serviço no recorte informado. Cabeçalho **próprio** (`X-Logs-Key`),
+não o `Authorization` do domínio — **mais** o `X-Tenant-Id`, que delimita o resultado ao tenant.
+`{term}` vai **URL-encoded**.
+
+```
+GET /logs/service/crs/query/criarficha/from/2026-08-31T01:00:00.000/to/2026-08-31T02:00:00.000
+Headers: X-Logs-Key: <chave>, X-Tenant-Id: <tenant-id>
+
+→ 200
+{ "service": "crs", "tenantId": "<tenant-id>", "matched": 12, "returned": 12, "truncated": false,
+  "records": [ "•••registro•••", "•••registro•••" ] }
+```
+
+```
+GET /logs/service/q/query/<termo>/from/1756605600000/to/1756609200000
+Headers: X-Logs-Key: <chave>, X-Tenant-Id: <tenant-id>
+
+→ 204   // nada casou o filtro (não é erro)
+```
+
+Sem a chave (ou com chave errada) → `403`. Detalhe do contrato: [endpoints/logs.md](endpoints/logs.md).
 
 ## Observação sobre leitura após comando
 Depois de um comando bem-sucedido, **consultar a projeção** ([persistence-q](../persistence-q/README.md))
@@ -3535,6 +3745,10 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
 > persistence-crs grava a projeção autenticado como `MASTER`). Os papéis citados aqui são **nomes** — criar
 > o papel `MASTER` (e demais) para a organização e vincular usuários é feito no [orgid](../../orgid/README.md),
 > não aqui.
+>
+> **`accessControl.read` e `accessControl.write` — papéis adicionais além de `MASTER`.**
+> Declare em `read` os papéis de usuário-final que podem **consultar** a projeção via persistence-q (ex.: `["MASTER", "INSTRUTOR", "ASSOCIADO"]`).
+> Declare em `write` os papéis que podem **escrever na projeção** além da plataforma (ex.: serviços internos autorizados). O app-cliente **nunca** escreve diretamente na projeção — a projeção é materializada pelo fluxo comando → evento → consumidor de fila (ver [coordenação CP-5](../../coordenacao.md#cp-5--consumidor-da-fila-de-projeção-atualiza-o-banco-de-leitura)). `accessControl.write` com papéis além de `MASTER` é portanto para casos específicos de serviços intra-infraestrutura autorizados — **não** para o cliente.
 
 ## Colunas obrigatórias de toda projeção — `aggregateid`, `status` e cada `whenAttribute` de evento (REGRA)
 
@@ -3940,7 +4154,10 @@ Ver [arquitetura](../01-arquitetura.md) e os exemplos de modelo em [examples/](.
   [forger/dataschema — gate de status](../forger/endpoints/dataschema.md#atualizar).
 - **Spec carregada por-instância (cache):** a cada consulta o serviço resolve a spec do tenant igual ao
   write-side — dataschema `RUNNING` via Forger → memória local → `../cache` (não mem-cache db direto) →
-  **se falta no cache, recupera do Forger e repõe** → senão exceção. Alterar o modelo só propaga após
+  **se falta no cache, recupera do Forger e repõe** → senão exceção. ⚠️ **Esse "repõe" (self-heal) está em
+  vias de deixar de existir** — o Forger passa a ser o único publicador do modelo, no `MODELING` → `RUNNING`;
+  a partir daí, tenant sem modelo publicado **falha na consulta** em vez de se recuperar sozinho (detalhe na
+  nota de [persistence-crs/README §Carga da spec do tenant](../persistence-crs/README.md)). Alterar o modelo só propaga após
   **invalidar o cache** (as duas chaves do modelo — read-model + write-model, valores internos) +
   republicar; **restart sozinho não resolve**. Detalhe:
   [persistence-crs/README §Carga da spec do tenant](../persistence-crs/README.md).
@@ -3959,6 +4176,7 @@ Ver [arquitetura](../01-arquitetura.md) e os exemplos de modelo em [examples/](.
 | Operação | Método · Path | Documento |
 |---|---|---|
 | Consultar projeções | `POST /` | [endpoints/consulta.md](endpoints/consulta.md) |
+| Consultar logs deste serviço (`service=q`) | `GET /logs/service/{crs\|q}/query/{term}/from/{from}/to/{to}` | [persistence-crs/endpoints/logs.md](../persistence-crs/endpoints/logs.md) |
 | Controles da DSL (operadores, paging, sorting, cache, associações) | — | [query-controls.md](query-controls.md) |
 
 Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md).
@@ -4222,6 +4440,12 @@ Todos no nível **raiz**:
 - **`_behavior`**: `use` (usa/popula o cache), `evict` (invalida), `ignore` (não usa).
 - **`_ttl`**: tempo de vida da entrada em cache.
 
+> **⚠️ Não use `_cache: use` por ora — o resultado vem errado.** Há um defeito conhecido, em conserto: na
+> **primeira** chamada (nada em cache ainda) a consulta **não chega a ser executada** e a resposta vem com
+> um objeto de controle no lugar dos registros; nas **seguintes**, o dado vem **embrulhado**, em formato
+> diferente do que a mesma consulta devolve sem cache. Enquanto este aviso estiver aqui, prefira
+> `_behavior: ignore` (ou simplesmente **omita** o `_cache`) — a consulta sem cache funciona normalmente.
+
 ## Associações (popular relacionados)
 
 Para trazer entidades **associadas** junto do resultado, use os controles de população **dentro do objeto
@@ -4249,7 +4473,7 @@ do rótulo** (junto dos predicados), limitando a profundidade por `_level`:
 |---|---|---|---|
 | `400` | Requisição inválida | JSON malformado; estrutura de critério inválida. | Corrigir o corpo (modo array/object, um rótulo por item). |
 | `401` / `403` | Não autorizado | Credencial inválida; `tenant-id` fora do escopo do usuário. | Usar credencial/tenant corretos. |
-| `510` | Falha de execução | Predicado/identificador não reconhecido; falha ao ler a projeção. | Usar o vocabulário do tenant; conferir a projeção/entity. |
+| `510` | Falha de execução | Predicado/identificador não reconhecido; falha ao ler a projeção; **modelo do tenant ausente do cache** (ver nota abaixo). | Usar o vocabulário do tenant; conferir a projeção/entity; se a mensagem citar `X-Tenant-Id`, ver a nota. |
 
 ## Categorias (para diagnóstico)
 
@@ -4265,6 +4489,16 @@ do rótulo** (junto dos predicados), limitando a profundidade por `_level`:
 
 ## Nota
 `204` **não** é erro: significa "nenhum resultado". A consulta é idempotente e segura para repetição.
+
+## Nota — `510` dizendo "X-Tenant-Id não reconhecido" nem sempre é o tenant
+
+Essa mensagem também aparece quando o **tenant é válido** mas o **modelo dele não está no cache** — por
+exemplo, um tenant novo cujo modelo ainda não foi publicado, ou cuja entrada expirou. O texto aponta para o
+cabeçalho, mas a causa é o modelo ausente.
+
+**Antes de suspeitar do `X-Tenant-Id`:** confirme que o modelo do tenant foi publicado e que o dataschema
+está em `RUNNING` (ver [forger/dataschema](../forger/endpoints/dataschema.md#atualizar)). Republicar
+(`MODELING` → `RUNNING`) repõe a entrada.
 
 <!-- ===== persistence-q/exemplos.md ===== -->
 
@@ -4643,6 +4877,9 @@ comandos** automaticamente (saga), visíveis como novos eventos no histórico do
 - Pontos de coordenação
 - Pitfalls
 
+> Para **auditar o que já executou** (por termo e intervalo, com chave própria), ver
+> [endpoints/logs.md](endpoints/logs.md).
+
 ---
 
 ## Posição no fluxo
@@ -4658,11 +4895,13 @@ tipo de hook — e, quando o caso de uso exigir, chamar integrações externas n
 
 ## Índice de endpoints
 
-> Apenas o endpoint de contrato é documentado. Endpoints de saúde/observabilidade **não** constam aqui.
+> Endpoints de saúde e de métricas **não** constam aqui. A consulta de log consta por ser **contrato de
+> cliente** — quem chama é o interessado autorizado, sobre as próprias execuções.
 
 | Operação | Método · Path | Documento |
 |---|---|---|
 | Executar função (rota) | `POST /br` | [endpoints/br.md](endpoints/br.md) |
+| Consultar o log de execução | `GET /v3/brservice/logs/query/{term}/from/{f}/to/{t}` | [endpoints/logs.md](endpoints/logs.md) |
 
 > **⚠️ `POST /coordination` — pendente (gap de plataforma).** O motor de comandos (persistence-crs)
 > aciona uma coordenação **síncrona no caminho do comando** quando o modelo do comando declara
@@ -4720,11 +4959,12 @@ Aninhando os escopos, o **path completo é globalmente único** → duas organiz
 
 ### Deploy de um processador (por sistema de arquivos — NÃO via gateway)
 
-Um processador é um **arquivo `.js`** cujo **caminho na pasta de processadores do serviço** é a **rota**
-(`<org>/<project>/<bc>/<aggregate>/<função>.js`). **Não há endpoint/API para publicar um processador** — o
-br-service é **interno** (sem rota no gateway). O deploy é por **sistema de arquivos**: coloca-se o `.js` na pasta
-de processadores e o serviço o carrega (na inicialização; recarregar torna a rota viva). Uma rota sem processador
-correspondente → **erro de rota** quando o persistence-crs a aciona.
+Um processador é um **arquivo** cujo **caminho dentro da pasta de processadores do serviço** é a **rota** —
+`<org>/<project>/<bc>/<aggregate>/<função>`, sem a extensão. **Não há endpoint/API para publicar um
+processador**: o br-service é **interno**, sem rota no gateway para isso. O deploy é por **sistema de
+arquivos** — coloca-se o arquivo na pasta de processadores e o serviço o carrega (na inicialização;
+recarregar torna a rota viva). Uma rota sem processador correspondente → **erro de rota** quando o
+persistence-crs a aciona.
 
 ## Contrato de resposta
 
@@ -4882,31 +5122,35 @@ isso **não consta desta documentação** — a plataforma o injeta no ambiente 
 
 ### Como o processador obtém a URL (variáveis de ambiente)
 
+Endereço e path são injetados pela plataforma no **ambiente do serviço** e ficam disponíveis a
+**qualquer** processador, em qualquer nível de pasta. Nada disso vem no payload:
+
 O br-service acessa persistence **diretamente no cluster** (não via gateway). Existem duas instâncias
 físicas, diferenciadas pela **porta**:
 
-| Instância | Modo | Endereço (intra-cluster) |
-|---|---|---|
-| `tinterpreter` | **teste** | `concriz:8061` |
-| `interpreter` | **produção** | `concriz:8060` |
+| Instância | Modo |
+|---|---|
+| instância de **teste** | dados e topologia isolados de produção |
+| instância de **produção** | — |
 
-Caminhos e superfícies (segura / interna) são **idênticos** nas duas instâncias — só a porta muda.
+Caminhos e superfícies (segura / interna) são **idênticos** nas duas — o que difere é o endereço, e ele
+**não vai no processador**: vem da variável de ambiente correspondente (tabela abaixo).
 
-O developer escolhe **explicitamente** qual instância acessar no código do processor:
-- `ENDPOINTS.PERSISTENCE_T_*` → tinterpreter (teste)
-- `ENDPOINTS.PERSISTENCE_*` → interpreter (produção)
+O developer escolhe **explicitamente** qual instância acessar no código do processador:
+- `ENDPOINTS.PERSISTENCE_T_*` → instância de **teste**
+- `ENDPOINTS.PERSISTENCE_*` → instância de **produção**
 
 | Variável de ambiente | Conteúdo |
 |---|---|
-| `PLATFORM_ENDPOINT_PERSISTENCE_T` | base do tinterpreter (**teste**, concriz:8061), terminado em `/` |
-| `PLATFORM_ENDPOINT_PERSISTENCE` | base do interpreter (**produção**, concriz:8060), terminado em `/` |
+| `PLATFORM_ENDPOINT_PERSISTENCE_T` | base da instância de **teste**, terminado em `/` |
+| `PLATFORM_ENDPOINT_PERSISTENCE` | base da instância de **produção**, terminado em `/` |
 | `PLATFORM_ENDPOINT_PERSISTENCE_Q_UNSEC_PATH` | **path da superfície interna** — mesmo valor em ambas as instâncias |
 | `PLATFORM_ENDPOINT_ORGID` | endereço-base do orgid (para verificar/criar conta de usuário de app via `ENDPOINTS.ORGID`) |
 
 - Montagem da URL interna de leitura de projeção (teste): `PLATFORM_ENDPOINT_PERSISTENCE_T` +
   `PLATFORM_ENDPOINT_PERSISTENCE_Q_UNSEC_PATH`, com exatamente uma `/` entre os dois.
 - Acesso ao orgid: `ENDPOINTS.ORGID` → `GET .../open/ua/account/by/username/{username}/exists` (`200` = conta existe, `204` = não existe). Ver `orgid/endpoints/publico.md`.
-- **Helper recomendado — `lib/platform-endpoints.js`:** em vez de ler `process.env.PLATFORM_ENDPOINT_*`
+- **Helper recomendado — `lib/platform-endpoints`:** em vez de ler as variáveis de ambiente
   diretamente, use o módulo `lib/platform-endpoints` (disponível em qualquer processador, independente de
   profundidade de pasta):
   ```js
@@ -4990,6 +5234,157 @@ externos próprios).
 ## Erros
 `400` em todos os casos de falha (validação, rota desconhecida — com lista de rotas disponíveis —,
 exceção do processador). Catálogo: [../erros.md](../erros.md).
+
+<!-- ===== br-service/endpoints/logs.md ===== -->
+
+# br-service · endpoints · consultar o log de execução
+
+> Devolve o **registro das execuções** de regra/coordenação, filtrado por termo e por intervalo de tempo.
+> Autorizado por **chave própria**, não pelo token de usuário. Guia: [../README.md](../README.md).
+
+## Requisição
+
+Duas formas — a segunda acrescenta o filtro por arquivo:
+
+```
+GET /v3/brservice/logs/query/{term}/from/{f}/to/{t}
+GET /v3/brservice/logs/query/{term}/file/{file}/from/{f}/to/{t}
+```
+
+| Parâmetro | O que é |
+|---|---|
+| `term` | texto procurado no registro. Casa por **substring**, sem diferenciar maiúsculas. `*` devolve tudo do intervalo |
+| `file` | trecho do campo `erroArquivo` — **onde o erro foi lançado**. Casa por substring. `*` aceita qualquer arquivo |
+| `f` · `t` | limites do intervalo, **inclusivos**. ISO 8601 (`2026-08-31T00:00:00Z`) ou epoch em **milissegundos** |
+
+> **`term` e `file` somam, não substituem.** Os dois filtros são aplicados juntos: o registro precisa
+> conter o termo **e** ter sido lançado no arquivo indicado. Para filtrar só por arquivo, use `*` no `term`.
+
+> **Não use barra em `file`.** O filtro casa por substring justamente para isso: `atualizar` ou
+> `associado` bastam para achar o caminho inteiro do arquivo. Barra
+> codificada (`%2F`) dentro de um segmento de caminho costuma ser recusada pelos proxies do caminho
+> público, antes mesmo de chegar ao serviço.
+
+> **Filtrar por arquivo implica erro.** Execução bem-sucedida tem `erroArquivo` vazio e não casa nenhum
+> `file` além de `*`.
+
+Os parâmetros são parte do caminho — codifique-os quando contiverem caractere reservado.
+
+### Cabeçalho
+
+| Cabeçalho | Obrigatório | Valor |
+|---|---|---|
+| `X-Logs-Key` | sim | a chave de consulta, no formato UUID, entregue no provisionamento |
+
+Esta rota **não** usa `Authorization` nem `X-Tenant-Id`: a chave é a credencial inteira.
+
+## Resposta
+
+`200` — objeto com o resultado da busca:
+
+```json
+{
+  "total": 2,
+  "truncado": false,
+  "limite": 1000,
+  "registros": [
+    {
+      "ts": "2026-08-31T02:10:52.494Z",
+      "traceId": "<id de correlação, quando propagado>",
+      "spanId": null,
+      "tenantId": "<tenant>",
+      "route": "<org>/<project>/<bc>/<aggregate>/<função>",
+      "outcome": "success",
+      "durationMs": 4,
+      "bytesIn": 46,
+      "bytesOut": 100,
+      "dataKeys": ["nome"],
+      "erroTipo": null,
+      "erroMensagem": null,
+      "erroArquivo": ""
+    }
+  ]
+}
+```
+
+> Ilustrativo — `<...>` é placeholder, não JSON literal.
+
+| Campo | O que é |
+|---|---|
+| `total` | quantos registros vieram nesta resposta |
+| `truncado` | `true` quando o teto foi atingido e há mais registros no intervalo — estreite o intervalo ou o termo |
+| `limite` | teto de registros por consulta |
+| `registros[].outcome` | `success` · `validation_error` · `processor_error` |
+| `registros[].tenantId` | tenant da execução. **Sempre presente**; vem `""` quando a requisição não trouxe tenant em lugar nenhum |
+| `registros[].dataKeys` | **nomes** dos campos que chegaram em `data` — nunca os valores |
+| `registros[].erroMensagem` | mensagem do erro, **truncada**; o corte é sinalizado no fim do texto |
+| `registros[].erroArquivo` | **onde** o erro foi lançado, no formato `caminho:linha` — aponta o arquivo da função que falhou. `""` quando não houve erro |
+
+> **Como o tenant é encontrado.** Ele não chega sempre no mesmo lugar: em execução **síncrona** vem no
+> cabeçalho da requisição ou junto do corpo; em **coordenação e projeção** vem dentro do próprio payload do
+> evento. A consulta normaliza isso — o campo `tenantId` é preenchido a partir de qualquer uma dessas
+> origens, e só fica vazio quando nenhuma delas trouxe o dado.
+
+**O payload não é registrado.** Só metadados. Os dados do comando podem conter informação pessoal e
+credencial, então não são gravados — logo não há como recuperá-los por aqui.
+
+## Erros
+
+| Código | Quando |
+|---|---|
+| `400` | `f` ou `t` fora de formato, ou `f` posterior a `t` |
+| `401` | `X-Logs-Key` ausente ou incorreta |
+| `503` | consulta de log não provisionada neste ambiente |
+
+Corpo de erro: `{ status, mensagem, tipo }`. Catálogo geral: [../erros.md](../erros.md).
+
+## Alcance e retenção
+
+- Só há registro do que passou pelo **próprio br-service** — execuções de regra, coordenação e projeção.
+  O que acontece no motor de comandos não aparece aqui.
+- O registro é gravado **depois** de a requisição terminar, em qualquer desfecho: sucesso, falha de
+  validação e exceção do processador entram igual.
+- **Sem garantia de retenção indefinida.** O intervalo consultável depende da política de retenção do
+  ambiente; consultas a datas antigas podem voltar vazias mesmo tendo havido execução.
+- Correlação com o motor de comandos: quando o chamador propaga um identificador de rastreio, ele aparece
+  em `traceId` — é a chave para juntar os dois lados.
+
+## Exemplos
+
+Tudo o que houve num dia:
+
+```
+GET /v3/brservice/logs/query/*/from/2026-08-31T00:00:00Z/to/2026-08-31T23:59:59Z
+X-Logs-Key: <uuid>
+```
+
+Só o que falhou numa rota:
+
+```
+GET /v3/brservice/logs/query/processor_error/from/1756605600000/to/1756692000000
+X-Logs-Key: <uuid>
+```
+
+Rastrear uma execução específica pelo identificador de correlação:
+
+```
+GET /v3/brservice/logs/query/<traceId>/from/2026-08-31T02:00:00Z/to/2026-08-31T03:00:00Z
+X-Logs-Key: <uuid>
+```
+
+Tudo o que falhou **num arquivo**, no dia:
+
+```
+GET /v3/brservice/logs/query/*/file/atualizar/from/2026-08-31T00:00:00Z/to/2026-08-31T23:59:59Z
+X-Logs-Key: <uuid>
+```
+
+Os dois filtros somados — falhas **daquele arquivo** cuja mensagem contém um texto:
+
+```
+GET /v3/brservice/logs/query/obrigat%C3%B3rio/file/atualizar/from/2026-08-31T00:00:00Z/to/2026-08-31T23:59:59Z
+X-Logs-Key: <uuid>
+```
 
 <!-- ===== br-service/erros.md ===== -->
 
@@ -5523,6 +5918,130 @@ real.
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.23 — 2026-08-31
+
+- **br-service: consulta do log de execução documentada** (novo `br-service/endpoints/logs.md`).
+  `GET /v3/brservice/logs/query/{term}/from/{f}/to/{t}` devolve os registros das execuções de regra/coordenação,
+  filtrados por **termo** (substring, sem diferenciar maiúsculas; `*` = todos) e por **intervalo
+  inclusivo** (ISO 8601 ou epoch em milissegundos). Autorização por **chave própria** no cabeçalho
+  `X-Logs-Key` — **não** usa `Authorization` nem `X-Tenant-Id`. Erros: `400` (intervalo malformado ou
+  invertido), `401` (chave ausente/incorreta), `503` (não provisionado no ambiente).
+- **Só metadados.** O registro traz `ts, traceId, spanId, tenantId, route, outcome, durationMs, bytesIn,
+  bytesOut, dataKeys, erroTipo, erroMensagem, erroArquivo`. `dataKeys` guarda os **nomes** dos campos
+  recebidos, nunca os valores; o **payload do comando não é gravado** (pode conter informação pessoal e
+  credencial), então não há como recuperá-lo por esta rota. `erroMensagem` vem truncada.
+- **`tenantId` está sempre presente**, e vem `""` só quando a requisição não trouxe tenant em origem
+  nenhuma. O tenant não chega sempre no mesmo lugar — em execução síncrona vem no cabeçalho ou no corpo;
+  em coordenação/projeção vem dentro do payload do evento — e a consulta normaliza as origens num campo só.
+- **`erroArquivo`** diz **onde** o erro foi lançado (`caminho:linha`), apontando o arquivo da função que
+  falhou; `""` quando não houve erro. E há uma **segunda forma da rota que filtra por ele**:
+  `GET /v3/brservice/logs/query/{term}/file/{file}/from/{f}/to/{t}`. Os dois filtros **somam** — o
+  registro precisa conter o termo **e** ter falhado no arquivo; `*` desliga qualquer um dos dois. O
+  `file` casa por **substring** de propósito (um pedaço do nome acha o caminho inteiro): barra codificada
+  em segmento de caminho costuma ser recusada pelos proxies do caminho público. A forma sem `file`
+  continua valendo.
+- **`truncado: true`** sinaliza que o teto de registros foi atingido e há mais no intervalo — estreitar
+  intervalo ou termo. **Retenção não é garantida**: datas antigas podem voltar vazias mesmo tendo havido
+  execução.
+- **Exceção consciente ao invariante de "nada de observabilidade" em `public/`** (`CLAUDE-extended.md` §2,
+  item 3): esta rota entra por ser **contrato de cliente** — quem consulta é o interessado autorizado,
+  sobre as próprias execuções, e não o operador da plataforma. Saúde e métricas continuam fora.
+- **Higiene em `br-service/README.md`:** saíram os **endereços internos** das duas instâncias de
+  persistência (host e porta) e as marcas de implementação no texto de deploy de processador. O endereço
+  nunca deveria estar ali — a própria página manda obtê-lo da variável de ambiente, e o processador não o
+  escreve. A tabela agora distingue as instâncias por **modo** (teste / produção), que é o que decide qual
+  variável usar.
+- Atualizados: `br-service/README.md` (índice de endpoints + ponteiro no Contents + higiene acima),
+  `br-service/openapi.yaml` (dois paths + `BrLogQueryResult`/`BrLogEntry`), `llms.txt`,
+  `llms-full.txt` (regenerado).
+
+## 1.22 — 2026-08-31
+
+- **⚠️ `_cache: use` não deve ser usado por ora — devolve resultado errado nos dois caminhos.** Defeito
+  conhecido, em conserto: na **primeira** chamada (nada em cache) a consulta **não é executada** e a resposta
+  traz um objeto de controle no lugar dos registros; nas **seguintes**, o dado vem **embrulhado**, em formato
+  diferente do que a mesma consulta devolve sem cache. Recomendação enquanto durar: `_behavior: ignore` ou
+  omitir o `_cache`. Aviso em `persistence-q/query-controls.md` §Cache.
+- **`510` dizendo "X-Tenant-Id não reconhecido" nem sempre é o tenant.** A mesma mensagem aparece quando o
+  **tenant é válido** mas o **modelo dele não está no cache** (tenant novo sem modelo publicado, ou entrada
+  expirada) — o texto aponta para o cabeçalho, a causa é outra. Antes de suspeitar do `X-Tenant-Id`, conferir
+  a publicação do modelo e o dataschema em `RUNNING`. Nota nova em `persistence-q/erros.md` e
+  `persistence-crs/erros.md`.
+- Atualizados: `persistence-q/query-controls.md`, `persistence-q/erros.md`, `persistence-crs/erros.md`,
+  `llms-full.txt` (regenerado).
+
+## 1.20 — 2026-08-31
+
+- **Aviso de mudança em implantação: o self-heal do modelo em cache vai deixar de existir.** Hoje, quando o
+  modelo do tenant não está no cache, `persistence-crs`/`persistence-q` o recuperam do Forger e o **repõem**
+  (passo 4 de "Carga da spec do tenant"). Isso passa a ser feito **só pelo Forger**, no momento em que o
+  dataschema transita para `RUNNING`. **Efeito para quem integra:** tenant cujo modelo não tenha sido
+  publicado por essa via **não se recupera sozinho** — a consulta falha até o modelo ser republicado
+  (`MODELING` → `RUNNING`). A nota está marcada como *em implantação*: o comportamento em produção, por ora,
+  **continua com self-heal**.
+- **Novo endpoint documentado: consulta de logs** — `GET /logs/service/{crs|q}/query/{term}/from/{from}/to/{to}`,
+  para diagnóstico de uma operação já executada. Autorização por **cabeçalho próprio** (`X-Logs-Key`), **não**
+  pelo token do domínio — é o primeiro endpoint da doc com credencial fora do par `Authorization`/`X-Tenant-Id`.
+  Devolve o registro **inteiro** (um registro pode ter várias linhas), com `matched`/`returned`/`truncated`;
+  `204` quando nada casa. **Teste** (`/v3/persistence/t/logs/...`) é o alvo desta entrega; **produção**
+  (`/v3/persistence/logs/...`) tem o mesmo contrato, mas **ainda não está publicada** e devolverá bem menos,
+  porque o nível de log lá é mais restritivo.
+- Atualizados: `persistence-crs/README.md` (nota após o passo 5 de "Carga da spec do tenant" + linha no índice),
+  `persistence-q/README.md` (marca no item "Spec carregada por-instância" + linha no índice), novo
+  `persistence-crs/endpoints/logs.md`, `persistence-crs/exemplos.md`, `llms.txt`, `README.md` ("Por tarefa"),
+  `llms-full.txt` (regenerado).
+- **Pendente de revisão:** `cache/README.md:14` ainda descreve "spec por-instância, com TTL e self-heal" —
+  mesma afirmação, fora do escopo desta revisão; corrigir quando a mudança entrar em produção.
+
+## 1.19 — 2026-08-30
+
+- **orgid: a rota documentada como "listar contas da org" NÃO lista — devolve só o chamador.**
+  `GET /up/account/by/org/{orgName}` deduz o dono da organização pelo token e filtra o resultado pela
+  conta de quem chama. A rota de listagem é `GET /up/account/by/org/{orgName}/org-owner/{orgOwner}`, que
+  até agora não constava do `openapi.yaml` e era descrita como "igual ao anterior". Medido em ambiente
+  real: a rota com `org-owner` devolveu **5** contas numa organização em que a outra devolveu **1**.
+- **A listagem mistura vínculos ativos e suspensos, sem distinção visível.** Só o que está **cancelado**
+  é descartado; **suspensos** e **pendentes** vêm na resposta. E o campo `status` é o estado **global** da
+  conta — não diz nada sobre a organização consultada: a mesma pessoa pode estar suspensa numa org e
+  ativa em outra. Membro ativo naquela organização = `status`, `accountStatus` e `orgStatus` **todos**
+  `ACTIVE`. O filtro é do consumidor.
+- **Forma da resposta documentada.** Cada conta traz `accountRoleOrgs[]` com `role.name`, `org`
+  (`name`/`owner`), `accountStatus` e `orgStatus`; senha nunca é devolvida; sem membro → `204` **sem
+  corpo**, não `[]`. Novos schemas `UpOrgMember` e `UpAccountRoleOrg`.
+- **Cabeçalho ausente responde `401`, não `404`.** Medido nas duas rotas: sem `Authorization` → `401`;
+  o cabeçalho `Accept` **não** é condição de roteamento. Nenhuma das duas rotas produz `404`.
+- Atualizados: `orgid/endpoints/up-conta.md` (duas seções reescritas), `orgid/openapi.yaml` (dois paths
+  detalhados + `UpOrgMember`/`UpAccountRoleOrg`), `llms-full.txt` (regenerado).
+
+## 1.18 — 2026-08-27
+
+- **Pré-visualização do frontend documentada** (novo `08-preview-de-frontend.md`). O frontend que o agente
+  constrói pode ser **visto e testado pelo usuário** antes de qualquer publicação. Contrato para o agente:
+  o app vai em **`application/`** na raiz do sistema (**nome fixo**, não configurável); precisa de manifesto de
+  dependências + rotina de build produzindo **`application/dist/`**; bibliotecas podem ser instaladas
+  livremente (registro público é destino autorizado da "janela", e há **depósito compartilhado** entre sistemas).
+- **A regra que mais quebra na prática:** o app deve chamar o BFF em **caminho relativo** (`/api/...`), nunca pelo
+  endereço dele. **Sessão** (o cookie só é guardado se a chamada for da mesma origem) e **permissão de origem**
+  (o BFF não conhece a origem da pré-visualização) dependem disso.
+- **Quem dispara é o usuário**, por um botão no painel — o agente não aciona nem comanda a pré-visualização;
+  só deixa o app pronto para ser montado. Preview é **teste**, não publicação: o caminho de publicação segue o
+  de `07` §7 (proposta → revisão humana → build fora → armazenamento estático).
+- **Precisão em `07-isolamento-e-entrega.md` §7:** "a sala nunca faz build" valia para o caminho de **publicação**
+  e continua valendo. A sala **pode** montar o app localmente para o agente **verificar o próprio trabalho** —
+  isso não publica nada.
+- **Descoberta**: entrada em `llms.txt` (Fundamentos) + linha na tabela "Por tarefa" do `README.md`.
+
+## 1.17 — 2026-08-08
+
+- **Autocadastro de usuário de aplicação (self-service) documentado.** Nova seção em `orgid/README.md`
+  ("Autocadastro de usuário de aplicação (modo da plataforma)"): padrão em **2 etapas** — conta `/ua` + papel via
+  `POST /open/ua/account-role` (público) → **registro de domínio** (agregado no persistence-crs) com o `username`
+  **como identidade / chave de unicidade** (1 conta = no máx. 1 registro). **Qual papel = decisão de design do
+  sistema** (default fixo OU cardápio `ispublic` via `GET /ua/open/role/owner/{roleOwner}`); o papel precisa
+  **pré-existir** (senão `204` = nada criado). Recuperação **CQRS-ES** antes de transicionar. **Autorização "só o
+  próprio registro" NÃO vem do token** — é regra de negócio (ex.: processador br-service).
+- **Descoberta**: ponteiro de topo em `06-autenticacao.md` + linha no índice orgid do `llms.txt` → a seção.
 
 ## 1.16 — 2026-08-02
 

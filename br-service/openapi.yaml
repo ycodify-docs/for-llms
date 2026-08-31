@@ -33,6 +33,99 @@ paths:
         '400':
           description: "Validação, rota inexistente, ou exceção do processador."
           content: { application/json: { schema: { $ref: '#/components/schemas/BrError' } } }
+  /v3/brservice/logs/query/{term}/from/{f}/to/{t}:
+    get:
+      summary: Consultar o log de execução
+      description: >
+        Registros das execuções de regra/coordenação, filtrados por termo (substring, sem diferenciar
+        maiúsculas; `*` = todos) e por intervalo inclusivo. Autorizado pela chave própria `X-Logs-Key`,
+        não pelo token de usuário. Só metadados — o payload do comando não é registrado.
+        NOTA DE CAMINHO: diferente de `/br`, que é o caminho interno (o serviço é chamado
+        serviço-a-serviço, sem passar pelo gateway), este path já inclui o prefixo público
+        `/v3/brservice` — é a URL que o cliente usa.
+      parameters:
+        - name: term
+          in: path
+          required: true
+          schema: { type: string }
+          description: "Texto procurado no registro. `*` devolve tudo do intervalo."
+        - name: f
+          in: path
+          required: true
+          schema: { type: string }
+          description: "Início do intervalo (inclusivo): ISO 8601 ou epoch em milissegundos."
+        - name: t
+          in: path
+          required: true
+          schema: { type: string }
+          description: "Fim do intervalo (inclusivo): ISO 8601 ou epoch em milissegundos."
+        - name: X-Logs-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
+          description: "Chave de consulta, entregue no provisionamento."
+      responses:
+        '200':
+          description: "Resultado da busca."
+          content: { application/json: { schema: { $ref: '#/components/schemas/BrLogQueryResult' } } }
+        '400':
+          description: "Intervalo fora de formato, ou início posterior ao fim."
+          content: { application/json: { schema: { $ref: '#/components/schemas/BrError' } } }
+        '401':
+          description: "X-Logs-Key ausente ou incorreta."
+          content: { application/json: { schema: { $ref: '#/components/schemas/BrError' } } }
+        '503':
+          description: "Consulta de log não provisionada neste ambiente."
+          content: { application/json: { schema: { $ref: '#/components/schemas/BrError' } } }
+  /v3/brservice/logs/query/{term}/file/{file}/from/{f}/to/{t}:
+    get:
+      summary: Consultar o log de execução, filtrando também pelo arquivo do erro
+      description: >
+        Mesma consulta da forma sem `file`, com um filtro a mais: o arquivo onde o erro foi lançado.
+        Os dois filtros SOMAM — o registro precisa conter o termo E ter falhado no arquivo indicado.
+        Para filtrar só por arquivo, passe `*` no `term`. Como o filtro casa por substring, use o nome
+        do arquivo, sem a extensão, ou um trecho do caminho, sem barra: barra codificada
+        em segmento de caminho costuma ser recusada pelos proxies do caminho público.
+        Filtrar por arquivo implica erro — execução bem-sucedida tem `erroArquivo` vazio.
+      parameters:
+        - name: term
+          in: path
+          required: true
+          schema: { type: string }
+          description: "Texto procurado no registro. `*` desliga este filtro."
+        - name: file
+          in: path
+          required: true
+          schema: { type: string }
+          description: "Trecho de `erroArquivo`. `*` aceita qualquer arquivo."
+        - name: f
+          in: path
+          required: true
+          schema: { type: string }
+          description: "Início do intervalo (inclusivo): ISO 8601 ou epoch em milissegundos."
+        - name: t
+          in: path
+          required: true
+          schema: { type: string }
+          description: "Fim do intervalo (inclusivo): ISO 8601 ou epoch em milissegundos."
+        - name: X-Logs-Key
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
+          description: "Chave de consulta, entregue no provisionamento."
+      responses:
+        '200':
+          description: "Resultado da busca."
+          content: { application/json: { schema: { $ref: '#/components/schemas/BrLogQueryResult' } } }
+        '400':
+          description: "Intervalo fora de formato, ou início posterior ao fim."
+          content: { application/json: { schema: { $ref: '#/components/schemas/BrError' } } }
+        '401':
+          description: "X-Logs-Key ausente ou incorreta."
+          content: { application/json: { schema: { $ref: '#/components/schemas/BrError' } } }
+        '503':
+          description: "Consulta de log não provisionada neste ambiente."
+          content: { application/json: { schema: { $ref: '#/components/schemas/BrError' } } }
 components:
   schemas:
     BrError:
@@ -41,3 +134,40 @@ components:
         status: { type: string, example: error }
         mensagem: { type: string }
         tipo: { type: string }
+    BrLogQueryResult:
+      type: object
+      properties:
+        total: { type: integer, description: "Quantos registros vieram nesta resposta." }
+        truncado: { type: boolean, description: "true = teto atingido; há mais registros no intervalo." }
+        limite: { type: integer, description: "Teto de registros por consulta." }
+        registros:
+          type: array
+          items: { $ref: '#/components/schemas/BrLogEntry' }
+    BrLogEntry:
+      type: object
+      properties:
+        ts: { type: string, format: date-time }
+        traceId: { type: string, nullable: true, description: "Identificador de correlação, quando propagado pelo chamador." }
+        spanId: { type: string, nullable: true }
+        tenantId:
+          type: string
+          description: >
+            Tenant da execução. Sempre presente; string vazia quando a requisição não trouxe tenant
+            em nenhuma das origens possíveis (cabeçalho, corpo da execução síncrona, ou payload do
+            evento nos hooks de coordenação/projeção).
+        route: { type: string, nullable: true }
+        outcome: { type: string, enum: [success, validation_error, processor_error] }
+        durationMs: { type: integer }
+        bytesIn: { type: integer }
+        bytesOut: { type: integer }
+        dataKeys:
+          type: array
+          items: { type: string }
+          description: "NOMES dos campos recebidos em data — nunca os valores."
+        erroTipo: { type: string, nullable: true }
+        erroMensagem: { type: string, nullable: true, description: "Truncada; o corte é sinalizado no fim do texto." }
+        erroArquivo:
+          type: string
+          description: >
+            Onde o erro foi lançado, no formato `caminho:linha` — o arquivo da função que falhou.
+            String vazia quando não houve erro.

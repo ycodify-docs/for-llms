@@ -26,7 +26,10 @@
   [forger/dataschema — gate de status](../forger/endpoints/dataschema.md#atualizar).
 - **Spec carregada por-instância (cache):** a cada consulta o serviço resolve a spec do tenant igual ao
   write-side — dataschema `RUNNING` via Forger → memória local → `../cache` (não mem-cache db direto) →
-  **se falta no cache, recupera do Forger e repõe** → senão exceção. Alterar o modelo só propaga após
+  **se falta no cache, recupera do Forger e repõe** → senão exceção. ⚠️ **Esse "repõe" (self-heal) está em
+  vias de deixar de existir** — o Forger passa a ser o único publicador do modelo, no `MODELING` → `RUNNING`;
+  a partir daí, tenant sem modelo publicado **falha na consulta** em vez de se recuperar sozinho (detalhe na
+  nota de [persistence-crs/README §Carga da spec do tenant](../persistence-crs/README.md)). Alterar o modelo só propaga após
   **invalidar o cache** (as duas chaves do modelo — read-model + write-model, valores internos) +
   republicar; **restart sozinho não resolve**. Detalhe:
   [persistence-crs/README §Carga da spec do tenant](../persistence-crs/README.md).
@@ -45,6 +48,7 @@
 | Operação | Método · Path | Documento |
 |---|---|---|
 | Consultar projeções | `POST /` | [endpoints/consulta.md](endpoints/consulta.md) |
+| Consultar logs deste serviço (`service=q`) | `GET /logs/service/{crs\|q}/query/{term}/from/{from}/to/{to}` | [persistence-crs/endpoints/logs.md](../persistence-crs/endpoints/logs.md) |
 | Controles da DSL (operadores, paging, sorting, cache, associações) | — | [query-controls.md](query-controls.md) |
 
 Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md).

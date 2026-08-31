@@ -16,6 +16,9 @@
 - Pontos de coordenação
 - Pitfalls
 
+> Para **auditar o que já executou** (por termo e intervalo, com chave própria), ver
+> [endpoints/logs.md](endpoints/logs.md).
+
 ---
 
 ## Posição no fluxo
@@ -31,11 +34,13 @@ tipo de hook — e, quando o caso de uso exigir, chamar integrações externas n
 
 ## Índice de endpoints
 
-> Apenas o endpoint de contrato é documentado. Endpoints de saúde/observabilidade **não** constam aqui.
+> Endpoints de saúde e de métricas **não** constam aqui. A consulta de log consta por ser **contrato de
+> cliente** — quem chama é o interessado autorizado, sobre as próprias execuções.
 
 | Operação | Método · Path | Documento |
 |---|---|---|
 | Executar função (rota) | `POST /br` | [endpoints/br.md](endpoints/br.md) |
+| Consultar o log de execução | `GET /v3/brservice/logs/query/{term}/from/{f}/to/{t}` | [endpoints/logs.md](endpoints/logs.md) |
 
 > **⚠️ `POST /coordination` — pendente (gap de plataforma).** O motor de comandos (persistence-crs)
 > aciona uma coordenação **síncrona no caminho do comando** quando o modelo do comando declara
@@ -93,11 +98,12 @@ Aninhando os escopos, o **path completo é globalmente único** → duas organiz
 
 ### Deploy de um processador (por sistema de arquivos — NÃO via gateway)
 
-Um processador é um **arquivo `.js`** cujo **caminho na pasta de processadores do serviço** é a **rota**
-(`<org>/<project>/<bc>/<aggregate>/<função>.js`). **Não há endpoint/API para publicar um processador** — o
-br-service é **interno** (sem rota no gateway). O deploy é por **sistema de arquivos**: coloca-se o `.js` na pasta
-de processadores e o serviço o carrega (na inicialização; recarregar torna a rota viva). Uma rota sem processador
-correspondente → **erro de rota** quando o persistence-crs a aciona.
+Um processador é um **arquivo** cujo **caminho dentro da pasta de processadores do serviço** é a **rota** —
+`<org>/<project>/<bc>/<aggregate>/<função>`, sem a extensão. **Não há endpoint/API para publicar um
+processador**: o br-service é **interno**, sem rota no gateway para isso. O deploy é por **sistema de
+arquivos** — coloca-se o arquivo na pasta de processadores e o serviço o carrega (na inicialização;
+recarregar torna a rota viva). Uma rota sem processador correspondente → **erro de rota** quando o
+persistence-crs a aciona.
 
 ## Contrato de resposta
 
@@ -261,28 +267,29 @@ Endereço e path são injetados pela plataforma no **ambiente do serviço** e fi
 O br-service acessa persistence **diretamente no cluster** (não via gateway). Existem duas instâncias
 físicas, diferenciadas pela **porta**:
 
-| Instância | Modo | Endereço (intra-cluster) |
-|---|---|---|
-| `tinterpreter` | **teste** | `concriz:8061` |
-| `interpreter` | **produção** | `concriz:8060` |
+| Instância | Modo |
+|---|---|
+| instância de **teste** | dados e topologia isolados de produção |
+| instância de **produção** | — |
 
-Caminhos e superfícies (segura / interna) são **idênticos** nas duas instâncias — só a porta muda.
+Caminhos e superfícies (segura / interna) são **idênticos** nas duas — o que difere é o endereço, e ele
+**não vai no processador**: vem da variável de ambiente correspondente (tabela abaixo).
 
-O developer escolhe **explicitamente** qual instância acessar no código do processor:
-- `ENDPOINTS.PERSISTENCE_T_*` → tinterpreter (teste)
-- `ENDPOINTS.PERSISTENCE_*` → interpreter (produção)
+O developer escolhe **explicitamente** qual instância acessar no código do processador:
+- `ENDPOINTS.PERSISTENCE_T_*` → instância de **teste**
+- `ENDPOINTS.PERSISTENCE_*` → instância de **produção**
 
 | Variável de ambiente | Conteúdo |
 |---|---|
-| `PLATFORM_ENDPOINT_PERSISTENCE_T` | base do tinterpreter (**teste**, concriz:8061), terminado em `/` |
-| `PLATFORM_ENDPOINT_PERSISTENCE` | base do interpreter (**produção**, concriz:8060), terminado em `/` |
+| `PLATFORM_ENDPOINT_PERSISTENCE_T` | base da instância de **teste**, terminado em `/` |
+| `PLATFORM_ENDPOINT_PERSISTENCE` | base da instância de **produção**, terminado em `/` |
 | `PLATFORM_ENDPOINT_PERSISTENCE_Q_UNSEC_PATH` | **path da superfície interna** — mesmo valor em ambas as instâncias |
 | `PLATFORM_ENDPOINT_ORGID` | endereço-base do orgid (para verificar/criar conta de usuário de app via `ENDPOINTS.ORGID`) |
 
 - Montagem da URL interna de leitura de projeção (teste): `PLATFORM_ENDPOINT_PERSISTENCE_T` +
   `PLATFORM_ENDPOINT_PERSISTENCE_Q_UNSEC_PATH`, com exatamente uma `/` entre os dois.
 - Acesso ao orgid: `ENDPOINTS.ORGID` → `GET .../open/ua/account/by/username/{username}/exists` (`200` = conta existe, `204` = não existe). Ver `orgid/endpoints/publico.md`.
-- **Helper recomendado — `lib/platform-endpoints.js`:** em vez de ler `process.env.PLATFORM_ENDPOINT_*`
+- **Helper recomendado — `lib/platform-endpoints`:** em vez de ler as variáveis de ambiente
   diretamente, use o módulo `lib/platform-endpoints` (disponível em qualquer processador, independente de
   profundidade de pasta):
   ```js

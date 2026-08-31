@@ -52,7 +52,36 @@ paths:
   /up/account/password:
     put: { tags: [conta], summary: Atualizar senha, security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { type: object, properties: { password: { type: string } } } } } }, responses: { '200': { description: OK } } }
   /up/account/by/org/{orgName}:
-    get: { tags: [conta], summary: Listar contas da org, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/orgName' }], responses: { '200': { description: Lista }, '204': { description: Vazio } } }
+    get:
+      tags: [conta]
+      summary: "Conta do chamador na org (NÃO lista os membros)"
+      description: >
+        Apesar do nome, não devolve os membros da organização. O dono da org é deduzido do token e o
+        resultado é filtrado pela conta de quem chama — na prática, retorna apenas o próprio chamador.
+        Para obter os membros, use /up/account/by/org/{orgName}/org-owner/{orgOwner}.
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/orgName' }]
+      responses:
+        '200': { description: "Array com uma conta, a do portador do token", content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/UpOrgMember' } } } } }
+        '204': { description: "Sem vínculo — sem corpo" }
+        '401': { description: "Authorization ausente ou inválido" }
+        '403': { $ref: '#/components/responses/Forbidden' }
+  /up/account/by/org/{orgName}/org-owner/{orgOwner}:
+    get:
+      tags: [conta]
+      summary: Listar os membros da organização
+      description: >
+        Rota de listagem: devolve as contas vinculadas à organização, cada uma com os seus vínculos
+        (papel e status). Papéis aceitos: administrador, engenheiro ou analista na própria organização;
+        os demais recebem 403. Vínculos cancelados são omitidos; suspensos e pendentes SÃO retornados,
+        sem distinção visível — filtrar por status é responsabilidade do consumidor.
+      security: [{ bearerAuth: [] }]
+      parameters: [{ $ref: '#/components/parameters/orgName' }, { $ref: '#/components/parameters/orgOwner' }]
+      responses:
+        '200': { description: "Membros da organização", content: { application/json: { schema: { type: array, items: { $ref: '#/components/schemas/UpOrgMember' } } } } }
+        '204': { description: "Nenhum membro — sem corpo (não é lista vazia)" }
+        '401': { description: "Authorization ausente ou inválido" }
+        '403': { $ref: '#/components/responses/Forbidden' }
   /ua/account/by/jwt:
     get: { tags: [conta], summary: Conta autenticada (externo), security: [{ bearerAuth: [] }], responses: { '200': { description: Conta }, '204': { description: Não encontrada } } }
   /ua/account:
@@ -122,6 +151,29 @@ components:
     Conflict: { description: "Conflito — identificador único já em uso (ex.: username no registro público)", content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
   schemas:
     Error: { type: object, properties: { error: { type: string } } }
+    UpOrgMember:
+      type: object
+      description: >
+        Conta vinculada a uma organização. A senha nunca é devolvida. O campo status é o estado GLOBAL
+        da conta e não diz nada sobre uma organização específica; o estado do vínculo vive em cada item
+        de accountRoleOrgs. Uma conta pode ter mais de um vínculo na mesma organização (um por papel).
+      properties:
+        username: { type: string }
+        name: { type: string }
+        email: { type: string, format: email }
+        status: { type: string, enum: [ACTIVE, SUSPENDED, PENDING, CANCELED], description: "Estado GLOBAL da conta" }
+        accountRoleOrgs: { type: array, items: { $ref: '#/components/schemas/UpAccountRoleOrg' } }
+    UpAccountRoleOrg:
+      type: object
+      description: >
+        Vínculo conta-papel-organização. Considere o membro ativo NAQUELA organização somente quando o
+        status global da conta, o accountStatus e o orgStatus forem todos ACTIVE. Vínculos cancelados
+        são omitidos da listagem; suspensos e pendentes são retornados sem distinção visível.
+      properties:
+        role: { type: object, properties: { name: { type: string, enum: [API_MASTER, API_ENGINEER, API_FINANCIAL, API_ANALYST, API_GUEST, API_APP] } } }
+        org: { type: object, properties: { name: { type: string }, owner: { type: string } } }
+        accountStatus: { type: string, enum: [ACTIVE, SUSPENDED, CANCELED], description: "Estado do vínculo conta→org" }
+        orgStatus: { type: string, enum: [ACTIVE, SUSPENDED, CANCELED], description: "Estado do vínculo org→conta" }
     UaAccountRole:
       type: object
       required: [account, role]

@@ -46,6 +46,7 @@
 | Ler o estado ou o histórico de um agregado | [`persistence-crs/endpoints/agregado-leitura.md`](persistence-crs/endpoints/agregado-leitura.md) |
 | Fazer CRUD simples de uma entidade convencional (não-agregado) | [`persistence-crs/endpoints/entidade.md`](persistence-crs/endpoints/entidade.md) |
 | Consultar projeções (query) | [`persistence-q/endpoints/consulta.md`](persistence-q/endpoints/consulta.md) |
+| Recuperar logs de uma operação (diagnóstico) | [`persistence-crs/endpoints/logs.md`](persistence-crs/endpoints/logs.md) |
 | Escrever uma regra de negócio ou coordenação | [`br-service/README.md`](br-service/README.md) |
 | Entender quando/como os serviços se chamam | [`coordenacao.md`](coordenacao.md) |
 | Entender o despacho de eventos (projeção, saga) | [`es-n/README.md`](es-n/README.md) |

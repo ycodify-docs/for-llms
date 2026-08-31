@@ -44,7 +44,7 @@
 ## persistence-crs (comandos, CQRS-ES) — núcleo da modelagem
 - [Gramática do modelo de domínio (.model.json)](persistence-crs/spec/model-format.md): **essencial** — agregado, comando, evento, tipos, identidade, value objects.
 - [Guia](persistence-crs/README.md): pré-requisitos, ciclo do comando, estados/concorrência (regra do `status`), regras de payload.
-- [comando](persistence-crs/endpoints/comando.md) · [leitura de agregado](persistence-crs/endpoints/agregado-leitura.md) · [entidade (CRUD convencional)](persistence-crs/endpoints/entidade.md) · [escrita de projeção](persistence-crs/endpoints/projecao.md)
+- [comando](persistence-crs/endpoints/comando.md) · [leitura de agregado](persistence-crs/endpoints/agregado-leitura.md) · [entidade (CRUD convencional)](persistence-crs/endpoints/entidade.md) · [escrita de projeção](persistence-crs/endpoints/projecao.md) · [consulta de logs](persistence-crs/endpoints/logs.md)
 - [Erros](persistence-crs/erros.md) · [Exemplos](persistence-crs/exemplos.md) · [OpenAPI](persistence-crs/openapi.yaml)
 
 ## forger (implanta recursos) — primeiro serviço usado
@@ -62,7 +62,7 @@
 
 ## br-service (regras e coordenação)
 - [Guia](br-service/README.md): posição no fluxo, três categorias de processador, forma canônica da rota, contrato de resposta.
-- [executar função (/br)](br-service/endpoints/br.md) · [Erros](br-service/erros.md) · [Exemplos](br-service/exemplos.md) · [OpenAPI](br-service/openapi.yaml)
+- [executar função (/br)](br-service/endpoints/br.md) · [consultar log de execução](br-service/endpoints/logs.md) · [Erros](br-service/erros.md) · [Exemplos](br-service/exemplos.md) · [OpenAPI](br-service/openapi.yaml)
 
 ## filer (arquivos anexos a agregados) — serviço transversal
 - [Guia](filer/README.md): convenção de nome (arquivo↔agregado), RBAC por entidade, limites/tipos.

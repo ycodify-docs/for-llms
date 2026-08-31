@@ -39,6 +39,7 @@
 | Ler histórico de eventos | `GET /a/{boundedContext}/{aggregateType}/{id}/history` | [endpoints/agregado-leitura.md](endpoints/agregado-leitura.md) |
 | CRUD de entidade convencional (não-agregado) | `POST /e` | [endpoints/entidade.md](endpoints/entidade.md) |
 | Escrever projeção (uso interno do mesmo `/e`) | `POST /e` | [endpoints/projecao.md](endpoints/projecao.md) |
+| Consultar logs (diagnóstico; chave própria, não o token) | `GET /logs/service/{crs\|q}/query/{term}/from/{from}/to/{to}` | [endpoints/logs.md](endpoints/logs.md) |
 
 Gramática do modelo de domínio: **[spec/model-format.md](spec/model-format.md)** (estrutura do
 `.model.json`: agregado, comando, evento, tipos). Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md).
@@ -108,6 +109,14 @@ A cada requisição (com `X-Tenant-Id`), o serviço resolve a spec do tenant (en
 3. Senão, recupera do **serviço de cache** (`../cache`; **não** mem-cache db direto) e a carrega na memória local.
 4. Se **não** houver no cache, **recupera do Forger e repõe no cache** (self-heal), então carrega na memória local.
 5. Se nem o Forger prover → **exceção**.
+
+> **⚠️ Mudança em implantação — o passo 4 deixa de existir.** O serviço passará a **apenas ler** o modelo do
+> cache; quem o publica passa a ser **exclusivamente o Forger**, no momento em que o dataschema transita
+> para `RUNNING`. **Efeito para quem integra:** um tenant cujo modelo não tenha sido publicado por essa via
+> **não é mais recuperado sozinho** — a consulta falha (ver [erros](erros.md)) até que o modelo seja
+> republicado (`MODELING` → `RUNNING`, ver [forger/dataschema](../forger/endpoints/dataschema.md#atualizar)).
+> Enquanto esta nota estiver aqui, o comportamento **em produção continua sendo o descrito acima**, com
+> self-heal.
 
 A spec fica **stale na memória local** e **não** refresca sozinha. Após alterar entity/model, o refresh exige
 **invalidar as DUAS chaves de cache do modelo** — a do **read-model** **e** a do **write-model** (valores
