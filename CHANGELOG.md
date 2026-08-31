@@ -2,6 +2,24 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.26 — 2026-08-31
+
+- **Saíram endereço e porta internos das instâncias de persistence** (`06-autenticacao.md`). A seção
+  "Instâncias físicas" listava host e porta intra-cluster de cada instância — mesmo tipo de exposição que
+  a 1.23 tirou do `br-service/README.md`. A seção passa a se chamar **"Duas instâncias de persistence
+  (teste e produção)"** e descreve as instâncias **por modo**, com as duas formas de alcançá-las: prefixo
+  do gateway (externo) e **variável de ambiente** (intra-cluster). O endereço é configuração de deploy e
+  não pertence a esta documentação. Saiu junto o nome do arquivo de configuração do consumidor.
+- **O endpoint de verificação de saúde do BFF saiu de `bff/README.md`** (bloco "como confirmar que está
+  no ar" + linha da tabela de operação). Endpoint de observabilidade não entra em `public/` — é
+  invariante do acervo. Não é caminho de consumo: nenhum cliente precisava dele.
+- **Nome de produto de banco e de tenant real saíram de `forger/endpoints/entity.md`** — a nota de
+  verificação citava os dois; passa a dizer "o banco provisionado de um tenant real", que é o que importa
+  para quem lê. Pelo mesmo motivo, `forger/bnfs/create-dbconn-request.bnf` deixou de trazer o nome do
+  produto como valor de exemplo de `dbsqlname`: o campo pede o **banco de bootstrap do seu SGBD**, e o
+  exemplo agora é o placeholder `"<banco-de-bootstrap>"`, no mesmo estilo dos demais placeholders do
+  arquivo.
+
 ## 1.25 — 2026-08-31
 
 - **O `510` de modelo ausente parou de culpar o `X-Tenant-Id`.** A mensagem passou a nomear a causa e a

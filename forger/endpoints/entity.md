@@ -89,7 +89,7 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
 > com `nullable: false` viram `NOT NULL` sem default e **rejeitam** o `INSERT` que os omitir. Ou seja,
 > a garantia de obrigatoriedade é **forte** nesses tipos e **fraca** em `String`.
 >
-> *(Verificado em Postgres — `clubflow`, 2026-08-26; os `.model.json` de origem não declaram `default`
+> *(Verificado no banco provisionado de um tenant real; os `.model.json` de origem não declaram `default`
 > algum.)*
 
 > **⚠️ `_conf` é OBRIGATÓRIO e semântico aqui.** A definição de **entity** exige `_conf` (configuração:

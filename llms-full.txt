@@ -679,7 +679,6 @@ Tolere a breve defasagem de propagação (reconsulte se necessário). Ver
 ```
 
 <!-- ===== 06-autenticacao.md ===== -->
-
 # Autenticação e identificação de tenant
 
 > Como formar uma requisição válida: a **URL base** (via API Gateway, prefixo `/v3/<svc>`) + o cabeçalho
@@ -783,19 +782,20 @@ vazia → **`403`**):
 | br-service · `/br` | (interno) | (chamado pelo persistence-crs) | propagado pelo chamador |
 | es-n · acionar processamento | (interno) | operacional/interno | tenant no caminho |
 
-## Instâncias físicas de persistence (diagnóstico — não usar em código de processor)
+## Duas instâncias de persistence (teste e produção)
 
-> ⛔ Esta seção é para **troubleshooting manual** (curl direto, observabilidade). Processors **nunca**
-> referenciam estes endereços — usam `ENDPOINTS.PERSISTENCE_T_*` (teste) ou `ENDPOINTS.PERSISTENCE_*`
-> (produção) via `lib/platform-endpoints.js`. A diferença entre instâncias é **só a porta**.
+A persistência roda em **duas instâncias**, com dados e topologia isolados entre si. O **contrato é o
+mesmo** nas duas — o que muda é qual delas você endereça:
 
-| Instância | Modo | Porta (intra-cluster) | Acessado via |
-|---|---|---|---|
-| `tinterpreter` | **teste** | `concriz:8061` | `PLATFORM_ENDPOINT_PERSISTENCE_T` |
-| `interpreter` | **produção** | `concriz:8060` | `PLATFORM_ENDPOINT_PERSISTENCE` |
+| Instância | Via gateway (externo) | Intra-cluster (processors) |
+|---|---|---|
+| **teste** | `/v3/persistence/t/{c,q}` | variável de ambiente `PLATFORM_ENDPOINT_PERSISTENCE_T` |
+| **produção** | `/v3/persistence/{c,q}` | variável de ambiente `PLATFORM_ENDPOINT_PERSISTENCE` |
 
-Agentes (se-agents) acessam persistence **via gateway** (`/v3/persistence/{t/}c` e `/v3/persistence/{t/}q`) —
-nunca os endereços diretos acima. Processors do br-service acessam **diretamente** (intra-cluster, sem gateway).
+- Agentes (se-agents) acessam **sempre via gateway**, pelos prefixos acima.
+- Processors do br-service acessam **direto** (intra-cluster, sem gateway) — e **sempre pela variável de
+  ambiente**, nunca por endereço escrito no código. O endereço é configuração de deploy e **não** consta
+  desta documentação.
 
 <!-- ===== coordenacao.md ===== -->
 
@@ -3664,7 +3664,6 @@ identidade de tenant para comandos/eventos/consultas.
 Habilita criar **entity** ([entity.md](entity.md)) e publicar **model** ([model.md](model.md)).
 
 <!-- ===== forger/endpoints/entity.md ===== -->
-
 # forger · endpoints · entity
 
 > **entity** = definição de uma **projeção** materializada como **tabela no banco de leitura**. Criar/
@@ -3756,7 +3755,7 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
 > com `nullable: false` viram `NOT NULL` sem default e **rejeitam** o `INSERT` que os omitir. Ou seja,
 > a garantia de obrigatoriedade é **forte** nesses tipos e **fraca** em `String`.
 >
-> *(Verificado em Postgres — `clubflow`, 2026-08-26; os `.model.json` de origem não declaram `default`
+> *(Verificado no banco provisionado de um tenant real; os `.model.json` de origem não declaram `default`
 > algum.)*
 
 > **⚠️ `_conf` é OBRIGATÓRIO e semântico aqui.** A definição de **entity** exige `_conf` (configuração:
@@ -5967,6 +5966,24 @@ real.
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.26 — 2026-08-31
+
+- **Saíram endereço e porta internos das instâncias de persistence** (`06-autenticacao.md`). A seção
+  "Instâncias físicas" listava host e porta intra-cluster de cada instância — mesmo tipo de exposição que
+  a 1.23 tirou do `br-service/README.md`. A seção passa a se chamar **"Duas instâncias de persistence
+  (teste e produção)"** e descreve as instâncias **por modo**, com as duas formas de alcançá-las: prefixo
+  do gateway (externo) e **variável de ambiente** (intra-cluster). O endereço é configuração de deploy e
+  não pertence a esta documentação. Saiu junto o nome do arquivo de configuração do consumidor.
+- **O endpoint de verificação de saúde do BFF saiu de `bff/README.md`** (bloco "como confirmar que está
+  no ar" + linha da tabela de operação). Endpoint de observabilidade não entra em `public/` — é
+  invariante do acervo. Não é caminho de consumo: nenhum cliente precisava dele.
+- **Nome de produto de banco e de tenant real saíram de `forger/endpoints/entity.md`** — a nota de
+  verificação citava os dois; passa a dizer "o banco provisionado de um tenant real", que é o que importa
+  para quem lê. Pelo mesmo motivo, `forger/bnfs/create-dbconn-request.bnf` deixou de trazer o nome do
+  produto como valor de exemplo de `dbsqlname`: o campo pede o **banco de bootstrap do seu SGBD**, e o
+  exemplo agora é o placeholder `"<banco-de-bootstrap>"`, no mesmo estilo dos demais placeholders do
+  arquivo.
+
 ## 1.25 — 2026-08-31
 
 - **O `510` de modelo ausente parou de culpar o `X-Tenant-Id`.** A mensagem passou a nomear a causa e a
@@ -6363,7 +6380,6 @@ Primeira versão consolidada da documentação pública para agentes de IA.
 > `llms.txt`.
 
 <!-- ===== bff/README.md ===== -->
-
 # bff — guia do serviço (endpoints e contratos)
 
 > O **BFF** (Backend-for-Frontend) é a **borda de consumo** da plataforma: faz o login, guarda o token
@@ -6402,12 +6418,6 @@ derivá-lo, nem convenção a adivinhar.
 | instalação | endereço |
 |---|---|
 | `yc.app` (casca universal "Stager") | `https://bff.stager.ycodify.com` |
-
-**Como confirmar que é o BFF e está no ar:**
-
-```
-GET https://<endereço-do-bff>/health   →   200  {"ok":true,"service":"yc-app-bff"}
-```
 
 **Como chamar** — os paths deste documento vão **na raiz**, sem prefixo nenhum:
 
@@ -6599,15 +6609,6 @@ Tudo composto **no servidor**. Nenhum deles é montado — nem visto — pelo br
 > configuração: **sem ela, o login falha com `401` no gateway**, e não por credencial de usuário inválida.
 > É segredo: nunca vai ao browser, nunca em código, nunca em doc.
 
-## Operação
-
-| Operação | Método · Path | Resposta |
-|---|---|---|
-| Health | `GET /health` | `{ "ok": true, "service": "yc-app-bff" }` |
-
-Sem autenticação e sem estado — serve ao healthcheck do container e ao balanceador. Não é caminho de
-consumo: um cliente não precisa dele.
-
 ## Erros
 
 | HTTP | Quando |
@@ -6628,3 +6629,4 @@ consumo: um cliente não precisa dele.
       (ver [seguranca](../shell/seguranca.md)).
 - [ ] No autocadastro, ofereça só o que `GET /ua/roles` devolve — o servidor recusa o resto.
 - [ ] Endereços de serviço = **config de deploy**, nunca hardcode nem em doc pública.
+

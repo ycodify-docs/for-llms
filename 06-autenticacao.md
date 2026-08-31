@@ -101,16 +101,17 @@ vazia → **`403`**):
 | br-service · `/br` | (interno) | (chamado pelo persistence-crs) | propagado pelo chamador |
 | es-n · acionar processamento | (interno) | operacional/interno | tenant no caminho |
 
-## Instâncias físicas de persistence (diagnóstico — não usar em código de processor)
+## Duas instâncias de persistence (teste e produção)
 
-> ⛔ Esta seção é para **troubleshooting manual** (curl direto, observabilidade). Processors **nunca**
-> referenciam estes endereços — usam `ENDPOINTS.PERSISTENCE_T_*` (teste) ou `ENDPOINTS.PERSISTENCE_*`
-> (produção) via `lib/platform-endpoints.js`. A diferença entre instâncias é **só a porta**.
+A persistência roda em **duas instâncias**, com dados e topologia isolados entre si. O **contrato é o
+mesmo** nas duas — o que muda é qual delas você endereça:
 
-| Instância | Modo | Porta (intra-cluster) | Acessado via |
-|---|---|---|---|
-| `tinterpreter` | **teste** | `concriz:8061` | `PLATFORM_ENDPOINT_PERSISTENCE_T` |
-| `interpreter` | **produção** | `concriz:8060` | `PLATFORM_ENDPOINT_PERSISTENCE` |
+| Instância | Via gateway (externo) | Intra-cluster (processors) |
+|---|---|---|
+| **teste** | `/v3/persistence/t/{c,q}` | variável de ambiente `PLATFORM_ENDPOINT_PERSISTENCE_T` |
+| **produção** | `/v3/persistence/{c,q}` | variável de ambiente `PLATFORM_ENDPOINT_PERSISTENCE` |
 
-Agentes (se-agents) acessam persistence **via gateway** (`/v3/persistence/{t/}c` e `/v3/persistence/{t/}q`) —
-nunca os endereços diretos acima. Processors do br-service acessam **diretamente** (intra-cluster, sem gateway).
+- Agentes (se-agents) acessam **sempre via gateway**, pelos prefixos acima.
+- Processors do br-service acessam **direto** (intra-cluster, sem gateway) — e **sempre pela variável de
+  ambiente**, nunca por endereço escrito no código. O endereço é configuração de deploy e **não** consta
+  desta documentação.

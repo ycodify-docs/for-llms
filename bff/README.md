@@ -37,12 +37,6 @@ derivá-lo, nem convenção a adivinhar.
 |---|---|
 | `yc.app` (casca universal "Stager") | `https://bff.stager.ycodify.com` |
 
-**Como confirmar que é o BFF e está no ar:**
-
-```
-GET https://<endereço-do-bff>/health   →   200  {"ok":true,"service":"yc-app-bff"}
-```
-
 **Como chamar** — os paths deste documento vão **na raiz**, sem prefixo nenhum:
 
 ```
@@ -232,15 +226,6 @@ Tudo composto **no servidor**. Nenhum deles é montado — nem visto — pelo br
 > `sign-in` passa por ele (ver [06-autenticacao](../06-autenticacao.md)). Por isso o BFF precisa dela em
 > configuração: **sem ela, o login falha com `401` no gateway**, e não por credencial de usuário inválida.
 > É segredo: nunca vai ao browser, nunca em código, nunca em doc.
-
-## Operação
-
-| Operação | Método · Path | Resposta |
-|---|---|---|
-| Health | `GET /health` | `{ "ok": true, "service": "yc-app-bff" }` |
-
-Sem autenticação e sem estado — serve ao healthcheck do container e ao balanceador. Não é caminho de
-consumo: um cliente não precisa dele.
 
 ## Erros
 

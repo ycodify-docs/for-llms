@@ -71,7 +71,8 @@
  *    - Examples: "db.example.internal", "db.example.internal", "db.example.internal"
  *
  * 1b. dbsqlname: REQUIRED, non-empty string — nome do banco de CONEXÃO/bootstrap no SGDB ao qual conectar
- *    (o DB que JÁ EXISTE no servidor:porta, ex.: "postgres"). É o "nome lógico da conexão" (ver dbconn.md).
+ *    (o DB que JÁ EXISTE no servidor:porta — o banco de bootstrap padrão do seu SGBD). É o "nome lógico
+ *    da conexão" (ver dbconn.md).
  *    ⚠️ NÃO confundir com database.dbsqlname (POST .../dbconn/{id}/database), que é o banco da APLICAÇÃO que
  *    a plataforma CRIA (^[a-z]+$). São DOIS bancos distintos: conexão/bootstrap (já existe) vs app (criado).
  *
@@ -92,7 +93,7 @@
  * Example 1: Valid request with strong password
  * {
  *   "dbsqlserveraddress": "db.example.internal",
- *   "dbsqlname": "postgres",
+ *   "dbsqlname": "<banco-de-bootstrap>",
  *   "dbsqlserverport": <porta>,
  *   "dbsqlusername": "admin_example",
  *   "dbsqluserpassword": "MySecureP@ssw0rd!"
@@ -101,7 +102,7 @@
  * Example 2: Local SQL server
  * {
  *   "dbsqlserveraddress": "db.example.internal",
- *   "dbsqlname": "postgres",
+ *   "dbsqlname": "<banco-de-bootstrap>",
  *   "dbsqlserverport": 5433,
  *   "dbsqlusername": "admin_example",
  *   "dbsqluserpassword": "SecretPass123!"
@@ -117,7 +118,7 @@
  *   -H "Accept: application/json" \
  *   -d '{
  *     "dbsqlserveraddress": "db.example.internal",
- *     "dbsqlname": "postgres",
+ *     "dbsqlname": "<banco-de-bootstrap>",
  *     "dbsqlserverport": <porta>,
  *     "dbsqlusername": "admin_example",
  *     "dbsqluserpassword": "MySecurePassword"
@@ -131,7 +132,7 @@
  * When constructing a request:
  * 1. ALWAYS include the 4 REQUIRED fields: dbsqlserveraddress, dbsqlname, dbsqlserverport,
  *    dbsqlusername. (dbsqluserpassword é OPCIONAL — ver item 5.)
- * 1b. dbsqlname: banco de CONEXÃO/bootstrap existente no SGDB (ex.: "postgres") — NÃO é o banco da app
+ * 1b. dbsqlname: banco de CONEXÃO/bootstrap existente no SGDB (o padrão do seu SGBD) — NÃO é o banco da app
  *    (esse é criado depois via POST .../database, campo database.dbsqlname, ^[a-z]+$). Dois bancos distintos.
  * 2. dbsqlserveraddress: Must be non-empty string (hostname or IP address)
  * 3. dbsqlserverport: Must be integer between 1 and 65535 (porta padrao do SGBD)
