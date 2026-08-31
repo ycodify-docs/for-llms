@@ -8,7 +8,7 @@
 |---|---|---|---|
 | `400` | Requisição inválida | JSON malformado; estrutura de critério inválida. | Corrigir o corpo (modo array/object, um rótulo por item). |
 | `401` / `403` | Não autorizado | Credencial inválida; `tenant-id` fora do escopo do usuário. | Usar credencial/tenant corretos. |
-| `510` | Falha de execução | Predicado/identificador não reconhecido; falha ao ler a projeção; **modelo do tenant ausente do cache** (ver nota abaixo). | Usar o vocabulário do tenant; conferir a projeção/entity; se a mensagem falar em **modelo não encontrado na cache** — ou, em versão antiga, em `X-Tenant-Id` — ver a nota. |
+| `510` | Falha de execução | Predicado/identificador não reconhecido; **rótulo que não existe no modelo do tenant** (ver nota abaixo); falha ao ler a projeção; **modelo do tenant ausente do cache** (ver nota abaixo). | Usar o vocabulário do tenant; conferir a projeção/entity; se a mensagem falar em **modelo não encontrado na cache** — ou, em versão antiga, em `X-Tenant-Id` — ver a nota. |
 
 ## Categorias (para diagnóstico)
 
@@ -24,6 +24,23 @@
 
 ## Nota
 `204` **não** é erro: significa "nenhum resultado". A consulta é idempotente e segura para repetição.
+
+## Nota — `510` de **rótulo que não existe no modelo** (não confundir com o de baixo)
+
+Rótulo que não corresponde a nenhuma entidade/projeção provisionada para o tenant:
+
+```
+510 · Entidade '<rótulo>' não existe no modelo do tenant '<tenant-id>'. Na consulta, o rótulo deve ser
+o nome da entidade/projeção provisionada para o tenant; confira o nome ou republique o modelo.
+```
+
+**Distinção que importa:** aqui o **modelo do tenant está carregado** — o que falta é *aquele nome* dentro
+dele. Já a nota seguinte é o caso em que o modelo **inteiro** não está disponível. Sintoma parecido,
+correção diferente: aqui, corrigir o rótulo (ou publicar a entidade); lá, republicar o modelo.
+
+> **Mudou em 2026-08-31.** Antes esta falha vazava uma exceção interna de biblioteca como mensagem de
+> usuário (`JSONObject["<rótulo>"] not found`), sem dizer o que fazer. Se o seu cliente casava aquele
+> texto, **ajuste** — o código HTTP (`510`) não mudou.
 
 ## Nota — `510` de **modelo do tenant ausente do cache**
 

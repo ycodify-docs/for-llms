@@ -10,7 +10,8 @@
 
 > ⚠️ **Rótulo = nome da projeção**: os rótulos abaixo (`pedidosCriados` etc.) são ilustrativos — na prática
 > o rótulo DEVE ser o **nome da projeção/entidade** provisionada (ex.: `pedido`); rótulo arbitrário →
-> `510` (projeção de nome `<rótulo>` inexistente). Ver [endpoints/consulta.md](endpoints/consulta.md).
+> `510` com `Entidade '<rótulo>' não existe no modelo do tenant '<tenant-id>'…`. Ver
+> [endpoints/consulta.md](endpoints/consulta.md).
 
 > ⚠️ **Dois ids na projeção**: cada linha tem `id` (**Long**, PK da linha) e `aggregateid` (**UUID**, o
 > id do agregado). Nas respostas abaixo o `<uuid>` é o **`aggregateid`**. Para localizar **um** agregado

@@ -33,8 +33,10 @@ O corpo tem **dois modos**, detectados pelo primeiro caractere:
 - Cada item do array tem **um rótulo** no nível raiz (nome da projeção → objeto de **predicados**),
   **mais** os controles opcionais (`_paging`/`_sorting`/`_count`/`_connective`/`_cache`) como **irmãos** do rótulo.
 - ⚠️ **O rótulo NÃO é livre**: DEVE ser o **nome da projeção (entidade) provisionada** para o tenant
-  (ex.: `pedido`) — é a projeção sobre a qual a consulta roda. Um rótulo arbitrário **falha** (`510`,
-  projeção de nome `<rótulo>` inexistente). O rótulo também nomeia a chave correspondente na resposta.
+  (ex.: `pedido`) — é a projeção sobre a qual a consulta roda. Um rótulo arbitrário **falha** com `510` e
+  a mensagem `Entidade '<rótulo>' não existe no modelo do tenant '<tenant-id>'. Na consulta, o rótulo deve
+  ser o nome da entidade/projeção provisionada para o tenant; confira o nome ou republique o modelo.`
+  O rótulo também nomeia a chave correspondente na resposta.
 - Cada predicado é `{ "<atributo>": "<valor>" }` (igualdade) ou `{ "<atributo>": { "<op>": "<valor>" } }`
   (operadores: `eq/neq/gt/gte/lt/lte/like/ilike/in`).
 - Múltiplos predicados combinam por **`_connective`** no **nível raiz** (irmão do rótulo): **`AND`**

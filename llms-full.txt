@@ -4345,8 +4345,10 @@ O corpo tem **dois modos**, detectados pelo primeiro caractere:
 - Cada item do array tem **um rótulo** no nível raiz (nome da projeção → objeto de **predicados**),
   **mais** os controles opcionais (`_paging`/`_sorting`/`_count`/`_connective`/`_cache`) como **irmãos** do rótulo.
 - ⚠️ **O rótulo NÃO é livre**: DEVE ser o **nome da projeção (entidade) provisionada** para o tenant
-  (ex.: `pedido`) — é a projeção sobre a qual a consulta roda. Um rótulo arbitrário **falha** (`510`,
-  projeção de nome `<rótulo>` inexistente). O rótulo também nomeia a chave correspondente na resposta.
+  (ex.: `pedido`) — é a projeção sobre a qual a consulta roda. Um rótulo arbitrário **falha** com `510` e
+  a mensagem `Entidade '<rótulo>' não existe no modelo do tenant '<tenant-id>'. Na consulta, o rótulo deve
+  ser o nome da entidade/projeção provisionada para o tenant; confira o nome ou republique o modelo.`
+  O rótulo também nomeia a chave correspondente na resposta.
 - Cada predicado é `{ "<atributo>": "<valor>" }` (igualdade) ou `{ "<atributo>": { "<op>": "<valor>" } }`
   (operadores: `eq/neq/gt/gte/lt/lte/like/ilike/in`).
 - Múltiplos predicados combinam por **`_connective`** no **nível raiz** (irmão do rótulo): **`AND`**
@@ -4558,7 +4560,7 @@ do rótulo** (junto dos predicados), limitando a profundidade por `_level`:
 |---|---|---|---|
 | `400` | Requisição inválida | JSON malformado; estrutura de critério inválida. | Corrigir o corpo (modo array/object, um rótulo por item). |
 | `401` / `403` | Não autorizado | Credencial inválida; `tenant-id` fora do escopo do usuário. | Usar credencial/tenant corretos. |
-| `510` | Falha de execução | Predicado/identificador não reconhecido; falha ao ler a projeção; **modelo do tenant ausente do cache** (ver nota abaixo). | Usar o vocabulário do tenant; conferir a projeção/entity; se a mensagem falar em **modelo não encontrado na cache** — ou, em versão antiga, em `X-Tenant-Id` — ver a nota. |
+| `510` | Falha de execução | Predicado/identificador não reconhecido; **rótulo que não existe no modelo do tenant** (ver nota abaixo); falha ao ler a projeção; **modelo do tenant ausente do cache** (ver nota abaixo). | Usar o vocabulário do tenant; conferir a projeção/entity; se a mensagem falar em **modelo não encontrado na cache** — ou, em versão antiga, em `X-Tenant-Id` — ver a nota. |
 
 ## Categorias (para diagnóstico)
 
@@ -4574,6 +4576,23 @@ do rótulo** (junto dos predicados), limitando a profundidade por `_level`:
 
 ## Nota
 `204` **não** é erro: significa "nenhum resultado". A consulta é idempotente e segura para repetição.
+
+## Nota — `510` de **rótulo que não existe no modelo** (não confundir com o de baixo)
+
+Rótulo que não corresponde a nenhuma entidade/projeção provisionada para o tenant:
+
+```
+510 · Entidade '<rótulo>' não existe no modelo do tenant '<tenant-id>'. Na consulta, o rótulo deve ser
+o nome da entidade/projeção provisionada para o tenant; confira o nome ou republique o modelo.
+```
+
+**Distinção que importa:** aqui o **modelo do tenant está carregado** — o que falta é *aquele nome* dentro
+dele. Já a nota seguinte é o caso em que o modelo **inteiro** não está disponível. Sintoma parecido,
+correção diferente: aqui, corrigir o rótulo (ou publicar a entidade); lá, republicar o modelo.
+
+> **Mudou em 2026-08-31.** Antes esta falha vazava uma exceção interna de biblioteca como mensagem de
+> usuário (`JSONObject["<rótulo>"] not found`), sem dizer o que fazer. Se o seu cliente casava aquele
+> texto, **ajuste** — o código HTTP (`510`) não mudou.
 
 ## Nota — `510` de **modelo do tenant ausente do cache**
 
@@ -4605,7 +4624,8 @@ a entrada.
 
 > ⚠️ **Rótulo = nome da projeção**: os rótulos abaixo (`pedidosCriados` etc.) são ilustrativos — na prática
 > o rótulo DEVE ser o **nome da projeção/entidade** provisionada (ex.: `pedido`); rótulo arbitrário →
-> `510` (projeção de nome `<rótulo>` inexistente). Ver [endpoints/consulta.md](endpoints/consulta.md).
+> `510` com `Entidade '<rótulo>' não existe no modelo do tenant '<tenant-id>'…`. Ver
+> [endpoints/consulta.md](endpoints/consulta.md).
 
 > ⚠️ **Dois ids na projeção**: cada linha tem `id` (**Long**, PK da linha) e `aggregateid` (**UUID**, o
 > id do agregado). Nas respostas abaixo o `<uuid>` é o **`aggregateid`**. Para localizar **um** agregado
@@ -6012,6 +6032,21 @@ real.
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.28 — 2026-08-31
+
+- **Rótulo inexistente no modelo passou a ter mensagem própria — e agora está documentado.** Consultar
+  com um rótulo que não corresponde a nenhuma entidade/projeção do tenant devolvia `510` **vazando uma
+  exceção interna de biblioteca** como mensagem de usuário (`JSONObject["<rótulo>"] not found`), sem dizer
+  o que fazer. Agora devolve `Entidade '<rótulo>' não existe no modelo do tenant '<tenant-id>'. Na
+  consulta, o rótulo deve ser o nome da entidade/projeção provisionada para o tenant; confira o nome ou
+  republique o modelo.` O código HTTP (`510`) **não** mudou; quem casava o texto antigo precisa ajustar.
+- **Nota nova em `persistence-q/erros.md` separando dois `510` que se pareciam.** Rótulo ausente **do**
+  modelo (o modelo está carregado; falta aquele nome) × modelo **inteiro** ausente do cache. Sintoma
+  parecido, correção diferente: no primeiro caso corrige-se o rótulo; no segundo, republica-se o modelo.
+- Atualizados: `persistence-q/erros.md` (linha do `510` + nota nova), `persistence-q/endpoints/consulta.md`
+  e `persistence-q/exemplos.md` (os dois traziam a redação antiga "projeção de nome `<rótulo>`
+  inexistente"), `llms-full.txt` (regenerado).
 
 ## 1.27 — 2026-08-31
 

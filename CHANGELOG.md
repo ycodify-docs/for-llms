@@ -2,6 +2,21 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.28 — 2026-08-31
+
+- **Rótulo inexistente no modelo passou a ter mensagem própria — e agora está documentado.** Consultar
+  com um rótulo que não corresponde a nenhuma entidade/projeção do tenant devolvia `510` **vazando uma
+  exceção interna de biblioteca** como mensagem de usuário (`JSONObject["<rótulo>"] not found`), sem dizer
+  o que fazer. Agora devolve `Entidade '<rótulo>' não existe no modelo do tenant '<tenant-id>'. Na
+  consulta, o rótulo deve ser o nome da entidade/projeção provisionada para o tenant; confira o nome ou
+  republique o modelo.` O código HTTP (`510`) **não** mudou; quem casava o texto antigo precisa ajustar.
+- **Nota nova em `persistence-q/erros.md` separando dois `510` que se pareciam.** Rótulo ausente **do**
+  modelo (o modelo está carregado; falta aquele nome) × modelo **inteiro** ausente do cache. Sintoma
+  parecido, correção diferente: no primeiro caso corrige-se o rótulo; no segundo, republica-se o modelo.
+- Atualizados: `persistence-q/erros.md` (linha do `510` + nota nova), `persistence-q/endpoints/consulta.md`
+  e `persistence-q/exemplos.md` (os dois traziam a redação antiga "projeção de nome `<rótulo>`
+  inexistente"), `llms-full.txt` (regenerado).
+
 ## 1.27 — 2026-08-31
 
 - **A autorização por papel (`command.<comando>.roles`) passou a ser documentada — e mudou de lugar e de
