@@ -95,7 +95,12 @@ Vale para todos os endpoints de forger (variações específicas em cada documen
      o efeito físico no banco relacional (criar banco/esquema), com rollback se o efeito físico falhar;
    - `entity`: **compila** a definição (léxica → sintática → semântica → representação intermediária →
      DDL) e aplica a DDL no banco de leitura, de forma transacional;
-   - `model`/`process`: **publica** o documento no cache distribuído (semântica de sobrescrita).
+   - `model`/`process`: **publica** o documento no cache distribuído (semântica de sobrescrita, **sem
+     prazo de validade** — vale até ser republicado ou removido);
+   - `dataschema` com mudança de `status`: `MODELING → RUNNING` **publica** o modelo de entidades no
+     cache distribuído (permanente, sobrescreve); `RUNNING → MODELING` o **remove**; o `DELETE` do
+     dataschema também remove. Falha no cache **reverte** a operação e responde `500` — ver
+     [dataschema.md](endpoints/dataschema.md#efeito-da-transição-sobre-o-cache-distribuído).
 5. **Resposta** — `201` (criação), `200` (leitura/atualização/remoção), `204` (sem conteúdo). Erros
    conforme [erros.md](erros.md).
 

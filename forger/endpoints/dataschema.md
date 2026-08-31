@@ -35,23 +35,54 @@ Erros: `400`, `403`, `500`.
 `dbsqlminimumconnidle`, `dbsqlmaximumpoolsize`). `200`; conflito → `409`.
 
 > **Campo `status` — gate operacional (`MODELING` ↔ `RUNNING`).** O `status` do dataschema **não** é um
-> rótulo passivo: ele **controla** o que pode ser feito sobre o esquema e sobre o tenant. Defina/transite
-> o `status` pelo `PUT` acima.
+> rótulo passivo: ele **controla** o que pode ser feito sobre o esquema e sobre o tenant, e **é o gatilho
+> da publicação do modelo de entidades**. Defina/transite o `status` pelo `PUT` acima.
 >
-> | `status` | Schema (entity) | Interpretação/execução do modelo |
-> |---|---|---|
-> | **`MODELING`** | **editável** — criar/alterar/remover `entity` (e atributos/associações) é permitido | **não ocorre** — persistence-crs e persistence-q **não operam** sobre este tenant |
-> | **`RUNNING`** | **congelado** — o **forger rejeita** criar/alterar `entity` neste estado | **ocorre** — persistence-crs/persistence-q interpretam e executam o modelo |
+> | `status` | Schema (entity) | Modelo de entidades no cache | Interpretação/execução do modelo |
+> |---|---|---|---|
+> | **`MODELING`** | **editável** — criar/alterar/remover `entity` (e atributos/associações) é permitido | **ausente** | **não ocorre** — persistence-crs e persistence-q **não operam** sobre este tenant |
+> | **`RUNNING`** | **congelado** — o **forger rejeita** criar/alterar `entity` neste estado | **publicado** | **ocorre** — persistence-crs/persistence-q interpretam e executam o modelo |
+>
+> O valor é normalizado (`trim` + maiúsculas) antes de ser gravado e comparado: `running` e `RUNNING`
+> são a mesma transição.
 >
 > **Regra para o agente:** para **editar schema** (criar/alterar entity), o dataschema precisa estar em
 > `MODELING`; para **operar** (comandos/consultas via persistence-crs/persistence-q), em `RUNNING`. Para
 > alterar o schema de um sistema já em operação: transite `RUNNING → MODELING` (via `PUT` no `status`),
 > edite as entities, e volte a `MODELING → RUNNING`.
 
+### Efeito da transição sobre o cache distribuído
+
+A transição de `status` **publica e despublica o modelo de entidades** (a descrição das entidades que
+correspondem às projeções dos agregados) no cache distribuído, sob a referência do `tenant-id`:
+
+| Transição | Efeito |
+|---|---|
+| `MODELING → RUNNING` | **publica** o estado atual das entidades, **sem prazo de validade** e **sobrescrevendo** o valor anterior |
+| `RUNNING → MODELING` | **remove** a publicação |
+| qualquer outra (ou nenhuma mudança de `status`) | nenhum efeito no cache |
+
+O forger é o **único publicador** dessa referência — os consumidores (persistence-crs, persistence-q)
+apenas leem. Como não há expiração, vale o que foi publicado na última transição para `RUNNING`, até a
+próxima transição.
+
+**Atomicidade:** se a operação no cache falhar, o `status` é **revertido** no banco e a requisição
+responde `500` — nada fica em estado intermediário (nunca `RUNNING` sem modelo publicado, nem
+`MODELING` com modelo publicado). Repita o `PUT` relendo o `logversion` atual.
+
+**Consequência prática:** editar entities e voltar a `RUNNING` **republica** o modelo, e o efeito é
+imediato para os consumidores. Um tenant que nunca passou por `MODELING → RUNNING` **não tem** modelo
+de entidades publicado, e consultas sobre ele falham no consumidor.
+
 ## Remover
 
 `DELETE .../dataschema/{dataSchema}` → `200`/`204`. **Bloqueado** enquanto o esquema físico existir
 (há projeções/conteúdo). Ver também a remoção em nível de projeção em [entity.md](entity.md).
+
+A remoção também **despublica o modelo de entidades** do cache distribuído — a publicação não tem
+prazo de validade, então ficaria órfã apontando para um tenant inexistente. A despublicação acontece
+**antes** de o registro ser apagado: se o cache falhar, **nada é removido** e a requisição responde
+`500`, podendo ser repetida. Dataschema que nunca foi publicado é removido normalmente.
 
 ## Ciclo de vida
 Metadados + efeito físico (criação de esquema) + geração do `tenant-id`. A partir daqui o sistema tem
