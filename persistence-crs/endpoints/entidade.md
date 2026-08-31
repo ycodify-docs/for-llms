@@ -8,6 +8,10 @@
 > a entity precisa existir no esquema do tenant ([forger/entity](../../forger/endpoints/entity.md)).
 > Guia: [../README.md](../README.md).
 
+> **URL externa — o segmento `t` escolhe o ambiente.** `POST /e` é o path **downstream**; via gateway:
+> **produção** `POST /v3/persistence/c/e` · **teste** `POST /v3/persistence/t/c/e`. Ver
+> [autenticação](../../06-autenticacao.md).
+
 ## Quando usar
 
 Duas formas de escrever no domínio:

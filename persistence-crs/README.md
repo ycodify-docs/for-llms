@@ -19,6 +19,16 @@
 
 ## Pré-requisitos do chamador
 
+- **URL externa — escolha o ambiente pelo segmento `t`:** os paths deste guia (`/a/...`, `/e`) são
+  **downstream**; o chamador externo os anexa ao prefixo do gateway, que muda conforme o ambiente:
+
+  | Ambiente | Prefixo | Exemplo (executar comando) |
+  |---|---|---|
+  | **produção** | `/v3/persistence/c` | `POST /v3/persistence/c/a/{bc}/{type}` |
+  | **teste** | `/v3/persistence/t/c` | `POST /v3/persistence/t/c/a/{bc}/{type}` |
+
+  Os paths downstream são **idênticos** nos dois — só muda o segmento `t`. Prefixo fora da allowlist →
+  `404`. Detalhe: [autenticação](../06-autenticacao.md).
 - **Cabeçalhos obrigatórios:** `Authorization` e o **cabeçalho de tenant** `X-Tenant-Id`.
 - **Autorização de tenant:** o `tenant-id` deve pertencer ao usuário; caso contrário → `403`.
 - **Modelo publicado:** o agregado/comando precisa existir no **model** publicado para o tenant (CP-1).
@@ -29,8 +39,10 @@
 
 ## Índice de endpoints
 
-> Base do serviço: `/a` (agregados) e `/e` (entidade convencional). Apenas endpoints autenticados são documentados. Endpoints internos
-> sem autenticação e endpoints de observabilidade/administração **não** constam aqui.
+> Base do serviço: `/a` (agregados) e `/e` (entidade convencional) — paths **downstream**, a anexar ao
+> prefixo do ambiente (`/v3/persistence/c` prod · `/v3/persistence/t/c` teste; ver acima). Apenas endpoints
+> autenticados são documentados. Endpoints internos sem autenticação e endpoints de
+> observabilidade/administração **não** constam aqui.
 
 | Operação | Método · Path | Documento |
 |---|---|---|

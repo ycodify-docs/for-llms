@@ -2345,7 +2345,6 @@ POST /open/ua/account-role
 > têm `owner` (espaço de nomes). Ver [README](README.md) e [coordenação](../coordenacao.md).
 
 <!-- ===== persistence-crs/README.md ===== -->
-
 # persistence-crs — guia do serviço
 
 > **Papel:** executa os **comandos** definidos para um agregado num bounded context. É o **lado de
@@ -2367,6 +2366,16 @@ POST /open/ua/account-role
 
 ## Pré-requisitos do chamador
 
+- **URL externa — escolha o ambiente pelo segmento `t`:** os paths deste guia (`/a/...`, `/e`) são
+  **downstream**; o chamador externo os anexa ao prefixo do gateway, que muda conforme o ambiente:
+
+  | Ambiente | Prefixo | Exemplo (executar comando) |
+  |---|---|---|
+  | **produção** | `/v3/persistence/c` | `POST /v3/persistence/c/a/{bc}/{type}` |
+  | **teste** | `/v3/persistence/t/c` | `POST /v3/persistence/t/c/a/{bc}/{type}` |
+
+  Os paths downstream são **idênticos** nos dois — só muda o segmento `t`. Prefixo fora da allowlist →
+  `404`. Detalhe: [autenticação](../06-autenticacao.md).
 - **Cabeçalhos obrigatórios:** `Authorization` e o **cabeçalho de tenant** `X-Tenant-Id`.
 - **Autorização de tenant:** o `tenant-id` deve pertencer ao usuário; caso contrário → `403`.
 - **Modelo publicado:** o agregado/comando precisa existir no **model** publicado para o tenant (CP-1).
@@ -2377,8 +2386,10 @@ POST /open/ua/account-role
 
 ## Índice de endpoints
 
-> Base do serviço: `/a` (agregados) e `/e` (entidade convencional). Apenas endpoints autenticados são documentados. Endpoints internos
-> sem autenticação e endpoints de observabilidade/administração **não** constam aqui.
+> Base do serviço: `/a` (agregados) e `/e` (entidade convencional) — paths **downstream**, a anexar ao
+> prefixo do ambiente (`/v3/persistence/c` prod · `/v3/persistence/t/c` teste; ver acima). Apenas endpoints
+> autenticados são documentados. Endpoints internos sem autenticação e endpoints de
+> observabilidade/administração **não** constam aqui.
 
 | Operação | Método · Path | Documento |
 |---|---|---|
@@ -2753,7 +2764,6 @@ Atributos aparecem em `command.<cmd>.data.attribute.<campo>`:
   tabelas**: as projeções (tabelas) vêm das `entity` do forger; as filas, do deploy de processo.
 
 <!-- ===== persistence-crs/endpoints/comando.md ===== -->
-
 # persistence-crs · endpoints · comando
 
 > Executa um **comando** sobre um agregado. Guia: [../README.md](../README.md).
@@ -2767,6 +2777,11 @@ Atributos aparecem em `command.<cmd>.data.attribute.<campo>`:
 | Cabeçalhos | `Authorization`, `X-Tenant-Id` (cabeçalho de tenant), `Content-Type: application/json` |
 | `{boundedContext}` | contexto delimitado do agregado |
 | `{aggregateType}` | tipo do agregado |
+
+> **URL externa — o segmento `t` escolhe o ambiente.** O path acima é **downstream**; via gateway:
+> **produção** `POST /v3/persistence/c/a/{bc}/{type}` · **teste** `POST /v3/persistence/t/c/a/{bc}/{type}`.
+> Corpo, cabeçalhos e respostas são **iguais** nos dois — só muda o prefixo. Ver
+> [autenticação](../../06-autenticacao.md).
 
 Corpo: o **comando** identificado pelo seu nome, com os dados:
 
@@ -2818,7 +2833,6 @@ validação do estado de destino (`endState`) → gravação do evento (notifica
 exceções). Catálogo: [../erros.md](../erros.md).
 
 <!-- ===== persistence-crs/endpoints/agregado-leitura.md ===== -->
-
 # persistence-crs · endpoints · leitura de agregado
 
 > Leitura do **estado atual** e do **histórico de eventos** de um agregado, direto pelo lado de escrita.
@@ -2826,6 +2840,10 @@ exceções). Catálogo: [../erros.md](../erros.md).
 > Guia: [../README.md](../README.md).
 
 Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`.
+
+> **URL externa — o segmento `t` escolhe o ambiente.** Os paths abaixo são **downstream**; via gateway,
+> anexe-os a `/v3/persistence/c` (**produção**) ou `/v3/persistence/t/c` (**teste**). Ver
+> [autenticação](../../06-autenticacao.md).
 
 ## Estado atual
 
@@ -2855,7 +2873,6 @@ Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`.
 `403` (tenant não autorizado), `510` (falha de processamento). Catálogo: [../erros.md](../erros.md).
 
 <!-- ===== persistence-crs/endpoints/entidade.md ===== -->
-
 # persistence-crs · endpoints · entidade (CRUD convencional)
 
 > CRUD **direto** de linhas numa **entidade convencional** — uma tabela do domínio que **não** é
@@ -2865,6 +2882,10 @@ Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`.
 > Pré-requisitos: [conceitos](../../02-conceitos.md), [autenticação](../../06-autenticacao.md),
 > a entity precisa existir no esquema do tenant ([forger/entity](../../forger/endpoints/entity.md)).
 > Guia: [../README.md](../README.md).
+
+> **URL externa — o segmento `t` escolhe o ambiente.** `POST /e` é o path **downstream**; via gateway:
+> **produção** `POST /v3/persistence/c/e` · **teste** `POST /v3/persistence/t/c/e`. Ver
+> [autenticação](../../06-autenticacao.md).
 
 ## Quando usar
 
@@ -3190,13 +3211,17 @@ Vale o mesmo que em [persistence-q/erros.md](../persistence-q/erros.md): a mensa
 expirada). Confirme a publicação do modelo e o dataschema em `RUNNING` antes de suspeitar do cabeçalho.
 
 <!-- ===== persistence-crs/exemplos.md ===== -->
-
 # persistence-crs · exemplos anotados
 
 > Dados genéricos (`acme.vendas`, agregado `pedido`). Cabeçalhos `Authorization` + `X-Tenant-Id` em todas.
 
 > ⚠️ Blocos abaixo são **ilustrativos**: `<...>` e `•••` são placeholders, não JSON literal pronto para envio.
 > Guia: [README.md](README.md).
+
+> ⚠️ **Os paths abaixo são downstream** — sem o prefixo do gateway. Via gateway, anexe-os a
+> `/v3/persistence/c` (**produção**) ou `/v3/persistence/t/c` (**teste**): `POST /a/vendas/pedido` vira
+> `POST /v3/persistence/t/c/a/vendas/pedido` no ambiente de teste. Ver
+> [autenticação](../06-autenticacao.md).
 
 ## Executar um comando
 
@@ -4125,7 +4150,6 @@ Ver [arquitetura](../01-arquitetura.md) e os exemplos de modelo em [examples/](.
   estão no documento em prosa correspondente.
 
 <!-- ===== persistence-q/README.md ===== -->
-
 # persistence-q — guia do serviço
 
 > **Papel:** **lado de leitura** do CQRS. Consulta o estado dos agregados pela ótica de suas
@@ -4145,6 +4169,16 @@ Ver [arquitetura](../01-arquitetura.md) e os exemplos de modelo em [examples/](.
 
 ## Pré-requisitos do chamador
 
+- **URL externa — escolha o ambiente pelo segmento `t`:** o path deste guia (`POST /`) é **downstream**;
+  o chamador externo o anexa ao prefixo do gateway, que muda conforme o ambiente:
+
+  | Ambiente | Prefixo | Exemplo (consultar) |
+  |---|---|---|
+  | **produção** | `/v3/persistence/q` | `POST /v3/persistence/q/` |
+  | **teste** | `/v3/persistence/t/q` | `POST /v3/persistence/t/q/` |
+
+  O path downstream é **idêntico** nos dois — só muda o segmento `t`. Prefixo fora da allowlist → `404`.
+  Detalhe: [autenticação](../06-autenticacao.md).
 - **Cabeçalhos obrigatórios:** `Authorization` e o **cabeçalho de tenant** `X-Tenant-Id`.
 - **Autorização de tenant:** o `tenant-id` deve pertencer ao usuário; senão → `403`.
 - **Vocabulário do tenant:** os identificadores de consulta e predicados válidos são definidos pelo
@@ -4170,8 +4204,9 @@ Ver [arquitetura](../01-arquitetura.md) e os exemplos de modelo em [examples/](.
 
 ## Índice de endpoints
 
-> Apenas o endpoint autenticado é documentado. Endpoints internos sem autenticação e endpoints de
-> observabilidade/administração **não** constam aqui.
+> Paths **downstream** — anexe ao prefixo do ambiente (`/v3/persistence/q` prod · `/v3/persistence/t/q`
+> teste; ver acima). Apenas o endpoint autenticado é documentado. Endpoints internos sem autenticação e
+> endpoints de observabilidade/administração **não** constam aqui.
 
 | Operação | Método · Path | Documento |
 |---|---|---|
@@ -4227,7 +4262,6 @@ Ver [coordenação](../coordenacao.md).
 - [ ] Tratar `204` como "nenhum resultado", não como erro.
 
 <!-- ===== persistence-q/endpoints/consulta.md ===== -->
-
 # persistence-q · endpoints · consulta
 
 > Consulta projeções por critério. Guia: [../README.md](../README.md).
@@ -4237,6 +4271,10 @@ Ver [coordenação](../coordenacao.md).
 `POST /`
 
 Cabeçalhos: `Authorization`, `X-Tenant-Id` (cabeçalho de tenant), `Content-Type: application/json`.
+
+> **URL externa — o segmento `t` escolhe o ambiente.** O path acima é **downstream**; via gateway:
+> **produção** `POST /v3/persistence/q/` · **teste** `POST /v3/persistence/t/q/`. Corpo, cabeçalhos e
+> respostas são **iguais** nos dois — só muda o prefixo. Ver [autenticação](../../06-autenticacao.md).
 
 O corpo tem **dois modos**, detectados pelo primeiro caractere:
 
@@ -4501,12 +4539,15 @@ está em `RUNNING` (ver [forger/dataschema](../forger/endpoints/dataschema.md#at
 (`MODELING` → `RUNNING`) repõe a entrada.
 
 <!-- ===== persistence-q/exemplos.md ===== -->
-
 # persistence-q · exemplos anotados
 
 > Dados genéricos. Cabeçalhos `Authorization` + `X-Tenant-Id` em todas. Guia: [README.md](README.md).
 
 > ⚠️ Blocos abaixo são **ilustrativos**: `<...>` e `•••` são placeholders, não JSON literal pronto para envio.
+
+> ⚠️ **O path das consultas abaixo é downstream** (`POST /`) — sem o prefixo do gateway. Via gateway:
+> `POST /v3/persistence/q/` (**produção**) ou `POST /v3/persistence/t/q/` (**teste**). Ver
+> [autenticação](../06-autenticacao.md).
 
 > ⚠️ **Rótulo = nome da projeção**: os rótulos abaixo (`pedidosCriados` etc.) são ilustrativos — na prática
 > o rótulo DEVE ser o **nome da projeção/entidade** provisionada (ex.: `pedido`); rótulo arbitrário →
@@ -5914,10 +5955,24 @@ transições, regra de negócio, projeção e saga — cobrem o que um agente pr
 real.
 
 <!-- ===== CHANGELOG.md ===== -->
-
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.24 — 2026-08-31
+
+- **A escolha teste × produção passou a constar onde a requisição é montada.** A regra já existia, mas
+  **só** em `06-autenticacao.md`: **produção** `/v3/persistence/{c,q}` · **teste** `/v3/persistence/t/{c,q}`.
+  Nenhum dos documentos de `persistence-crs`/`persistence-q` a repetia — quem abrisse `endpoints/comando.md`
+  para disparar um comando não tinha como saber que existe rota de teste. Os paths ali continuam sendo os
+  **downstream** (`/a/{bc}/{type}`, `/e`, `/`); o que faltava era dizer a que prefixo anexá-los.
+- **Contrato idêntico nos dois ambientes** — corpo, cabeçalhos e respostas não mudam; muda **só** o
+  segmento `t` no prefixo. Prefixo fora da allowlist → `404`.
+- Atualizados: `persistence-crs/README.md` e `persistence-q/README.md` (tabela de prefixo por ambiente nos
+  pré-requisitos + nota no índice de endpoints), `persistence-crs/endpoints/comando.md`,
+  `endpoints/agregado-leitura.md`, `endpoints/entidade.md`, `persistence-q/endpoints/consulta.md`,
+  ambos `exemplos.md`, e os dois `openapi.yaml` (bloco `servers` passa a declarar produção e teste, além
+  da forma downstream). `llms-full.txt` (regenerado).
 
 ## 1.23 — 2026-08-31
 

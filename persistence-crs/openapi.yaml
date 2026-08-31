@@ -6,8 +6,16 @@ info:
     Lado de escrita: executa comandos de agregados, lê estado/histórico, aplica projeção (serviço).
     Detalhe e ciclo de vida: README.md, endpoints/, spec/model-format.md. Apenas endpoints autenticados.
 servers:
+  - url: /v3/persistence/c
+    description: >
+      PRODUÇÃO — via gateway da plataforma (host omitido por política). Os paths abaixo são downstream e
+      se anexam a este prefixo.
+  - url: /v3/persistence/t/c
+    description: >
+      TESTE — mesmo contrato; muda só o segmento `t` no prefixo.
   - url: /
-    description: Acesso via gateway da plataforma (host omitido por política).
+    description: >
+      Somente os paths downstream, sem o prefixo do gateway (forma usada ao longo dos documentos).
 security:
   - bearerAuth: []
 paths:

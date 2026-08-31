@@ -12,6 +12,11 @@
 | `{boundedContext}` | contexto delimitado do agregado |
 | `{aggregateType}` | tipo do agregado |
 
+> **URL externa — o segmento `t` escolhe o ambiente.** O path acima é **downstream**; via gateway:
+> **produção** `POST /v3/persistence/c/a/{bc}/{type}` · **teste** `POST /v3/persistence/t/c/a/{bc}/{type}`.
+> Corpo, cabeçalhos e respostas são **iguais** nos dois — só muda o prefixo. Ver
+> [autenticação](../../06-autenticacao.md).
+
 Corpo: o **comando** identificado pelo seu nome, com os dados:
 
 ```json

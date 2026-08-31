@@ -2,6 +2,21 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.24 — 2026-08-31
+
+- **A escolha teste × produção passou a constar onde a requisição é montada.** A regra já existia, mas
+  **só** em `06-autenticacao.md`: **produção** `/v3/persistence/{c,q}` · **teste** `/v3/persistence/t/{c,q}`.
+  Nenhum dos documentos de `persistence-crs`/`persistence-q` a repetia — quem abrisse `endpoints/comando.md`
+  para disparar um comando não tinha como saber que existe rota de teste. Os paths ali continuam sendo os
+  **downstream** (`/a/{bc}/{type}`, `/e`, `/`); o que faltava era dizer a que prefixo anexá-los.
+- **Contrato idêntico nos dois ambientes** — corpo, cabeçalhos e respostas não mudam; muda **só** o
+  segmento `t` no prefixo. Prefixo fora da allowlist → `404`.
+- Atualizados: `persistence-crs/README.md` e `persistence-q/README.md` (tabela de prefixo por ambiente nos
+  pré-requisitos + nota no índice de endpoints), `persistence-crs/endpoints/comando.md`,
+  `endpoints/agregado-leitura.md`, `endpoints/entidade.md`, `persistence-q/endpoints/consulta.md`,
+  ambos `exemplos.md`, e os dois `openapi.yaml` (bloco `servers` passa a declarar produção e teste, além
+  da forma downstream). `llms-full.txt` (regenerado).
+
 ## 1.23 — 2026-08-31
 
 - **br-service: consulta do log de execução documentada** (novo `br-service/endpoints/logs.md`).

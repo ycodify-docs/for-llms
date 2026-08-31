@@ -4,6 +4,10 @@
 
 > ⚠️ Blocos abaixo são **ilustrativos**: `<...>` e `•••` são placeholders, não JSON literal pronto para envio.
 
+> ⚠️ **O path das consultas abaixo é downstream** (`POST /`) — sem o prefixo do gateway. Via gateway:
+> `POST /v3/persistence/q/` (**produção**) ou `POST /v3/persistence/t/q/` (**teste**). Ver
+> [autenticação](../06-autenticacao.md).
+
 > ⚠️ **Rótulo = nome da projeção**: os rótulos abaixo (`pedidosCriados` etc.) são ilustrativos — na prática
 > o rótulo DEVE ser o **nome da projeção/entidade** provisionada (ex.: `pedido`); rótulo arbitrário →
 > `510` (projeção de nome `<rótulo>` inexistente). Ver [endpoints/consulta.md](endpoints/consulta.md).

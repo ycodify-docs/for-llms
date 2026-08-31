@@ -8,6 +8,10 @@
 
 Cabeçalhos: `Authorization`, `X-Tenant-Id` (cabeçalho de tenant), `Content-Type: application/json`.
 
+> **URL externa — o segmento `t` escolhe o ambiente.** O path acima é **downstream**; via gateway:
+> **produção** `POST /v3/persistence/q/` · **teste** `POST /v3/persistence/t/q/`. Corpo, cabeçalhos e
+> respostas são **iguais** nos dois — só muda o prefixo. Ver [autenticação](../../06-autenticacao.md).
+
 O corpo tem **dois modos**, detectados pelo primeiro caractere:
 
 ### Modo array (múltiplos critérios) — primeiro caractere `[`

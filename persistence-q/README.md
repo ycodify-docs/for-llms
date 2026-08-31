@@ -17,6 +17,16 @@
 
 ## Pré-requisitos do chamador
 
+- **URL externa — escolha o ambiente pelo segmento `t`:** o path deste guia (`POST /`) é **downstream**;
+  o chamador externo o anexa ao prefixo do gateway, que muda conforme o ambiente:
+
+  | Ambiente | Prefixo | Exemplo (consultar) |
+  |---|---|---|
+  | **produção** | `/v3/persistence/q` | `POST /v3/persistence/q/` |
+  | **teste** | `/v3/persistence/t/q` | `POST /v3/persistence/t/q/` |
+
+  O path downstream é **idêntico** nos dois — só muda o segmento `t`. Prefixo fora da allowlist → `404`.
+  Detalhe: [autenticação](../06-autenticacao.md).
 - **Cabeçalhos obrigatórios:** `Authorization` e o **cabeçalho de tenant** `X-Tenant-Id`.
 - **Autorização de tenant:** o `tenant-id` deve pertencer ao usuário; senão → `403`.
 - **Vocabulário do tenant:** os identificadores de consulta e predicados válidos são definidos pelo
@@ -42,8 +52,9 @@
 
 ## Índice de endpoints
 
-> Apenas o endpoint autenticado é documentado. Endpoints internos sem autenticação e endpoints de
-> observabilidade/administração **não** constam aqui.
+> Paths **downstream** — anexe ao prefixo do ambiente (`/v3/persistence/q` prod · `/v3/persistence/t/q`
+> teste; ver acima). Apenas o endpoint autenticado é documentado. Endpoints internos sem autenticação e
+> endpoints de observabilidade/administração **não** constam aqui.
 
 | Operação | Método · Path | Documento |
 |---|---|---|

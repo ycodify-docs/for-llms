@@ -5,6 +5,11 @@
 > ⚠️ Blocos abaixo são **ilustrativos**: `<...>` e `•••` são placeholders, não JSON literal pronto para envio.
 > Guia: [README.md](README.md).
 
+> ⚠️ **Os paths abaixo são downstream** — sem o prefixo do gateway. Via gateway, anexe-os a
+> `/v3/persistence/c` (**produção**) ou `/v3/persistence/t/c` (**teste**): `POST /a/vendas/pedido` vira
+> `POST /v3/persistence/t/c/a/vendas/pedido` no ambiente de teste. Ver
+> [autenticação](../06-autenticacao.md).
+
 ## Executar um comando
 
 ```
