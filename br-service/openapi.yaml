@@ -157,6 +157,9 @@ paths:
           description: "Bearer <token de acesso>. Assinatura verificada; define as organizações permitidas."
       requestBody:
         required: true
+        description: >
+          O arquivo compactado cru, no máximo 5 MB. Acima disso a requisição é barrada na borda da
+          plataforma e devolve 413, sem o corpo de erro deste serviço.
         content:
           application/zip:
             schema: { type: string, format: binary }

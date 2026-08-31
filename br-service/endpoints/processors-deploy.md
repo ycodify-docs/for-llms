@@ -41,6 +41,12 @@ O **arquivo compactado cru** — não é formulário nem `multipart`, e não vai
 |---|---|
 | Corpo | os bytes do `.zip` |
 | `Content-Type` | `application/zip` |
+| Tamanho máximo | **5 MB** |
+
+> **O `413` não vem deste serviço.** Pacote acima do teto é barrado na borda da plataforma, antes de
+> chegar ao br-service — a resposta não tem o corpo `{status, mensagem, tipo}` dos erros daqui. Se o seu
+> pacote encostar no limite, o caminho é reduzi-lo (processadores são texto; o que costuma inchar um
+> pacote é arquivo que não deveria estar nele), não reenviar.
 
 ### Cabeçalhos — os dois são obrigatórios
 
