@@ -198,7 +198,10 @@ Atributos aparecem em `command.<cmd>.data.attribute.<campo>`:
   `data.attribute` (colunas escalares) **+** `valueObject.single`/`valueObject.multiple` (colunas JSON).
   Cada `<nomeVO>` pode ser um **grupo de campos** (`{ campo: {type,...} }`) **ou** um **único atributo
   tipado** direto (`{ type, ... }`) — neste caso, `multiple` é um array desse valor.
-- `roles`: lista de papéis que podem executar o comando.
+- `roles`: lista de papéis que podem executar o comando. **É aplicada em runtime**, e **antes** de
+  `br.route`: usuário sem nenhum desses papéis recebe `403` e o comando **não** chega à regra de negócio.
+  Lista vazia ⇒ **ninguém** executa. Ver
+  [autorização por papel](../README.md#autorizacao-por-papel).
 - `br.route`: se presente, o persistence-crs chama o [br-service](../../br-service/README.md) antes de
   gravar o evento (CP-6). A rota segue a **forma canônica totalmente qualificada**
   `<org>/<project>/<bc>/<aggregate>/<comando>` (evita colisão entre organizações) — ver

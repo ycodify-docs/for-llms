@@ -2,6 +2,28 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.27 — 2026-08-31
+
+- **A autorização por papel (`command.<comando>.roles`) passou a ser documentada — e mudou de lugar e de
+  código.** Ela sempre existiu no modelo (`spec/model-format.md`), mas em nenhum lugar se dizia que é
+  **aplicada em runtime**, nem quando, nem com que resposta. Agora consta como **passo 4** do ciclo de
+  vida em `persistence-crs/README.md`, com seção própria.
+- **Mudança de comportamento (quebra contrato observável):** a verificação corria **depois** da regra de
+  negócio e a recusa saía como **`510`** com mensagem interna. Agora corre **antes** da regra e devolve
+  **`403`** com `O usuário '<usuário>' não possui papel autorizado para executar o comando '<comando>'.`
+  Quem tratava aquele `510` precisa ajustar.
+- **Consequência prática para quem integra:** comando recusado por papel **não aciona mais a regra de
+  negócio**, então as mensagens da regra (ex.: "referência não existe", "campo obrigatório ausente")
+  deixam de chegar a quem não tem o papel. Antes chegavam — e podiam revelar estado do domínio a quem não
+  estava autorizado.
+- **Correção de ordem no ciclo de vida documentado:** a lista dizia que a validação de transição
+  (`fromState`) vinha **antes** da regra de negócio. É o contrário — a regra roda primeiro, e `fromState`
+  e `endState` são validados depois. Os passos foram reordenados para descrever o que de fato acontece.
+- Atualizados: `persistence-crs/README.md` (passo 4 + seção "Autorização por papel" + Contents),
+  `persistence-crs/erros.md` (linha do `403` + nota nova), `persistence-crs/endpoints/comando.md`
+  (comportamento + erros), `persistence-crs/spec/model-format.md` (`roles` agora diz que é aplicado e
+  quando), `llms-full.txt` (regenerado).
+
 ## 1.26 — 2026-08-31
 
 - **Saíram endereço e porta internos das instâncias de persistence** (`06-autenticacao.md`). A seção

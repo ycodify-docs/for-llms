@@ -59,9 +59,15 @@ para **leitura** (`GET .../{uuid}`) e **histórico** (`GET .../{uuid}/history`),
 ## Comportamento
 
 Segue o [ciclo de vida de um comando](../README.md#ciclo-de-vida-de-um-comando): auth/tenant → carga do
-estado → validação de transição (`fromState`) → regra/coordenação no br-service (se o modelo exigir) →
-validação do estado de destino (`endState`) → gravação do evento (notifica es-n) → resposta.
+estado → **autorização por papel (`roles`)** → regra/coordenação no br-service (se o modelo exigir) →
+validação de transição (`fromState`) → validação do estado de destino (`endState`) → gravação do evento
+(notifica es-n) → resposta.
+
+> **A checagem de papel vem antes da regra de negócio.** Usuário sem nenhum dos papéis de
+> `command.<comando>.roles` recebe **`403`** e o comando **não** aciona a regra — então as mensagens da
+> regra não chegam a ele. Mudou em 2026-08-31 (antes: depois da regra, e `510`). Ver
+> [README — autorização por papel](../README.md#autorizacao-por-papel).
 
 ## Erros
-`400` (corpo inválido), `403` (tenant não autorizado), `510` (falha de transição/processamento e demais
-exceções). Catálogo: [../erros.md](../erros.md).
+`400` (corpo inválido), `403` (tenant não autorizado **ou usuário sem papel para o comando**), `510`
+(falha de transição/processamento e demais exceções). Catálogo: [../erros.md](../erros.md).

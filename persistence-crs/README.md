@@ -11,6 +11,7 @@
 - Pré-requisitos do chamador
 - Índice de endpoints
 - Ciclo de vida de um comando
+- Autorização por papel (`roles`)
 - Estados, transições e concorrência
 - Pontos de coordenação
 - Pitfalls
@@ -63,19 +64,44 @@ Gramática do modelo de domínio: **[spec/model-format.md](spec/model-format.md)
 1. **Auth + tenant** — valida `Authorization` e o `tenant-id`; carrega o **modelo** do tenant (CP-1).
 2. **Decomposição** — identifica o agregado, o **comando** e seus dados a partir do corpo.
 3. **Carga do estado atual** — reconstitui o estado do agregado a partir dos seus eventos.
-4. **Validação de transição** — o estado atual precisa pertencer ao conjunto de **estados de origem**
-   (`fromState`) do comando; senão → erro de transição.
+4. **Autorização por papel (`roles`)** — o usuário precisa ter **pelo menos um** dos papéis
+   declarados em `command.<comando>.roles` no modelo do tenant; senão → **`403`**, e a execução
+   **para aqui**. Ver [Autorização por papel](#autorizacao-por-papel) abaixo.
 5. **Regra/coordenação (se declarada)** — se o modelo do comando declara uma rota de **regra de
    negócio** ou de **coordenação**, o serviço chama o **br-service** para validar/enriquecer/coordenar
    **antes** de concluir (CP-6).
-6. **Validação do estado de destino** — após a regra, o estado resultante deve corresponder ao
-   **estado de destino** (`endState`) previsto.
-7. **Gravação do evento** — grava o evento no banco de escrita (universal, isolado por `tenant-id`).
+6. **Validação de transição** — o estado atual precisa pertencer ao conjunto de **estados de origem**
+   (`fromState`) do comando; senão → erro de transição.
+7. **Validação do estado de destino** — o estado resultante deve corresponder ao **estado de
+   destino** (`endState`) previsto.
+8. **Gravação do evento** — grava o evento no banco de escrita (universal, isolado por `tenant-id`).
    A gravação, na mesma transação, **notifica o es-n** (CP-3).
-8. **Resposta** — `200` com `{ "id": "<id do agregado>", "status": "<estado>" }`.
+9. **Resposta** — `200` com `{ "id": "<id do agregado>", "status": "<estado>" }`.
 
 A atualização da **projeção** acontece **depois**, de forma assíncrona, pelo fluxo es-n → projeção
 (CP-4/CP-5). A resposta do comando **não** garante que a projeção já reflete a mudança.
+
+<a id="autorizacao-por-papel"></a>
+## Autorização por papel (`roles`) — acontece **antes** da regra de negócio
+
+Todo comando declara, no modelo do tenant, a lista de papéis que podem executá-lo
+(`command.<comando>.roles` — ver [spec/model-format.md](spec/model-format.md)). A verificação:
+
+- **compara os papéis do usuário** (do `Authorization`) com essa lista; basta **um** casar;
+- **roda antes** de qualquer chamada de **regra de negócio/coordenação** (passo 4, antes do 5);
+- nega com **`403`** e a mensagem `O usuário '<usuário>' não possui papel autorizado para executar o
+  comando '<comando>'.`
+
+**O que isso significa para quem integra:** um comando recusado por papel **não** aciona a regra de
+negócio. Logo, quem não tem o papel **não recebe mais** mensagens vindas da regra (por exemplo
+"referência X não existe" ou "campo obrigatório ausente") — recebe `403` e nada além disso. Não conte
+com essas mensagens para descobrir o estado do domínio: elas só chegam a quem está autorizado.
+
+> **Mudança de comportamento (2026-08-31).** Até então a verificação de papel acontecia **depois** da
+> regra de negócio, e a recusa saía como `510` com uma mensagem interna. Efeitos práticos do que mudou:
+> a recusa agora é **`403`** (não `510`); ela chega **mais cedo**, sem executar a regra; e um comando
+> que antes respondia com erro **da regra** para usuário sem papel agora responde `403`. Se o seu
+> cliente tratava esse `510`, ou dependia da mensagem da regra nesse cenário, **ajuste**.
 
 ## Estados, transições e concorrência
 
