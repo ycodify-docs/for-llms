@@ -62,7 +62,7 @@
 
 ## br-service (regras e coordenação)
 - [Guia](br-service/README.md): posição no fluxo, três categorias de processador, forma canônica da rota, contrato de resposta.
-- [executar função (/br)](br-service/endpoints/br.md) · [consultar log de execução](br-service/endpoints/logs.md) · [Erros](br-service/erros.md) · [Exemplos](br-service/exemplos.md) · [OpenAPI](br-service/openapi.yaml)
+- [executar função (/br)](br-service/endpoints/br.md) · [consultar log de execução](br-service/endpoints/logs.md) · [implantar/desfazer processadores](br-service/endpoints/processors-deploy.md) · [Erros](br-service/erros.md) · [Exemplos](br-service/exemplos.md) · [OpenAPI](br-service/openapi.yaml)
 
 ## filer (arquivos anexos a agregados) — serviço transversal
 - [Guia](filer/README.md): convenção de nome (arquivo↔agregado), RBAC por entidade, limites/tipos.

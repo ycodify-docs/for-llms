@@ -679,6 +679,7 @@ Tolere a breve defasagem de propagação (reconsulte se necessário). Ver
 ```
 
 <!-- ===== 06-autenticacao.md ===== -->
+
 # Autenticação e identificação de tenant
 
 > Como formar uma requisição válida: a **URL base** (via API Gateway, prefixo `/v3/<svc>`) + o cabeçalho
@@ -2345,6 +2346,7 @@ POST /open/ua/account-role
 > têm `owner` (espaço de nomes). Ver [README](README.md) e [coordenação](../coordenacao.md).
 
 <!-- ===== persistence-crs/README.md ===== -->
+
 # persistence-crs — guia do serviço
 
 > **Papel:** executa os **comandos** definidos para um agregado num bounded context. É o **lado de
@@ -2527,6 +2529,7 @@ Ver [coordenação](../coordenacao.md).
       para ler, use [persistence-q](../persistence-q/README.md), tolerando um curto atraso.
 
 <!-- ===== persistence-crs/spec/model-format.md ===== -->
+
 # Formato do modelo de domínio (`.model.json`)
 
 > Referência **formal** da estrutura do `.model.json` — o documento declarativo que descreve um
@@ -2792,6 +2795,7 @@ Atributos aparecem em `command.<cmd>.data.attribute.<campo>`:
   tabelas**: as projeções (tabelas) vêm das `entity` do forger; as filas, do deploy de processo.
 
 <!-- ===== persistence-crs/endpoints/comando.md ===== -->
+
 # persistence-crs · endpoints · comando
 
 > Executa um **comando** sobre um agregado. Guia: [../README.md](../README.md).
@@ -2867,6 +2871,7 @@ validação de transição (`fromState`) → validação do estado de destino (`
 (falha de transição/processamento e demais exceções). Catálogo: [../erros.md](../erros.md).
 
 <!-- ===== persistence-crs/endpoints/agregado-leitura.md ===== -->
+
 # persistence-crs · endpoints · leitura de agregado
 
 > Leitura do **estado atual** e do **histórico de eventos** de um agregado, direto pelo lado de escrita.
@@ -2907,6 +2912,7 @@ Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`.
 `403` (tenant não autorizado), `510` (falha de processamento). Catálogo: [../erros.md](../erros.md).
 
 <!-- ===== persistence-crs/endpoints/entidade.md ===== -->
+
 # persistence-crs · endpoints · entidade (CRUD convencional)
 
 > CRUD **direto** de linhas numa **entidade convencional** — uma tabela do domínio que **não** é
@@ -3199,6 +3205,7 @@ Catálogo: [../erros.md](../erros.md).
 > configurada no serviço, o endpoint **nega todas** as chamadas — não existe modo aberto por omissão.
 
 <!-- ===== persistence-crs/erros.md ===== -->
+
 # persistence-crs · catálogo de erros
 
 > Envelope e categorias de erro. Guia: [README.md](README.md).
@@ -3260,6 +3267,7 @@ cabeçalho, mas a causa é o modelo. Nos dois casos a ação é a mesma: confirm
 dataschema em `RUNNING`, não mexer no cabeçalho.
 
 <!-- ===== persistence-crs/exemplos.md ===== -->
+
 # persistence-crs · exemplos anotados
 
 > Dados genéricos (`acme.vendas`, agregado `pedido`). Cabeçalhos `Authorization` + `X-Tenant-Id` em todas.
@@ -3477,7 +3485,12 @@ Vale para todos os endpoints de forger (variações específicas em cada documen
      o efeito físico no banco relacional (criar banco/esquema), com rollback se o efeito físico falhar;
    - `entity`: **compila** a definição (léxica → sintática → semântica → representação intermediária →
      DDL) e aplica a DDL no banco de leitura, de forma transacional;
-   - `model`/`process`: **publica** o documento no cache distribuído (semântica de sobrescrita).
+   - `model`/`process`: **publica** o documento no cache distribuído (semântica de sobrescrita, **sem
+     prazo de validade** — vale até ser republicado ou removido);
+   - `dataschema` com mudança de `status`: `MODELING → RUNNING` **publica** o modelo de entidades no
+     cache distribuído (permanente, sobrescreve); `RUNNING → MODELING` o **remove**; o `DELETE` do
+     dataschema também remove. Falha no cache **reverte** a operação e responde `500` — ver
+     [dataschema.md](endpoints/dataschema.md#efeito-da-transição-sobre-o-cache-distribuído).
 5. **Resposta** — `201` (criação), `200` (leitura/atualização/remoção), `204` (sem conteúdo). Erros
    conforme [erros.md](erros.md).
 
@@ -3682,24 +3695,66 @@ Erros: `400`, `403`, `500`.
 `PUT .../dataschema/{dataSchema}` — corpo: `logversion` + editáveis (`alias`, `description`, `status`,
 `dbsqlminimumconnidle`, `dbsqlmaximumpoolsize`). `200`; conflito → `409`.
 
-> **Campo `status` — gate operacional (`MODELING` ↔ `RUNNING`).** O `status` do dataschema **não** é um
-> rótulo passivo: ele **controla** o que pode ser feito sobre o esquema e sobre o tenant. Defina/transite
-> o `status` pelo `PUT` acima.
+> **Sempre leia antes de atualizar.** `logversion` é **versão otimista**: precisa ser o valor **atual**
+> do recurso, obtido no `GET` acima. Chutar `0` (ou reusar um valor antigo) responde **`409`** e **nada
+> acontece** — nem a gravação, nem o efeito no cache descrito abaixo. Receita: `GET` → pegue
+> `logversion` → `PUT` com esse valor.
 >
-> | `status` | Schema (entity) | Interpretação/execução do modelo |
-> |---|---|---|
-> | **`MODELING`** | **editável** — criar/alterar/remover `entity` (e atributos/associações) é permitido | **não ocorre** — persistence-crs e persistence-q **não operam** sobre este tenant |
-> | **`RUNNING`** | **congelado** — o **forger rejeita** criar/alterar `entity` neste estado | **ocorre** — persistence-crs/persistence-q interpretam e executam o modelo |
+> **`status` inválido não é rejeitado.** O campo **não** é validado contra a lista de valores: um erro
+> de digitação (`RUNNIG`, `RUNING`) é **gravado como veio** e responde `200`. Como a transição é
+> comparada contra `MODELING`/`RUNNING`, o efeito é **falha silenciosa**: nada é publicado nem removido
+> do cache, e o dataschema fica num status que **não** libera edição de entity (só `MODELING` libera)
+> **nem** habilita operação. Confira a grafia; para sair do estado, faça outro `PUT` com o valor certo.
+
+> **Campo `status` — gate operacional (`MODELING` ↔ `RUNNING`).** O `status` do dataschema **não** é um
+> rótulo passivo: ele **controla** o que pode ser feito sobre o esquema e sobre o tenant, e **é o gatilho
+> da publicação do modelo de entidades**. Defina/transite o `status` pelo `PUT` acima.
+>
+> | `status` | Schema (entity) | Modelo de entidades no cache | Interpretação/execução do modelo |
+> |---|---|---|---|
+> | **`MODELING`** | **editável** — criar/alterar/remover `entity` (e atributos/associações) é permitido | **ausente** | **não ocorre** — persistence-crs e persistence-q **não operam** sobre este tenant |
+> | **`RUNNING`** | **congelado** — o **forger rejeita** criar/alterar `entity` neste estado | **publicado** | **ocorre** — persistence-crs/persistence-q interpretam e executam o modelo |
+>
+> O valor é normalizado (`trim` + maiúsculas) antes de ser gravado e comparado: `running` e `RUNNING`
+> são a mesma transição.
 >
 > **Regra para o agente:** para **editar schema** (criar/alterar entity), o dataschema precisa estar em
 > `MODELING`; para **operar** (comandos/consultas via persistence-crs/persistence-q), em `RUNNING`. Para
 > alterar o schema de um sistema já em operação: transite `RUNNING → MODELING` (via `PUT` no `status`),
 > edite as entities, e volte a `MODELING → RUNNING`.
 
+### Efeito da transição sobre o cache distribuído
+
+A transição de `status` **publica e despublica o modelo de entidades** (a descrição das entidades que
+correspondem às projeções dos agregados) no cache distribuído, sob a referência do `tenant-id`:
+
+| Transição | Efeito |
+|---|---|
+| `MODELING → RUNNING` | **publica** o estado atual das entidades, **sem prazo de validade** e **sobrescrevendo** o valor anterior |
+| `RUNNING → MODELING` | **remove** a publicação |
+| qualquer outra (ou nenhuma mudança de `status`) | nenhum efeito no cache |
+
+O forger é o **único publicador** dessa referência — os consumidores (persistence-crs, persistence-q)
+apenas leem. Como não há expiração, vale o que foi publicado na última transição para `RUNNING`, até a
+próxima transição.
+
+**Atomicidade:** se a operação no cache falhar, o `status` é **revertido** no banco e a requisição
+responde `500` — nada fica em estado intermediário (nunca `RUNNING` sem modelo publicado, nem
+`MODELING` com modelo publicado). Repita o `PUT` relendo o `logversion` atual.
+
+**Consequência prática:** editar entities e voltar a `RUNNING` **republica** o modelo, e o efeito é
+imediato para os consumidores. Um tenant que nunca passou por `MODELING → RUNNING` **não tem** modelo
+de entidades publicado, e consultas sobre ele falham no consumidor.
+
 ## Remover
 
 `DELETE .../dataschema/{dataSchema}` → `200`/`204`. **Bloqueado** enquanto o esquema físico existir
 (há projeções/conteúdo). Ver também a remoção em nível de projeção em [entity.md](entity.md).
+
+A remoção também **despublica o modelo de entidades** do cache distribuído — a publicação não tem
+prazo de validade, então ficaria órfã apontando para um tenant inexistente. A despublicação acontece
+**antes** de o registro ser apagado: se o cache falhar, **nada é removido** e a requisição responde
+`500`, podendo ser repetida. Dataschema que nunca foi publicado é removido normalmente.
 
 ## Ciclo de vida
 Metadados + efeito físico (criação de esquema) + geração do `tenant-id`. A partir daqui o sistema tem
@@ -3711,6 +3766,7 @@ identidade de tenant para comandos/eventos/consultas.
 Habilita criar **entity** ([entity.md](entity.md)) e publicar **model** ([model.md](model.md)).
 
 <!-- ===== forger/endpoints/entity.md ===== -->
+
 # forger · endpoints · entity
 
 > **entity** = definição de uma **projeção** materializada como **tabela no banco de leitura**. Criar/
@@ -3922,6 +3978,8 @@ Envio: o documento de modelo (`.json`) como **upload `multipart/form-data`, no c
 `curl -F "file=@modelo.json"`). **`Content-Type: application/json` (JSON no corpo) → `415`**. Efeito: valida a consistência
 `(org, project, tenant)` — o `tenantId` deve referenciar exatamente um dataschema do contexto — e
 **publica** o modelo no cache distribuído. **Semântica de sobrescrita**: republicar substitui o anterior.
+**A publicação não tem prazo de validade**: o modelo permanece disponível até ser republicado ou
+removido — não expira nem é repopulado por consumidor. O forger é o único publicador.
 Resposta `201`: `{ "key": "<referência de publicação>" }`.
 Erros: `400` (documento inválido / faltando seção de agregado), `403`/`404` (consistência), `500`.
 
@@ -3958,6 +4016,12 @@ publicação no cache (criar/atualizar) → resposta.
 > distribuído. As **filas/topologia de mensageria** são provisionadas pelo deploy de **process (BPMN)**
 > — ver [process.md](process.md). O modelo de domínio descreve agregados/comandos/eventos e seus
 > marcadores de despacho (projeção/coordenação), mas não declara nem cria infraestrutura de filas.
+
+> **São dois modelos distintos, publicados separadamente.** Este endpoint publica o **modelo de
+> domínio** (agregados, comandos, eventos). O **modelo de entidades** — a descrição das entidades que
+> correspondem às **projeções** desses agregados — é publicado por outro caminho: a transição de
+> `status` do dataschema `MODELING → RUNNING` (ver [dataschema.md](dataschema.md#efeito-da-transição-sobre-o-cache-distribuído)).
+> Publicar o modelo de domínio **não** publica o de entidades, e vice-versa. Ambos são permanentes.
 
 ## Coordenação
 **CP-1:** o modelo publicado aqui é a **fonte da verdade** lida por **persistence-crs** (quais comandos/
@@ -4086,11 +4150,16 @@ críticos retorna também o relatório de análise.)
 | `404` | Não encontrado | Recurso inexistente; `tenant` não referencia dataschema do contexto. | Verificar a ordem de deploy e os identificadores. |
 | `409` | Conflito de versão | `logversion` divergente do atual (alguém atualizou antes); ou remoção bloqueada por dependentes. | Reler o recurso, reenviar com o `logversion` atual; remover dependentes antes. |
 | `422` | Não processável | Publicação de **process** com problemas **críticos** na análise. | Corrigir o processo conforme o relatório retornado. |
-| `500` | Erro interno | Falha na compilação/aplicação de DDL; falha ao materializar efeito físico (rollback aplicado). | Revisar a definição; retentar; se persistir, escalar. |
+| `500` | Erro interno | Falha na compilação/aplicação de DDL; falha ao materializar efeito físico (rollback aplicado); falha ao publicar/remover o modelo no cache na transição de `status` do dataschema (status revertido). | Revisar a definição; retentar; se persistir, escalar. |
 
 ## Notas de comportamento
+- **`200` que não fez nada:** o `status` do dataschema **não é validado** contra a lista de valores. Um
+  erro de digitação (`RUNNIG`) é gravado e responde `200`, mas **não** dispara a publicação/remoção do
+  modelo no cache e **não** libera edição de entity — falha silenciosa. Ver
+  [dataschema.md](endpoints/dataschema.md#atualizar).
 - **Rollback:** ao criar `database`/`dataschema`/`entity`, se o efeito físico falhar, os metadados são
-  revertidos — o recurso não fica num estado parcial.
+  revertidos — o recurso não fica num estado parcial. Na transição de `status` do dataschema, falha no
+  cache também reverte o status (resposta `500`).
 - **Remoção bloqueada:** qualquer recurso com dependentes não pode ser removido (cadeia
   dbconn ⟶ database ⟶ dataschema ⟶ entity; project ⟶ dataschema).
 
@@ -4198,6 +4267,7 @@ Ver [arquitetura](../01-arquitetura.md) e os exemplos de modelo em [examples/](.
   estão no documento em prosa correspondente.
 
 <!-- ===== persistence-q/README.md ===== -->
+
 # persistence-q — guia do serviço
 
 > **Papel:** **lado de leitura** do CQRS. Consulta o estado dos agregados pela ótica de suas
@@ -4310,6 +4380,7 @@ Ver [coordenação](../coordenacao.md).
 - [ ] Tratar `204` como "nenhum resultado", não como erro.
 
 <!-- ===== persistence-q/endpoints/consulta.md ===== -->
+
 # persistence-q · endpoints · consulta
 
 > Consulta projeções por critério. Guia: [../README.md](../README.md).
@@ -4550,6 +4621,7 @@ do rótulo** (junto dos predicados), limitando a profundidade por `_level`:
 > As chaves de controle têm prefixo `_`; nomes de atributo são `^[a-z]+$` (sem `_`), portanto não colidem.
 
 <!-- ===== persistence-q/erros.md ===== -->
+
 # persistence-q · catálogo de erros
 
 > Envelope e categorias de erro. Guia: [README.md](README.md).
@@ -4612,6 +4684,7 @@ publicado e que o dataschema está em `RUNNING` (ver
 a entrada.
 
 <!-- ===== persistence-q/exemplos.md ===== -->
+
 # persistence-q · exemplos anotados
 
 > Dados genéricos. Cabeçalhos `Authorization` + `X-Tenant-Id` em todas. Guia: [README.md](README.md).
@@ -4993,7 +5066,8 @@ comandos** automaticamente (saga), visíveis como novos eventos no histórico do
 - Pitfalls
 
 > Para **auditar o que já executou** (por termo e intervalo, com chave própria), ver
-> [endpoints/logs.md](endpoints/logs.md).
+> [endpoints/logs.md](endpoints/logs.md). Para **publicar processadores** de uma organização,
+> ver [endpoints/processors-deploy.md](endpoints/processors-deploy.md).
 
 ---
 
@@ -5010,13 +5084,16 @@ tipo de hook — e, quando o caso de uso exigir, chamar integrações externas n
 
 ## Índice de endpoints
 
-> Endpoints de saúde e de métricas **não** constam aqui. A consulta de log consta por ser **contrato de
-> cliente** — quem chama é o interessado autorizado, sobre as próprias execuções.
+> Endpoints de saúde e de métricas **não** constam aqui. A consulta de log e a implantação de
+> processadores constam por serem **contrato de cliente** — quem chama é o interessado autorizado, sobre
+> as próprias execuções e a própria organização.
 
 | Operação | Método · Path | Documento |
 |---|---|---|
 | Executar função (rota) | `POST /br` | [endpoints/br.md](endpoints/br.md) |
 | Consultar o log de execução | `GET /v3/brservice/logs/query/{term}/from/{f}/to/{t}` | [endpoints/logs.md](endpoints/logs.md) |
+| Implantar processadores de uma org | `POST /v3/brservice/processors/deploy/{org}` | [endpoints/processors-deploy.md](endpoints/processors-deploy.md) |
+| Desfazer a última implantação | `POST /v3/brservice/processors/rollback/{org}/{backupId}` | [endpoints/processors-deploy.md](endpoints/processors-deploy.md#desfazer) |
 
 > **⚠️ `POST /coordination` — pendente (gap de plataforma).** O motor de comandos (persistence-crs)
 > aciona uma coordenação **síncrona no caminho do comando** quando o modelo do comando declara
@@ -5072,14 +5149,21 @@ Aninhando os escopos, o **path completo é globalmente único** → duas organiz
 > caminho** e, portanto, para o **mesmo processador** — a regra de uma passa a valer, silenciosamente,
 > para a outra.
 
-### Deploy de um processador (por sistema de arquivos — NÃO via gateway)
+### Deploy de um processador
 
 Um processador é um **arquivo** cujo **caminho dentro da pasta de processadores do serviço** é a **rota** —
-`<org>/<project>/<bc>/<aggregate>/<função>`, sem a extensão. **Não há endpoint/API para publicar um
-processador**: o br-service é **interno**, sem rota no gateway para isso. O deploy é por **sistema de
-arquivos** — coloca-se o arquivo na pasta de processadores e o serviço o carrega (na inicialização;
-recarregar torna a rota viva). Uma rota sem processador correspondente → **erro de rota** quando o
-persistence-crs a aciona.
+`<org>/<project>/<bc>/<aggregate>/<função>`, sem a extensão. Uma rota sem processador correspondente →
+**erro de rota** quando o persistence-crs a aciona.
+
+Há **duas** formas de publicar:
+
+| Forma | Quando |
+|---|---|
+| **Pelo endpoint** — [`POST /v3/brservice/processors/deploy/{org}`](endpoints/processors-deploy.md) | caminho normal para quem integra. Envia-se um arquivo compactado com os processadores da organização; as rotas entram em vigor **sem reinício** |
+| **Pelo sistema de arquivos** | operação da plataforma: coloca-se o arquivo na pasta de processadores. Exige recarregar o serviço para a rota ficar viva |
+
+A publicação pelo endpoint é **por organização** e **substitui a árvore inteira** dela — ver o documento
+do endpoint para o formato do pacote, o que é recusado e como desfazer.
 
 ## Contrato de resposta
 
@@ -5500,6 +5584,284 @@ Os dois filtros somados — falhas **daquele arquivo** cuja mensagem contém um 
 GET /v3/brservice/logs/query/obrigat%C3%B3rio/file/atualizar/from/2026-08-31T00:00:00Z/to/2026-08-31T23:59:59Z
 X-Logs-Key: <uuid>
 ```
+
+<!-- ===== br-service/endpoints/processors-deploy.md ===== -->
+
+# br-service · endpoints · implantar processadores
+
+> Publica os **processadores de uma organização** a partir de um arquivo compactado, e desfaz a última
+> publicação. Exige **duas credenciais ao mesmo tempo**. Guia: [../README.md](../README.md).
+
+> ⚠️ Este endpoint publica **código que o serviço vai executar**. Quem consegue publicar numa organização
+> passa a decidir o que roda nas regras de negócio dela. Trate as credenciais como tal.
+
+## Contents
+- Requisição
+- Formato do arquivo
+- Como montar o pacote (inclui **não perder o que não deveria sair** e **não deixar arquivo inalcançável**)
+- O que é recusado
+- Resposta
+- Erros
+- Desfazer
+- Exemplos
+
+---
+
+## Requisição
+
+```
+POST /v3/brservice/processors/deploy/{org}
+```
+
+### Variável de caminho
+
+| Variável | Formato | O que é |
+|---|---|---|
+| `{org}` | minúsculas, dígitos, `-` e `_`; começa por letra ou dígito; até 64 caracteres | a organização — **primeiro segmento da rota** e pasta raiz dos processadores dela |
+
+Fora desse formato o pedido é recusado. Atenção a **maiúsculas**: nomes de organização são minúsculos, e
+`Clubflow` não é o mesmo que `clubflow`.
+
+### Corpo
+
+O **arquivo compactado cru** — não é formulário nem `multipart`, e não vai em campo de upload.
+
+| Item | Valor |
+|---|---|
+| Corpo | os bytes do `.zip` |
+| `Content-Type` | `application/zip` |
+
+### Cabeçalhos — os dois são obrigatórios
+
+Faltando qualquer um dos dois, a resposta é `401` e **nada** é publicado.
+
+| Cabeçalho | Obrigatório | Valor | Papel |
+|---|---|---|---|
+| `X-Processors-Deploy-Credential` | sim | UUID, entregue no provisionamento | autoriza a **operação** — é a credencial do serviço |
+| `Authorization` | sim | `Bearer <token de acesso>` | diz **quem** publica e **em que organizações** pode publicar |
+| `Content-Type` | recomendado | `application/zip` | o corpo é lido como binário de qualquer forma |
+
+As duas credenciais são **independentes e cumulativas**: a primeira não substitui a segunda. Uma diz que a
+operação é permitida neste serviço; a outra, que **este portador** pode publicar **nesta organização**. É
+por isso que possuir a credencial não basta para publicar na organização de outro cliente.
+
+O token de acesso é o mesmo obtido no login da plataforma — ver
+[autenticação](../../06-autenticacao.md). Sua assinatura é verificada aqui.
+
+A `{org}` da URL precisa estar entre as organizações do portador do token — senão `403`. É o que impede
+alguém de publicar na organização de outro cliente. O token tem a **assinatura verificada**; token
+forjado, expirado ou com algoritmo trocado é recusado.
+
+## Formato do arquivo
+
+O conteúdo pode vir de dois jeitos, e o serviço aceita os dois:
+
+```
+clubflow/pessoal/associado/criar…      ← embrulhado na pasta da organização
+pessoal/associado/criar…               ← já com o conteúdo dela na raiz
+```
+
+A decisão é do **conjunto**: o prefixo só é removido se **todas** as entradas o tiverem. O caminho de cada
+arquivo, sem a extensão, vira o resto da rota — `pessoal/associado/criar` publicado em `clubflow` responde
+por `clubflow/pessoal/associado/criar`.
+
+**Substituição é por organização.** Cada envio troca **toda** a árvore daquela organização: o que não
+estiver no arquivo enviado **deixa de existir**. As outras organizações não são tocadas. É assim que se
+despublica uma regra — enviando um pacote sem ela.
+
+Extensões aceitas: arquivos de processador e `.json` (para dados de apoio). Qualquer outra é recusada.
+
+## Como montar o pacote
+
+**A regra única:** o caminho de cada arquivo **dentro do pacote**, sem a extensão, é o que vem **depois do
+nome da organização** na rota. Errar a profundidade não dá erro — publica, e a rota fica diferente da que
+o modelo aciona.
+
+Partindo de uma árvore assim, com a organização `clubflow`:
+
+```
+clubflow/
+└── pessoal/            ← project
+    └── pessoal/        ← bounded context
+        └── associado/  ← agregado
+            ├── criar
+            ├── atualizar
+            └── encerrar
+```
+
+As duas formas de compactar produzem pacotes aceitos — escolha uma:
+
+```
+# A) de dentro da pasta da organização (o pacote não a contém)
+cd clubflow && zip -r ../clubflow.zip .
+
+# B) de fora, incluindo a pasta da organização
+zip -r clubflow.zip clubflow
+```
+
+Em A, as entradas ficam `pessoal/pessoal/associado/criar…`; em B, `clubflow/pessoal/pessoal/associado/criar…`.
+O serviço reconhece as duas — na B ele remove o prefixo, e só o faz se **todas** as entradas o tiverem.
+
+**O erro que passa despercebido** é compactar do diretório errado, uma pasta acima:
+
+```
+# ERRADO: gera "clubflow/clubflow/pessoal/…" quando enviado como forma B
+cd .. && zip -r clubflow.zip meu-projeto/clubflow
+```
+
+O pacote é aceito, os arquivos são gravados — e a rota vira
+`clubflow/meu-projeto/clubflow/pessoal/…`, que **nenhum modelo aciona**. O sintoma é a regra "não rodar"
+sem erro nenhum. Confira sempre a lista `rotas` da resposta contra a `br.route` declarada no modelo.
+
+Confira o conteúdo antes de enviar:
+
+```
+unzip -l clubflow.zip
+```
+
+### Não perder o que não deveria sair
+
+A publicação **substitui a árvore inteira da organização**. Por isso:
+
+- **Monte o pacote a partir da árvore completa da organização**, nunca só dos arquivos que você mexeu.
+  Enviar um pacote com um arquivo só **apaga todos os outros** daquela organização.
+- Para **despublicar** uma regra, é o contrário: monte a árvore completa **sem** ela.
+- Depois de publicar, olhe **`recarga.removidas`** na resposta. Se aparecer ali algo que você não queria
+  remover, o pacote estava incompleto — reenvie a árvore completa, ou desfaça pelo `backupId`.
+
+### Não deixar arquivo inalcançável
+
+Um arquivo pode ser gravado com sucesso e mesmo assim **nunca virar rota**. Três causas, em ordem de
+frequência:
+
+| Causa | Como aparece |
+|---|---|
+| **Profundidade errada** no pacote | a rota existe, mas com caminho diferente do que o modelo aciona — aparece em `recarga.adicionadas` com um caminho que você não reconhece |
+| **Não exporta uma função de processador** | aparece em `arquivos` e **não** em `recarga.adicionadas` |
+| **Extensão não aceita** | recusado com `400`; nada é publicado |
+
+Erro de sintaxe **não** entra nessa lista: é barrado antes, com `400`.
+
+## O que é recusado
+
+Antes de qualquer coisa ser gravada, o pacote inteiro é validado. Falhou uma entrada, **nada** é publicado
+— não existe publicação pela metade.
+
+| Recusa | Por quê |
+|---|---|
+| Entrada com `..` no caminho | escaparia da pasta da organização |
+| Caminho absoluto | idem |
+| Link simbólico | apontaria para fora da árvore |
+| Extensão não aceita | só processador e `.json` entram |
+| **Erro de sintaxe** | cada arquivo é **compilado** (sem executar) antes de entrar |
+| Arquivo maior que o declarado | defesa contra pacote-bomba |
+| Entradas ou bytes acima do teto | idem |
+| Dois arquivos com o mesmo destino | ambiguidade |
+| Arquivo compactado ilegível | — |
+
+A checagem de sintaxe importa mais do que parece: um processador que não compila seria **descartado em
+silêncio** no carregamento, e a rota simplesmente não existiria — sem nenhum aviso.
+
+## Resposta
+
+`200` — publicado:
+
+```json
+{
+  "org": "clubflow",
+  "backupId": "<id para desfazer, ou null se não havia árvore anterior>",
+  "substituiuArvoreAnterior": true,
+  "arquivos": ["pessoal/associado/criar…"],
+  "rotas": ["clubflow/pessoal/associado/criar"],
+  "recarga": {
+    "total": 12,
+    "adicionadas": ["clubflow/pessoal/associado/criar"],
+    "removidas": ["clubflow/pessoal/associado/antigo"]
+  }
+}
+```
+
+> Ilustrativo — `<...>` é placeholder, não JSON literal.
+
+- **As rotas entram em vigor na hora**, sem reinício do serviço.
+- **`recarga` é a confirmação que importa.** `rotas` é o que o pacote pretendia publicar; `recarga.adicionadas`
+  é o que o serviço **de fato** passou a atender. Compare os dois: arquivo que não exporte uma função de
+  processador aparece em `arquivos` e **não** em `recarga.adicionadas`.
+- **`recarga.removidas`** lista o que deixou de existir por não estar no pacote.
+- **Guarde o `backupId`** — é o que permite desfazer.
+
+## Erros
+
+| Código | Quando |
+|---|---|
+| `400` | pacote inválido: caminho suspeito, extensão recusada, erro de sintaxe, teto estourado, corpo vazio, organização com nome inválido |
+| `401` | `X-Processors-Deploy-Credential` ausente/incorreta, ou token ausente, expirado, com assinatura inválida ou algoritmo trocado |
+| `403` | o portador do token **não está vinculado** à organização da URL |
+| `500` | falha ao trocar a árvore no destino — o estado anterior é restaurado |
+| `503` | implantação não provisionada neste ambiente (credencial ou verificação de token ausente) |
+
+Corpo de erro: `{ status, mensagem, tipo }`. Catálogo geral: [../erros.md](../erros.md).
+
+## Desfazer
+
+```
+POST /v3/brservice/processors/rollback/{org}/{backupId}
+```
+
+Mesmos dois cabeçalhos e a mesma checagem de organização. Repõe a árvore que estava no lugar antes da
+publicação identificada por `{backupId}` e recarrega as rotas. Responde com a mesma forma de `recarga`.
+
+### Variáveis de caminho
+
+| Variável | Formato | O que é |
+|---|---|---|
+| `{org}` | mesmo do deploy | a organização cuja árvore será reposta |
+| `{backupId}` | o valor **devolvido no campo `backupId`** da resposta da publicação | identifica qual publicação desfazer |
+
+Sobre o `{backupId}`:
+
+- **Não é inventável** — só funciona o que veio numa resposta de publicação.
+- **Pertence a uma organização**: começa pelo nome dela, e usá-lo na URL de outra é recusado. É o que
+  impede quem publica numa organização de mexer no histórico de outra.
+- Vem `null` quando a publicação **não** substituiu nada (primeira publicação daquela organização) —
+  nesse caso não há o que desfazer.
+- Desfazer é uma **troca**, não um apagamento: a árvore que estava no ar é guardada antes de ser
+  substituída pela anterior.
+
+## Exemplos
+
+Publicar:
+
+```
+POST /v3/brservice/processors/deploy/clubflow
+X-Processors-Deploy-Credential: <uuid>
+Authorization: Bearer <token>
+Content-Type: application/zip
+
+<bytes do arquivo .zip>
+```
+
+Com uma ferramenta de linha de comando, o essencial é enviar o **binário cru**:
+
+```
+curl -X POST \
+  -H 'X-Processors-Deploy-Credential: <uuid>' \
+  -H 'Authorization: Bearer <token>' \
+  -H 'Content-Type: application/zip' \
+  --data-binary @clubflow.zip \
+  https://<base>/v3/brservice/processors/deploy/clubflow
+```
+
+Desfazer a última publicação:
+
+```
+POST /v3/brservice/processors/rollback/clubflow/<backupId>
+X-Processors-Deploy-Credential: <uuid>
+Authorization: Bearer <token>
+```
+
+Depois de publicar, confirme pela [consulta de log](logs.md) que as execuções da rota nova estão saindo com
+`outcome: success` — o `erroArquivo` aponta o arquivo exato quando não estiverem.
 
 <!-- ===== br-service/erros.md ===== -->
 
@@ -6029,9 +6391,38 @@ transições, regra de negócio, projeção e saga — cobrem o que um agente pr
 real.
 
 <!-- ===== CHANGELOG.md ===== -->
+
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.29 — 2026-08-31
+
+- **br-service: implantação de processadores por endpoint** (novo `br-service/endpoints/processors-deploy.md`).
+  `POST /v3/brservice/processors/deploy/{org}` recebe um **arquivo compactado como corpo cru** (não é
+  formulário nem multipart) e publica os processadores daquela organização. As rotas entram em vigor
+  **sem reinício**. `POST /v3/brservice/processors/rollback/{org}/{backupId}` desfaz.
+- **Duas credenciais, ambas obrigatórias, com papéis distintos.** `X-Processors-Deploy-Credential`
+  autoriza a **operação**; `Authorization: Bearer` diz **em que organizações** o portador pode publicar —
+  a org da URL precisa estar entre elas, senão `403`. A assinatura do token é **verificada**: expirado,
+  forjado ou com algoritmo trocado é recusado. É o segundo endpoint da doc com credencial fora do par
+  `Authorization`/`X-Tenant-Id`, e o primeiro que exige **as duas** ao mesmo tempo.
+- **Substituição é por organização, e é total.** O pacote passa a ser a verdade da árvore daquela org: o
+  que não vier nele **deixa de existir** — é assim que se despublica uma regra. As outras organizações
+  não são tocadas.
+- **Validação antes de qualquer gravação — falhou uma entrada, nada é publicado.** Recusa `..` no
+  caminho, caminho absoluto, link simbólico, extensão fora do permitido, arquivo maior que o declarado,
+  tetos de entradas/bytes, destino duplicado e pacote ilegível. Cada arquivo é **compilado sem executar**:
+  processador com erro de sintaxe seria descartado em silêncio no carregamento, e a rota simplesmente
+  não existiria.
+- **`recarga` é a confirmação que importa**, não `rotas`. `rotas` é o que o pacote pretendia publicar;
+  `recarga.adicionadas` é o que o serviço passou a atender de fato — arquivo que não exporte função de
+  processador aparece em `arquivos` e não em `adicionadas`. `recarga.removidas` mostra o que saiu.
+- **CORREÇÃO em `br-service/README.md`:** a seção de deploy afirmava *"não há endpoint/API para publicar
+  um processador"*. Passou a haver. Agora a seção descreve as duas formas — pelo endpoint (integração) e
+  pelo sistema de arquivos (operação da plataforma).
+- Atualizados: `br-service/README.md` (índice + seção de deploy + ponteiro), `br-service/openapi.yaml`
+  (dois paths + `BrDeployResult`/`BrRollbackResult`/`BrRecarga`), `llms.txt`, `llms-full.txt` (regenerado).
 
 ## 1.28 — 2026-08-31
 
@@ -6484,6 +6875,7 @@ Primeira versão consolidada da documentação pública para agentes de IA.
 > `llms.txt`.
 
 <!-- ===== bff/README.md ===== -->
+
 # bff — guia do serviço (endpoints e contratos)
 
 > O **BFF** (Backend-for-Frontend) é a **borda de consumo** da plataforma: faz o login, guarda o token
@@ -6733,4 +7125,3 @@ Tudo composto **no servidor**. Nenhum deles é montado — nem visto — pelo br
       (ver [seguranca](../shell/seguranca.md)).
 - [ ] No autocadastro, ofereça só o que `GET /ua/roles` devolve — o servidor recusa o resto.
 - [ ] Endereços de serviço = **config de deploy**, nunca hardcode nem em doc pública.
-

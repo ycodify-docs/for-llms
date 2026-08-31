@@ -126,6 +126,105 @@ paths:
         '503':
           description: "Consulta de log não provisionada neste ambiente."
           content: { application/json: { schema: { $ref: '#/components/schemas/BrError' } } }
+  /v3/brservice/processors/deploy/{org}:
+    post:
+      summary: Implantar os processadores de uma organização
+      description: >
+        Publica os processadores da organização a partir de um arquivo compactado enviado como corpo
+        CRU (não é formulário nem multipart). Substitui a árvore INTEIRA daquela organização: o que não
+        vier no pacote deixa de existir. As outras organizações não são tocadas. As rotas entram em vigor
+        sem reinício. Exige as DUAS credenciais: X-Processors-Deploy-Credential autoriza a operação, e o
+        Authorization: Bearer diz em que organizações o portador pode publicar — a org da URL precisa
+        estar entre elas. O pacote é validado por inteiro antes de qualquer gravação; falhou uma entrada,
+        nada é publicado.
+      parameters:
+        - name: org
+          in: path
+          required: true
+          schema: { type: string, pattern: '^[a-z0-9][a-z0-9_-]{0,63}$' }
+          description: >
+            Organização: primeiro segmento da rota e pasta raiz dos processadores dela. Minúsculas,
+            dígitos, "-" e "_"; começa por letra ou dígito; até 64 caracteres.
+        - name: X-Processors-Deploy-Credential
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
+          description: "Credencial da operação, entregue no provisionamento."
+        - name: Authorization
+          in: header
+          required: true
+          schema: { type: string }
+          description: "Bearer <token de acesso>. Assinatura verificada; define as organizações permitidas."
+      requestBody:
+        required: true
+        content:
+          application/zip:
+            schema: { type: string, format: binary }
+      responses:
+        '200':
+          description: "Publicado."
+          content: { application/json: { schema: { $ref: '#/components/schemas/BrDeployResult' } } }
+        '400':
+          description: "Pacote inválido: caminho suspeito, extensão recusada, erro de sintaxe, teto estourado, corpo vazio, organização com nome inválido."
+          content: { application/json: { schema: { $ref: '#/components/schemas/BrError' } } }
+        '401':
+          description: "Credencial ausente/incorreta, ou token ausente, expirado, com assinatura inválida ou algoritmo trocado."
+          content: { application/json: { schema: { $ref: '#/components/schemas/BrError' } } }
+        '403':
+          description: "O portador do token não está vinculado à organização da URL."
+          content: { application/json: { schema: { $ref: '#/components/schemas/BrError' } } }
+        '500':
+          description: "Falha ao trocar a árvore no destino; o estado anterior é restaurado."
+          content: { application/json: { schema: { $ref: '#/components/schemas/BrError' } } }
+        '503':
+          description: "Implantação não provisionada neste ambiente."
+          content: { application/json: { schema: { $ref: '#/components/schemas/BrError' } } }
+  /v3/brservice/processors/rollback/{org}/{backupId}:
+    post:
+      summary: Desfazer a última implantação de uma organização
+      description: >
+        Repõe a árvore que estava no lugar antes da publicação identificada por backupId, e recarrega as
+        rotas. Mesmas credenciais e mesma checagem de organização do deploy. O backupId pertence a uma
+        organização — usar o de outra é recusado.
+      parameters:
+        - name: org
+          in: path
+          required: true
+          schema: { type: string }
+        - name: backupId
+          in: path
+          required: true
+          schema: { type: string }
+          description: >
+            Devolvido no campo backupId da resposta da publicação. Começa pelo nome da organização —
+            usá-lo na URL de outra é recusado. Não é inventável.
+        - name: X-Processors-Deploy-Credential
+          in: header
+          required: true
+          schema: { type: string, format: uuid }
+        - name: Authorization
+          in: header
+          required: true
+          schema: { type: string }
+      responses:
+        '200':
+          description: "Restaurado."
+          content: { application/json: { schema: { $ref: '#/components/schemas/BrRollbackResult' } } }
+        '400':
+          description: "backupId de outra organização, ou organização com nome inválido."
+          content: { application/json: { schema: { $ref: '#/components/schemas/BrError' } } }
+        '401':
+          description: "Credencial ou token inválidos."
+          content: { application/json: { schema: { $ref: '#/components/schemas/BrError' } } }
+        '403':
+          description: "O portador do token não está vinculado à organização da URL."
+          content: { application/json: { schema: { $ref: '#/components/schemas/BrError' } } }
+        '404':
+          description: "backupId não encontrado."
+          content: { application/json: { schema: { $ref: '#/components/schemas/BrError' } } }
+        '503':
+          description: "Implantação não provisionada neste ambiente."
+          content: { application/json: { schema: { $ref: '#/components/schemas/BrError' } } }
 components:
   schemas:
     BrError:
@@ -134,6 +233,45 @@ components:
         status: { type: string, example: error }
         mensagem: { type: string }
         tipo: { type: string }
+    BrDeployResult:
+      type: object
+      properties:
+        org: { type: string }
+        backupId:
+          type: string
+          nullable: true
+          description: "Identificador para desfazer. Null quando não havia árvore anterior."
+        substituiuArvoreAnterior: { type: boolean }
+        arquivos:
+          type: array
+          items: { type: string }
+          description: "Caminhos publicados, relativos à raiz da organização."
+        rotas:
+          type: array
+          items: { type: string }
+          description: "Rotas que o pacote pretendia publicar."
+        recarga: { $ref: '#/components/schemas/BrRecarga' }
+    BrRollbackResult:
+      type: object
+      properties:
+        org: { type: string }
+        backupId: { type: string }
+        restaurado: { type: boolean }
+        recarga: { $ref: '#/components/schemas/BrRecarga' }
+    BrRecarga:
+      type: object
+      description: >
+        O que o serviço passou a atender DE FATO. Compare `adicionadas` com `rotas`: arquivo que não
+        exporte uma função de processador aparece em `arquivos` e não aqui.
+      properties:
+        total: { type: integer, description: "Total de rotas ativas após a recarga." }
+        adicionadas:
+          type: array
+          items: { type: string }
+        removidas:
+          type: array
+          items: { type: string }
+          description: "Rotas que deixaram de existir por não constarem do pacote."
     BrLogQueryResult:
       type: object
       properties:

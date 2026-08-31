@@ -2,6 +2,34 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.29 — 2026-08-31
+
+- **br-service: implantação de processadores por endpoint** (novo `br-service/endpoints/processors-deploy.md`).
+  `POST /v3/brservice/processors/deploy/{org}` recebe um **arquivo compactado como corpo cru** (não é
+  formulário nem multipart) e publica os processadores daquela organização. As rotas entram em vigor
+  **sem reinício**. `POST /v3/brservice/processors/rollback/{org}/{backupId}` desfaz.
+- **Duas credenciais, ambas obrigatórias, com papéis distintos.** `X-Processors-Deploy-Credential`
+  autoriza a **operação**; `Authorization: Bearer` diz **em que organizações** o portador pode publicar —
+  a org da URL precisa estar entre elas, senão `403`. A assinatura do token é **verificada**: expirado,
+  forjado ou com algoritmo trocado é recusado. É o segundo endpoint da doc com credencial fora do par
+  `Authorization`/`X-Tenant-Id`, e o primeiro que exige **as duas** ao mesmo tempo.
+- **Substituição é por organização, e é total.** O pacote passa a ser a verdade da árvore daquela org: o
+  que não vier nele **deixa de existir** — é assim que se despublica uma regra. As outras organizações
+  não são tocadas.
+- **Validação antes de qualquer gravação — falhou uma entrada, nada é publicado.** Recusa `..` no
+  caminho, caminho absoluto, link simbólico, extensão fora do permitido, arquivo maior que o declarado,
+  tetos de entradas/bytes, destino duplicado e pacote ilegível. Cada arquivo é **compilado sem executar**:
+  processador com erro de sintaxe seria descartado em silêncio no carregamento, e a rota simplesmente
+  não existiria.
+- **`recarga` é a confirmação que importa**, não `rotas`. `rotas` é o que o pacote pretendia publicar;
+  `recarga.adicionadas` é o que o serviço passou a atender de fato — arquivo que não exporte função de
+  processador aparece em `arquivos` e não em `adicionadas`. `recarga.removidas` mostra o que saiu.
+- **CORREÇÃO em `br-service/README.md`:** a seção de deploy afirmava *"não há endpoint/API para publicar
+  um processador"*. Passou a haver. Agora a seção descreve as duas formas — pelo endpoint (integração) e
+  pelo sistema de arquivos (operação da plataforma).
+- Atualizados: `br-service/README.md` (índice + seção de deploy + ponteiro), `br-service/openapi.yaml`
+  (dois paths + `BrDeployResult`/`BrRollbackResult`/`BrRecarga`), `llms.txt`, `llms-full.txt` (regenerado).
+
 ## 1.28 — 2026-08-31
 
 - **Rótulo inexistente no modelo passou a ter mensagem própria — e agora está documentado.** Consultar

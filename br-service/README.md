@@ -17,7 +17,8 @@
 - Pitfalls
 
 > Para **auditar o que já executou** (por termo e intervalo, com chave própria), ver
-> [endpoints/logs.md](endpoints/logs.md).
+> [endpoints/logs.md](endpoints/logs.md). Para **publicar processadores** de uma organização,
+> ver [endpoints/processors-deploy.md](endpoints/processors-deploy.md).
 
 ---
 
@@ -34,13 +35,16 @@ tipo de hook — e, quando o caso de uso exigir, chamar integrações externas n
 
 ## Índice de endpoints
 
-> Endpoints de saúde e de métricas **não** constam aqui. A consulta de log consta por ser **contrato de
-> cliente** — quem chama é o interessado autorizado, sobre as próprias execuções.
+> Endpoints de saúde e de métricas **não** constam aqui. A consulta de log e a implantação de
+> processadores constam por serem **contrato de cliente** — quem chama é o interessado autorizado, sobre
+> as próprias execuções e a própria organização.
 
 | Operação | Método · Path | Documento |
 |---|---|---|
 | Executar função (rota) | `POST /br` | [endpoints/br.md](endpoints/br.md) |
 | Consultar o log de execução | `GET /v3/brservice/logs/query/{term}/from/{f}/to/{t}` | [endpoints/logs.md](endpoints/logs.md) |
+| Implantar processadores de uma org | `POST /v3/brservice/processors/deploy/{org}` | [endpoints/processors-deploy.md](endpoints/processors-deploy.md) |
+| Desfazer a última implantação | `POST /v3/brservice/processors/rollback/{org}/{backupId}` | [endpoints/processors-deploy.md](endpoints/processors-deploy.md#desfazer) |
 
 > **⚠️ `POST /coordination` — pendente (gap de plataforma).** O motor de comandos (persistence-crs)
 > aciona uma coordenação **síncrona no caminho do comando** quando o modelo do comando declara
@@ -96,14 +100,21 @@ Aninhando os escopos, o **path completo é globalmente único** → duas organiz
 > caminho** e, portanto, para o **mesmo processador** — a regra de uma passa a valer, silenciosamente,
 > para a outra.
 
-### Deploy de um processador (por sistema de arquivos — NÃO via gateway)
+### Deploy de um processador
 
 Um processador é um **arquivo** cujo **caminho dentro da pasta de processadores do serviço** é a **rota** —
-`<org>/<project>/<bc>/<aggregate>/<função>`, sem a extensão. **Não há endpoint/API para publicar um
-processador**: o br-service é **interno**, sem rota no gateway para isso. O deploy é por **sistema de
-arquivos** — coloca-se o arquivo na pasta de processadores e o serviço o carrega (na inicialização;
-recarregar torna a rota viva). Uma rota sem processador correspondente → **erro de rota** quando o
-persistence-crs a aciona.
+`<org>/<project>/<bc>/<aggregate>/<função>`, sem a extensão. Uma rota sem processador correspondente →
+**erro de rota** quando o persistence-crs a aciona.
+
+Há **duas** formas de publicar:
+
+| Forma | Quando |
+|---|---|
+| **Pelo endpoint** — [`POST /v3/brservice/processors/deploy/{org}`](endpoints/processors-deploy.md) | caminho normal para quem integra. Envia-se um arquivo compactado com os processadores da organização; as rotas entram em vigor **sem reinício** |
+| **Pelo sistema de arquivos** | operação da plataforma: coloca-se o arquivo na pasta de processadores. Exige recarregar o serviço para a rota ficar viva |
+
+A publicação pelo endpoint é **por organização** e **substitui a árvore inteira** dela — ver o documento
+do endpoint para o formato do pacote, o que é recusado e como desfazer.
 
 ## Contrato de resposta
 
