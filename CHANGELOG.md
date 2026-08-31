@@ -2,6 +2,19 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.25 — 2026-08-31
+
+- **O `510` de modelo ausente parou de culpar o `X-Tenant-Id`.** A mensagem passou a nomear a causa e a
+  ação: `Modelo do tenant não encontrado na cache (chave '<chave>'). O X-Tenant-Id foi reconhecido; o que
+  falta é o modelo. Publique/republique o modelo do tenant (dataschema MODELING -> RUNNING).` O texto
+  anterior — `Falha crítica. X-Tenant-Id não reconhecido.` — mandava o integrador conferir cabeçalho,
+  credencial e roteamento, onde não havia nada errado.
+- **As duas notas de `erros.md` foram reescritas** (`persistence-crs`, `persistence-q`) para descrever as
+  **duas** mensagens, já que ambiente ainda não atualizado segue devolvendo o texto antigo. Nos dois casos a
+  ação é a mesma, e não é mexer no cabeçalho: republicar o modelo (`MODELING` → `RUNNING`).
+- Atualizados: `persistence-q/erros.md` (linha do `510` + nota), `persistence-crs/erros.md` (nota),
+  `llms-full.txt` (regenerado).
+
 ## 1.24 — 2026-08-31
 
 - **A escolha teste × produção passou a constar onde a requisição é montada.** A regra já existia, mas

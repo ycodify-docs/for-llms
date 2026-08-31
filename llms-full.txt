@@ -3165,7 +3165,6 @@ Catálogo: [../erros.md](../erros.md).
 > configurada no serviço, o endpoint **nega todas** as chamadas — não existe modo aberto por omissão.
 
 <!-- ===== persistence-crs/erros.md ===== -->
-
 # persistence-crs · catálogo de erros
 
 > Envelope e categorias de erro. Guia: [README.md](README.md).
@@ -3204,11 +3203,14 @@ As falhas são classificadas em categorias que ajudam o agente a decidir a corre
 Um erro de **transição** ou de **concorrência** não é falha de rede: é resposta de domínio. O agente
 deve tratá-los como sinais de fluxo (ajustar o comando ou reenviar), não como indisponibilidade.
 
-## Nota — `510` dizendo "X-Tenant-Id não reconhecido" nem sempre é o tenant
+## Nota — `510` de **modelo do tenant ausente do cache**
 
-Vale o mesmo que em [persistence-q/erros.md](../persistence-q/erros.md): a mensagem também aparece quando o
-**tenant é válido** mas o **modelo dele não está no cache** (tenant novo sem modelo publicado, ou entrada
-expirada). Confirme a publicação do modelo e o dataschema em `RUNNING` antes de suspeitar do cabeçalho.
+Vale o mesmo que em [persistence-q/erros.md](../persistence-q/erros.md): acontece quando o **tenant é
+válido** mas o **modelo dele não está no cache** (tenant novo sem modelo publicado, ou entrada expirada).
+A mensagem **atual** nomeia a causa e a chave que faltou; a **anterior** — `Falha crítica. X-Tenant-Id não
+reconhecido.` — ainda pode aparecer em ambiente que não recebeu a versão nova, e é enganosa: aponta para o
+cabeçalho, mas a causa é o modelo. Nos dois casos a ação é a mesma: confirmar a publicação do modelo e o
+dataschema em `RUNNING`, não mexer no cabeçalho.
 
 <!-- ===== persistence-crs/exemplos.md ===== -->
 # persistence-crs · exemplos anotados
@@ -4500,7 +4502,6 @@ do rótulo** (junto dos predicados), limitando a profundidade por `_level`:
 > As chaves de controle têm prefixo `_`; nomes de atributo são `^[a-z]+$` (sem `_`), portanto não colidem.
 
 <!-- ===== persistence-q/erros.md ===== -->
-
 # persistence-q · catálogo de erros
 
 > Envelope e categorias de erro. Guia: [README.md](README.md).
@@ -4511,7 +4512,7 @@ do rótulo** (junto dos predicados), limitando a profundidade por `_level`:
 |---|---|---|---|
 | `400` | Requisição inválida | JSON malformado; estrutura de critério inválida. | Corrigir o corpo (modo array/object, um rótulo por item). |
 | `401` / `403` | Não autorizado | Credencial inválida; `tenant-id` fora do escopo do usuário. | Usar credencial/tenant corretos. |
-| `510` | Falha de execução | Predicado/identificador não reconhecido; falha ao ler a projeção; **modelo do tenant ausente do cache** (ver nota abaixo). | Usar o vocabulário do tenant; conferir a projeção/entity; se a mensagem citar `X-Tenant-Id`, ver a nota. |
+| `510` | Falha de execução | Predicado/identificador não reconhecido; falha ao ler a projeção; **modelo do tenant ausente do cache** (ver nota abaixo). | Usar o vocabulário do tenant; conferir a projeção/entity; se a mensagem falar em **modelo não encontrado na cache** — ou, em versão antiga, em `X-Tenant-Id` — ver a nota. |
 
 ## Categorias (para diagnóstico)
 
@@ -4528,15 +4529,22 @@ do rótulo** (junto dos predicados), limitando a profundidade por `_level`:
 ## Nota
 `204` **não** é erro: significa "nenhum resultado". A consulta é idempotente e segura para repetição.
 
-## Nota — `510` dizendo "X-Tenant-Id não reconhecido" nem sempre é o tenant
+## Nota — `510` de **modelo do tenant ausente do cache**
 
-Essa mensagem também aparece quando o **tenant é válido** mas o **modelo dele não está no cache** — por
-exemplo, um tenant novo cujo modelo ainda não foi publicado, ou cuja entrada expirou. O texto aponta para o
-cabeçalho, mas a causa é o modelo ausente.
+Acontece quando o **tenant é válido** mas o **modelo dele não está no cache** — por exemplo, um tenant novo
+cujo modelo ainda não foi publicado, ou cuja entrada expirou.
 
-**Antes de suspeitar do `X-Tenant-Id`:** confirme que o modelo do tenant foi publicado e que o dataschema
-está em `RUNNING` (ver [forger/dataschema](../forger/endpoints/dataschema.md#atualizar)). Republicar
-(`MODELING` → `RUNNING`) repõe a entrada.
+**Duas mensagens, conforme a versão do serviço:**
+
+| Mensagem | O que significa |
+|---|---|
+| `Modelo do tenant não encontrado na cache (chave '<chave>'). O X-Tenant-Id foi reconhecido; o que falta é o modelo. Publique/republique o modelo do tenant (dataschema MODELING -> RUNNING).` | texto **atual** — nomeia a causa e a ação |
+| `Falha crítica. X-Tenant-Id não reconhecido.` | texto **anterior**, ainda possível em ambiente que não tenha recebido a versão nova. **Enganoso:** aponta para o cabeçalho, mas a causa é a mesma — o modelo ausente |
+
+**Nos dois casos, a ação é a mesma** (e não é mexer no `X-Tenant-Id`): confirme que o modelo do tenant foi
+publicado e que o dataschema está em `RUNNING` (ver
+[forger/dataschema](../forger/endpoints/dataschema.md#atualizar)). Republicar (`MODELING` → `RUNNING`) repõe
+a entrada.
 
 <!-- ===== persistence-q/exemplos.md ===== -->
 # persistence-q · exemplos anotados
@@ -5958,6 +5966,19 @@ real.
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.25 — 2026-08-31
+
+- **O `510` de modelo ausente parou de culpar o `X-Tenant-Id`.** A mensagem passou a nomear a causa e a
+  ação: `Modelo do tenant não encontrado na cache (chave '<chave>'). O X-Tenant-Id foi reconhecido; o que
+  falta é o modelo. Publique/republique o modelo do tenant (dataschema MODELING -> RUNNING).` O texto
+  anterior — `Falha crítica. X-Tenant-Id não reconhecido.` — mandava o integrador conferir cabeçalho,
+  credencial e roteamento, onde não havia nada errado.
+- **As duas notas de `erros.md` foram reescritas** (`persistence-crs`, `persistence-q`) para descrever as
+  **duas** mensagens, já que ambiente ainda não atualizado segue devolvendo o texto antigo. Nos dois casos a
+  ação é a mesma, e não é mexer no cabeçalho: republicar o modelo (`MODELING` → `RUNNING`).
+- Atualizados: `persistence-q/erros.md` (linha do `510` + nota), `persistence-crs/erros.md` (nota),
+  `llms-full.txt` (regenerado).
 
 ## 1.24 — 2026-08-31
 

@@ -36,8 +36,11 @@ As falhas são classificadas em categorias que ajudam o agente a decidir a corre
 Um erro de **transição** ou de **concorrência** não é falha de rede: é resposta de domínio. O agente
 deve tratá-los como sinais de fluxo (ajustar o comando ou reenviar), não como indisponibilidade.
 
-## Nota — `510` dizendo "X-Tenant-Id não reconhecido" nem sempre é o tenant
+## Nota — `510` de **modelo do tenant ausente do cache**
 
-Vale o mesmo que em [persistence-q/erros.md](../persistence-q/erros.md): a mensagem também aparece quando o
-**tenant é válido** mas o **modelo dele não está no cache** (tenant novo sem modelo publicado, ou entrada
-expirada). Confirme a publicação do modelo e o dataschema em `RUNNING` antes de suspeitar do cabeçalho.
+Vale o mesmo que em [persistence-q/erros.md](../persistence-q/erros.md): acontece quando o **tenant é
+válido** mas o **modelo dele não está no cache** (tenant novo sem modelo publicado, ou entrada expirada).
+A mensagem **atual** nomeia a causa e a chave que faltou; a **anterior** — `Falha crítica. X-Tenant-Id não
+reconhecido.` — ainda pode aparecer em ambiente que não recebeu a versão nova, e é enganosa: aponta para o
+cabeçalho, mas a causa é o modelo. Nos dois casos a ação é a mesma: confirmar a publicação do modelo e o
+dataschema em `RUNNING`, não mexer no cabeçalho.
