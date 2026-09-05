@@ -43,7 +43,7 @@ Atualiza um papel.
 **Corpo** (JSON): os campos do POST **mais** o `id`:
 
 ```json
-{ "id": 101, "name": "ASSOCIADO", "owner": "clubflow", "label": "Associado", "status": "ACTIVE", "ispublic": true }
+{ "id": 101, "name": "ASSOCIADO", "owner": "acme", "label": "Associado", "status": "ACTIVE", "ispublic": true }
 ```
 
 **Resposta:** `200` (sem corpo) quando gravou · `400` se faltar o `id` · `404` se o papel não existe

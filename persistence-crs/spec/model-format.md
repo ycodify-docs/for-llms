@@ -226,9 +226,7 @@ Atributos aparecem em `command.<cmd>.data.attribute.<campo>`:
   - **Coluna da projeção:** o valor é gravado como chega. Array e objeto exigem coluna `Json`; um
     `single` de **tipo direto** grava um **escalar**, então declare a coluna com o tipo do escalar
     (`String`, `Integer`, …) — numa coluna `Json`, um escalar de texto não é JSON válido.
-- `roles`: lista de papéis que podem executar o comando. Quem chama sem nenhum desses papéis recebe
-  **`403`** com a explicação, **antes** da validação de transição — nada é gravado. (O nome do usuário e
-  os papéis exigidos ficam no log do serviço, não na resposta.)
+- `roles`: lista de papéis que podem executar o comando.
 - `br.route`: se presente, o persistence-crs chama o [br-service](../../br-service/README.md) antes de
   gravar o evento (CP-6). A rota segue a **forma canônica totalmente qualificada**
   `<org>/<project>/<bc>/<aggregate>/<comando>` (evita colisão entre organizações) — ver

@@ -121,7 +121,7 @@ correspondem aos três pontos onde o modelo referencia uma rota de br:
 > Todas as rotas seguem a [forma canônica](#forma-canônica-da-rota-obrigatória)
 > `<org>/<project>/<bc>/<aggregate>/…`. As colunas abaixo mostram só o **sufixo** que distingue a categoria.
 
-| Categoria | Referenciado em | Sufixo da rota | Entrada | Retorno (em `processedData`) |
+| Categoria | Referenciado em | Sufixo da rota | Entrada | Retorno |
 |---|---|---|---|---|
 | **Regra de negócio** | `command.br.route` | `…/<aggregate>/<comando>` (nome do comando) | dados do comando | os **dados validados/enriquecidos** do comando — mesclados no comando antes de gravar o evento |
 | **Coordenação (saga)** | `event.domainBus.triggerCoordination[].br.route` | `…/<aggregate>/coordination/<alvo_from_origem>` (segmento **`coordination`**) | dados do evento (estado do agregado de origem) | um **`targetCommand`** `{ boundedContext, aggregateType, commandName, data }` — submetido como novo comando no contexto destino (CP-7) |

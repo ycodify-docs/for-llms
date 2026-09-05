@@ -45,8 +45,8 @@ Esta rota **não** usa `Authorization`, e **não** aceita `X-Tenant-Id`.
 
 > **Por que dois cabeçalhos.** São de camadas diferentes: o `X-Forger-Credential` é exigido pela **borda**,
 > que classifica esta rota como administrativa; o `X-Logs-Key` é a credencial do **serviço**, e é ele que
-> autoriza a consulta. Faltando o primeiro, a recusa é `401` com `tipo: missing_forger_credential` e o
-> pedido nem chega ao br-service.
+> autoriza a consulta. Faltando o primeiro, a recusa é `401` da própria borda, com um corpo que nomeia o
+> cabeçalho ausente — o pedido nem chega ao br-service, então a `X-Logs-Key` nem é avaliada.
 
 ## Resposta
 
@@ -95,8 +95,24 @@ Esta rota **não** usa `Authorization`, e **não** aceita `X-Tenant-Id`.
 > evento. A consulta normaliza isso — o campo `tenantId` é preenchido a partir de qualquer uma dessas
 > origens, e só fica vazio quando nenhuma delas trouxe o dado.
 
-**O payload não é registrado.** Só metadados. Os dados do comando podem conter informação pessoal e
-credencial, então não são gravados — logo não há como recuperá-los por aqui.
+### O payload
+
+O registro guarda **sempre** os metadados da execução. Os **dados do comando** — o payload — dependem do
+ambiente:
+
+| Ambiente | O que acontece |
+|---|---|
+| payload **desligado** (padrão) | só metadados. O campo `payload` **não existe** no registro |
+| payload **ligado** | o payload é gravado **mascarado**, e volta em `registros[].payload` na consulta |
+
+**O mascaramento não é opcional e não se desliga.** Mesmo com o payload ligado, um conjunto de campos
+nunca é gravado em claro — vem como `<omitido>`: token de autorização, senha, CPF, e-mail, telefone e data
+de nascimento. O mascaramento desce por objetos aninhados e por listas, até seis níveis de profundidade;
+abaixo disso o valor é gravado como está.
+
+> **Consequência para quem consulta.** Se o ambiente estiver com o payload desligado, nenhuma consulta
+> recupera os dados de uma execução passada — eles nunca foram gravados. Ligar depois não traz o
+> retroativo: vale a partir do momento em que passou a valer.
 
 ## Erros
 
@@ -104,7 +120,7 @@ credencial, então não são gravados — logo não há como recuperá-los por a
 |---|---|
 | `400` | `f` ou `t` fora de formato, ou `f` posterior a `t` |
 | `400` **da borda** | `X-Tenant-Id` enviado junto com `X-Forger-Credential` (`tipo: multiple_headers`) |
-| `401` **da borda** | `X-Forger-Credential` ausente (`tipo: missing_forger_credential`) — o pedido não chega ao serviço |
+| `401` **da borda** | `X-Forger-Credential` ausente — o pedido não chega ao serviço. O corpo nomeia o cabeçalho que falta |
 | `401` | `X-Logs-Key` ausente ou incorreta |
 | `503` | consulta de log não provisionada neste ambiente |
 
@@ -118,6 +134,14 @@ Corpo de erro: `{ status, mensagem, tipo }`. Catálogo geral: [../erros.md](../e
   validação e exceção do processador entram igual.
 - **Sem garantia de retenção indefinida.** O intervalo consultável depende da política de retenção do
   ambiente; consultas a datas antigas podem voltar vazias mesmo tendo havido execução.
+- **A gravação é de melhor esforço e falha em silêncio.** O registro nunca derruba uma requisição: se a
+  gravação falhar — área de log indisponível, sem espaço, sem permissão —, a execução segue normalmente e
+  **nada é sinalizado**, nem na resposta da execução nem aqui. Se a área de log não puder sequer ser aberta
+  quando o serviço sobe, o registro fica desligado por inteiro e **nenhuma** execução daquele período é
+  gravada.
+- **Portanto, resposta vazia não prova ausência de execução.** Ela quer dizer uma destas três coisas: não
+  houve execução no intervalo; houve e o período já saiu da retenção; ou houve e o registro se perdeu.
+  A consulta não distingue os três casos — para separá-los, é preciso uma fonte independente de tráfego.
 - Correlação com o motor de comandos: quando o chamador propaga um identificador de rastreio, ele aparece
   em `traceId` — é a chave para juntar os dois lados.
 
