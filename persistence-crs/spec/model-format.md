@@ -112,9 +112,7 @@ validação e do JSON publicado) e o grid de interpretação (persistence-crs/es
 
 Na **projeção** (banco de leitura), a linha de cada agregado é **identificada por `aggregateid`** — o
 `id` (UUID) do agregado. Consultas que buscam um agregado específico filtram por esse campo; o fluxo de
-projeção localiza/atualiza a linha por ele. Como a projeção default é **1:1** (uma linha por instância de
-agregado), `aggregateid` é **único** na tabela — a entity o declara com **`unique: true`** (ver
-[colunas obrigatórias](../../forger/endpoints/entity.md#colunas-obrigatórias-de-toda-projeção)). O atributo **`status`** carrega o **estado atual** do
+projeção localiza/atualiza a linha por ele. O atributo **`status`** carrega o **estado atual** do
 agregado (ver [regra do `status`](../README.md#estados-transições-e-concorrência)). Em consultas
 ([persistence-q](../../persistence-q/README.md)), `aggregateid` e `status` são campos típicos de filtro.
 
@@ -190,18 +188,45 @@ Atributos aparecem em `command.<cmd>.data.attribute.<campo>`:
   **Não** inclua aqui o `whenAttribute` do evento (o carimbo, ex.: `criadaem`): ele é **auto-valorizado**
   e **não** é atributo de dados do comando — mas **é** coluna obrigatória da projeção (declarada na
   entity; ver [Eventos e `domainBus`](#eventos-e-domainbus) e [forger — entity](../../forger/endpoints/entity.md)).
-- **`data.valueObject`** — dados **aninhados** (cada `<nomeVO>` é um grupo de campos tipados, mesma
-  forma de um atributo). Na **projeção** (banco de leitura), cada value object vira **uma coluna `Json`**:
-  - `valueObject.single.<nomeVO>` → **objeto JSON** (1:1);
-  - `valueObject.multiple.<nomeVO>` → **array de objetos JSON** (1:N).
-  Ou seja, os atributos de uma entity **não** vêm só de `data.attribute`: vêm de
-  `data.attribute` (colunas escalares) **+** `valueObject.single`/`valueObject.multiple` (colunas JSON).
-  Cada `<nomeVO>` pode ser um **grupo de campos** (`{ campo: {type,...} }`) **ou** um **único atributo
-  tipado** direto (`{ type, ... }`) — neste caso, `multiple` é um array desse valor.
-- `roles`: lista de papéis que podem executar o comando. **É aplicada em runtime**, e **antes** de
-  `br.route`: usuário sem nenhum desses papéis recebe `403` e o comando **não** chega à regra de negócio.
-  Lista vazia ⇒ **ninguém** executa. Ver
-  [autorização por papel](../README.md#autorizacao-por-papel).
+- **`data.valueObject`** — dados **aninhados**. `valueObject.single.<nomeVO>` é 1:1 e
+  `valueObject.multiple.<nomeVO>` é 1:N. Cada um vira **uma coluna** na projeção (banco de leitura) —
+  ou seja, os atributos de uma entity **não** vêm só de `data.attribute`: vêm de `data.attribute`
+  (colunas escalares) **+** `valueObject.single`/`valueObject.multiple`.
+
+  Cada `<nomeVO>` tem **duas formas de declaração**, e a forma escolhida determina a **forma do valor
+  no comando**. O discriminador é a chave `type` na raiz da declaração (nome de campo nunca é `type`:
+  nomes casam `^[a-z]+$` e são do domínio):
+
+  | Declaração | Forma | Valor em `single` | Valor em `multiple` | Coluna |
+  |---|---|---|---|---|
+  | `{ "<campo>": { "type": … } }` | **grupo de campos** | objeto | array de objetos | `Json` |
+  | `{ "type": …, "length": … }` | **atributo tipado direto** | escalar | **array de escalares** | `multiple`: `Json` · `single`: o tipo do escalar |
+
+  ```jsonc
+  // grupo de campos                          // atributo tipado direto
+  "multiple": {                               "multiple": {
+    "itens": {                                  "diassemana": {
+      "nome": { "type": "String" },               "type": "String", "length": 10, "nullable": false
+      "qtd":  { "type": "Integer" }             }
+    }                                         }
+  }
+  // comando:                                 // comando:
+  // "itens": [ { "nome": "a", "qtd": 1 } ]   // "diassemana": [ "terca" ]
+  ```
+
+  **Comportamento do persistence-crs ao receber o comando:**
+  - **Grupo de campos:** campos do item que **não** estejam declarados no modelo são **descartados**
+    silenciosamente — o comando segue com o que foi declarado.
+  - **Tipo direto:** o escalar passa intacto até a projeção (`"diassemana": ["terca"]` grava `["terca"]`).
+    Por compatibilidade, o objeto de chave única `{"<nomeVO>": <escalar>}` também é aceito e
+    **desembrulhado** para o escalar.
+  - **Forma incompatível com a declaração → `400`** com a forma esperada (não `510`): `multiple` que
+    não recebeu array; item escalar onde a declaração é grupo de campos; item objeto que não casa
+    `{"<nomeVO>": <escalar>}` onde a declaração é tipo direto.
+  - **Coluna da projeção:** o valor é gravado como chega. Array e objeto exigem coluna `Json`; um
+    `single` de **tipo direto** grava um **escalar**, então declare a coluna com o tipo do escalar
+    (`String`, `Integer`, …) — numa coluna `Json`, um escalar de texto não é JSON válido.
+- `roles`: lista de papéis que podem executar o comando.
 - `br.route`: se presente, o persistence-crs chama o [br-service](../../br-service/README.md) antes de
   gravar o evento (CP-6). A rota segue a **forma canônica totalmente qualificada**
   `<org>/<project>/<bc>/<aggregate>/<comando>` (evita colisão entre organizações) — ver

@@ -84,26 +84,8 @@ paths:
   /org/{org}/project/{project}/database/{databaseId}/dataschema/{dataSchema}:
     parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/project' }, { name: databaseId, in: path, required: true, schema: { type: integer } }, { $ref: '#/components/parameters/dataSchema' }]
     get: { tags: [dataschema], summary: Ler dataschema, responses: { '200': { description: OK }, '204': { description: Não encontrado } } }
-    put:
-      tags: [dataschema]
-      summary: 'Atualizar dataschema; a transição de status publica/despublica o modelo de entidades'
-      description: >
-        Campos editáveis: alias, description, status, dbsqlminimumconnidle, dbsqlmaximumpoolsize
-        (com logversion, controle otimista). O status é normalizado (trim + maiúsculas).
-        Efeito no cache distribuído: MODELING -> RUNNING publica o modelo de entidades do tenant,
-        sem prazo de validade e sobrescrevendo; RUNNING -> MODELING remove a publicação; demais
-        transições não afetam o cache. Se a operação no cache falhar, o status é revertido e a
-        resposta é 500 — nada fica em estado intermediário.
-      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Versioned' } } } }
-      responses: { '200': { description: OK }, '409': { $ref: '#/components/responses/Conflict' }, '500': { description: 'Falha ao publicar/remover o modelo no cache; status revertido' } }
-    delete:
-      tags: [dataschema]
-      summary: 'Remover (bloqueado se o esquema físico existir); despublica o modelo de entidades'
-      description: >
-        Remove a publicação do modelo de entidades no cache distribuído ANTES de apagar o registro —
-        a publicação é permanente e ficaria órfã. Se o cache falhar, nada é removido (500) e a
-        operação pode ser repetida.
-      responses: { '200': { description: OK }, '204': { description: Sem conteúdo }, '500': { description: 'Falha ao remover o modelo no cache; dataschema não removido' } }
+    put: { tags: [dataschema], summary: Atualizar dataschema, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Versioned' } } } }, responses: { '200': { description: OK }, '409': { $ref: '#/components/responses/Conflict' } } }
+    delete: { tags: [dataschema], summary: Remover (bloqueado se o esquema físico existir), responses: { '200': { description: OK }, '204': { description: Sem conteúdo } } }
   /org/{org}/project/{project}/dataschema/{dataSchema}/entity/validate:
     parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/project' }, { $ref: '#/components/parameters/dataSchema' }]
     post: { tags: [entity], summary: Validar definição de entity (dry-run, não persiste), requestBody: { required: true, content: { application/json: { schema: { type: object } } } }, responses: { '200': { description: Válido }, '400': { $ref: '#/components/responses/BadRequest' } } }
@@ -116,7 +98,7 @@ paths:
   /org/{org}/project/{project}/dataschema/{dataSchema}/entity/{entity}:
     parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/project' }, { $ref: '#/components/parameters/dataSchema' }, { $ref: '#/components/parameters/entity' }]
     get: { tags: [entity], summary: Ler estado atual da entity, responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/NotFound' } } }
-    put: { tags: [entity], summary: Atualizar entity (aplica ChangeSet), requestBody: { required: true, content: { application/json: { schema: { type: object } } } }, responses: { '200': { description: OK }, '409': { $ref: '#/components/responses/Conflict' } } }
+    put: { tags: [entity], summary: 'Atualizar entity (parcial: ausente = ignorado, vazio explícito = limpa)', requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/EntityPartialUpdate' } } } }, responses: { '200': { description: 'Mudanças aplicadas', content: { application/json: { schema: { $ref: '#/components/schemas/ChangeReport' } } } }, '400': { $ref: '#/components/responses/BadRequest' }, '409': { $ref: '#/components/responses/Conflict' } } }
     delete: { tags: [entity], summary: Remover entity (DROP da tabela), responses: { '200': { description: OK } } }
   /org/{org}/project/{project}/dataschema/{dataSchema}/entity/{entity}/attribute:
     parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/project' }, { $ref: '#/components/parameters/dataSchema' }, { $ref: '#/components/parameters/entity' }]
@@ -137,7 +119,7 @@ paths:
     parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/project' }, { $ref: '#/components/parameters/tenantId' }]
     post:
       tags: [model]
-      summary: Publicar modelo de domínio (.model.json) no cache (sobrescreve, sem prazo de validade)
+      summary: Publicar modelo de domínio (.model.json) no cache (sobrescreve)
       requestBody: { required: true, content: { multipart/form-data: { schema: { type: object, properties: { file: { type: string, format: binary } } } } } }
       responses: { '201': { description: Publicado, content: { application/json: { schema: { type: object, properties: { key: { type: string } } } } } }, '400': { $ref: '#/components/responses/BadRequest' }, '404': { $ref: '#/components/responses/NotFound' } }
     get: { tags: [model], summary: Ler modelo publicado, responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/NotFound' } } }
@@ -183,6 +165,40 @@ components:
     Error: { type: object, properties: { error: { type: string } } }
     IdMessage: { type: object, properties: { id: { type: integer }, message: { type: string } } }
     Versioned: { type: object, required: [logversion], properties: { logversion: { type: integer, description: "versão otimista atual" } }, additionalProperties: true }
+    EntityPartialUpdate:
+      type: object
+      required: [name]
+      description: >-
+        Atualização PARCIAL. Propriedade ausente é ignorada (valor atual preservado); propriedade com
+        valor vazio ([] ou "") é limpa; null explícito conta como ausente. accessControl é substituído
+        por inteiro, não mesclado. _conf é opcional aqui (obrigatório apenas na criação). Um único
+        escopo por requisição: _conf OU attributes OU associations.
+      properties:
+        name: { type: string, description: "deve casar com a entity do caminho" }
+        _conf: { type: object, additionalProperties: true }
+        attributes: { type: array, items: { type: object, additionalProperties: true } }
+        associations: { type: array, items: { type: object, additionalProperties: true } }
+    ChangeReport:
+      type: object
+      description: "O que a atualização efetivamente aplicou."
+      properties:
+        entityName: { type: string }
+        valid: { type: boolean }
+        summary: { type: string }
+        totalChanges: { type: integer, description: "0 quando a requisição não teve efeito" }
+        applied: { type: array, items: { $ref: '#/components/schemas/ChangeEntry' } }
+        skipped: { type: array, items: { $ref: '#/components/schemas/ChangeEntry' } }
+    ChangeEntry:
+      type: object
+      properties:
+        scope: { type: string, enum: [config, attribute, association] }
+        element: { type: string, nullable: true, description: "nome do atributo/associação, quando aplicável" }
+        property: { type: string }
+        oldValue: { nullable: true }
+        newValue: { nullable: true }
+        description: { type: string, nullable: true }
+        ddl: { type: string, nullable: true, description: "operação aplicada no banco de leitura" }
+        reason: { type: string, description: "apenas em skipped" }
     DbConnCreate:
       type: object
       required: [dbsqlserveraddress, dbsqlname, dbsqlserverport, dbsqlusername]

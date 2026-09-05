@@ -6,16 +6,8 @@ info:
     Lado de escrita: executa comandos de agregados, lê estado/histórico, aplica projeção (serviço).
     Detalhe e ciclo de vida: README.md, endpoints/, spec/model-format.md. Apenas endpoints autenticados.
 servers:
-  - url: /v3/persistence/c
-    description: >
-      PRODUÇÃO — via gateway da plataforma (host omitido por política). Os paths abaixo são downstream e
-      se anexam a este prefixo.
-  - url: /v3/persistence/t/c
-    description: >
-      TESTE — mesmo contrato; muda só o segmento `t` no prefixo.
   - url: /
-    description: >
-      Somente os paths downstream, sem o prefixo do gateway (forma usada ao longo dos documentos).
+    description: Acesso via gateway da plataforma (host omitido por política).
 security:
   - bearerAuth: []
 paths:
@@ -55,7 +47,7 @@ paths:
       responses: { '200': { description: Lista de eventos }, '204': { description: Sem eventos } }
   /e:
     post:
-      summary: Entidade convencional (CRUD direto) — mesmo endpoint da escrita de projeção interna
+      summary: Escrever projeção (serviço autorizado)
       parameters: [{ $ref: '#/components/parameters/tenant' }]
       requestBody:
         required: true
@@ -69,7 +61,6 @@ paths:
         '201': { description: Criado (action CREATE) }
         '200': { description: OK (action UPDATE/DELETE) }
         '400': { $ref: '#/components/responses/BadRequest' }
-        '403': { $ref: '#/components/responses/Forbidden' }
         '510': { $ref: '#/components/responses/StateOrProcessing' }
 components:
   securitySchemes:

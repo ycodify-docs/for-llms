@@ -17,9 +17,6 @@
 
 ## Visão geral (mapa)
 
-> **Acesso externo** aos serviços é via **API Gateway**: uma base (host) + prefixo `/v3/<svc>` que o gateway
-> remove antes de encaminhar. Como formar a URL: [06-autenticacao — URL base](06-autenticacao.md).
-
 ```
                           ┌───────────┐
    (1) modelos+recursos   │  forger   │  publica modelos no cache distribuído
@@ -110,6 +107,42 @@ A resposta é síncrona; o que acontece depois (projeção) é assíncrono.
 
 Ao fim desta fase, o banco de leitura reflete o estado atual do agregado.
 
+### Qual banco de leitura — e quando isso é decidido
+
+O destino da projeção **não** viaja na requisição do cliente e **não** é decidido na Fase 1: ele é
+resolvido **aqui**, no consumo da fila, a partir do `tenant-id` que vem **na própria mensagem**.
+
+```
+   evento gravado (Fase 1)  ──▶  resposta do comando volta ao cliente
+        │                         (daqui em diante o cliente já não vê nada)
+        ▼
+   fila de projeção
+        │
+        ▼
+   ┌────────────────────────────────────────────┐
+   │ 1. lê o tenant-id DA MENSAGEM              │
+   └───────────────────┬────────────────────────┘
+                       ▼
+   ┌────────────────────────────────────────────┐
+   │ 2. resolve o banco de leitura DESSE tenant │
+   │    (cadeia dataschema → database → dbconn) │
+   └───────────────────┬────────────────────────┘
+                       ▼
+   ┌────────────────────────────────────────────┐
+   │ 3. aplica a linha na projeção              │
+   └────────────────────────────────────────────┘
+```
+
+Três consequências que valem para quem integra:
+
+- **O banco de leitura é determinado pelo `tenant-id`**, sempre e da mesma forma. Não depende de qual
+  requisição, qual cliente ou qual rota originou o comando.
+- **Tudo isto acontece depois da resposta do comando.** Por isso a consulta logo após o comando pode
+  não refletir a mudança — e por isso o polling precisa de atraso inicial. Regra completa:
+  [persistence-q — depois de um comando, espere antes de consultar](persistence-q/README.md).
+- **Uma falha aqui não aparece na resposta do comando**, que já foi entregue. Investigar a resposta do
+  comando não revela nada sobre uma projeção que não chegou.
+
 ---
 
 ## Fase 4 — Consulta
@@ -165,6 +198,5 @@ a **fonte da verdade** de cada um é:
 | Pontos de **coordenação** entre serviços (CP-n) | [coordenacao.md](coordenacao.md) |
 | **Ordem de deploy** dos recursos | [03-fluxo-de-deploy.md](03-fluxo-de-deploy.md) |
 | Vocabulário **abstrato de infraestrutura** | [02-conceitos.md](02-conceitos.md#vocabulário-de-infraestrutura-termos-abstratos) |
-| **URL base / endereçamento** (API Gateway, prefixo `/v3/<svc>`) | [06-autenticacao.md](06-autenticacao.md) |
 
 Ao corrigir um desses fatos, **edite primeiro o documento canônico** e propague.

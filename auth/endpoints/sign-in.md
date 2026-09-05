@@ -21,9 +21,9 @@ Cabeçalhos: `Content-Type: application/json`. **Não** exige `Authorization` (�
 `200`:
 
 ```jsonc
-{ "accessToken": "<token de acesso>", "tokenType": "Bearer",
+{ "token": "<token de acesso>", "type": "Bearer",
   "id": 0, "username": "...", "name": "...", "email": "...",
-  "roles": ["..."], "mcpSessionId": "<uuid da sessão>" }
+  "roles": ["..."], "sessionId": "<uuid da sessão>" }
 ```
 
 Use `token` em `Authorization: Bearer <token>` nas chamadas seguintes. O token embute usuário, papéis,

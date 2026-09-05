@@ -11,7 +11,6 @@
 3. [`01-arquitetura.md`](01-arquitetura.md) — fluxo ponta a ponta entre os serviços.
 4. [`03-fluxo-de-deploy.md`](03-fluxo-de-deploy.md) — como implantar um sistema do zero.
 5. [`coordenacao.md`](coordenacao.md) — pontos de articulação entre serviços.
-6. [`06-autenticacao.md`](06-autenticacao.md) — como formar a requisição: **URL base** (API Gateway, `/v3/<svc>`) + `Authorization` + `X-Tenant-Id`.
 
 ## Documentação por serviço
 
@@ -20,12 +19,11 @@
 | **auth** | Emissão de token (login): autentica e emite o token de acesso com a identidade. | [`auth/`](auth/README.md) |
 | **orgid** | Identidade e acesso (IAM): organizações, contas, papéis, contratos. Pré-requisito de identidade. | [`orgid/`](orgid/README.md) |
 | **forger** | Implanta os recursos do sistema (sob a organização). | [`forger/`](forger/README.md) |
-| **persistence-crs** | Executa comandos de agregados (escrita) e CRUD de entidade convencional. | [`persistence-crs/`](persistence-crs/README.md) |
+| **persistence-crs** | Executa comandos de agregados (escrita). | [`persistence-crs/`](persistence-crs/README.md) |
 | **es-n** | Despacha eventos para projeção e coordenação. | [`es-n/`](es-n/README.md) |
 | **persistence-q** | Consulta projeções (leitura). | [`persistence-q/`](persistence-q/README.md) |
 | **br-service** | Regras de negócio e coordenação de agregados. | [`br-service/`](br-service/README.md) |
 | **filer** | Arquivos anexos a agregados (upload/download/listar/remover). | [`filer/`](filer/README.md) |
-| **cache** | Cache distribuído (mem-cache db) do modelo publicado — **interno**, sem endpoint público. | [`cache/`](cache/README.md) |
 
 > **Camada de aplicação (não é um serviço da plataforma):** a **casca (shell) universal + BFF** — a
 > aplicação única que loga o usuário, descobre suas permissões pelo token e **injeta o miolo** por tenant.
@@ -44,10 +42,9 @@
 | Criar as projeções (tabelas de leitura) | [`forger/endpoints/entity.md`](forger/endpoints/entity.md) |
 | Executar/disparar um comando de domínio | [`persistence-crs/endpoints/comando.md`](persistence-crs/endpoints/comando.md) |
 | Ler o estado ou o histórico de um agregado | [`persistence-crs/endpoints/agregado-leitura.md`](persistence-crs/endpoints/agregado-leitura.md) |
-| Fazer CRUD simples de uma entidade convencional (não-agregado) | [`persistence-crs/endpoints/entidade.md`](persistence-crs/endpoints/entidade.md) |
 | Consultar projeções (query) | [`persistence-q/endpoints/consulta.md`](persistence-q/endpoints/consulta.md) |
-| Recuperar logs de uma operação (diagnóstico) | [`persistence-crs/endpoints/logs.md`](persistence-crs/endpoints/logs.md) |
 | Escrever uma regra de negócio ou coordenação | [`br-service/README.md`](br-service/README.md) |
+| Publicar/depurar o arquivo de um processador (rota, export, carga) | [`br-service/processadores.md`](br-service/processadores.md) |
 | Entender quando/como os serviços se chamam | [`coordenacao.md`](coordenacao.md) |
 | Entender o despacho de eventos (projeção, saga) | [`es-n/README.md`](es-n/README.md) |
 | Anexar/baixar arquivos de um agregado | [`filer/`](filer/README.md) |
@@ -57,7 +54,6 @@
 | Entender o contrato casca↔miolo | [`shell/contrato-miolo.md`](shell/contrato-miolo.md) |
 | Evitar erros comuns | [`05-antipatterns.md`](05-antipatterns.md) |
 | Entender o isolamento multi-tenant dos agentes + entrega de código | [`07-isolamento-e-entrega.md`](07-isolamento-e-entrega.md) |
-| Construir um frontend que o usuário possa **ver e testar** antes de publicar | [`08-preview-de-frontend.md`](08-preview-de-frontend.md) |
 
 ## Exemplos concretos
 
@@ -75,5 +71,5 @@ persistence-crs, es-n e br-service ponta a ponta.
 
 ---
 
-> **Versão da documentação:** 1.0 · **Última revisão:** 2026-06-20 · Histórico: [CHANGELOG.md](CHANGELOG.md).
+> **Versão da documentação:** 1.15 · **Última revisão:** 2026-09-05 · Histórico: [CHANGELOG.md](CHANGELOG.md).
 > Índice navegável por máquina: [`llms.txt`](llms.txt); corpus completo num arquivo: [`llms-full.txt`](llms-full.txt).

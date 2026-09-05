@@ -14,10 +14,18 @@ Exigem `Authorization` e papel de administrador/engenheiro em `{org}`.
 |---|---|---|---|
 | `name` | string | sim | Nome do contexto. Só letras minúsculas (`^[a-z]+$`), **máx. 16 caracteres**. |
 | `alias` | string | sim | Apelido legível. |
-| `envtype` | string | sim | Tipo de ambiente. |
+| `envtype` | string | sim | **Rótulo** de ambiente (obrigatório). Ver aviso abaixo. |
 | `email` | string | não | Contato. |
 | `description` | string | não | Descrição. |
 | `status` | string | não | Situação inicial. |
+
+> ⚠️ **`envtype` é um rótulo informativo — não seleciona nada.** Ele **não** escolhe banco, esquema,
+> instância nem rota: o destino das projeções vem da cadeia `dbconn → database → dataschema`
+> ([dbconn](dbconn.md) · [database](database.md) · [dataschema](dataschema.md)), e nada no
+> processamento consulta este campo. Preenchê-lo com `PRODUCTION` **não** torna o contexto produtivo,
+> e alterá-lo depois **não** muda o comportamento de nenhum serviço. Trate-o como anotação
+> administrativa; para saber para onde um tenant realmente projeta, percorra a cadeia
+> (ver [README — descobrir o destino de um tenant](../README.md#descobrir-para-onde-um-tenant-projeta)).
 
 Resposta `201`: `{ "id": <número>, "tenantSecret": "<uuid>", "tenantPid": "<uuid>", "message": "..." }`.
 Os identificadores de tenant retornados pertencem ao contexto. Erros: `400`, `403`, `500`.

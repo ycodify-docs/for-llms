@@ -43,8 +43,13 @@ objeto tem a forma:
   { "account": { "username": "carol" }, "role": { "name": "gestor",  "owner": "acme" } } ]
 ```
 
-**Resposta:** `200` (sem corpo). Conta/papel inexistentes → `204`/`400`; corpo incompleto ou contexto
-que impede montar a associação → `510` (falha não tratada — ver [../erros.md](../erros.md)).
+**Resposta:** `200` (sem corpo). Conta ou papel inexistente → **`404`**, dizendo qual dos dois faltou e que
+a associação **não foi criada** (`"account not found: the account-role association was not created."` /
+`"role not found: …"`); corpo incompleto ou contexto que impede montar a associação → `510` (falha não
+tratada — ver [../erros.md](../erros.md)).
+
+> ⚠️ Até 2026-09-05 esse caso era **`204`**, que é sucesso sem corpo: a associação não era criada e o
+> chamador não tinha como saber.
 
 ## PUT /ua/account-role/role-owner/{roleOwner}/using/authority
 Atualiza associações em lote para um dono de papel.
@@ -55,7 +60,9 @@ Atualiza associações em lote para um dono de papel.
 
 **Corpo** (JSON): **array** de associações `{ account{username}, role{name,owner}, status? }`.
 
-**Resposta:** `200` (sem corpo).
+**Resposta:** `200` (sem corpo) · `404` se alguma conta ou papel do lote não existir —
+`"… not found: no association was updated."` O lote é tudo-ou-nada: um item ausente aborta a operação
+inteira e **nada** é gravado.
 
 ## PUT /ua/account-role/status/using/authority
 Altera o **status** de uma associação conta-papel. **Corpo é um objeto único** (não array).
@@ -66,7 +73,8 @@ Altera o **status** de uma associação conta-papel. **Corpo é um objeto único
 { "account": { "username": "bob" }, "role": { "name": "cliente", "owner": "acme" }, "status": "SUSPENDED" }
 ```
 
-**Resposta:** `200` (sem corpo).
+**Resposta:** `200` (sem corpo) · `404` — `"account and role association not found: nothing was
+updated."`
 
 ## DELETE /ua/account/by/username/{username}/role-name/{roleName}/role-owner/{roleOwner}/using/authority
 Desassocia um papel de uma conta.

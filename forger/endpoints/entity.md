@@ -4,12 +4,10 @@
 > alterar uma entity passa pela **compilação** (léxica → sintática → semântica → representação
 > intermediária → DDL) e aplica a DDL de forma **transacional** no banco de leitura. Guia: [../README.md](../README.md).
 >
-> No **caso comum**, a entity é a **projeção de um agregado**: suas colunas **derivam dos atributos do agregado**
-> — escalares (`data.attribute`) **e** value objects (`valueObject.single` → coluna `Json` objeto;
+> A entity é a **projeção de um agregado**: suas colunas **derivam dos atributos do agregado** —
+> escalares (`data.attribute`) **e** value objects (`valueObject.single` → coluna `Json` objeto;
 > `valueObject.multiple` → coluna `Json` array) — e ela é criada **sob o dataschema** cujo nome = o do
-> bounded context. (Uma entity **pode não** ser projeção de agregado — ex.: tabela de referência/lookup; nesse
-> caso **não** carrega `aggregateid`/`status`/`whenAttribute`, ver §"Colunas obrigatórias de toda projeção".)
-> Cadeia completa:
+> bounded context. Cadeia completa:
 > [conceitos — do agregado à projeção](../../02-conceitos.md#do-agregado-à-projeção-derivação-e-implantação).
 
 Exigem `Authorization` e papel de administrador/engenheiro em `{org}`.
@@ -25,6 +23,8 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
 - Forma da definição
 - Endpoints (exaustivo)
 - Ciclo de vida (criar/atualizar)
+- Chave única: `attribute.unique` vs `_conf.uniqueKey`
+- Semântica do `PUT`: ausente vs vazio
 - Regra de escopo único no `PUT`
 - Saída de `analyze` / `validate`
 
@@ -35,7 +35,7 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
 | entity | só letras minúsculas (sem dígitos/`_`) | `^[a-z]+$` | **24** |
 | atributo | só letras minúsculas (sem dígitos/`_`) | `^[a-z]+$` | **24** |
 | associação | só letras minúsculas (sem dígitos/`_`) | `^[a-z]+$` | **24** |
-| superentidade | só letras minúsculas | `^[a-z]+$` | **64** |
+| superentidade | só letras minúsculas | `^[a-z]+$` | **24** |
 
 **Nomes reservados** (proibidos para entity/atributo/associação): `id`, `logversion`, `logrole`,
 `loguser` — são atributos de controle injetados pela plataforma. Violar padrão/limite/reservado → `400`.
@@ -50,11 +50,10 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
       "unique": false, "comment": "string", "default": "string" }
   ],
   "associations": [
-    { "name": "string", "type": "string", "nullable": true,
+    { "name": "string", "targetEntity": "string", "nullable": true,
       "unique": false, "comment": "string" }
   ],
   "_conf": {
-    "type": "entity",
     "comment": "string", "concurrencyControl": true,
     "uniqueKey": ["string"], "indexKey": ["string"],
     "accessControl": {}, "superEntity": "string", "superEntityStrategy": "string"
@@ -62,63 +61,19 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
 }
 ```
 
-> **⚠️ `attributes[].comment` com `;` FALHA a criação (defeito conhecido).** Um `comment` cujo texto
-> contenha ponto-e-vírgula faz o `POST .../entity` retornar
-> **`510 "DDL execution failed ... Unterminated string literal ... in SQL COMMENT ON COLUMN <t>.<col>"`**.
-> Causa provável: o executor de DDL divide o lote de `COMMENT ON COLUMN ...;` por `;` **sem respeitar
-> aspas**, cortando a string no meio. `;` dentro de literal aspado é SQL válido — o defeito é do
-> executor, não do texto.
->
-> **Contorno**: substituir `;` por `,` **apenas no corpo do POST**, preservando o texto original na
-> fonte de design. Comentários **sem `;`** passam intactos, inclusive com parênteses, vírgulas,
-> dois-pontos e barra vertical — não há necessidade de descartar todos os comentários.
-> *(Isolado experimentalmente em 2026-08-26: remover só o travessão `—` NÃO resolve — travessão
-> descartado como causa; trocar `;` resolve. 11 de 16 atributos sem `;` sempre passaram.)*
-
-> **ℹ️ Coluna `String` recebe `DEFAULT ''` automático (comportamento intencional).** Toda coluna de tipo
-> `String` declarada em `attributes[]` é criada com `DEFAULT ''::character varying` — **independente de
-> `nullable`** e **mesmo sem `default` no payload**. As colunas que a plataforma auto-injeta
-> (`logrole`, `loguser`) **não** recebem esse default.
->
-> **Consequência para quem chama** — `nullable: false` **não garante conteúdo**: a restrição impede
-> `NULL` explícito, mas um `INSERT` que **omita** a coluna grava **string vazia** e satisfaz o
-> `NOT NULL`. Para exigir conteúdo de fato (ex.: `nome` não pode ser em branco), **valide na regra de
-> negócio** (`command.br.route`) — não conte com o `NOT NULL` do banco.
->
-> **Assimetria por tipo**: `Integer`/`Long`/`Date`/`Timestamp`/`Text`/`Json` **não** recebem default;
-> com `nullable: false` viram `NOT NULL` sem default e **rejeitam** o `INSERT` que os omitir. Ou seja,
-> a garantia de obrigatoriedade é **forte** nesses tipos e **fraca** em `String`.
->
-> *(Verificado no banco provisionado de um tenant real; os `.model.json` de origem não declaram `default`
-> algum.)*
-
 > **⚠️ `_conf` é OBRIGATÓRIO e semântico aqui.** A definição de **entity** exige `_conf` (configuração:
-> chave única, índices, controle de concorrência, superentidade…). O único campo **obrigatório** dentro de
-> `_conf` é **`type`** (`entity` | `abstract` | `component` | `enumeration`). A convenção "chave `_`-prefixada =
+> chave única, índices, controle de concorrência, superentidade…). A convenção "chave `_`-prefixada =
 > metadado removido" vale **apenas para o `.model.json`** (publicação de modelo), **não** para a
 > definição de entity. **Não** remova `_conf` (nem outras chaves) deste payload — é outro contrato, em
 > outro endpoint. Ver [model-format — chaves de metadado](../../persistence-crs/spec/model-format.md#chaves-de-metadado-_-prefixadas).
-
-> **`_conf.accessControl` — default automático (`MASTER`).** O campo é **opcional**: se **omitido**, o
-> Forger aplica automaticamente `{ "read": ["MASTER"], "write": ["MASTER"] }` a toda entity que cria — não
-> é preciso declará-lo à mão. Se **declarado**, `MASTER` **deve** constar em `read` **e** `write` (o
-> persistence-crs grava a projeção autenticado como `MASTER`). Os papéis citados aqui são **nomes** — criar
-> o papel `MASTER` (e demais) para a organização e vincular usuários é feito no [orgid](../../orgid/README.md),
-> não aqui.
->
-> **`accessControl.read` e `accessControl.write` — papéis adicionais além de `MASTER`.**
-> Declare em `read` os papéis de usuário-final que podem **consultar** a projeção via persistence-q (ex.: `["MASTER", "INSTRUTOR", "ASSOCIADO"]`).
-> Declare em `write` os papéis que podem **escrever na projeção** além da plataforma (ex.: serviços internos autorizados). O app-cliente **nunca** escreve diretamente na projeção — a projeção é materializada pelo fluxo comando → evento → consumidor de fila (ver [coordenação CP-5](../../coordenacao.md#cp-5--consumidor-da-fila-de-projeção-atualiza-o-banco-de-leitura)). `accessControl.write` com papéis além de `MASTER` é portanto para casos específicos de serviços intra-infraestrutura autorizados — **não** para o cliente.
 
 ## Colunas obrigatórias de toda projeção — `aggregateid`, `status` e cada `whenAttribute` de evento (REGRA)
 
 Além das colunas derivadas de `data.attribute` + valueObjects, **toda entity que é projeção de um
 agregado DEVE declarar** as colunas de projeção abaixo — em **todo** agregado, sem exceção:
 
-- **`aggregateid`** — `String`, `length` **36**, `nullable: false`, **`unique: true`**: o **UUID do agregado**;
-  **identifica a linha** da projeção (ver [identificação na projeção](../../persistence-crs/spec/model-format.md#identificação-na-projeção-leitura)).
-  A projeção default é **1:1** (uma linha por instância de agregado), então `aggregateid` é **único** na tabela —
-  declare `unique: true` para tornar a invariante uma constraint (o gerador determinístico já o faz).
+- **`aggregateid`** — `String`, `length` **36**, `nullable: false`: o **UUID do agregado**; **identifica
+  a linha** da projeção (ver [identificação na projeção](../../persistence-crs/spec/model-format.md#identificação-na-projeção-leitura)).
 - **`status`** — `String`, `nullable: false`: o **estado atual** do agregado (campo de filtro típico em
   [persistence-q](../../persistence-q/README.md)).
 - **cada `whenAttribute` de evento** — `Timestamp`, `nullable: true`: o **carimbo de tempo do evento**
@@ -134,11 +89,6 @@ qualquer um deles, a projeção do agregado não é materializável**: o fluxo d
 linha por `aggregateid`, registra `status` e escreve o carimbo em cada `whenAttribute` — se a coluna
 correspondente não existir, o consumidor de projeção falha (atributo/componente desconhecido) e a linha
 **nunca** é materializada (consultas em [persistence-q](../../persistence-q/README.md) retornam vazio).
-
-> **⚠️ Escopo — SÓ projeção de agregado.** `aggregateid` (incl. `unique: true`), `status` e os
-> `whenAttribute` são colunas do **contrato de projeção de um agregado**. Uma entity que **NÃO** é projeção de
-> agregado (ex.: tabela de **referência/lookup** ou entity criada direto, fora do fluxo comando→evento→projeção)
-> **NÃO** declara nenhuma delas — não tem `aggregateid`. Aplicar essas colunas a uma entity não-projeção é **erro**.
 
 ## Endpoints (exaustivo)
 
@@ -172,8 +122,87 @@ correspondente não existir, o consumidor de projeção falha (atributo/componen
 
 3. **Aplicação transacional** da DDL no banco de leitura do tenant; qualquer erro → **rollback** total.
 4. **Atualização do estado** da entity (para leituras subsequentes).
-5. **Resposta**: `201` (criação) / `200` (alteração) com o conjunto de mudanças; falha de
-   compilação/DDL → `400`/`500`.
+5. **Resposta**: `201` (criação) / `200` (alteração) **com o conjunto de mudanças aplicadas**
+   (ver [Semântica do `PUT`](#semântica-do-put-ausente-vs-vazio)); falha de compilação/DDL → `400`/`500`.
+
+## Chave única: `attribute.unique` vs `_conf.uniqueKey`
+
+São dois conceitos **ortogonais**, e o serviço aceita os dois na mesma entity:
+
+| Declaração | Significado |
+|---|---|
+| `attribute.unique: true` | unicidade no espaço de valores **daquele atributo** |
+| `_conf.uniqueKey: ["a","b"]` | **chave composta** — exige 2+ atributos (com um só, é recusado) |
+
+O uso conjunto é legítimo quando incidem sobre atributos **diferentes** — ex.: `email` único por si
+**e** `(filial, codigo)` único como par. São duas chaves candidatas distintas.
+
+> ⚠️ Quando o **mesmo** atributo é `unique` **e** aparece no `uniqueKey`, a composta fica
+> **logicamente redundante**: se `a` já é único sozinho, o par `(a, b)` nunca rejeita nada que `a` já
+> não rejeitasse. Não é erro — é aceito —, mas normalmente indica que a regra pretendida era só uma
+> das duas. Custa um índice a mais em toda escrita e um passo a mais para remover a coluna (não se
+> remove atributo que participa de `uniqueKey` sem antes tirá-lo de lá).
+>
+> O teste é uma pergunta: *duas linhas podem repetir o valor de `a` sozinho?* Se **sim**, `a` não pode
+> ser `unique` — a unicidade dele só existe dentro do par.
+
+A ordem declarada em `uniqueKey` não é preservada na constraint resultante; não conte com ela.
+
+## Semântica do `PUT`: ausente vs vazio
+
+O `PUT` é **atualização parcial**. Envie apenas o que quer mudar — e note que **omitir não é o mesmo
+que esvaziar**:
+
+| No payload | Efeito |
+|---|---|
+| propriedade **ausente** | **ignorada** — o valor atual é preservado |
+| propriedade com **valor vazio** (`[]`, `""`) | **limpa** — o valor atual é removido |
+| propriedade com valor | substituída |
+
+```jsonc
+// preserva uniqueKey, indexKey, comment… e aplica só o controle de acesso
+{ "name": "ocorrencia", "_conf": { "type": "entity",
+    "accessControl": { "read": ["MASTER","INSTRUTOR"], "write": ["MASTER","INSTRUTOR"] } } }
+
+// remove a chave única composta (vazio explícito)
+{ "name": "ocorrencia", "_conf": { "type": "entity", "uniqueKey": [] } }
+```
+
+Vale igual para atributos e associações: declarar um atributo só com `nullable` altera **apenas**
+`nullable` — `length`, `unique` e `comment` continuam como estavam.
+
+Três detalhes que costumam morder:
+
+- **`null` explícito conta como ausente.** Para limpar, use o vazio do tipo (`[]`, `""`), não `null`.
+- **`accessControl` é substituído por inteiro**, não mesclado chave a chave: enviar só `read` reseta
+  `write` para `["MASTER"]`. Não existe entity sem controle de acesso — `MASTER` é o piso.
+- **`_conf` é opcional no `PUT`.** Uma requisição que só toca atributos não precisa mencioná-lo.
+  (Na **criação** ele continua obrigatório.) `name` é sempre obrigatório e deve casar com o caminho.
+
+### Corpo da resposta
+
+O `200` informa o que foi aplicado — uma alteração que remove uma constraint **diz isso na resposta**:
+
+```jsonc
+{
+  "entityName": "ocorrencia",
+  "valid": true,
+  "summary": "…",
+  "totalChanges": 1,
+  "applied": [
+    { "scope": "config",              // config | attribute | association
+      "element": null,                // nome do atributo/associação, quando aplicável
+      "property": "accessControl",
+      "oldValue": { "read": ["MASTER"], "write": ["MASTER"] },
+      "newValue": { "read": ["MASTER","INSTRUTOR"], "write": ["MASTER","INSTRUTOR"] },
+      "description": "…",
+      "ddl": "<operação aplicada>" }
+  ],
+  "skipped": []
+}
+```
+
+Requisição sem efeito responde `200` com `totalChanges: 0` e `applied: []`.
 
 ## Regra de escopo único no `PUT`
 Uma atualização (`PUT`) altera **um** escopo por requisição: **ou** `_conf`, **ou** atributos, **ou**

@@ -125,6 +125,47 @@ Em palavras:
 - **Header de tenant** — todas as requisições de comando, leitura e consulta exigem o cabeçalho que
   carrega o `tenant-id`. Sem ele, a requisição é rejeitada.
 
+### Como o `tenant-id` vira o banco de um cliente
+
+Duas coisas são resolvidas a partir do `tenant-id`, e elas vêm de **fontes diferentes** — confundi-las é
+a causa mais comum de diagnóstico errado:
+
+| O que é resolvido | De onde vem |
+|---|---|
+| **a conexão** (qual banco de leitura, com que credencial) | do **forger**, percorrendo `dataschema → database → dbconn` |
+| **o modelo** (quais agregados, comandos e projeções existem) | do **cache**, onde a publicação do modelo o colocou |
+
+```
+   requisição com o cabeçalho de tenant
+              │
+              ▼
+   ┌─────────────────────────────┐
+   │ tenant-id é um UUID válido? │ ── não ──▶ rejeita (400)
+   └──────────────┬──────────────┘
+                  │ sim
+                  ├───────────────── (a) CONEXÃO ─────────────────┐
+                  │                                               │
+                  ▼                                               ▼
+   ┌──────────────────────────────┐              ┌──────────────────────────────┐
+   │ já resolvida em memória?     │── sim ──▶ usa │ modelo presente no cache?    │
+   └──────────────┬───────────────┘              └───────────┬──────────┬───────┘
+                  │ não                                      │ sim      │ não
+                  ▼                                          ▼          ▼
+   ┌──────────────────────────────┐                        segue     erro 510
+   │ pergunta ao forger qual é o  │                                  "republique
+   │ banco deste tenant e conecta │                                   o modelo"
+   └──────────────────────────────┘                        (b) MODELO
+```
+
+Consequências que decorrem do desenho:
+
+- **A conexão é guardada por um intervalo** — trocar `dbconn` no forger não vale de imediato
+  ([dbconn](forger/endpoints/dbconn.md)).
+- **O modelo só entra no cache pela publicação**, e um miss é **parada**, não caminho lento: não há
+  recuperação automática ([persistence-crs — carga da spec](persistence-crs/README.md)).
+- **O `tenant-id` é opaco** — nada nele revela o banco de destino. Para saber, percorra a cadeia
+  ([forger — descobrir para onde um tenant projeta](forger/README.md#descobrir-para-onde-um-tenant-projeta)).
+
 ---
 
 ## Vocabulário de infraestrutura (termos abstratos)

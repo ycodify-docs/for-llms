@@ -2,324 +2,110 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
-## 1.29 — 2026-08-31
+## 1.16 — 2026-09-05
 
-- **br-service: implantação de processadores por endpoint** (novo `br-service/endpoints/processors-deploy.md`).
-  `POST /v3/brservice/processors/deploy/{org}` recebe um **arquivo compactado como corpo cru** (não é
-  formulário nem multipart) e publica os processadores daquela organização. As rotas entram em vigor
-  **sem reinício**. `POST /v3/brservice/processors/rollback/{org}/{backupId}` desfaz.
-- **Duas credenciais, ambas obrigatórias, com papéis distintos.** `X-Processors-Deploy-Credential`
-  autoriza a **operação**; `Authorization: Bearer` diz **em que organizações** o portador pode publicar —
-  a org da URL precisa estar entre elas, senão `403`. A assinatura do token é **verificada**: expirado,
-  forjado ou com algoritmo trocado é recusado. É o segundo endpoint da doc com credencial fora do par
-  `Authorization`/`X-Tenant-Id`, e o primeiro que exige **as duas** ao mesmo tempo.
-- **Substituição é por organização, e é total.** O pacote passa a ser a verdade da árvore daquela org: o
-  que não vier nele **deixa de existir** — é assim que se despublica uma regra. As outras organizações
-  não são tocadas.
-- **Validação antes de qualquer gravação — falhou uma entrada, nada é publicado.** Recusa `..` no
-  caminho, caminho absoluto, link simbólico, extensão fora do permitido, arquivo maior que o declarado,
-  tetos de entradas/bytes, destino duplicado e pacote ilegível. Cada arquivo é **compilado sem executar**:
-  processador com erro de sintaxe seria descartado em silêncio no carregamento, e a rota simplesmente
-  não existiria.
-- **`recarga` é a confirmação que importa**, não `rotas`. `rotas` é o que o pacote pretendia publicar;
-  `recarga.adicionadas` é o que o serviço passou a atender de fato — arquivo que não exporte função de
-  processador aparece em `arquivos` e não em `adicionadas`. `recarga.removidas` mostra o que saiu.
-- **CORREÇÃO em `br-service/README.md`:** a seção de deploy afirmava *"não há endpoint/API para publicar
-  um processador"*. Passou a haver. Agora a seção descreve as duas formas — pelo endpoint (integração) e
-  pelo sistema de arquivos (operação da plataforma).
-- Atualizados: `br-service/README.md` (índice + seção de deploy + ponteiro), `br-service/openapi.yaml`
-  (dois paths + `BrDeployResult`/`BrRollbackResult`/`BrRecarga`), `llms.txt`, `llms-full.txt` (regenerado).
+- **Escrita que não acha o alvo responde `404`, não `204` — 31 operações do orgid.** A 1.15 corrigiu um
+  caso (`PUT /ua/role`); a varredura mostrou que o padrão era idiomático no serviço. `204` é família 2xx —
+  sucesso sem corpo —, então uma escrita que falhava era **indistinguível de uma que gravou**: os dois
+  respondiam 2xx e vazio, `response.ok` era `true` nos dois, e a mensagem de erro era descartada pelo
+  próprio protocolo, que proíbe corpo em `204`. Agora cada `404` traz **o efeito que não ocorreu**, não só
+  o objeto que faltou: `"account not found: the password was not changed."`, `"O papel informado não
+  existe: nada foi removido."` Os dois casos mais perigosos que isso encerra: `DELETE` de papel inexistente
+  (num `DELETE`, `204` **é** o código canônico de sucesso — a leitura era a oposta da correta) e
+  `replace-master-account`, em que trocar a conta administradora de uma organização virava no-op
+  silencioso. **`204` continua em leitura**, incluindo os `/exists`, onde `200`/`204` é o contrato e não um
+  erro. Atualizados `orgid/erros.md` (linha `404` nova + nota), `orgid/README.md` (ciclo de vida) e as
+  seções de escrita de `ua-papel.md`, `ua-conta.md`, `ua-associacao.md`, `up-conta.md`,
+  `up-organizacao.md`, `up-associacao.md` e `publico.md`.
 
-## 1.28 — 2026-08-31
+- **⚠️ `/ua/open/role/owner/{owner}` é o único público do orgid fora do prefixo `/open/`.** Os segmentos
+  estão invertidos, e por isso ele escapa de qualquer regra de autorização derivada de `/open/**` — no
+  `OrgIdSecurityConfig` do orgid standalone ele **exige token apesar de documentado como público**. O
+  `composer`, que é o que está implantado, libera os dois prefixos desde 2026-09-05. Registrado em
+  `orgid/endpoints/publico.md` e `ua-papel.md`.
 
-- **Rótulo inexistente no modelo passou a ter mensagem própria — e agora está documentado.** Consultar
-  com um rótulo que não corresponde a nenhuma entidade/projeção do tenant devolvia `510` **vazando uma
-  exceção interna de biblioteca** como mensagem de usuário (`JSONObject["<rótulo>"] not found`), sem dizer
-  o que fazer. Agora devolve `Entidade '<rótulo>' não existe no modelo do tenant '<tenant-id>'. Na
-  consulta, o rótulo deve ser o nome da entidade/projeção provisionada para o tenant; confira o nome ou
-  republique o modelo.` O código HTTP (`510`) **não** mudou; quem casava o texto antigo precisa ajustar.
-- **Nota nova em `persistence-q/erros.md` separando dois `510` que se pareciam.** Rótulo ausente **do**
-  modelo (o modelo está carregado; falta aquele nome) × modelo **inteiro** ausente do cache. Sintoma
-  parecido, correção diferente: no primeiro caso corrige-se o rótulo; no segundo, republica-se o modelo.
-- Atualizados: `persistence-q/erros.md` (linha do `510` + nota nova), `persistence-q/endpoints/consulta.md`
-  e `persistence-q/exemplos.md` (os dois traziam a redação antiga "projeção de nome `<rótulo>`
-  inexistente"), `llms-full.txt` (regenerado).
+- **Duas correções de comportamento que a doc não trazia:** conta `/ua` nasce `PENDING` e **já loga** — o
+  sign-in não checa `status`, e a ativação por hash serve para provar posse do e-mail, não como portão de
+  acesso (`ua-conta.md`); e **registro não envia e-mail** — quem envia é o fluxo de hash e
+  `/open/ua/account/e-mail/send`, contra provedor real com cota, o que desaconselha acioná-los em teste
+  (`publico.md`).
 
-## 1.27 — 2026-08-31
+## 1.15 — 2026-09-05
 
-- **A autorização por papel (`command.<comando>.roles`) passou a ser documentada — e mudou de lugar e de
-  código.** Ela sempre existiu no modelo (`spec/model-format.md`), mas em nenhum lugar se dizia que é
-  **aplicada em runtime**, nem quando, nem com que resposta. Agora consta como **passo 4** do ciclo de
-  vida em `persistence-crs/README.md`, com seção própria.
-- **Mudança de comportamento (quebra contrato observável):** a verificação corria **depois** da regra de
-  negócio e a recusa saía como **`510`** com mensagem interna. Agora corre **antes** da regra e devolve
-  **`403`** com `O usuário '<usuário>' não possui papel autorizado para executar o comando '<comando>'.`
-  Quem tratava aquele `510` precisa ajustar.
-- **Consequência prática para quem integra:** comando recusado por papel **não aciona mais a regra de
-  negócio**, então as mensagens da regra (ex.: "referência não existe", "campo obrigatório ausente")
-  deixam de chegar a quem não tem o papel. Antes chegavam — e podiam revelar estado do domínio a quem não
-  estava autorizado.
-- **Correção de ordem no ciclo de vida documentado:** a lista dizia que a validação de transição
-  (`fromState`) vinha **antes** da regra de negócio. É o contrário — a regra roda primeiro, e `fromState`
-  e `endState` são validados depois. Os passos foram reordenados para descrever o que de fato acontece.
-- Atualizados: `persistence-crs/README.md` (passo 4 + seção "Autorização por papel" + Contents),
-  `persistence-crs/erros.md` (linha do `403` + nota nova), `persistence-crs/endpoints/comando.md`
-  (comportamento + erros), `persistence-crs/spec/model-format.md` (`roles` agora diz que é aplicado e
-  quando), `llms-full.txt` (regenerado).
+- **`PUT /ua/role` exige `id`, e a documentação não dizia.** O texto era "mesmos campos do POST" — e o
+  POST **não tem `id`**. Quem seguia a doc ao pé da letra montava um corpo sem `id`, e o serviço
+  respondia **`204`**: família 2xx, sucesso sem corpo. A mensagem "role not found." era descartada pelo
+  próprio protocolo, e o chamador seguia achando que tinha configurado. Um cliente marcou dois papéis
+  como públicos assim e perdeu tempo até descobrir que o valor no banco nunca mudara. A seção agora
+  mostra o corpo com `id`, diz como descobri-lo (`GET /ua/role/by/name/{roleName}/owner/{roleOwner}`),
+  e registra os códigos corretos: `400` sem `id`, `404` quando o papel não existe ou é de outro `owner`.
+  O `204` foi corrigido no serviço na mesma data. Em `orgid/endpoints/ua-papel.md`.
 
-## 1.26 — 2026-08-31
+## 1.14 — 2026-09-03
 
-- **Saíram endereço e porta internos das instâncias de persistence** (`06-autenticacao.md`). A seção
-  "Instâncias físicas" listava host e porta intra-cluster de cada instância — mesmo tipo de exposição que
-  a 1.23 tirou do `br-service/README.md`. A seção passa a se chamar **"Duas instâncias de persistence
-  (teste e produção)"** e descreve as instâncias **por modo**, com as duas formas de alcançá-las: prefixo
-  do gateway (externo) e **variável de ambiente** (intra-cluster). O endereço é configuração de deploy e
-  não pertence a esta documentação. Saiu junto o nome do arquivo de configuração do consumidor.
-- **O endpoint de verificação de saúde do BFF saiu de `bff/README.md`** (bloco "como confirmar que está
-  no ar" + linha da tabela de operação). Endpoint de observabilidade não entra em `public/` — é
-  invariante do acervo. Não é caminho de consumo: nenhum cliente precisava dele.
-- **Nome de produto de banco e de tenant real saíram de `forger/endpoints/entity.md`** — a nota de
-  verificação citava os dois; passa a dizer "o banco provisionado de um tenant real", que é o que importa
-  para quem lê. Pelo mesmo motivo, `forger/bnfs/create-dbconn-request.bnf` deixou de trazer o nome do
-  produto como valor de exemplo de `dbsqlname`: o campo pede o **banco de bootstrap do seu SGBD**, e o
-  exemplo agora é o placeholder `"<banco-de-bootstrap>"`, no mesmo estilo dos demais placeholders do
-  arquivo.
+- **Correção de fato: não existe recuperação automática do modelo a partir do forger.** A documentação
+  descrevia um *self-heal* — "se falta no cache, recupera do Forger e repõe" — que **não existe mais**: o
+  serviço de implantação passou a ser o **único** publicador do modelo no cache, e o caminho de leitura
+  **só lê**. Um miss é **parada** (`510`, "republique o modelo"), não um caminho lento que se resolve
+  sozinho; e, como a entrada **não expira**, um miss significa "nunca publicado" ou "removido". Corrigido
+  em `persistence-crs/README.md` (dono do fato) e `persistence-q/README.md`; consequência registrada em
+  `03-fluxo-de-deploy.md` (a publicação é a única porta de entrada).
+- **Regra nova: depois de um comando, espere antes de consultar.** O polling contra o serviço de consulta
+  deve começar por um **atraso inicial em milissegundos** e reconsultar com tentativas limitadas — nunca
+  disparar a primeira consulta junto com a resposta do comando. A razão passa a estar escrita: o
+  mecanismo que persiste a **projeção** é **desvinculado** do que persiste o **agregado**, logo o `200`
+  do comando **não afirma nada** sobre a projeção. Inclui a consequência que mais engana: uma falha na
+  projeção **não aparece** na resposta do comando. Em `persistence-q/README.md`.
+- **`_cache: "use"` marcado como não utilizável.** O controle está documentado, mas hoje erra nos dois
+  caminhos: sem entrada, responde sem os registros **e a consulta nem executa**; com entrada, devolve o
+  invólucro em vez do resultado. Enquanto não houver correção, a orientação é omitir `_cache` ou usar
+  `"ignore"`. Em `persistence-q/query-controls.md`.
+- **`envtype` é rótulo, não seletor.** O campo é obrigatório na criação do project, mas **não** escolhe
+  banco, esquema, instância nem rota, e nenhum processamento o consulta — preenchê-lo com `PRODUCTION`
+  não torna nada produtivo. Documentado como anotação administrativa, com ponteiro para a única forma
+  de saber o destino real. Em `forger/endpoints/project.md`.
+- **Nova seção: "descobrir para onde um tenant projeta".** O destino das projeções não está no modelo
+  nem no `tenant-id`; vem do provisionamento. Documentado o percurso da cadeia
+  `model → dataschema → database → dbconn` com os endpoints autenticados de cada passo, e o motivo:
+  antes de qualquer ação com consequência sobre os dados de um tenant, é a cadeia que diz qual banco a
+  ação alcança. Em `forger/README.md`.
+- **Alterar `dbconn` não vale de imediato.** A conexão resolvida do tenant fica guardada em memória por
+  um intervalo; até vencer, as requisições seguem usando endereço e credencial antigos — e uma falha de
+  autenticação logo após a troca não significa que o novo valor está errado. Em
+  `forger/endpoints/dbconn.md`.
+- **Dois diagramas novos.** (1) *Como o `tenant-id` vira o banco de um cliente* — separa as duas
+  resoluções que partem do mesmo `tenant-id`, a **conexão** (vem do forger) e o **modelo** (vem do
+  cache), em `02-conceitos.md`. (2) *Qual banco de leitura, e quando isso é decidido* — mostra que o
+  destino da projeção é resolvido **no consumo da fila**, a partir do `tenant-id` **da mensagem**, e
+  portanto **depois** da resposta do comando, em `01-arquitetura.md` §Fase 3.
 
-## 1.25 — 2026-08-31
+## 1.13 — 2026-09-02
 
-- **O `510` de modelo ausente parou de culpar o `X-Tenant-Id`.** A mensagem passou a nomear a causa e a
-  ação: `Modelo do tenant não encontrado na cache (chave '<chave>'). O X-Tenant-Id foi reconhecido; o que
-  falta é o modelo. Publique/republique o modelo do tenant (dataschema MODELING -> RUNNING).` O texto
-  anterior — `Falha crítica. X-Tenant-Id não reconhecido.` — mandava o integrador conferir cabeçalho,
-  credencial e roteamento, onde não havia nada errado.
-- **As duas notas de `erros.md` foram reescritas** (`persistence-crs`, `persistence-q`) para descrever as
-  **duas** mensagens, já que ambiente ainda não atualizado segue devolvendo o texto antigo. Nos dois casos a
-  ação é a mesma, e não é mexer no cabeçalho: republicar o modelo (`MODELING` → `RUNNING`).
-- Atualizados: `persistence-q/erros.md` (linha do `510` + nota), `persistence-crs/erros.md` (nota),
-  `llms-full.txt` (regenerado).
-
-## 1.24 — 2026-08-31
-
-- **A escolha teste × produção passou a constar onde a requisição é montada.** A regra já existia, mas
-  **só** em `06-autenticacao.md`: **produção** `/v3/persistence/{c,q}` · **teste** `/v3/persistence/t/{c,q}`.
-  Nenhum dos documentos de `persistence-crs`/`persistence-q` a repetia — quem abrisse `endpoints/comando.md`
-  para disparar um comando não tinha como saber que existe rota de teste. Os paths ali continuam sendo os
-  **downstream** (`/a/{bc}/{type}`, `/e`, `/`); o que faltava era dizer a que prefixo anexá-los.
-- **Contrato idêntico nos dois ambientes** — corpo, cabeçalhos e respostas não mudam; muda **só** o
-  segmento `t` no prefixo. Prefixo fora da allowlist → `404`.
-- Atualizados: `persistence-crs/README.md` e `persistence-q/README.md` (tabela de prefixo por ambiente nos
-  pré-requisitos + nota no índice de endpoints), `persistence-crs/endpoints/comando.md`,
-  `endpoints/agregado-leitura.md`, `endpoints/entidade.md`, `persistence-q/endpoints/consulta.md`,
-  ambos `exemplos.md`, e os dois `openapi.yaml` (bloco `servers` passa a declarar produção e teste, além
-  da forma downstream). `llms-full.txt` (regenerado).
-
-## 1.23 — 2026-08-31
-
-- **br-service: consulta do log de execução documentada** (novo `br-service/endpoints/logs.md`).
-  `GET /v3/brservice/logs/query/{term}/from/{f}/to/{t}` devolve os registros das execuções de regra/coordenação,
-  filtrados por **termo** (substring, sem diferenciar maiúsculas; `*` = todos) e por **intervalo
-  inclusivo** (ISO 8601 ou epoch em milissegundos). Autorização por **chave própria** no cabeçalho
-  `X-Logs-Key` — **não** usa `Authorization` nem `X-Tenant-Id`. Erros: `400` (intervalo malformado ou
-  invertido), `401` (chave ausente/incorreta), `503` (não provisionado no ambiente).
-- **Só metadados.** O registro traz `ts, traceId, spanId, tenantId, route, outcome, durationMs, bytesIn,
-  bytesOut, dataKeys, erroTipo, erroMensagem, erroArquivo`. `dataKeys` guarda os **nomes** dos campos
-  recebidos, nunca os valores; o **payload do comando não é gravado** (pode conter informação pessoal e
-  credencial), então não há como recuperá-lo por esta rota. `erroMensagem` vem truncada.
-- **`tenantId` está sempre presente**, e vem `""` só quando a requisição não trouxe tenant em origem
-  nenhuma. O tenant não chega sempre no mesmo lugar — em execução síncrona vem no cabeçalho ou no corpo;
-  em coordenação/projeção vem dentro do payload do evento — e a consulta normaliza as origens num campo só.
-- **`erroArquivo`** diz **onde** o erro foi lançado (`caminho:linha`), apontando o arquivo da função que
-  falhou; `""` quando não houve erro. E há uma **segunda forma da rota que filtra por ele**:
-  `GET /v3/brservice/logs/query/{term}/file/{file}/from/{f}/to/{t}`. Os dois filtros **somam** — o
-  registro precisa conter o termo **e** ter falhado no arquivo; `*` desliga qualquer um dos dois. O
-  `file` casa por **substring** de propósito (um pedaço do nome acha o caminho inteiro): barra codificada
-  em segmento de caminho costuma ser recusada pelos proxies do caminho público. A forma sem `file`
-  continua valendo.
-- **`truncado: true`** sinaliza que o teto de registros foi atingido e há mais no intervalo — estreitar
-  intervalo ou termo. **Retenção não é garantida**: datas antigas podem voltar vazias mesmo tendo havido
-  execução.
-- **Exceção consciente ao invariante de "nada de observabilidade" em `public/`** (`CLAUDE-extended.md` §2,
-  item 3): esta rota entra por ser **contrato de cliente** — quem consulta é o interessado autorizado,
-  sobre as próprias execuções, e não o operador da plataforma. Saúde e métricas continuam fora.
-- **Higiene em `br-service/README.md`:** saíram os **endereços internos** das duas instâncias de
-  persistência (host e porta) e as marcas de implementação no texto de deploy de processador. O endereço
-  nunca deveria estar ali — a própria página manda obtê-lo da variável de ambiente, e o processador não o
-  escreve. A tabela agora distingue as instâncias por **modo** (teste / produção), que é o que decide qual
-  variável usar.
-- Atualizados: `br-service/README.md` (índice de endpoints + ponteiro no Contents + higiene acima),
-  `br-service/openapi.yaml` (dois paths + `BrLogQueryResult`/`BrLogEntry`), `llms.txt`,
-  `llms-full.txt` (regenerado).
-
-## 1.22 — 2026-08-31
-
-- **⚠️ `_cache: use` não deve ser usado por ora — devolve resultado errado nos dois caminhos.** Defeito
-  conhecido, em conserto: na **primeira** chamada (nada em cache) a consulta **não é executada** e a resposta
-  traz um objeto de controle no lugar dos registros; nas **seguintes**, o dado vem **embrulhado**, em formato
-  diferente do que a mesma consulta devolve sem cache. Recomendação enquanto durar: `_behavior: ignore` ou
-  omitir o `_cache`. Aviso em `persistence-q/query-controls.md` §Cache.
-- **`510` dizendo "X-Tenant-Id não reconhecido" nem sempre é o tenant.** A mesma mensagem aparece quando o
-  **tenant é válido** mas o **modelo dele não está no cache** (tenant novo sem modelo publicado, ou entrada
-  expirada) — o texto aponta para o cabeçalho, a causa é outra. Antes de suspeitar do `X-Tenant-Id`, conferir
-  a publicação do modelo e o dataschema em `RUNNING`. Nota nova em `persistence-q/erros.md` e
-  `persistence-crs/erros.md`.
-- Atualizados: `persistence-q/query-controls.md`, `persistence-q/erros.md`, `persistence-crs/erros.md`,
-  `llms-full.txt` (regenerado).
-
-## 1.20 — 2026-08-31
-
-- **Aviso de mudança em implantação: o self-heal do modelo em cache vai deixar de existir.** Hoje, quando o
-  modelo do tenant não está no cache, `persistence-crs`/`persistence-q` o recuperam do Forger e o **repõem**
-  (passo 4 de "Carga da spec do tenant"). Isso passa a ser feito **só pelo Forger**, no momento em que o
-  dataschema transita para `RUNNING`. **Efeito para quem integra:** tenant cujo modelo não tenha sido
-  publicado por essa via **não se recupera sozinho** — a consulta falha até o modelo ser republicado
-  (`MODELING` → `RUNNING`). A nota está marcada como *em implantação*: o comportamento em produção, por ora,
-  **continua com self-heal**.
-- **Novo endpoint documentado: consulta de logs** — `GET /logs/service/{crs|q}/query/{term}/from/{from}/to/{to}`,
-  para diagnóstico de uma operação já executada. Autorização por **cabeçalho próprio** (`X-Logs-Key`), **não**
-  pelo token do domínio — é o primeiro endpoint da doc com credencial fora do par `Authorization`/`X-Tenant-Id`.
-  Devolve o registro **inteiro** (um registro pode ter várias linhas), com `matched`/`returned`/`truncated`;
-  `204` quando nada casa. **Teste** (`/v3/persistence/t/logs/...`) é o alvo desta entrega; **produção**
-  (`/v3/persistence/logs/...`) tem o mesmo contrato, mas **ainda não está publicada** e devolverá bem menos,
-  porque o nível de log lá é mais restritivo.
-- Atualizados: `persistence-crs/README.md` (nota após o passo 5 de "Carga da spec do tenant" + linha no índice),
-  `persistence-q/README.md` (marca no item "Spec carregada por-instância" + linha no índice), novo
-  `persistence-crs/endpoints/logs.md`, `persistence-crs/exemplos.md`, `llms.txt`, `README.md` ("Por tarefa"),
-  `llms-full.txt` (regenerado).
-- **Pendente de revisão:** `cache/README.md:14` ainda descreve "spec por-instância, com TTL e self-heal" —
-  mesma afirmação, fora do escopo desta revisão; corrigir quando a mudança entrar em produção.
-
-## 1.19 — 2026-08-30
-
-- **orgid: a rota documentada como "listar contas da org" NÃO lista — devolve só o chamador.**
-  `GET /up/account/by/org/{orgName}` deduz o dono da organização pelo token e filtra o resultado pela
-  conta de quem chama. A rota de listagem é `GET /up/account/by/org/{orgName}/org-owner/{orgOwner}`, que
-  até agora não constava do `openapi.yaml` e era descrita como "igual ao anterior". Medido em ambiente
-  real: a rota com `org-owner` devolveu **5** contas numa organização em que a outra devolveu **1**.
-- **A listagem mistura vínculos ativos e suspensos, sem distinção visível.** Só o que está **cancelado**
-  é descartado; **suspensos** e **pendentes** vêm na resposta. E o campo `status` é o estado **global** da
-  conta — não diz nada sobre a organização consultada: a mesma pessoa pode estar suspensa numa org e
-  ativa em outra. Membro ativo naquela organização = `status`, `accountStatus` e `orgStatus` **todos**
-  `ACTIVE`. O filtro é do consumidor.
-- **Forma da resposta documentada.** Cada conta traz `accountRoleOrgs[]` com `role.name`, `org`
-  (`name`/`owner`), `accountStatus` e `orgStatus`; senha nunca é devolvida; sem membro → `204` **sem
-  corpo**, não `[]`. Novos schemas `UpOrgMember` e `UpAccountRoleOrg`.
-- **Cabeçalho ausente responde `401`, não `404`.** Medido nas duas rotas: sem `Authorization` → `401`;
-  o cabeçalho `Accept` **não** é condição de roteamento. Nenhuma das duas rotas produz `404`.
-- Atualizados: `orgid/endpoints/up-conta.md` (duas seções reescritas), `orgid/openapi.yaml` (dois paths
-  detalhados + `UpOrgMember`/`UpAccountRoleOrg`), `llms-full.txt` (regenerado).
-
-## 1.18 — 2026-08-27
-
-- **Pré-visualização do frontend documentada** (novo `08-preview-de-frontend.md`). O frontend que o agente
-  constrói pode ser **visto e testado pelo usuário** antes de qualquer publicação. Contrato para o agente:
-  o app vai em **`application/`** na raiz do sistema (**nome fixo**, não configurável); precisa de manifesto de
-  dependências + rotina de build produzindo **`application/dist/`**; bibliotecas podem ser instaladas
-  livremente (registro público é destino autorizado da "janela", e há **depósito compartilhado** entre sistemas).
-- **A regra que mais quebra na prática:** o app deve chamar o BFF em **caminho relativo** (`/api/...`), nunca pelo
-  endereço dele. **Sessão** (o cookie só é guardado se a chamada for da mesma origem) e **permissão de origem**
-  (o BFF não conhece a origem da pré-visualização) dependem disso.
-- **Quem dispara é o usuário**, por um botão no painel — o agente não aciona nem comanda a pré-visualização;
-  só deixa o app pronto para ser montado. Preview é **teste**, não publicação: o caminho de publicação segue o
-  de `07` §7 (proposta → revisão humana → build fora → armazenamento estático).
-- **Precisão em `07-isolamento-e-entrega.md` §7:** "a sala nunca faz build" valia para o caminho de **publicação**
-  e continua valendo. A sala **pode** montar o app localmente para o agente **verificar o próprio trabalho** —
-  isso não publica nada.
-- **Descoberta**: entrada em `llms.txt` (Fundamentos) + linha na tabela "Por tarefa" do `README.md`.
-
-## 1.17 — 2026-08-08
-
-- **Autocadastro de usuário de aplicação (self-service) documentado.** Nova seção em `orgid/README.md`
-  ("Autocadastro de usuário de aplicação (modo da plataforma)"): padrão em **2 etapas** — conta `/ua` + papel via
-  `POST /open/ua/account-role` (público) → **registro de domínio** (agregado no persistence-crs) com o `username`
-  **como identidade / chave de unicidade** (1 conta = no máx. 1 registro). **Qual papel = decisão de design do
-  sistema** (default fixo OU cardápio `ispublic` via `GET /ua/open/role/owner/{roleOwner}`); o papel precisa
-  **pré-existir** (senão `204` = nada criado). Recuperação **CQRS-ES** antes de transicionar. **Autorização "só o
-  próprio registro" NÃO vem do token** — é regra de negócio (ex.: processador br-service).
-- **Descoberta**: ponteiro de topo em `06-autenticacao.md` + linha no índice orgid do `llms.txt` → a seção.
-
-## 1.16 — 2026-08-02
-
-- **orgid: `POST /open/ua/account-role` documentado por completo — e o `204` dele NÃO é sucesso.** O
-  endpoint público cria a conta externa **e** o vínculo com um papel **já existente** em **uma única
-  transação**. Papel (`name`+`owner`) inexistente → **`204` sem corpo** e **nada** é criado (nem a
-  conta): a transação é revertida. Só `200` confirma o registro.
-- **`role.owner` é o `name` da organização** dona do papel (antes descrito apenas como "espaço de
-  nomes"). E `role.label`/`role.ispublic`/`role.status`/`role.id` no corpo são **aceitos e ignorados** —
-  a doc os chamava de "metadados do papel", sugerindo um efeito que não existe: o papel vem do cadastro.
-- **Validações do registro agora na doc.** `username`: mín. 3 caracteres, só letras e dígitos, `yc`
-  reservado, normalizado para minúsculas e **único em toda a plataforma** (não por organização) —
-  duplicado → **`409`**, código antes ausente do catálogo. `password`: ao menos 1 maiúscula, 1 minúscula
-  e 1 dígito. `email`: formato `algo@algo`.
-- **Estado inicial da conta.** `account.status` aceita só `PENDING` ou `ACTIVE`; qualquer outro valor
-  vira `PENDING` **em silêncio**. `ACTIVE` cria a conta já ativa; `PENDING` exige o fluxo de hash.
-- **Chave `from` na raiz do corpo: só a presença importa.** Existindo a chave — com qualquer valor,
-  inclusive `false`/`null` — a conta nasce **ativa** e `account.status` é sobreposto. Preferir
-  `account.status`, que deixa a intenção legível.
-- **Corpo fora da forma → `510`, não `400`:** propriedade **desconhecida** dentro de `account` ou de
-  `role`, ou corpo sem `account`/`role`.
-- Atualizados: `orgid/endpoints/publico.md` (seção reescrita), `orgid/erros.md` (`409`, nota do `204`
-  enganoso, categoria "Conflito"), `orgid/exemplos.md` (exemplo #8), `orgid/openapi.yaml`
-  (`UaRegistroAccountRole`, resposta `Conflict`, path `/open/ua/account-role`), `llms-full.txt`.
-
-## 1.15 — 2026-08-02
-
-- **CORREÇÃO (persistence-q): posição dos controles de consulta e forma do `_sorting`.** A doc dizia que
-  `_paging`/`_sorting`/`_count`/`_connective`/`_cache` iam **dentro** do objeto do rótulo — **errado**. O
-  serviço lê esses controles no **nível raiz** do critério (irmãos do rótulo); postos dentro do rótulo são
-  **ignorados em silêncio** (aplica default). Além disso `_sorting` é **indexado por posição**
-  (`{ "0": { "_orderBy", "_order" } }`, até `"1"`/`"2"`), não plano. Confirmado por código
-  (`QueryServiceImpl.readByCriteria` + `ReadStatementTransformation`) + teste git-tracked
-  (`TestReadStatementJSON`).
-- **Conectivo `OR` documentado.** `_connective` (nível raiz) = `AND` (padrão) ou `OR` (maiúsculas), global
-  ao critério; não mistura AND/OR num mesmo critério; sub-condições de atributo composto são sempre AND.
-  Exemplos de `OR` (igualdade e operadores) adicionados.
-- Atualizados: `persistence-q/query-controls.md` (reescrito), `endpoints/consulta.md`, `exemplos.md`
-  (paging/sorting/OR/count), `README.md`, `openapi.yaml` (`Criterio`: controles no nível raiz, removido
-  `maxProperties:1`), `llms-full.txt`.
-- **Nota:** os controles de associação (`_associations`/`_populating`/`_level`/`_as`) permanecem **dentro**
-  do rótulo e **não têm consumidor** no código de consulta atual (provável tratamento na camada de
-  aplicação/BFF); mantidos na doc como estão, a confirmar.
-
-## 1.14 — 2026-08-01
-
-- **URL de callback do processador: endereço e path por variável de ambiente (br-service).** O
-  processador obtém o destino de rede em `PLATFORM_ENDPOINT_PERSISTENCE_C` /
-  `PLATFORM_ENDPOINT_PERSISTENCE_Q` e o path do endpoint interno em
-  `PLATFORM_ENDPOINT_PERSISTENCE_Q_UNSEC_PATH` — injetadas no ambiente do serviço e disponíveis a
-  **qualquer** processador, em qualquer nível de pasta, sem passar pelo payload. Variável ausente →
-  `400` nomeando a variável faltante. Antes a doc dizia que o path vinha "de variável de ambiente" sem
-  nomear nenhuma, o que levava o leitor a supor que a URL interna era a raiz do endereço-base.
-- **Duas superfícies espelhadas, e a escolha é ditada pelo tipo de hook.** Cada operação existe na
-  superfície **pública** (via gateway, `Authorization` + `X-Tenant-Id`) e na **interna de cluster**
-  (prefixo próprio, só `X-Tenant-Id`, negada pelo gateway). Hook síncrono tem JWT e pode as duas;
-  coordenação e projeção não têm JWT e só podem a interna. Antes o texto dizia apenas "endpoint interno,
-  path via variável de ambiente" sem nomear variável nem contrastar com a superfície pública — daí a
-  suposição frequente de que bastava apontar para o endereço-base.
-- **Contrato de resposta `400`: são duas formas, não uma.** Falha de **validação do corpo** devolve
-  `{erro}`; **rota inexistente** e **exceção no processador** devolvem `{status, mensagem, tipo}`.
-- **Ciclo de vida: o processador pode receber até três argumentos.** Com `data`, `authToken` e
-  `tenantIds` no corpo, é invocado como `(data, authToken, tenantIds)`; sem `tenantIds`, como
-  `(data, authToken)`; só com `data`, como `(data)`; sem `data`, recebe o corpo inteiro. `authToken` e
-  `tenantIds` só chegam na raiz do corpo no hook síncrono; `tenantIds` traz o `tenantId.forReadModel` do
-  modelo do agregado.
-- **JWT em hook assíncrono: oportunista, não garantido.** Parte dos fluxos de coordenação propaga o token
-  do usuário de origem em `data._meta.authToken` (para que a escrita de comando use a credencial de quem
-  originou o evento, não uma credencial de serviço fixa); outros fluxos não enviam token algum. Nunca
-  chega como argumento. Um processador assíncrono precisa funcionar sem token.
-- **Forma canônica da rota: o serviço não a valida.** A unicidade global depende da disciplina de quem
-  publica; sem o prefixo, duas organizações acabam apontando para o mesmo processador.
-  Atualizados: `br-service/README.md`, `CHANGELOG.md`.
-
-## 1.13 — 2026-07-31
-
-- **CRUD de entidade convencional (`POST /e`) documentado para o cliente.** Antes, `/e` só constava como
-  "escrita de projeção (serviço)". Agora há doc cliente para CRUD direto de **entidade convencional**
-  (tabela não-agregado, identificada por `id`/PK), distinta do caminho de **agregado** (`/a`, comando/
-  evento). Aviso: não usar `/e` em entity que é projeção de agregado event-sourced (desalinha a projeção).
-  Novo: `persistence-crs/endpoints/entidade.md`. Atualizados: `persistence-crs/endpoints/projecao.md`
-  (cross-link + enquadramento de uso interno), `persistence-crs/README.md` (índice + papel),
-  `persistence-crs/exemplos.md`, `persistence-crs/openapi.yaml` (`/e`: summary + `403`), `llms.txt`,
-  `README.md` ("Por tarefa"), `llms-full.txt` (regenerado).
+- **`PUT` de entity: atualização parcial de verdade — ausente ≠ vazio.** A documentação já prometia
+  *"campos omitidos são ignorados, não apagados"*, mas o serviço tratava propriedade **ausente** como
+  pedido de reset ao default: um `PUT` que enviava só `accessControl` **apagava o `uniqueKey`** da
+  entity, sem nada na resposta indicando a remoção. O mesmo mecanismo atingia `superEntity` (desfazia
+  herança) e, no nível de atributo, derrubava `NOT NULL`/`unique` e apagava o comentário. Corrigido no
+  serviço; o contrato agora é explícito:
+  - propriedade **ausente** → ignorada (valor atual preservado);
+  - propriedade com **valor vazio** (`[]`, `""`) → **limpa**;
+  - `null` explícito conta como **ausente** (não é sentinela de limpeza);
+  - `accessControl` é **substituído por inteiro**, não mesclado chave a chave (enviar só `read` reseta
+    `write` para `["MASTER"]`);
+  - `_conf` é **opcional** no `PUT` (segue obrigatório na criação).
+- **`PUT` passou a responder com o que aplicou.** O `200` antes vinha **sem corpo**; agora traz
+  `{entityName, valid, summary, totalChanges, applied[], skipped[]}`, com valor antigo e novo de cada
+  propriedade alterada — uma alteração que remove constraint passa a dizê-lo.
+- **Correção de fato:** `_conf.superEntity` e `_conf.superEntityStrategy` **são** atualizáveis; o BNF
+  os listava como imutáveis.
+- **Chave única: `attribute.unique` e `_conf.uniqueKey` são ortogonais e podem coexistir.** Documentado
+  o que antes era conhecimento tácito: unicidade de um atributo isolado vs chave composta (2+ atributos).
+  Combinar os dois é legítimo quando incidem sobre atributos **diferentes**; quando o **mesmo** atributo
+  é `unique` e também está no `uniqueKey`, a composta é logicamente redundante (aceita, mas sem efeito
+  prático além do custo). A ordem declarada em `uniqueKey` não é preservada.
+- Atualizados: `forger/endpoints/entity.md` (novas seções "Chave única" e "Semântica do `PUT`: ausente
+  vs vazio" + corpo da resposta), `forger/bnfs/update-entity-request.bnf`, `forger/openapi.yaml`
+  (`EntityPartialUpdate`, `ChangeReport`, `ChangeEntry`).
 
 ## 1.12 — 2026-07-05
 
@@ -448,7 +234,7 @@
   `persistence-q/openapi.yaml`, `br-service/openapi.yaml` (tech-agnóstico; só `Authorization`/`X-Tenant-Id`).
 - **`05-antipatterns.md`**: o que mais quebra, por serviço (sintoma → causa → correção).
 - `model-format.md`: identificação na projeção (linha por `aggregateid`; `status` = estado atual).
-- Bundle (`build-bundle.sh`): allowlist passa a incluir `.yaml`.
+- Fronteira de publicação: a allowlist passa a incluir `.yaml`.
 - `dataschema.md`: `status` documentado como **rótulo administrativo editável** (sem lifecycle imposto
   nem gate para criar entity). O ciclo "MODELING→RUNNING→STOPPED" da proposta **não** existe no código
   (drift do mirror); `ACTIVE` é status de broker, não de dataschema.
@@ -458,8 +244,8 @@
 - Guardião dividido: `docs/CLAUDE.md` (sensível, não publicado) + `public/CLAUDE-extended.md` (público).
 - `llms.txt` como índice primário; `llms-full.txt` como fallback (cabeçalho + ordem alto-valor-primeiro).
 - Regras contexto-aware (teto de tamanho, fatos-chave no topo, ordenação) no guardião.
-- **Fronteira de publicação:** `publish/build-bundle.sh` monta o bundle (allowlist `for-llms`, exceto
-  `CLAUDE*`), com guardas (sem CLAUDE, leak-scan, links). A app serve só `publish/dist/`.
+- **Fronteira de publicação:** definida a allowlist do que é publicado e a denylist do que nunca sai,
+  com as guardas de verificação antes de disponibilizar.
 
 ## 1.0 — 2026-06-20
 

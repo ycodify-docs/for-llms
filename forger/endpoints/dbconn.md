@@ -22,6 +22,13 @@ Corpo (JSON):
 Resposta `201`: `{ "id": <número>, "message": "..." }`.
 Erros: `400` (campo ausente/ inválido), `403`, `500`.
 
+> ⚠️ **Alterar uma conexão não passa a valer de imediato.** Os serviços de comando e de consulta
+> guardam a conexão resolvida do tenant em memória por um intervalo; até ele vencer, as requisições
+> continuam usando os **dados antigos** — inclusive usuário e senha anteriores. Consequência prática:
+> depois de trocar endereço, porta ou credencial aqui, **o efeito pode demorar** e uma falha de
+> autenticação logo após a troca **não** significa que o novo valor está errado. Planeje a troca com
+> essa defasagem em mente.
+
 ## Ler
 
 `GET /org/{org}/dbconn/{id}` → `200` com o registro; `204` se não existir.

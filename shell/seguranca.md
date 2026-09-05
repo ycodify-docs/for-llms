@@ -1,12 +1,8 @@
 # shell · segurança
 
-> As invariantes de segurança da casca + BFF. Regra-mãe: **todo segredo vive no BFF; o consumidor nunca
-> vê token nem chave**. A casca é a interface; o **BFF** é o guardião.
->
-> **As invariantes são do BFF, não da casca** — valem para **qualquer** consumidor, com ou sem UI
-> (cliente sem casca: app móvel, integração, serviço). O que é específico da casca/browser está
-> marcado como tal. Contrato do BFF: [bff/README.md](../bff/README.md). Pré: [README](README.md),
-> [bff](../bff/README.md), [autenticação](../06-autenticacao.md).
+> As invariantes de segurança da casca + BFF. Regra-mãe: **todo segredo vive no BFF; o browser nunca vê
+> token nem chave**. A casca é a interface; o **BFF** é o guardião. Pré: [README](README.md),
+> [bff](bff.md), [autenticação](../06-autenticacao.md).
 >
 > _(Documento **público**: descreve o **modelo**, não valores. Nenhuma credencial, chave, senha ou
 > endereço sensível deve constar aqui — isso é operacional e fica **fora** desta documentação.)_

@@ -6,6 +6,12 @@
 >
 > **Comum:** sem `Authorization`; POST/PUT enviam `Content-Type: application/json`.
 > `{action}`: **`R`** = ativação (registro) · **`PR`** = recuperação de senha. Erros: [../erros.md](../erros.md).
+>
+> ⚠️ **O prefixo `/open/` não é o inventário completo dos públicos.** Existe **um** público fora dele —
+> `GET /ua/open/role/owner/{roleOwner}`, com os segmentos invertidos (ver [ua-papel.md](ua-papel.md)).
+> Quem deriva regra de autorização do prefixo `/open/**` **deixa esse de fora** e ele passa a exigir token
+> apesar de público. É o estado do `OrgIdSecurityConfig` do orgid standalone até hoje; o `composer`, que é
+> o que está implantado, libera os dois prefixos desde 2026-09-05.
 
 ## Contents
 - GET /open/up/account/by/username/{username}/exists
@@ -15,8 +21,19 @@
 - GET /open/{up|ua}/hash/for/{action}/by/{username} — solicitar hash
 - PUT /open/{up|ua}/account/{username}/{action}/hash/{hash} — executar ação
 - POST /open/ua/account/e-mail/send — enviar e-mail (externo)
+- GET /ua/open/role/owner/{roleOwner} — listar papéis públicos ⚠️ **fora do prefixo** → [ua-papel.md](ua-papel.md)
 
 ---
+
+## ⚠️ Registro não envia e-mail; hash e `/e-mail/send` enviam — e o envio é real
+
+`POST /open/up/account` e `POST /open/ua/account-role` **criam a conta e não disparam nada**. Quem manda
+e-mail é `GET /open/{up|ua}/hash/for/{action}/by/{username}` (o hash vai por e-mail) e
+`POST /open/ua/account/e-mail/send`.
+
+Esses dois falam com um **provedor real** (mailersend), em plano com **cota**. Não os acione para exercitar
+fluxo: cada chamada consome cota e reputação de domínio. Para testar registro sem enviar nada, pare no POST
+da conta — ela já existe e, como diz [ua-conta.md](ua-conta.md), **já dá para logar sem ativar**.
 
 ## GET /open/up/account/by/username/{username}/exists
 ## GET /open/ua/account/by/username/{username}/exists
@@ -49,31 +66,21 @@ Cria a **conta** (estado inicial **pendente**) **e** a **organização**, vincul
 **Resposta:** `201` — conta criada (com `id`; senha omitida). Depois: **ativar** (fluxo de hash) e seguir para o forger.
 
 ## POST /open/ua/account-role — registro (externo): conta + papel
-Cria uma conta **externa** **e** a associa a um **papel já existente**, em **uma única transação**: se
-qualquer etapa falhar, **nada** é criado. O papel **não** é criado aqui — precisa já estar cadastrado
-(ver [ua-papel.md](ua-papel.md)).
+Cria uma conta **externa** e a associa a um **papel**.
 
-**Corpo** (JSON) — na raiz: `account` (obrigatório), `role` (obrigatório) e `from` (opcional).
+**Corpo** (JSON):
 
 | Campo | Tipo | Obrig. | Significado |
 |---|---|---|---|
-| `account.username` | string | **sim** | Login. **Mín. 3 caracteres**, **só letras e dígitos**, normalizado para minúsculas; o valor `yc` é **reservado**. **Único em toda a plataforma** (não por organização) — já em uso → `409`. Fora das regras → `400`. |
-| `account.password` | string | **sim** | Senha. Não pode ser em branco e precisa ter **ao menos 1 maiúscula, 1 minúscula e 1 dígito** — senão `400`. |
-| `account.email` | string | **sim** | E-mail no formato `algo@algo` — senão `400`. |
-| `account.status` | string | não | Só `PENDING` ou `ACTIVE`; **qualquer outro valor vira `PENDING` em silêncio**. `PENDING` (padrão) exige ativação pelo fluxo de hash antes do login. |
-| `account.*` | — | não | Demais campos da conta externa (ver [ua-conta.md](ua-conta.md)). Normalizados para minúsculas; omitidos viram string vazia. |
-| `role.name` | string | **sim** | Nome do papel — **já existente**. |
-| `role.owner` | string | **sim** | Dono do papel: o **`name` da organização** (é ele que forma o espaço de nomes dos papéis `/ua`). |
-| `from` | qualquer | não | **Basta a chave existir na raiz** — o valor é irrelevante (inclusive `false`/`null`): a conta nasce **ativa**, dispensando o fluxo de hash. **Sobrepõe `account.status`.** Prefira `account.status` para deixar a intenção legível. |
+| `account.username` | string | sim | Login. |
+| `account.password` | string | sim | Senha. |
+| `account.email` | string | sim | E-mail. |
+| `account.*` | — | não | Demais campos da conta externa (ver [ua-conta.md](ua-conta.md)). |
+| `role.name` | string | sim | Papel a associar. |
+| `role.owner` | string | sim | Dono (espaço de nomes) do papel. |
+| `role.label` / `role.ispublic` / `role.status` | — | não | Metadados do papel. |
 
-> ⚠️ **`204` aqui NÃO é sucesso.** Papel (`name`+`owner`) inexistente → **`204` sem corpo** e **nada é
-> criado** (nem a conta) — a transação é revertida. Só `200` confirma o registro; confirme antes que o
-> papel existe.
-> **`510`:** chave **desconhecida** dentro de `account` ou de `role`, ou corpo sem `account`/`role`.
-> **Aceitos e ignorados:** `role.label`, `role.ispublic`, `role.status`, `role.id` — o papel vem do
-> cadastro, não do corpo. A associação conta-papel nasce sempre **ativa**, seja qual for o corpo.
-
-**Resposta:** `200` (sem corpo) — conta criada e associada. Erros: `400`, `409`, `510`; e `204` (papel inexistente, nada criado).
+**Resposta:** `200` (sem corpo).
 
 ## GET /open/up/hash/for/{action}/by/{username}
 ## GET /open/ua/hash/for/{action}/by/{username}
@@ -84,7 +91,8 @@ Solicita um **hash** de vida curta (enviado ao usuário por e-mail) para `{actio
 | `action` | `R` (ativação) ou `PR` (recuperação de senha) |
 | `username` | conta alvo |
 
-**Resposta:** `200` — `{}` (efeito: envio do hash).
+**Resposta:** `200` — `{}` (efeito: envio do hash) · `404` — `"account not found: no hash was generated
+and no e-mail was sent."`
 
 ## PUT /open/up/account/{username}/{action}/hash/{hash}
 ## PUT /open/ua/account/{username}/{action}/hash/{hash}
@@ -102,7 +110,12 @@ Executa a ação do hash.
 |---|---|---|---|
 | `password` | string | sim (em `PR`) | Nova senha. |
 
-**Resposta:** `200` (sem corpo). Em `R`, ativa a conta; em `PR`, troca a senha.
+**Resposta:** `200` (sem corpo) — em `R`, ativa a conta; em `PR`, troca a senha · `404` —
+`"account not found: the hash action was not executed."`
+
+> ⚠️ Até 2026-09-05 a conta inexistente respondia **`204`** nos dois endpoints acima. `204` é sucesso sem
+> corpo: em `PR`, o usuário recebia confirmação de uma troca de senha que nunca aconteceu. Ver
+> [../erros.md](../erros.md).
 
 ## POST /open/ua/account/e-mail/send — enviar e-mail (externo)
 Envia uma notificação por e-mail.

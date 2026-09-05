@@ -58,18 +58,25 @@ Substitui **a conta** de um vínculo existente. **Papel:** administrador na org.
 | `accountRoleOrg` | objeto | sim | Vínculo atual a alterar. |
 | `account` | objeto | sim | Nova conta (`{username}`). |
 
-**Resposta:** `200`.
+**Resposta:** `200` quando substituiu · `404` se o vínculo, a conta substituta ou a org não existir — a
+mensagem diz **qual dos três** faltou e que **a conta não foi substituída**.
 
 ## PUT /up/account-role-org/replace-master-account
 Substitui a **conta administradora** do vínculo. **Papel:** administrador na org. Corpo igual ao
-`replace-account`. **Resposta:** `200`.
+`replace-account`.
+
+**Resposta:** `200` quando substituiu · `404` — `"… não existe: a conta master não foi substituída."`
+
+> ⚠️ Até 2026-09-05 estes três `replace-*` respondiam **`204`** quando o vínculo, a conta ou a org não
+> existia. `204` é sucesso sem corpo: **trocar a conta administradora de uma organização virava no-op
+> silencioso**. Ver [../erros.md](../erros.md).
 
 ## PUT /up/account-role-org/replace-role
 Substitui o **papel** do vínculo. **Papel:** administrador na org.
 
 **Corpo** (JSON): `org` `{name}` + `accountRoleOrg` (vínculo atual) + `role` `{name}` (novo papel).
 
-**Resposta:** `200`.
+**Resposta:** `200` quando substituiu · `404` — `"… não existe: o papel não foi substituído."`
 
 ## DELETE /up/account-role-org/by/org/{orgName}
 Desassocia a conta da org. **Papel:** administrador na org.

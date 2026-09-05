@@ -72,26 +72,5 @@ Headers: Authorization: ...
 > associação → `510` (falha não tratada, não validação de campo). Ver [erros.md](erros.md) e
 > [endpoints/ua-associacao.md](endpoints/ua-associacao.md).
 
-## 8. Registrar conta externa + papel de uma vez (público, sem token)
-
-Contraparte **pública** do #7: cria a conta **e** o vínculo numa transação. O papel (`name`+`owner`)
-**já precisa existir**; `owner` é o `name` da organização.
-
-```
-POST /open/ua/account-role
-{ "account": { "username": "bob", "email": "bob@acme.com", "password": "•••" },
-  "role": { "name": "cliente", "owner": "acme" } }
-→ 200   // conta criada PENDENTE + vínculo ativo; ativar pelo fluxo de hash (#2)
-
-// nascer já ativa (dispensa o hash): status ACTIVE no account
-{ "account": { "username": "bob", "email": "bob@acme.com", "password": "•••", "status": "ACTIVE" },
-  "role": { "name": "cliente", "owner": "acme" } }
-→ 200
-
-// papel "cliente"/"acme" inexistente  → 204 sem corpo e NADA criado (204 aqui não é sucesso)
-// username já usado na plataforma     → 409
-// chave desconhecida em account/role  → 510
-```
-
 > O `name` da org (`acme`) é o `{org}` dos caminhos do forger. Papéis `/up` são `API_*`; papéis `/ua`
 > têm `owner` (espaço de nomes). Ver [README](README.md) e [coordenação](../coordenacao.md).

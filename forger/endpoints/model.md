@@ -10,12 +10,9 @@ Exigem `Authorization` e papel de administrador/engenheiro em `{org}`.
 
 `POST /org/{org}/project/{project}/tenant/{tenantId}/model`
 
-Envio: o documento de modelo (`.json`) como **upload `multipart/form-data`, no campo `file`** (ex.:
-`curl -F "file=@modelo.json"`). **`Content-Type: application/json` (JSON no corpo) → `415`**. Efeito: valida a consistência
+Envio: o documento de modelo (`.json`) como upload. Efeito: valida a consistência
 `(org, project, tenant)` — o `tenantId` deve referenciar exatamente um dataschema do contexto — e
 **publica** o modelo no cache distribuído. **Semântica de sobrescrita**: republicar substitui o anterior.
-**A publicação não tem prazo de validade**: o modelo permanece disponível até ser republicado ou
-removido — não expira nem é repopulado por consumidor. O forger é o único publicador.
 Resposta `201`: `{ "key": "<referência de publicação>" }`.
 Erros: `400` (documento inválido / faltando seção de agregado), `403`/`404` (consistência), `500`.
 
@@ -52,12 +49,6 @@ publicação no cache (criar/atualizar) → resposta.
 > distribuído. As **filas/topologia de mensageria** são provisionadas pelo deploy de **process (BPMN)**
 > — ver [process.md](process.md). O modelo de domínio descreve agregados/comandos/eventos e seus
 > marcadores de despacho (projeção/coordenação), mas não declara nem cria infraestrutura de filas.
-
-> **São dois modelos distintos, publicados separadamente.** Este endpoint publica o **modelo de
-> domínio** (agregados, comandos, eventos). O **modelo de entidades** — a descrição das entidades que
-> correspondem às **projeções** desses agregados — é publicado por outro caminho: a transição de
-> `status` do dataschema `MODELING → RUNNING` (ver [dataschema.md](dataschema.md#efeito-da-transição-sobre-o-cache-distribuído)).
-> Publicar o modelo de domínio **não** publica o de entidades, e vice-versa. Ambos são permanentes.
 
 ## Coordenação
 **CP-1:** o modelo publicado aqui é a **fonte da verdade** lida por **persistence-crs** (quais comandos/

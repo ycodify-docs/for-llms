@@ -4,7 +4,7 @@
 > como **variáveis** e consumidos por utilitários — nunca cores/medidas "cravadas" no componente. Um único
 > primitivo, a **marca**, é **sobrescrevível pelo tenant** em runtime: a casca inteira recolore.
 > Pré: [README](README.md). _(Doc de estilo — necessariamente concreta; os **contratos** ficam em
-> [contrato-miolo](contrato-miolo.md)/[bff](../bff/README.md).)_
+> [contrato-miolo](contrato-miolo.md)/[bff](bff.md).)_
 
 ## Princípio: tokens semânticos, não valores cravados
 
@@ -33,7 +33,7 @@
 - Cada esquema define os tokens para **claro e escuro** (blocos mutuamente exclusivos). Os tokens de
   **estado** (`ok/warn/info/danger`) permanecem semânticos — **não** mudam por esquema.
 - **Escopo = organização**: o esquema é uma preferência **org-scoped**, persistida via o canal de
-  preferências da org (ver [bff](../bff/README.md)) e aplicada a **todos** os usuários da org. Só **MASTER-na-org**
+  preferências da org (ver [bff](bff.md)) e aplicada a **todos** os usuários da org. Só **MASTER-na-org**
   altera (revalidado no servidor).
 
 ## Grupos de token (papéis)
