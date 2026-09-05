@@ -13,6 +13,8 @@
 - Contrato de resposta
 - Ciclo de vida de uma requisição
 - Autoria de processadores → [processadores.md](processadores.md)
+- Implantar processadores → [endpoints/processors-deploy.md](endpoints/processors-deploy.md)
+- Consultar o log de execução → [endpoints/logs.md](endpoints/logs.md)
 - Pontos de coordenação
 - Pitfalls
 
@@ -30,11 +32,18 @@ coordenação (async); no caminho **crítico do comando** (síncrono), evite esc
 
 ## Índice de endpoints
 
-> Apenas o endpoint de contrato é documentado. Endpoints de saúde/observabilidade **não** constam aqui.
+> Endpoints de saúde/observabilidade **não** constam aqui.
 
 | Operação | Método · Path | Documento |
 |---|---|---|
 | Executar função (rota) | `POST /br` | [endpoints/br.md](endpoints/br.md) |
+| Implantar processadores de uma organização | `POST /processors/deploy/{org}` | [endpoints/processors-deploy.md](endpoints/processors-deploy.md) |
+| Desfazer a última publicação | `POST /processors/rollback/{org}/{backupId}` | [endpoints/processors-deploy.md](endpoints/processors-deploy.md) |
+| Consultar o log de execução | `GET /logs/query/…` | [endpoints/logs.md](endpoints/logs.md) |
+
+> **As rotas administrativas exigem um cabeçalho a mais.** Publicação, rollback e consulta de log passam
+> pela borda como rotas administrativas e pedem `X-Forger-Credential` — que **nunca** vai junto com
+> `X-Tenant-Id`. O `POST /br` não é afetado: ele é chamado pelo motor de comandos dentro do cluster.
 
 > **⚠️ `POST /coordination` — pendente (gap de plataforma).** O motor de comandos (persistence-crs)
 > aciona uma coordenação **síncrona no caminho do comando** quando o modelo do comando declara

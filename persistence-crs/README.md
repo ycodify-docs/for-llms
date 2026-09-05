@@ -47,15 +47,18 @@ Gramática do modelo de domínio: **[spec/model-format.md](spec/model-format.md)
 
 1. **Auth + tenant** — valida `Authorization` e o `tenant-id`; carrega o **modelo** do tenant (CP-1).
 2. **Decomposição** — identifica o agregado, o **comando** e seus dados a partir do corpo.
-3. **Carga do estado atual** — reconstitui o estado do agregado a partir dos seus eventos.
-4. **Validação de transição** — o estado atual precisa pertencer ao conjunto de **estados de origem**
+3. **Autorização por papel** — os papéis do usuário são conferidos contra `command.<cmd>.roles` do
+   modelo. Sem papel correspondente, o comando é recusado com **`403`** e **nada é gravado** — a recusa
+   acontece antes da validação de transição.
+4. **Carga do estado atual** — reconstitui o estado do agregado a partir dos seus eventos.
+5. **Validação de transição** — o estado atual precisa pertencer ao conjunto de **estados de origem**
    (`fromState`) do comando; senão → erro de transição.
-5. **Regra/coordenação (se declarada)** — se o modelo do comando declara uma rota de **regra de
+6. **Regra/coordenação (se declarada)** — se o modelo do comando declara uma rota de **regra de
    negócio** ou de **coordenação**, o serviço chama o **br-service** para validar/enriquecer/coordenar
    **antes** de concluir (CP-6).
-6. **Validação do estado de destino** — após a regra, o estado resultante deve corresponder ao
+7. **Validação do estado de destino** — após a regra, o estado resultante deve corresponder ao
    **estado de destino** (`endState`) previsto.
-7. **Gravação do evento** — grava o evento no banco de escrita (universal, isolado por `tenant-id`).
+8. **Gravação do evento** — grava o evento no banco de escrita (universal, isolado por `tenant-id`).
    A gravação, na mesma transação, **notifica o es-n** (CP-3).
 8. **Resposta** — `200` com `{ "id": "<id do agregado>", "status": "<estado>" }`.
 

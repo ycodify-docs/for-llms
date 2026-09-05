@@ -51,5 +51,6 @@ estado → validação de transição (`fromState`) → regra/coordenação no b
 validação do estado de destino (`endState`) → gravação do evento (notifica es-n) → resposta.
 
 ## Erros
-`400` (corpo inválido), `403` (tenant não autorizado), `510` (falha de transição/processamento e demais
-exceções). Catálogo: [../erros.md](../erros.md).
+`400` (corpo inválido, incluindo `valueObject` na forma errada), `403` (tenant não autorizado **ou
+usuário sem o papel exigido pelo comando**), `510` (falha de transição/processamento e demais exceções).
+Catálogo: [../erros.md](../erros.md).

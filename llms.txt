@@ -62,6 +62,8 @@
 - [Guia](br-service/README.md): posição no fluxo, três categorias de processador, forma canônica da rota, contrato de resposta.
 - [Autoria de processadores](br-service/processadores.md): caminho do arquivo → rota, forma do export, o que o processador recebe e devolve, publicação, diagnóstico.
 - [executar função (/br)](br-service/endpoints/br.md) · [Erros](br-service/erros.md) · [Exemplos](br-service/exemplos.md) · [OpenAPI](br-service/openapi.yaml)
+- [implantar processadores](br-service/endpoints/processors-deploy.md): publicar e desfazer a árvore de uma organização por arquivo compactado; os três cabeçalhos, o teto e como conferir o que entrou.
+- [consultar o log de execução](br-service/endpoints/logs.md): registro das execuções por termo, arquivo do erro e intervalo; o que é gravado e o que não é.
 
 ## filer (arquivos anexos a agregados) — serviço transversal
 - [Guia](filer/README.md): convenção de nome (arquivo↔agregado), RBAC por entidade, limites/tipos.

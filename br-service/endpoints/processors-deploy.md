@@ -43,10 +43,11 @@ O **arquivo compactado cru** — não é formulário nem `multipart`, e não vai
 | `Content-Type` | `application/zip` |
 | Tamanho máximo | **5 MB** |
 
-> **O `413` não vem deste serviço.** Pacote acima do teto é barrado na borda da plataforma, antes de
-> chegar ao br-service — a resposta não tem o corpo `{status, mensagem, tipo}` dos erros daqui. Se o seu
-> pacote encostar no limite, o caminho é reduzi-lo (processadores são texto; o que costuma inchar um
-> pacote é arquivo que não deveria estar nele), não reenviar.
+> **O `413` não vem deste serviço, e não vem em JSON.** Pacote acima do teto é barrado na borda da
+> plataforma, antes de chegar ao br-service, e a resposta é uma **página HTML** de erro da borda — não o
+> corpo `{status, mensagem, tipo}` dos erros daqui. **Quem faz parse esperando JSON quebra nesse ponto**;
+> trate `413` pelo código, não pelo corpo. Se o seu pacote encostar no limite, o caminho é reduzi-lo
+> (processadores são texto; o que costuma inchar um pacote é arquivo que não deveria estar nele).
 
 ### Cabeçalhos — os dois são obrigatórios
 
@@ -56,11 +57,22 @@ Faltando qualquer um dos dois, a resposta é `401` e **nada** é publicado.
 |---|---|---|---|
 | `X-Processors-Deploy-Credential` | sim | UUID, entregue no provisionamento | autoriza a **operação** — é a credencial do serviço |
 | `Authorization` | sim | `Bearer <token de acesso>` | diz **quem** publica e **em que organizações** pode publicar |
+| `X-Forger-Credential` | sim | UUID, entregue no provisionamento | exigido pela **borda**, antes de o pedido chegar ao serviço |
 | `Content-Type` | recomendado | `application/zip` | o corpo é lido como binário de qualquer forma |
 
-As duas credenciais são **independentes e cumulativas**: a primeira não substitui a segunda. Uma diz que a
-operação é permitida neste serviço; a outra, que **este portador** pode publicar **nesta organização**. É
-por isso que possuir a credencial não basta para publicar na organização de outro cliente.
+> ⛔ **Nunca envie `X-Tenant-Id` junto com `X-Forger-Credential`.** Os dois no mesmo pedido são recusados
+> pela borda com `400` e `tipo: multiple_headers` — *"Cannot have both X-Tenant-Id and X-Forger-Credential
+> headers simultaneously"*. Nesta rota vai **só** o `X-Forger-Credential`.
+
+> **Por que três cabeçalhos e não dois.** Esta é uma rota **administrativa**, não de execução de modelo. A
+> borda classifica as rotas administrativas e exige `X-Forger-Credential` nelas — `X-Tenant-Id` **não**
+> substitui. Faltando ele, a recusa é `401` com `tipo: missing_forger_credential`, e a mensagem diz qual
+> cabeçalho falta. O pedido nem chega ao br-service, então as credenciais de deploy e o token não são nem
+> avaliados.
+
+As duas credenciais do serviço são **independentes e cumulativas**: a primeira não substitui a segunda. Uma
+diz que a operação é permitida neste serviço; a outra, que **este portador** pode publicar **nesta
+organização**. É por isso que possuir a credencial não basta para publicar na organização de outro cliente.
 
 O token de acesso é o mesmo obtido no login da plataforma — ver
 [autenticação](../../06-autenticacao.md). Sua assinatura é verificada aqui.
@@ -201,9 +213,13 @@ silêncio** no carregamento, e a rota simplesmente não existiria — sem nenhum
 > Ilustrativo — `<...>` é placeholder, não JSON literal.
 
 - **As rotas entram em vigor na hora**, sem reinício do serviço.
-- **`recarga` é a confirmação que importa.** `rotas` é o que o pacote pretendia publicar; `recarga.adicionadas`
-  é o que o serviço **de fato** passou a atender. Compare os dois: arquivo que não exporte uma função de
-  processador aparece em `arquivos` e **não** em `recarga.adicionadas`.
+- **`recarga.adicionadas` é delta, não confirmação de recarga.** Lista as rotas **novas** — as que não
+  existiam antes deste envio. Republicar o conteúdo de uma rota que já existia **não** aparece ali: um
+  envio que só altera regras existentes volta com `adicionadas: []`, e isso é o esperado, não falha. Para
+  confirmar que a publicação entrou, use **`recarga.total`** (quantas rotas o serviço atende agora) e a
+  lista `rotas`.
+- **Para achar arquivo que não virou rota**, compare `arquivos` com `rotas`: o que não exporta uma função
+  de processador aparece em `arquivos` e não em `rotas`.
 - **`recarga.removidas`** lista o que deixou de existir por não estar no pacote.
 - **Guarde o `backupId`** — é o que permite desfazer.
 
@@ -212,6 +228,8 @@ silêncio** no carregamento, e a rota simplesmente não existiria — sem nenhum
 | Código | Quando |
 |---|---|
 | `400` | pacote inválido: caminho suspeito, extensão recusada, erro de sintaxe, teto estourado, corpo vazio, organização com nome inválido |
+| `400` **da borda** | `X-Tenant-Id` enviado junto com `X-Forger-Credential` (`tipo: multiple_headers`) |
+| `401` **da borda** | `X-Forger-Credential` ausente (`tipo: missing_forger_credential`) — o pedido não chega ao serviço |
 | `401` | `X-Processors-Deploy-Credential` ausente/incorreta, ou token ausente, expirado, com assinatura inválida ou algoritmo trocado |
 | `403` | o portador do token **não está vinculado** à organização da URL |
 | `500` | falha ao trocar a árvore no destino — o estado anterior é restaurado |
@@ -252,6 +270,7 @@ Publicar:
 ```
 POST /v3/brservice/processors/deploy/clubflow
 X-Processors-Deploy-Credential: <uuid>
+X-Forger-Credential: <uuid>
 Authorization: Bearer <token>
 Content-Type: application/zip
 
@@ -263,6 +282,7 @@ Com uma ferramenta de linha de comando, o essencial é enviar o **binário cru**
 ```
 curl -X POST \
   -H 'X-Processors-Deploy-Credential: <uuid>' \
+  -H 'X-Forger-Credential: <uuid>' \
   -H 'Authorization: Bearer <token>' \
   -H 'Content-Type: application/zip' \
   --data-binary @clubflow.zip \
@@ -274,6 +294,7 @@ Desfazer a última publicação:
 ```
 POST /v3/brservice/processors/rollback/clubflow/<backupId>
 X-Processors-Deploy-Credential: <uuid>
+X-Forger-Credential: <uuid>
 Authorization: Bearer <token>
 ```
 

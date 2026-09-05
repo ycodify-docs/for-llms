@@ -36,8 +36,17 @@ Os parâmetros são parte do caminho — codifique-os quando contiverem caracter
 | Cabeçalho | Obrigatório | Valor |
 |---|---|---|
 | `X-Logs-Key` | sim | a chave de consulta, no formato UUID, entregue no provisionamento |
+| `X-Forger-Credential` | sim | UUID, entregue no provisionamento | exigido pela **borda**, antes de o pedido chegar ao serviço |
 
-Esta rota **não** usa `Authorization` nem `X-Tenant-Id`: a chave é a credencial inteira.
+Esta rota **não** usa `Authorization`, e **não** aceita `X-Tenant-Id`.
+
+> ⛔ **Nunca envie `X-Tenant-Id`.** Junto com `X-Forger-Credential` ele é recusado pela borda com `400` e
+> `tipo: multiple_headers`. Aqui vão **só** `X-Logs-Key` e `X-Forger-Credential`.
+
+> **Por que dois cabeçalhos.** São de camadas diferentes: o `X-Forger-Credential` é exigido pela **borda**,
+> que classifica esta rota como administrativa; o `X-Logs-Key` é a credencial do **serviço**, e é ele que
+> autoriza a consulta. Faltando o primeiro, a recusa é `401` com `tipo: missing_forger_credential` e o
+> pedido nem chega ao br-service.
 
 ## Resposta
 
@@ -94,6 +103,8 @@ credencial, então não são gravados — logo não há como recuperá-los por a
 | Código | Quando |
 |---|---|
 | `400` | `f` ou `t` fora de formato, ou `f` posterior a `t` |
+| `400` **da borda** | `X-Tenant-Id` enviado junto com `X-Forger-Credential` (`tipo: multiple_headers`) |
+| `401` **da borda** | `X-Forger-Credential` ausente (`tipo: missing_forger_credential`) — o pedido não chega ao serviço |
 | `401` | `X-Logs-Key` ausente ou incorreta |
 | `503` | consulta de log não provisionada neste ambiente |
 
@@ -117,6 +128,7 @@ Tudo o que houve num dia:
 ```
 GET /v3/brservice/logs/query/*/from/2026-08-31T00:00:00Z/to/2026-08-31T23:59:59Z
 X-Logs-Key: <uuid>
+X-Forger-Credential: <uuid>
 ```
 
 Só o que falhou numa rota:
@@ -124,6 +136,7 @@ Só o que falhou numa rota:
 ```
 GET /v3/brservice/logs/query/processor_error/from/1756605600000/to/1756692000000
 X-Logs-Key: <uuid>
+X-Forger-Credential: <uuid>
 ```
 
 Rastrear uma execução específica pelo identificador de correlação:
@@ -131,6 +144,7 @@ Rastrear uma execução específica pelo identificador de correlação:
 ```
 GET /v3/brservice/logs/query/<traceId>/from/2026-08-31T02:00:00Z/to/2026-08-31T03:00:00Z
 X-Logs-Key: <uuid>
+X-Forger-Credential: <uuid>
 ```
 
 Tudo o que falhou **num arquivo**, no dia:
@@ -138,6 +152,7 @@ Tudo o que falhou **num arquivo**, no dia:
 ```
 GET /v3/brservice/logs/query/*/file/atualizar/from/2026-08-31T00:00:00Z/to/2026-08-31T23:59:59Z
 X-Logs-Key: <uuid>
+X-Forger-Credential: <uuid>
 ```
 
 Os dois filtros somados — falhas **daquele arquivo** cuja mensagem contém um texto:
@@ -145,4 +160,5 @@ Os dois filtros somados — falhas **daquele arquivo** cuja mensagem contém um 
 ```
 GET /v3/brservice/logs/query/obrigat%C3%B3rio/file/atualizar/from/2026-08-31T00:00:00Z/to/2026-08-31T23:59:59Z
 X-Logs-Key: <uuid>
+X-Forger-Credential: <uuid>
 ```
