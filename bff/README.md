@@ -134,11 +134,12 @@ O consumidor **não** compõe esses cabeçalhos nem conhece o token.
   **Isso vale para o comando. Leitura é outra história — ver abaixo.**
 - **Value object viaja no comando.** `data` carrega, no **mesmo nível** dos atributos escalares, cada
   `valueObject` declarado pelo comando no modelo (ver
-  [model-format](../persistence-crs/spec/model-format.md#datavalueobject)): `single` → o valor daquele
-  VO; `multiple` → lista. Quando o VO é declarado como **atributo tipado direto** (`{type,…}`, sem
-  sub-campos), o valor é um **escalar** — e `multiple`, uma lista de escalares. Forma incompatível é
-  recusada com `400` dizendo o que se esperava, **nunca omitida em silêncio**. O BFF não coage os
-  campos internos: repassa o valor como recebeu.
+  [model-format](../persistence-crs/spec/model-format.md#datavalueobject)): `single` → **um objeto**;
+  `multiple` → **um array de objetos**. **Vale para as duas formas de declaração** (grupo de campos e
+  atributo tipado direto): a forma do **valor** é a mesma nas duas, e **escalar nunca** — nem solto,
+  nem dentro de array. Forma incompatível é recusada com `400` que **diz a posição** do item errado,
+  **nunca omitida em silêncio** (um item fora da forma reprova o comando inteiro). O BFF não coage os
+  campos internos: repassa o valor como recebeu, aninhamento incluso.
 - `/session/aggregate` existe porque a **projeção é assíncrona**: para carregar o estado autoritativo de
   um agregado (ex.: preencher um form de transição) não se deve ler o read model.
 
@@ -191,6 +192,17 @@ qualquer agregado ficariam ao alcance de qualquer portador de sessão daquele te
 - `paging`/`sorting` são conveniências do BFF, que os coloca no **nível raiz** do critério (irmãos do
   rótulo) e indexa `sorting` por posição, como exige
   [query-controls](../persistence-q/query-controls.md). O consumidor envia a forma plana acima.
+- ⚠️ **Sem `paging`, a lista vem cortada e o consumidor não fica sabendo.** O read model aplica um
+  **limite padrão** (500 registros no modo array) — a resposta parece completa. Quem lista **manda
+  `paging` sempre**. E **meio `paging` é pior que nenhum**: incompleto, a consulta roda **sem limite**
+  e devolve a tabela inteira do tenant, então o BFF recusa a forma incompleta com `400` antes de ir à
+  rede. O mesmo vale para `sorting` sem `_orderBy` ou com `_order` fora de `ASC`/`DESC`.
+- **A resposta diz quando cortou.** Havendo mais registros além do teto, o sucesso traz
+  `truncated: true` e `maxRegisters` ao lado de `records`. **Ausência de `truncated` não é garantia de
+  lista inteira** enquanto a marca não estiver no ar em toda a plataforma — só a presença é
+  informação. Para continuar, repita a consulta avançando `_firstRegister` em `_maxRegisters`.
+- **O rótulo é a chave que NÃO começa com `_`.** Quem procura o resultado pela "primeira chave do
+  item" da resposta do persistence-q passa a tropeçar em `_truncated` e a ler um booleano como lista.
 - **Erro do upstream chega inteiro.** Em `/session/query`, `/session/aggregate` e `/session/history`, um
   não-2xx do persistence-q/-crs é repassado com **o status e o corpo de erro reais**. O consumidor
   **nunca** recebe status de erro com corpo em forma de sucesso — `{ records: [] }`, `{ state }` e
