@@ -19,20 +19,62 @@ O contrato **mínimo obrigatório** é `mount` (e o `dispose` que ele devolve). 
 
 ```jsonc
 {
-  "tenant":     { "org": "...", "project": "...", "boundedContext": "...", "tenantId": "..." },
-  "capability": { /* modelo de capacidade — abaixo */ },
-  "identity":   { "username": "...", "name": "...", "email": "..." },
-  "api":        "<cliente HTTP ligado ao BFF>",
-  "navigation": "<API de navegação da casca>",
-  "i18n":       "<API de i18n da casca>"
+  "tenant":       { "org": "...", "project": "...", "boundedContext": "...", "tenantId": "..." },
+  "capability":   { /* modelo de capacidade — abaixo */ },
+  "identity":     { "username": "...", "name": "...", "email": "..." },
+  "api":          { "command": "…", "query": "…", "aggregate": "…", "history": "…" },
+  "prefs":        { "formMode": "inline" | "modal" },
+  "canConfigure": false,
+  "savePrefs":    "(formMode) => Promise<void>"
 }
 ```
 
 - **`tenant`** — o bounded context selecionado (org/projeto/BC + `tenantId` **opaco**).
 - **`capability`** — o **modelo de capacidade** (abaixo): o que o usuário pode fazer ali.
 - **`identity`** — dados **não-sensíveis** do usuário. **Sem token, sem senha.**
-- **`api`** — cliente HTTP que fala **só com o BFF**. O miolo **não** compõe `Authorization` nem
-  `X-Tenant-Id` — o BFF injeta isso no servidor (ver [seguranca](seguranca.md), [bff](bff.md)).
+- **`api`** — as quatro operações de domínio, todas contra o **BFF** (nunca a plataforma direto):
+
+  | Método | Para quê |
+  |---|---|
+  | `command({ tenantId, aggregate, command, data, id?, status? })` | dispara um comando (escrita) |
+  | `query({ tenantId, aggregate, predicates?, paging?, sorting? })` | consulta a projeção (leitura) |
+  | `aggregate({ tenantId, aggregate, id })` | **estado autoritativo** do agregado |
+  | `history({ tenantId, aggregate, id })` | histórico de eventos do agregado |
+
+  O miolo **não** compõe `Authorization` nem `X-Tenant-Id` — o BFF injeta no servidor (ver
+  [seguranca](seguranca.md), [bff](../bff/README.md)).
+
+  > ⚠️ **`paging` é opcional na assinatura, não na prática.** Sem ele o read model aplica um **limite
+  > padrão** (500 registros no modo array) e **não avisa**: a lista chega cortada, e a tela a exibe
+  > como se estivesse completa. Um miolo que lista registros **manda `paging` sempre**.
+  >
+  > | campo | forma |
+  > |---|---|
+  > | `paging` | `{ _maxRegisters, _firstRegister }` — **os dois**, inteiros ≥ 0 |
+  > | `sorting` | `{ _orderBy, _order }`, com `_order` em `ASC`/`DESC` **maiúsculo** |
+  >
+  > **Meio `paging` é pior que nenhum**: incompleto, a consulta roda **sem limite** e devolve a tabela
+  > inteira do tenant. O BFF recusa a forma incompleta com `400` antes de ir à rede. Onde esses
+  > controles ficam no critério e o que mais é recusado: [persistence-q —
+  > query-controls](../persistence-q/query-controls.md).
+  >
+  > **Saber se há mais** sem uma segunda consulta: peça `_maxRegisters` registros; se vierem
+  > exatamente esse tanto, provavelmente há mais. `_count: true` devolve o total **no lugar** das
+  > linhas, então totalizar custa outra ida à rede.
+
+  > Use `aggregate()` — não `query()` — para carregar o estado de um agregado antes de uma transição:
+  > a projeção é **assíncrona** e pode ainda não refletir o último comando. Depois de escrever,
+  > **reconsulte** `query()` até o estado esperado aparecer (read-your-writes).
+
+- **`prefs`** — preferência de apresentação **da organização** (hoje: `formMode`, o layout do form de
+  comando). Vale para todos os usuários da org. Ver [bff](../bff/README.md).
+- **`canConfigure`** — se **este** usuário pode alterar a preferência (é `MASTER` na org). É dica de
+  UX: o BFF **revalida** no servidor.
+- **`savePrefs(formMode)`** — persiste a preferência da org. Só tem efeito se o BFF confirmar o papel.
+
+> **Ainda não providos:** `navigation` (navegação da casca) e `i18n` estiveram previstos neste
+> contrato, mas **não existem** na implementação. Um miolo não deve contar com eles. Quando forem
+> implementados, entram aqui **e** na casca na mesma mudança.
 
 ## Modelo de capacidade
 
