@@ -3,9 +3,6 @@
 > Escrita direta numa **projeção** (criar/atualizar/remover linhas no banco de leitura). Endpoint de
 > **serviço autorizado** — no fluxo normal, projeções são mantidas de forma assíncrona pelo caminho
 > es-n → projeção (CP-5); este endpoint é o ponto de aplicação dessa escrita. Guia: [../README.md](../README.md).
->
-> **Cliente:** para CRUD de uma **entidade convencional** (tabela não-agregado), veja
-> [entidade (CRUD convencional)](entidade.md) — mesmo `POST /e`, enquadrado para uso do cliente.
 
 ## Requisição
 

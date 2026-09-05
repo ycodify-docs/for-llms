@@ -7,7 +7,23 @@
  * IMPORTANT: This endpoint accepts PARTIAL JSON.
  * - Only send properties you want to UPDATE
  * - Missing properties are IGNORED (not deleted)
+ * - An EXPLICIT EMPTY VALUE CLEARS the property (see ABSENT vs EMPTY below)
  * - Only ONE type of update per request: entity _conf OR attribute OR association
+ *
+ * ABSENT vs EMPTY (the whole contract in one table):
+ *
+ *   {"_conf": {"accessControl": {...}}}   uniqueKey untouched  (absent  = ignored)
+ *   {"_conf": {"uniqueKey": []}}          uniqueKey dropped    (empty   = cleared)
+ *   {"_conf": {"uniqueKey": ["a","b"]}}   uniqueKey replaced   (value   = set)
+ *
+ * The same holds for indexKey ([]), comment (""), superEntity ("") and for attribute/association
+ * properties. An explicit null counts as ABSENT — it is not a clear-me sentinel.
+ *
+ * accessControl is REPLACED WHOLE, not merged key by key: sending only "read" resets "write" to
+ * ["MASTER"]. MASTER is the floor — there is no such thing as an entity without access control.
+ *
+ * _conf itself is optional here: a request that only touches attributes need not mention it.
+ * "name" is always required and must match the entity in the path.
  *
  * ALLOWED UPDATES:
  * - Entity _conf properties: comment, concurrencyControl, uniqueKey, indexKey, accessControl
@@ -191,10 +207,23 @@
  * - comment: string
  *
  * IMMUTABLE FIELDS (cannot be updated):
- * - Entity: name, _conf.type, _conf.superEntity, _conf.superEntityStrategy,
- *           _conf.partition, _conf.enumeration
+ * - Entity: name, _conf.type, _conf.partition, _conf.enumeration
  * - Attribute: name, type
  * - Association: name, type
+ *
+ * NOTE: _conf.superEntity and _conf.superEntityStrategy ARE updatable — this list said otherwise,
+ * the endpoint always allowed it.
+ *
+ * RESPONSE (200): reports what was actually applied, so a request that drops a constraint says so.
+ *   {
+ *     "entityName": "...", "valid": true,
+ *     "summary": "...", "totalChanges": N,
+ *     "applied": [ { "scope": "config" | "attribute" | "association", "element": "...",
+ *                    "property": "...", "oldValue": ..., "newValue": ...,
+ *                    "description": "...", "ddl": "<applied operation>" } ],
+ *     "skipped": [ ... same shape, plus "reason" ... ]
+ *   }
+ *   A no-op request answers 200 with totalChanges 0 and an empty "applied".
  *
  * ============================================================================
  * PUT BODY EXAMPLES

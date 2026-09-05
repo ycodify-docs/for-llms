@@ -5,6 +5,34 @@
 > conta e os papéis criados aqui são o que os demais serviços (forger e o resto) exigem para autorizar
 > operações. Pré-requisitos: [conceitos](../02-conceitos.md), [arquitetura](../01-arquitetura.md).
 
+---
+
+## ⛔ Esta pasta é a CASA da documentação do orgid — e é AUTORITATIVA
+
+`docs/public/for-llms/orgid/` é o **único** lugar onde a documentação do orgid vive. O que está aqui é
+**autoritativo**: em divergência com qualquer outro texto, prevalece isto.
+
+**Não existe cópia, resumo ou "nota de arquitetura" do orgid em outro repositório.** Documentação de
+orgid encontrada em `composer/`, em `orgid/` ou em qualquer outro projeto da plataforma é para ser
+**apagada**, não sincronizada — cópia diverge, e duas versões do mesmo fato viram duas verdades.
+Já custou caro: `/ua/open/role/owner/{owner}` estava descrito como público num lugar e tratado como
+autenticado no código, e o autocadastro de um cliente ficou parado por isso.
+
+**Como se escreve aqui**, quando houver achado sobre o orgid — nesta ordem, sem atalho:
+
+1. **Partir desta doc.** Ler o que ela já afirma sobre o assunto; é a base.
+2. **Conferir contra o código real** — `orgid/api/src/main/java/**`, o `OrgIdSecurityConfig`, os
+   controllers, ou o bytecode do `orgid-api`. O código decide; não a memória, não o registro de uma issue.
+3. **Concluir o delta**: o que **adicionar**, **remover** ou **alterar** para esta doc dizer o que o código
+   faz.
+4. **Escrever aqui**, no arquivo certo de [`endpoints/`](endpoints/).
+5. **Apagar a cópia** que existir noutro repositório. A migração só termina quando a cópia morre.
+
+Vale o mesmo para o `CHANGELOG` da documentação: mudança de comportamento do orgid entra em
+[`../CHANGELOG.md`](../CHANGELOG.md), não no histórico de outro projeto.
+
+---
+
 ## Contents
 - Papel e posição no fluxo
 - Dois domínios (`/up` e `/ua`)
@@ -12,7 +40,6 @@
 - Conceitos próprios
 - Índice de endpoints
 - Ciclo de vida geral
-- Autocadastro de usuário de aplicação (self-service)
 - Pontos de coordenação
 - Pitfalls (checklist do agente)
 
@@ -83,42 +110,10 @@ Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md). Contrato de f
 2. **Autorização** — confere o **papel** exigido **na organização** alvo. Falha → `403`.
 3. **Validação** — corpo/parâmetros (campos obrigatórios, formatos). Falha → `400`.
 4. **Efeito** — cria/atualiza/remove a entidade; vínculos (conta-papel-org) e contratos podem envolver
-   verificação cruzada (forger/persistência — ver coordenação).
-5. **Resposta** — `200`/`201`/`204`; erros conforme [erros.md](erros.md). Senha **nunca** é devolvida.
-
-## Autocadastro de usuário de aplicação (modo da plataforma)
-
-Padrão para um sistema deixar o **usuário final criar a própria conta** (self-service). **Conta (identidade,
-aqui no orgid)** é separada do **registro de domínio** (o agregado do próprio sistema, no persistence-crs). Duas etapas:
-
-1. **Conta na plataforma** — a tela de login oferece "autocadastrar-se"; um form **público** cria a **conta `/ua`
-   + o papel numa única transação** via [`POST /open/ua/account-role`](endpoints/publico.md) — `username`, e-mail,
-   senha + `role.name`/`role.owner`. **Qual papel** é **decisão de design do sistema** (não é fixo): um default
-   fixo, ou o usuário escolhe de um **cardápio** de papéis marcados `ispublic` — listáveis por
-   [`GET /ua/open/role/owner/{roleOwner}`](endpoints/ua-papel.md). ⚠️ **O papel precisa PRÉ-EXISTIR** (criado antes
-   via [`POST /ua/role`](endpoints/ua-papel.md)): papel inexistente → **`204` sem corpo = NADA criado** (nem a
-   conta; transação revertida); só `200` confirma. A conta mora na plataforma, **não** no banco do sistema. Login
-   depois: [`auth /ua/sign-in`](../auth/endpoints/sign-in.md) → token com `username` + papéis + tenants.
-2. **Registro de domínio** — no 1º acesso após o login (ou em **qualquer** acesso posterior, se ainda não
-   existir), o app detecta "conta com o papel, mas sem o agregado correspondente", coleta os dados que a conta
-   não cobre, e dispara o **comando de criação** do agregado
-   ([persistence-crs](../persistence-crs/endpoints/comando.md)) com o `username` **como identidade**.
-
-**`username` = chave de unicidade.** Quando o `username` é a identidade do agregado, a plataforma **recusa um
-segundo agregado com o mesmo `username`** → **1 conta = no máximo 1 registro de domínio**, sem validação manual.
-
-**Antes de transicionar o registro** vale o padrão **CQRS-ES**: consultar a projeção por `username` → ler o
-**estado atual** do agregado → só então enviar o comando (que precisa informar o estado; desatualizado →
-rejeitado). Ver [persistence-crs](../persistence-crs/README.md) (regra do `status`).
-
-**Autorização não vem do token.** Regras como "o usuário só altera o **próprio** registro" **não** são impostas
-pelo token (ele diz **quem é** e **que papéis tem**, não "que registros pode tocar") — são **regra de negócio do
-sistema** (verificar explicitamente, ex.: num processador do [br-service](../br-service/README.md)).
-
-> **Exemplos (ilustrativos, não normativos):** *conclusão adiada* — a conta existe mas o registro não; o app
-> reapresenta o formulário complementar até o agregado existir. *Pré-cadastro por papel privilegiado* — um admin
-> cria o registro **antes** de a pessoa ter conta, combinando o `username` fora do sistema; se ela se registrar
-> com outro `username`, o registro fica órfão (responsabilidade humana; a plataforma não amarra).
+   verificação cruzada (forger/persistência — ver coordenação). Alvo (ou referência) inexistente → `404`,
+   e **nada é gravado**.
+5. **Resposta** — `200`/`201` em sucesso; `204` **só em leitura** (ausente/vazio); `404` em escrita que não
+   achou o alvo; demais erros conforme [erros.md](erros.md). Senha **nunca** é devolvida.
 
 ## Pontos de coordenação
 

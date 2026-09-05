@@ -86,7 +86,7 @@ pode fazer.
 |---|---|---|
 | Capacidade do tenant | `GET /session/capabilities?tenant={tenantId}` | **modelo de capacidade** (ver [contrato-miolo](../shell/contrato-miolo.md#modelo-de-capacidade)) |
 
-O BFF lê o **modelo publicado** do tenant no **[cache](../cache/README.md)** — **não** no forger (o
+O BFF lê o **modelo publicado** do tenant no **serviço de cache** — **não** no forger (o
 forger é quem **grava** ali ao publicar o `.model.json`) — e cruza com os **papéis org-scoped** do token
 → devolve **só** os comandos autorizados. Só para tenant que **consta no token**; senão `404`.
 
@@ -131,8 +131,40 @@ O consumidor **não** compõe esses cabeçalhos nem conhece o token.
   nunca a PK `Long` da linha — ver [antipadrões](../05-antipatterns.md).
 - O BFF **re-deriva a capacidade** antes de encaminhar um comando e recusa (`403`) o que não estiver
   autorizado ao papel; o persistence-crs revalida de novo. Ver [seguranca](../shell/seguranca.md).
+  **Isso vale para o comando. Leitura é outra história — ver abaixo.**
+- **Value object viaja no comando.** `data` carrega, no **mesmo nível** dos atributos escalares, cada
+  `valueObject` declarado pelo comando no modelo (ver
+  [model-format](../persistence-crs/spec/model-format.md#datavalueobject)): `single` → o valor daquele
+  VO; `multiple` → lista. Quando o VO é declarado como **atributo tipado direto** (`{type,…}`, sem
+  sub-campos), o valor é um **escalar** — e `multiple`, uma lista de escalares. Forma incompatível é
+  recusada com `400` dizendo o que se esperava, **nunca omitida em silêncio**. O BFF não coage os
+  campos internos: repassa o valor como recebeu.
 - `/session/aggregate` existe porque a **projeção é assíncrona**: para carregar o estado autoritativo de
   um agregado (ex.: preencher um form de transição) não se deve ler o read model.
+
+### Quem autoriza a leitura
+
+Escrita e leitura **não** são governadas do mesmo jeito, e a diferença é deliberada:
+
+| Rota | Quem decide | Como |
+|---|---|---|
+| `POST /session/command` | BFF **e** persistence-crs | papéis do token × `command.roles` do modelo; recusa `403` |
+| `POST /session/query` | **persistence-q**, sozinho | `_conf.accessControl.read` da entity |
+| `POST /session/aggregate` · `/session/history` | BFF | mesma derivação de capacidade do comando |
+
+`POST /session/query` **não aplica portão de papel**. O BFF confere que o `tenantId` pertence ao
+portador e encaminha; quem autoriza é o persistence-q, pela política de leitura declarada na entity.
+A razão é de domínio: **ler não é executar**. Amarrar leitura aos papéis dos comandos tornava
+impossível um papel **somente-leitor** — para ver um catálogo, alguém teria de ganhar um comando que
+não deveria ter, falsificando o modelo e afrouxando a escrita.
+
+> ⚠️ **O default é restritivo.** Entity **sem** `_conf.accessControl.read` declarado, ou com a lista
+> vazia, **não é legível** — o persistence-q recusa. Autorizar leitura é ato explícito: declarar o
+> papel na política da entity, o que vale de imediato, sem republicar modelo nem reiniciar serviço.
+
+`/session/aggregate` e `/session/history` **mantêm** o portão de capacidade porque batem no
+persistence-crs, que valida **tenant**, não leitura por papel — sem o portão, estado e histórico de
+qualquer agregado ficariam ao alcance de qualquer portador de sessão daquele tenant.
 
 ### `predicates` é a forma do persistence-q — não há dialeto do BFF
 
@@ -232,12 +264,27 @@ Tudo composto **no servidor**. Nenhum deles é montado — nem visto — pelo br
 | HTTP | Quando |
 |---|---|
 | `400` | falta parâmetro (ex.: `username`/`password`, `tenant`), ou campo obrigatório do comando ausente |
-| `401` | sem sessão / sessão inválida / credencial inválida |
+| `401` | sem sessão / sessão inválida / credencial inválida — ver `reason` abaixo |
 | `403` | comando não autorizado ao papel · papel fora do cardápio público no autocadastro · papel que não é do usuário na org (`active-role`) |
 | `404` | tenant não pertence ao usuário / miolo não registrado / **modelo do tenant ausente ou expirado no cache** |
 | `409` | autocadastro: papel inexistente — nada foi criado (o `204` do orgid, traduzido) |
 | `500` | configuração ausente no servidor (ex.: o path do endpoint de cache não configurado) |
 | `502` | falha ao falar com um serviço da plataforma |
+
+### `401` diz **por que** não há sessão
+
+O corpo do `401` de sessão traz `reason`, para que o consumidor distinga o que antes era indistinguível:
+
+| `reason` | Significado | O que o consumidor deve fazer |
+|---|---|---|
+| `no-session` | não há sessão — ninguém entrou ainda | pedir login, normalmente |
+| `expired` | o prazo da sessão acabou | pedir login de novo |
+| `evicted` | a sessão **desapareceu do servidor antes de expirar** | pedir login **e preservar o destino**: o portador não fez nada errado |
+| `unknown` | não foi possível determinar | tratar como `expired` |
+
+`evicted` é o caso que não pode ficar mudo: o portador estava trabalhando e perdeu a sessão sem causa
+atribuível a ele. Uma interface que trate os quatro como o mesmo `401` seco devolve o usuário ao início
+sem explicação — e ninguém consegue medir a frequência do problema.
 
 ## Checklist do agente
 

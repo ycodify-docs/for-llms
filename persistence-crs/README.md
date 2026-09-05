@@ -2,8 +2,7 @@
 
 > **Papel:** executa os **comandos** definidos para um agregado num bounded context. É o **lado de
 > escrita** do CQRS-ES: valida a transição de estado, eventualmente aciona regra/coordenação e **grava
-> o evento**. Também expõe **CRUD direto de entidade convencional** (não-agregado) em `POST /e` — ver
-> [entidade](endpoints/entidade.md).
+> o evento**.
 > Pré-requisitos: [conceitos](../02-conceitos.md), [arquitetura](../01-arquitetura.md). Depende do
 > **model** publicado pelo forger (CP-1).
 
@@ -11,7 +10,6 @@
 - Pré-requisitos do chamador
 - Índice de endpoints
 - Ciclo de vida de um comando
-- Autorização por papel (`roles`)
 - Estados, transições e concorrência
 - Pontos de coordenação
 - Pitfalls
@@ -20,16 +18,6 @@
 
 ## Pré-requisitos do chamador
 
-- **URL externa — escolha o ambiente pelo segmento `t`:** os paths deste guia (`/a/...`, `/e`) são
-  **downstream**; o chamador externo os anexa ao prefixo do gateway, que muda conforme o ambiente:
-
-  | Ambiente | Prefixo | Exemplo (executar comando) |
-  |---|---|---|
-  | **produção** | `/v3/persistence/c` | `POST /v3/persistence/c/a/{bc}/{type}` |
-  | **teste** | `/v3/persistence/t/c` | `POST /v3/persistence/t/c/a/{bc}/{type}` |
-
-  Os paths downstream são **idênticos** nos dois — só muda o segmento `t`. Prefixo fora da allowlist →
-  `404`. Detalhe: [autenticação](../06-autenticacao.md).
 - **Cabeçalhos obrigatórios:** `Authorization` e o **cabeçalho de tenant** `X-Tenant-Id`.
 - **Autorização de tenant:** o `tenant-id` deve pertencer ao usuário; caso contrário → `403`.
 - **Modelo publicado:** o agregado/comando precisa existir no **model** publicado para o tenant (CP-1).
@@ -40,19 +28,15 @@
 
 ## Índice de endpoints
 
-> Base do serviço: `/a` (agregados) e `/e` (entidade convencional) — paths **downstream**, a anexar ao
-> prefixo do ambiente (`/v3/persistence/c` prod · `/v3/persistence/t/c` teste; ver acima). Apenas endpoints
-> autenticados são documentados. Endpoints internos sem autenticação e endpoints de
-> observabilidade/administração **não** constam aqui.
+> Base do serviço: `/a` (agregados). Apenas endpoints autenticados são documentados. Endpoints internos
+> sem autenticação e endpoints de observabilidade/administração **não** constam aqui.
 
 | Operação | Método · Path | Documento |
 |---|---|---|
 | Executar comando | `POST /a/{boundedContext}/{aggregateType}` | [endpoints/comando.md](endpoints/comando.md) |
 | Ler estado do agregado | `GET /a/{boundedContext}/{aggregateType}/{id}` | [endpoints/agregado-leitura.md](endpoints/agregado-leitura.md) |
 | Ler histórico de eventos | `GET /a/{boundedContext}/{aggregateType}/{id}/history` | [endpoints/agregado-leitura.md](endpoints/agregado-leitura.md) |
-| CRUD de entidade convencional (não-agregado) | `POST /e` | [endpoints/entidade.md](endpoints/entidade.md) |
-| Escrever projeção (uso interno do mesmo `/e`) | `POST /e` | [endpoints/projecao.md](endpoints/projecao.md) |
-| Consultar logs (diagnóstico; chave própria, não o token) | `GET /logs/service/{crs\|q}/query/{term}/from/{from}/to/{to}` | [endpoints/logs.md](endpoints/logs.md) |
+| Escrever projeção (serviço) | `POST /e` | [endpoints/projecao.md](endpoints/projecao.md) |
 
 Gramática do modelo de domínio: **[spec/model-format.md](spec/model-format.md)** (estrutura do
 `.model.json`: agregado, comando, evento, tipos). Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md).
@@ -64,44 +48,19 @@ Gramática do modelo de domínio: **[spec/model-format.md](spec/model-format.md)
 1. **Auth + tenant** — valida `Authorization` e o `tenant-id`; carrega o **modelo** do tenant (CP-1).
 2. **Decomposição** — identifica o agregado, o **comando** e seus dados a partir do corpo.
 3. **Carga do estado atual** — reconstitui o estado do agregado a partir dos seus eventos.
-4. **Autorização por papel (`roles`)** — o usuário precisa ter **pelo menos um** dos papéis
-   declarados em `command.<comando>.roles` no modelo do tenant; senão → **`403`**, e a execução
-   **para aqui**. Ver [Autorização por papel](#autorizacao-por-papel) abaixo.
+4. **Validação de transição** — o estado atual precisa pertencer ao conjunto de **estados de origem**
+   (`fromState`) do comando; senão → erro de transição.
 5. **Regra/coordenação (se declarada)** — se o modelo do comando declara uma rota de **regra de
    negócio** ou de **coordenação**, o serviço chama o **br-service** para validar/enriquecer/coordenar
    **antes** de concluir (CP-6).
-6. **Validação de transição** — o estado atual precisa pertencer ao conjunto de **estados de origem**
-   (`fromState`) do comando; senão → erro de transição.
-7. **Validação do estado de destino** — o estado resultante deve corresponder ao **estado de
-   destino** (`endState`) previsto.
-8. **Gravação do evento** — grava o evento no banco de escrita (universal, isolado por `tenant-id`).
+6. **Validação do estado de destino** — após a regra, o estado resultante deve corresponder ao
+   **estado de destino** (`endState`) previsto.
+7. **Gravação do evento** — grava o evento no banco de escrita (universal, isolado por `tenant-id`).
    A gravação, na mesma transação, **notifica o es-n** (CP-3).
-9. **Resposta** — `200` com `{ "id": "<id do agregado>", "status": "<estado>" }`.
+8. **Resposta** — `200` com `{ "id": "<id do agregado>", "status": "<estado>" }`.
 
 A atualização da **projeção** acontece **depois**, de forma assíncrona, pelo fluxo es-n → projeção
 (CP-4/CP-5). A resposta do comando **não** garante que a projeção já reflete a mudança.
-
-<a id="autorizacao-por-papel"></a>
-## Autorização por papel (`roles`) — acontece **antes** da regra de negócio
-
-Todo comando declara, no modelo do tenant, a lista de papéis que podem executá-lo
-(`command.<comando>.roles` — ver [spec/model-format.md](spec/model-format.md)). A verificação:
-
-- **compara os papéis do usuário** (do `Authorization`) com essa lista; basta **um** casar;
-- **roda antes** de qualquer chamada de **regra de negócio/coordenação** (passo 4, antes do 5);
-- nega com **`403`** e a mensagem `O usuário '<usuário>' não possui papel autorizado para executar o
-  comando '<comando>'.`
-
-**O que isso significa para quem integra:** um comando recusado por papel **não** aciona a regra de
-negócio. Logo, quem não tem o papel **não recebe mais** mensagens vindas da regra (por exemplo
-"referência X não existe" ou "campo obrigatório ausente") — recebe `403` e nada além disso. Não conte
-com essas mensagens para descobrir o estado do domínio: elas só chegam a quem está autorizado.
-
-> **Mudança de comportamento (2026-08-31).** Até então a verificação de papel acontecia **depois** da
-> regra de negócio, e a recusa saía como `510` com uma mensagem interna. Efeitos práticos do que mudou:
-> a recusa agora é **`403`** (não `510`); ela chega **mais cedo**, sem executar a regra; e um comando
-> que antes respondia com erro **da regra** para usuário sem papel agora responde `403`. Se o seu
-> cliente tratava esse `510`, ou dependia da mensagem da regra nesse cenário, **ajuste**.
 
 ## Estados, transições e concorrência
 
@@ -144,17 +103,15 @@ A cada requisição (com `X-Tenant-Id`), o serviço resolve a spec do tenant (en
 
 1. **Consulta o Forger** o status do dataschema do tenant — se **não** estiver `RUNNING` → **exceção** (o modelo não é interpretado).
 2. Usa a spec da **memória local** da instância, se presente → segue.
-3. Senão, recupera do **serviço de cache** (`../cache`; **não** mem-cache db direto) e a carrega na memória local.
-4. Se **não** houver no cache, **recupera do Forger e repõe no cache** (self-heal), então carrega na memória local.
-5. Se nem o Forger prover → **exceção**.
+3. Senão, lê do **serviço de cache** (`../cache`) e a carrega na memória local.
+4. Se **não** houver no cache → **exceção `510`**, indicando que o modelo do tenant não está no cache e
+   precisa ser **republicado**.
 
-> **⚠️ Mudança em implantação — o passo 4 deixa de existir.** O serviço passará a **apenas ler** o modelo do
-> cache; quem o publica passa a ser **exclusivamente o Forger**, no momento em que o dataschema transita
-> para `RUNNING`. **Efeito para quem integra:** um tenant cujo modelo não tenha sido publicado por essa via
-> **não é mais recuperado sozinho** — a consulta falha (ver [erros](erros.md)) até que o modelo seja
-> republicado (`MODELING` → `RUNNING`, ver [forger/dataschema](../forger/endpoints/dataschema.md#atualizar)).
-> Enquanto esta nota estiver aqui, o comportamento **em produção continua sendo o descrito acima**, com
-> self-heal.
+> **Não há recuperação automática a partir do Forger (não é self-heal).** O modelo entra no cache
+> **apenas** quando é publicado ([forger/model](../forger/endpoints/model.md)) — a publicação é a
+> **única** porta de entrada. Um miss **não** é um caminho lento que se resolve sozinho: é **parada**.
+> Como a entrada **não expira** por conta própria, um miss significa que o modelo nunca foi publicado
+> ou que a entrada foi removida — e a saída é **republicar**, não reiniciar nem esperar.
 
 A spec fica **stale na memória local** e **não** refresca sozinha. Após alterar entity/model, o refresh exige
 **invalidar as DUAS chaves de cache do modelo** — a do **read-model** **e** a do **write-model** (valores

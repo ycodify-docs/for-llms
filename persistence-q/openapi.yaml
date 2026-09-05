@@ -6,16 +6,8 @@ info:
     Consulta projeções materializadas por critério (DSL modo array/object). Idempotente; não modifica
     estado. Detalhe: README.md, endpoints/consulta.md. Apenas o endpoint autenticado consta.
 servers:
-  - url: /v3/persistence/q
-    description: >
-      PRODUÇÃO — via gateway da plataforma (host omitido por política). Os paths abaixo são downstream e
-      se anexam a este prefixo.
-  - url: /v3/persistence/t/q
-    description: >
-      TESTE — mesmo contrato; muda só o segmento `t` no prefixo.
   - url: /
-    description: >
-      Somente os paths downstream, sem o prefixo do gateway (forma usada ao longo dos documentos).
+    description: Acesso via gateway da plataforma (host omitido por política).
 security:
   - bearerAuth: []
 paths:
@@ -25,7 +17,7 @@ paths:
       parameters: [{ $ref: '#/components/parameters/tenant' }]
       requestBody:
         required: true
-        description: "Modo detectado pelo 1º caractere: '[' array (multi-critério) ou '{' object (critério único). Cada critério: { rótulo: { predicados } } MAIS controles opcionais (_paging/_sorting/_count/_connective/_cache) no MESMO nível (irmãos do rótulo)."
+        description: "Modo detectado pelo 1º caractere: '[' array (multi-critério) ou '{' object (critério único). Cada critério: { rótulo: { predicado: valor } }."
         content:
           application/json:
             schema:
@@ -53,11 +45,6 @@ components:
     Criterio:
       type: object
       minProperties: 1
-      description: "Um rótulo (= nome da projeção) → objeto de predicados; MAIS controles opcionais no MESMO nível (irmãos do rótulo). Predicados combinam por _connective (AND padrão | OR)."
-      properties:
-        _connective: { type: string, enum: [AND, OR], description: "Combina os predicados; padrão AND; global ao critério." }
-        _paging: { type: object, properties: { _maxRegisters: { type: integer }, _firstRegister: { type: integer } } }
-        _sorting: { type: object, description: "Indexado por posição \"0\",\"1\",\"2\"; cada um { _orderBy, _order }.", additionalProperties: { type: object, properties: { _orderBy: { type: string }, _order: { type: string, enum: [ASC, DESC] } } } }
-        _count: { type: boolean, description: "true devolve totalRegisters." }
-        _cache: { type: object, properties: { _behavior: { type: string, enum: [use, evict, ignore] }, _ttl: {} } }
+      maxProperties: 1
+      description: "Um rótulo (escolhido pelo cliente) → objeto de predicados (combinados por E)."
       additionalProperties: { type: object, additionalProperties: true }

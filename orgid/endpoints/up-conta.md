@@ -11,8 +11,8 @@
 - PUT /up/account — atualizar perfil
 - PUT /up/account/password — atualizar senha
 - DELETE /up/account/by/jwt — remover a própria conta
-- GET /up/account/by/org/{orgName} — conta do próprio chamador (NÃO lista a org)
-- GET /up/account/by/org/{orgName}/org-owner/{orgOwner} — **listar os membros da org**
+- GET /up/account/by/org/{orgName} — listar contas da org
+- GET /up/account/by/org/{orgName}/org-owner/{orgOwner} — listar contas da org (com dono)
 - POST /up/account/e-mail/send — enviar e-mail
 
 ---
@@ -34,7 +34,8 @@ Atualiza o **perfil** da própria conta (o `username` é forçado ao do token).
 | `email` | string | não | E-mail. |
 | `endRua`,`endNumero`,`endComplemento`,`endBairro`,`endCidade`,`endUf`,`endPais`,`endCep` | string | não | Endereço. |
 
-**Resposta:** `200` (sem corpo).
+**Resposta:** `200` (sem corpo) quando gravou · `404` —
+`"Conta de usuário não localizada: nenhum dado foi atualizado."`
 
 ## PUT /up/account/password
 Troca a senha da própria conta.
@@ -46,48 +47,32 @@ Troca a senha da própria conta.
 | `password` | string | sim | Nova senha. |
 | `oldPassword` | string | não | Senha atual (validação). |
 
-**Resposta:** `200` (sem corpo).
+**Resposta:** `200` (sem corpo) quando trocou · `404` se a conta não existe — **a senha não foi alterada**.
+
+> ⚠️ Até 2026-09-05 esse caso era `204`, que é sucesso: o usuário recebia confirmação de uma troca que não
+> aconteceu. Ver [../erros.md](../erros.md).
 
 ## DELETE /up/account/by/jwt
 Remove a conta do portador do token. Sem parâmetros/corpo. **Resposta:** `200`.
 
 ## GET /up/account/by/org/{orgName}
-⚠️ **Apesar do nome, NÃO lista os membros da organização.** O dono da org é deduzido do token e o
-resultado é filtrado pela conta de quem chama: devolve **apenas o próprio chamador**. Para os membros,
-use a rota com `org-owner`, abaixo. **Papéis:** administrador / engenheiro / analista (na org) — os
-demais recebem `403`, mesmo o resultado sendo a própria conta.
+Lista as contas de uma org. **Papéis:** administrador / engenheiro / analista (na org).
 
 | Path-var | Significado |
 |---|---|
 | `orgName` | nome da organização |
 
-**Resposta:** `200` — array com **uma** conta, a do portador do token (mesma forma da rota abaixo);
-`204` sem corpo se não houver vínculo. Sem `Authorization` → `401`.
+**Resposta:** `200` array de contas (senha nula); `204` se vazio.
 
 ## GET /up/account/by/org/{orgName}/org-owner/{orgOwner}
-**Esta é a rota de listagem:** devolve os **membros** da organização, cada conta com os seus **vínculos**
-(papel e status). **Papéis:** administrador / engenheiro / analista **na própria organização**; os demais
-recebem `403`. Sem `Authorization` → `401`.
+Igual ao anterior, qualificando o dono.
 
 | Path-var | Significado |
 |---|---|
 | `orgName` | nome da organização |
 | `orgOwner` | dono da organização |
 
-**Resposta:** `200` — array de contas. Por conta: `username`, `name`, `email`, `status` e
-`accountRoleOrgs[]`; a senha **nunca** é devolvida. Cada item de `accountRoleOrgs` traz `role.name`,
-`org` (`name` e `owner`), `accountStatus` e `orgStatus`. Sem membro → `204` **sem corpo** (não é `[]`).
-
-> ⚠️ **A lista mistura vínculos ativos e suspensos — e nada os distingue à vista.** O serviço descarta
-> somente o que estiver **cancelado**; vínculos **suspensos** e contas **pendentes** vêm na resposta.
-> Além disso, `status` é o estado **global** da conta e **não diz nada sobre esta organização**: a mesma
-> pessoa pode estar suspensa aqui e ativa em outra org. Considere alguém **membro ativo nesta
-> organização** apenas quando `status`, `accountStatus` e `orgStatus` forem **todos** `ACTIVE` — o filtro
-> é responsabilidade do consumidor.
-
-> Não há rota autenticada que resolva **uma** conta por `username` (só a verificação de existência, sem
-> dados, e a conta do próprio token). Para saber se alguém pertence a uma org, liste por esta rota e
-> procure — aplicando o filtro de status acima.
+**Resposta:** `200` array de contas (senha nula); `204` se vazio.
 
 ## POST /up/account/e-mail/send
 Envia uma notificação por e-mail (usuário autenticado).

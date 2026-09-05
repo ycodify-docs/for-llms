@@ -44,6 +44,7 @@ o forger exige para autorizar. **Sem org/identidade, o forger não autoriza nada
                               ▼
                        5. model            modelo de domínio publicado no cache
                               │            (agregados, comandos, eventos, transições)
+                              │            ÚNICA porta de entrada do modelo no cache
                               ▼
                        6. process          modelo de processo/decisão (opcional)
                               │
@@ -51,6 +52,12 @@ o forger exige para autorizar. **Sem org/identidade, o forger não autoriza nada
                        7. ativar           dataschema: MODELING → RUNNING
                                            (habilita comandos/consultas)
 ```
+
+> **A publicação do modelo (passo 5) é a única forma de o modelo chegar ao cache.** Não existe carga
+> automática a partir do forger em tempo de requisição: se o modelo não estiver no cache, comandos e
+> consultas do tenant **falham** com `510` pedindo republicação — não é lentidão, é parada. A entrada
+> **não expira** sozinha, então um miss significa "nunca publicado" ou "removido". Detalhe:
+> [persistence-crs — carga da spec do tenant](persistence-crs/README.md).
 
 > **Estado do dataschema durante o deploy:** os passos **4–5** (entity/model) exigem o dataschema em
 > **`MODELING`** (esquema em edição). Concluída a modelagem, **transite para `RUNNING`** (passo 7) — só

@@ -12,13 +12,9 @@
 - Roteamento de processadores
 - Contrato de resposta
 - Ciclo de vida de uma requisição
-- Três categorias de processador (inclui **Callback do processador** — qual endpoint usar e como montar a URL)
+- Autoria de processadores → [processadores.md](processadores.md)
 - Pontos de coordenação
 - Pitfalls
-
-> Para **auditar o que já executou** (por termo e intervalo, com chave própria), ver
-> [endpoints/logs.md](endpoints/logs.md). Para **publicar processadores** de uma organização,
-> ver [endpoints/processors-deploy.md](endpoints/processors-deploy.md).
 
 ---
 
@@ -28,23 +24,17 @@ Durante a execução de um comando, se o **model** do comando (ou de um evento d
 uma **rota** de regra/coordenação, o persistence-crs chama o br-service nessa rota, passando os dados.
 O br-service executa a **função** correspondente e devolve o resultado, que o persistence-crs incorpora
 ao processamento (CP-6/CP-7). O br-service **não é chamado diretamente pelo cliente** (só pelo
-persistence-crs). Um processador **pode ler de volta** persistence-q/crs para enriquecimento — ver
-[Callback do processador](#callback-do-processador), que define **qual** endpoint é utilizável em cada
-tipo de hook — e, quando o caso de uso exigir, chamar integrações externas nos hooks de coordenação
-(assíncronos); no caminho **crítico do comando** (síncrono), evite escrita/efeitos externos.
+persistence-crs). Um processor **pode ler de volta** persistence-q/crs para enriquecimento (via **endpoints
+internos de cluster**, ver abaixo) e — quando o caso de uso exigir — chamar integrações externas nos hooks de
+coordenação (async); no caminho **crítico do comando** (síncrono), evite escrita/efeitos externos.
 
 ## Índice de endpoints
 
-> Endpoints de saúde e de métricas **não** constam aqui. A consulta de log e a implantação de
-> processadores constam por serem **contrato de cliente** — quem chama é o interessado autorizado, sobre
-> as próprias execuções e a própria organização.
+> Apenas o endpoint de contrato é documentado. Endpoints de saúde/observabilidade **não** constam aqui.
 
 | Operação | Método · Path | Documento |
 |---|---|---|
 | Executar função (rota) | `POST /br` | [endpoints/br.md](endpoints/br.md) |
-| Consultar o log de execução | `GET /v3/brservice/logs/query/{term}/from/{f}/to/{t}` | [endpoints/logs.md](endpoints/logs.md) |
-| Implantar processadores de uma org | `POST /v3/brservice/processors/deploy/{org}` | [endpoints/processors-deploy.md](endpoints/processors-deploy.md) |
-| Desfazer a última implantação | `POST /v3/brservice/processors/rollback/{org}/{backupId}` | [endpoints/processors-deploy.md](endpoints/processors-deploy.md#desfazer) |
 
 > **⚠️ `POST /coordination` — pendente (gap de plataforma).** O motor de comandos (persistence-crs)
 > aciona uma coordenação **síncrona no caminho do comando** quando o modelo do comando declara
@@ -54,6 +44,7 @@ tipo de hook — e, quando o caso de uso exigir, chamar integrações externas n
 > `event.domainBus.triggerCoordination[]` (posta em `/br`, rota `…/coordination/<n>`; ver "Três categorias").
 
 Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md).
+Autoria e carga de processadores: [processadores.md](processadores.md).
 
 ## Roteamento de processadores
 
@@ -93,63 +84,23 @@ Aninhando os escopos, o **path completo é globalmente único** → duas organiz
 > (1 project = 1 bounded context), os segmentos `project` e `boundedContext` costumam **coincidir** —
 > ex.: `acme/vendas/vendas/pedido/criar`. Não é erro: são escopos distintos que, por padrão, têm o mesmo nome.
 
-> **O serviço NÃO valida a forma da rota.** Ele apenas casa a `route` recebida com o caminho do
-> processador publicado — qualquer caminho funciona. A unicidade global descrita acima é garantida
-> **pela disciplina de quem publica**, não por checagem em tempo de execução. Consequência concreta de
-> abrir mão do prefixo: duas organizações que publiquem `pedido/criar` acabam apontando para o **mesmo
-> caminho** e, portanto, para o **mesmo processador** — a regra de uma passa a valer, silenciosamente,
-> para a outra.
-
-### Deploy de um processador
-
-Um processador é um **arquivo** cujo **caminho dentro da pasta de processadores do serviço** é a **rota** —
-`<org>/<project>/<bc>/<aggregate>/<função>`, sem a extensão. Uma rota sem processador correspondente →
-**erro de rota** quando o persistence-crs a aciona.
-
-Há **duas** formas de publicar:
-
-| Forma | Quando |
-|---|---|
-| **Pelo endpoint** — [`POST /v3/brservice/processors/deploy/{org}`](endpoints/processors-deploy.md) | caminho normal para quem integra. Envia-se um arquivo compactado com os processadores da organização; as rotas entram em vigor **sem reinício** |
-| **Pelo sistema de arquivos** | operação da plataforma: coloca-se o arquivo na pasta de processadores. Exige recarregar o serviço para a rota ficar viva |
-
-A publicação pelo endpoint é **por organização** e **substitui a árvore inteira** dela — ver o documento
-do endpoint para o formato do pacote, o que é recusado e como desfazer.
+> Como o arquivo vira rota no disco, a forma do export, a assinatura recebida pelo processador e
+> por que um processador mal exportado desaparece **sem erro**: [processadores.md](processadores.md).
 
 ## Contrato de resposta
 
 - Sucesso (`200`): o serviço devolve **diretamente** o objeto retornado pelo processador (sem envelope).
   Esse objeto é o que o persistence-crs usa para enriquecer/validar/coordenar o comando.
-- Falha (`400`): **duas formas distintas**, conforme o ponto em que falhou:
-
-| Falha | Corpo da resposta |
-|---|---|
-| **Validação do corpo** (corpo vazio/não-objeto/sem `route`) | `{ "erro": "<mensagem>" }` |
-| **Rota inexistente** ou **exceção no processador** | `{ "status": "error", "mensagem": "<mensagem>", "tipo": "<tipo do erro>" }` |
+- Falha (`400`): objeto com `status`, mensagem e tipo do erro.
 
 ## Ciclo de vida de uma requisição
 
 `POST /br`:
 
-1. **Validação** — corpo não-nulo, objeto, com `route`. Falha → `400` (forma `{erro}`).
-2. **Roteamento** — localiza o processador pela `route`. Não encontrado → `400` (a mensagem lista as
-   rotas disponíveis).
-3. **Execução** — o processador recebe **de um a três argumentos**, conforme o que veio no corpo:
-
-   | Corpo recebido | Argumentos entregues ao processador |
-   |---|---|
-   | `data` **+** `authToken` **+** `tenantIds` | `(data, authToken, tenantIds)` |
-   | `data` **+** `authToken` | `(data, authToken)` |
-   | `data` | `(data)` |
-   | **sem** `data` | `(corpo inteiro)` |
-
-   `authToken` e `tenantIds` só aparecem na raiz do corpo no hook **síncrono** (regra de negócio) — é o
-   motor de comandos que os coloca lá. `tenantIds` é um **array** com o `tenantId.forReadModel` declarado
-   no modelo do agregado (ver [model-format](../persistence-crs/spec/model-format.md)); um `authToken`
-   nulo (comando sem credencial) não conta — nesse caso o processador cai no modo de **um argumento**
-   (`data` apenas), e `tenantIds` **não é entregue** mesmo que presente no corpo.
-
-   O processador pode ser assíncrono; o resultado é aguardado.
+1. **Validação** — corpo não-nulo, objeto, com `route`. Falha → `400`.
+2. **Roteamento** — localiza o processador pela `route`. Não encontrado → `400` (lista rotas disponíveis).
+3. **Execução** — invoca o processador com `data` (ou o corpo inteiro, se `data` ausente). Pode ser
+   assíncrono; o resultado é aguardado.
 4. **Resposta** — `200` com o resultado **direto** do processador; exceção no processador → `400` com
    `{ status, mensagem, tipo }`.
 
@@ -169,47 +120,6 @@ correspondem aos três pontos onde o modelo referencia uma rota de br:
 
 **Convenção de nome** (coordenação/projeção): `<alvo>_from_<origem>` (ex.: `conta_from_pedido`).
 
-### Forma do `data` por tipo de hook
-
-O campo `data` entregue ao processador tem **forma diferente** em cada categoria. Misturar as formas
-causa `undefined` silencioso (ex.: `data._meta.targetTenantId` num hook de coordenação retorna `undefined`).
-
-**1) Regra de negócio — síncrono (`command.br.route`)**
-
-`data` = payload bruto do comando (campos de `command.<cmd>.data.attribute[]` do `.model.json`).
-`authToken` e `tenantIds` chegam como **argumentos separados** — não dentro de `data`.
-
-**2) Coordenação saga — assíncrono (`triggerCoordination`)**
-
-```js
-data = {
-  "<entityName>": { ...eventData },   // dados do evento de origem
-  aggregateState: { ...fullState },   // estado completo do agregado de origem (carregado pelo crs)
-  targetTenantId: "<uuid>",           // tenant destino — top-level em data (NÃO em _meta)
-  sourceTenantId: "<uuid>"            // tenant origem  — top-level em data (NÃO em _meta)
-}
-// authToken chega na raiz do corpo → entregue como segundo argumento se não nulo
-```
-
-`aggregateState` é a **única** forma de ler o estado atual do agregado de origem dentro do processador.
-
-**3) Projeção cross-contexto — assíncrono (`triggerProjection`)**
-
-```js
-data = {
-  "<entityName>": { ...eventData },   // dados do evento de origem
-  _meta: {
-    targetTenantId: "<uuid>",         // tenant destino — dentro de _meta (≠ coordenação)
-    sourceTenantId: "<uuid>",         // tenant origem  — dentro de _meta
-    authToken?: "<jwt>"               // JWT de origem quando propagado; pode estar ausente
-  }
-}
-// authToken NÃO chega como argumento — leia de data._meta.authToken (oportunista)
-```
-
-⚠️ **Assimetria crítica:** em coordenação `targetTenantId`/`sourceTenantId` são **top-level** em `data`;
-em projeção cross-contexto ficam em **`data._meta`**. `aggregateState` **só existe** no hook de coordenação.
-
 > **⚠️ Regra de negócio — o merge de volta é whitelist (chaves novas são descartadas):** os dados
 > retornados pelo processor são mesclados no comando **apenas nas chaves que já existem** no
 > `commandData`; **chaves NOVAS retornadas pelo processor são DESCARTADAS** (não chegam ao evento
@@ -227,100 +137,26 @@ em projeção cross-contexto ficam em **`data._meta`**. `aggregateState` **só e
 - A rota usada é a mesma referenciada no **model** do comando/evento (ver
   [model-format](../persistence-crs/spec/model-format.md#eventos-e-domainbus)).
 
-<a id="callback-do-processador"></a>
-### Callback do processador → persistence-q / persistence-crs
+### Callback do processor → persistence-q / persistence-crs (endpoint interno de cluster)
 
-O br-service roda **intra-cluster** (atrás da DMZ). Quando um processador precisa **ler** uma projeção
-(enriquecimento), **ler** o estado de um agregado ou **escrever** um comando de volta, ele chama a
-persistence-q/crs diretamente.
+O br-service roda **intra-cluster** (atrás da DMZ). Quando um processor precisa **ler** uma projeção
+(enriquecimento) ou **escrever** de volta, usa os **endpoints internos de cluster** da persistence-q/crs
+— sem controle de acesso por conta de usuário, feitos para **chamadas internas** (**nunca expostos fora
+do cluster**). O **path exato é sensível e injetado pela plataforma no deploy** → o processor o lê de
+**variável de ambiente**; **NUNCA hardcodar** o path. Header obrigatório: **`X-Tenant-Id`** (o tenant vem
+do payload: `targetTenantId`/`sourceTenantId`). **Sem `Authorization`/JWT.**
 
-Ponto de partida: **só o hook síncrono (regra de negócio) recebe JWT de forma garantida** — ele chega em
-`authToken` na raiz do corpo e é entregue ao processador como **argumento**.
-
-Nos hooks **assíncronos** o comportamento do JWT difere por categoria:
-
-- **Coordenação (`triggerCoordination`):** o token do usuário de origem é propagado na **raiz do corpo**
-  (`authToken`) → o processador o recebe como **segundo argumento**, igual ao hook síncrono. Trate-o como
-  oportunista: quando o evento de origem não carregou JWT, o campo virá nulo e o processador cairá no modo
-  de um argumento.
-- **Projeção cross-contexto (`triggerProjection`):** o token — quando propagado — chega **dentro** de
-  `data._meta.authToken` (não como argumento separado). Nem toda projeção recebe token. Um processador de
-  projeção **não pode depender** de ter JWT: sempre tenha o caminho sem token.
-
-Cada operação existe em **duas superfícies espelhadas**, com as mesmas rotas e o mesmo corpo:
-
-| Superfície | Path | Headers | Utilizável em |
-|---|---|---|---|
-| **Pública** (via gateway) | o path documentado do serviço | `Authorization` **+** `X-Tenant-Id` | hook **síncrono**; num assíncrono, **só** se o token tiver vindo em `_meta.authToken` |
-| **Interna de cluster** | **prefixo próprio** + o mesmo path | **só** `X-Tenant-Id` — **sem** `Authorization` | qualquer hook — é a única opção que **sempre** funciona no assíncrono |
-
-O tenant sai do próprio payload (`targetTenantId`/`sourceTenantId`).
-
-A superfície interna não tem controle de acesso por conta de usuário: é feita para **chamadas internas**,
-o gateway **nega** esses paths, e ela só é alcançável de dentro do cluster. O prefixo é **sensível** e por
-isso **não consta desta documentação** — a plataforma o injeta no ambiente do serviço (ver abaixo).
-
-> **Erro comum:** supor que basta apontar para o endereço-base do serviço. **Não basta.** O endereço-base
-> leva à superfície **pública**, que exige `Authorization` — e um hook assíncrono pode muito bem não ter
-> token nenhum. A superfície interna fica sob um **prefixo próprio**, obtido conforme a seção seguinte.
-
-| Ação | Serviço · path (o mesmo nas duas superfícies) | Corpo |
+| Ação | Endpoint interno de cluster | Corpo |
 |---|---|---|
-| **Ler projeção** | persistence-q · endpoint de execução de consulta | `{"<projeção>":{<predicado>}}` → `200` array · `204` vazio |
-| **Ler estado do agregado** | persistence-crs · `…/a/<bc>/<aggType>/<uuid>` [+ `/history`] | — |
-| **Escrever comando** | persistence-crs · `…/a/<bc>/<aggType>` | `{"<comando>":{...}}` |
+| **Ler projeção** (persistence-q) | endpoint interno de **leitura** da persistence-q | `{"<projeção>":{<predicado>}}` → `200` array · `204` vazio |
+| **Ler estado do agregado** (persistence-crs) | endpoint interno de **leitura de agregado** (`…/a/<bc>/<aggType>/<uuid>` [+ `/history`]) | — |
+| **Escrever comando** (persistence-crs) | endpoint interno de **comando** (`…/a/<bc>/<aggType>`) | `{"<comando>":{...}}` |
 
-### Como o processador obtém a URL (variáveis de ambiente)
-
-Endereço e path são injetados pela plataforma no **ambiente do serviço** e ficam disponíveis a
-**qualquer** processador, em qualquer nível de pasta. Nada disso vem no payload:
-
-O br-service acessa persistence **diretamente no cluster** (não via gateway). Existem duas instâncias
-físicas, diferenciadas pela **porta**:
-
-| Instância | Modo |
-|---|---|
-| instância de **teste** | dados e topologia isolados de produção |
-| instância de **produção** | — |
-
-Caminhos e superfícies (segura / interna) são **idênticos** nas duas — o que difere é o endereço, e ele
-**não vai no processador**: vem da variável de ambiente correspondente (tabela abaixo).
-
-O developer escolhe **explicitamente** qual instância acessar no código do processador:
-- `ENDPOINTS.PERSISTENCE_T_*` → instância de **teste**
-- `ENDPOINTS.PERSISTENCE_*` → instância de **produção**
-
-| Variável de ambiente | Conteúdo |
-|---|---|
-| `PLATFORM_ENDPOINT_PERSISTENCE_T` | base da instância de **teste**, terminado em `/` |
-| `PLATFORM_ENDPOINT_PERSISTENCE` | base da instância de **produção**, terminado em `/` |
-| `PLATFORM_ENDPOINT_PERSISTENCE_Q_UNSEC_PATH` | **path da superfície interna** — mesmo valor em ambas as instâncias |
-| `PLATFORM_ENDPOINT_ORGID` | endereço-base do orgid (para verificar/criar conta de usuário de app via `ENDPOINTS.ORGID`) |
-
-- Montagem da URL interna de leitura de projeção (teste): `PLATFORM_ENDPOINT_PERSISTENCE_T` +
-  `PLATFORM_ENDPOINT_PERSISTENCE_Q_UNSEC_PATH`, com exatamente uma `/` entre os dois.
-- Acesso ao orgid: `ENDPOINTS.ORGID` → `GET .../open/ua/account/by/username/{username}/exists` (`200` = conta existe, `204` = não existe). Ver `orgid/endpoints/publico.md`.
-- **Helper recomendado — `lib/platform-endpoints`:** em vez de ler as variáveis de ambiente
-  diretamente, use o módulo `lib/platform-endpoints` (disponível em qualquer processador, independente de
-  profundidade de pasta):
-  ```js
-  const ENDPOINTS = require('../../../lib/platform-endpoints'); // ajuste ../ à profundidade
-  // Teste:     ENDPOINTS.PERSISTENCE_T_C   ENDPOINTS.PERSISTENCE_T_Q   ENDPOINTS.PERSISTENCE_T_Q_UNSEC
-  // Produção:  ENDPOINTS.PERSISTENCE_C     ENDPOINTS.PERSISTENCE_Q     ENDPOINTS.PERSISTENCE_Q_UNSEC
-  // Comum:     ENDPOINTS.ORGID
-  ```
-  O módulo usa **getters lazy** — a variável ausente lança erro nomeado na requisição (não no `require`),
-  mantendo o processador no mapa de rotas mesmo com env incompleto.
-- Variável **ausente** → o processador falha com `400`, e a mensagem **nomeia a variável faltante**.
-- Para o persistence-crs **não há**, hoje, variável com o prefixo da superfície interna. Um hook
-  assíncrono que precise escrever comando usa a superfície **pública** com um **token de serviço vindo do
-  ambiente** — nunca um token escrito no processador.
-- ⛔ **Nunca hardcodar** endereço, prefixo interno nem token no processador: todos mudam por ambiente, e o
-  valor gravado no arquivo fica errado no deploy seguinte.
-
-> ⛔ **Nunca hardcodar um JWT** no processador. O único JWT legítimo é o `authToken` que chega no corpo
-> do hook **síncrono**. Hook assíncrono não tem JWT — e a resposta para isso é o endpoint interno acima,
-> **nunca** um token gravado no arquivo.
+> **JWT — regra síncrono vs assíncrono:** no hook **síncrono** (regra de negócio `/br`, caminho do
+> comando) o corpo carrega `authToken` (JWT do usuário) — o processor **pode** usar endpoints seguros
+> com esse token. Nos hooks **assíncronos** (coordenação/projeção, via fila) **NÃO há JWT** → **usar o
+> endpoint interno de cluster** (path via env, `X-Tenant-Id`, sem `Authorization`). ⛔ **NUNCA hardcodar
+> um JWT nem o path do endpoint interno** no processor — ambos vêm do ambiente injetado no deploy.
 
 ## Pontos de coordenação
 - **CP-6** — o persistence-crs chama o br-service quando o modelo do comando exige regra/coordenação.
@@ -334,10 +170,4 @@ Ver [coordenação](../coordenacao.md).
 - [ ] Manter o processador **idempotente**; leituras de enriquecimento são aceitáveis, mas **evite
       escrita/efeitos externos** no caminho crítico do comando.
 - [ ] A resposta de sucesso é o objeto **direto** do processador (sem envelope) — modelar de acordo.
-- [ ] Escolher a superfície pelo **tipo de hook**: assíncrono (coordenação/projeção) → superfície **interna** (`X-Tenant-Id`, sem `Authorization`); síncrono → pode usar a **pública** com o `authToken` do corpo.
-- [ ] **Não** apontar para o endereço-base puro num hook assíncrono — isso cai na superfície **pública**, que exige `Authorization`.
-- [ ] Escolher a instância correta: `ENDPOINTS.PERSISTENCE_T_*` para sistemas de **teste**, `ENDPOINTS.PERSISTENCE_*` para **produção**. Escolha feita **no código** — a diferença é a porta da instância.
-- [ ] Endereço e path saem de `PLATFORM_ENDPOINT_PERSISTENCE_T` / `PLATFORM_ENDPOINT_PERSISTENCE` / `PLATFORM_ENDPOINT_PERSISTENCE_Q_UNSEC_PATH`. ⛔ **Nunca** gravar destino de rede, path interno ou JWT no processador.
-- [ ] Usar `lib/platform-endpoints` (`ENDPOINTS.*`) em vez de ler `process.env` diretamente — getters lazy nomeiam a variável faltante no erro.
-- [ ] Em hook síncrono com `authToken` nulo: o processador cai em modo de **um argumento** — `tenantIds` **não** é entregue. Não assuma que `tenantIds` chegou se o comando não carregou JWT.
-- [ ] Em hook de coordenação: `targetTenantId`/`sourceTenantId` são **top-level** em `data` (não em `_meta`). Em projeção cross-contexto: ficam em `data._meta`. Não trocar os dois.
+- [ ] Callback a persistence-q/crs: **hook async → endpoint interno de cluster + `X-Tenant-Id`, SEM JWT**; hook síncrono pode usar `body.authToken`. ⛔ **NUNCA hardcodar JWT nem o path do endpoint interno** (vêm de env injetada no deploy).

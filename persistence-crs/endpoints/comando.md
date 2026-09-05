@@ -12,11 +12,6 @@
 | `{boundedContext}` | contexto delimitado do agregado |
 | `{aggregateType}` | tipo do agregado |
 
-> **URL externa — o segmento `t` escolhe o ambiente.** O path acima é **downstream**; via gateway:
-> **produção** `POST /v3/persistence/c/a/{bc}/{type}` · **teste** `POST /v3/persistence/t/c/a/{bc}/{type}`.
-> Corpo, cabeçalhos e respostas são **iguais** nos dois — só muda o prefixo. Ver
-> [autenticação](../../06-autenticacao.md).
-
 Corpo: o **comando** identificado pelo seu nome, com os dados:
 
 ```json
@@ -26,24 +21,17 @@ Corpo: o **comando** identificado pelo seu nome, com os dados:
 O nome do comando, seus campos e as transições válidas são definidos no **model** publicado para o
 tenant (ver [forger/model](../../forger/endpoints/model.md) e [examples/](../../examples/README.md)).
 
+> **Campos de `valueObject`:** a forma do valor segue a forma **declarada** no modelo — grupo de campos
+> recebe objeto (`single`) ou array de objetos (`multiple`); atributo tipado direto recebe escalar
+> (`single`) ou **array de escalares** (`multiple`, ex.: `"diassemana": ["terca"]`). Forma divergente →
+> `400` dizendo a forma esperada. Ver
+> [spec/model-format.md § data.valueObject](../spec/model-format.md).
+
 > **Campo `status` (obrigatório, exceto na criação):** todo comando envia `status` = **estado atual**
 > do agregado (lido do banco de escrita), **nunca** o estado pretendido após o comando (`endState`). O
 > **comando de criação** é a **única exceção** — não envia `status`. Divergência com o estado real →
 > `510` (alguém avançou o agregado antes; reenvie sobre o estado atualizado). Ver
 > [README — regra do status](../README.md#estados-transições-e-concorrência).
-
-### Transição sobre um agregado existente
-
-Mesma rota da criação — `POST /a/{boundedContext}/{aggregateType}` — **sem** `/{uuid}` no path. O agregado
-alvo é apontado pelo campo **`id` dentro do corpo** do comando, valorado com o **UUID do registro do
-agregado** (o `id` devolvido na criação / o `aggregateid` da projeção; **não** a PK numérica da projeção):
-
-```json
-{ "<nomeDoComando>": { "id": "<uuid-do-agregado>", "status": "<estado atual>", "<campo>": "<valor>" } }
-```
-
-Só a **criação** não envia `id` nem `status` (o agregado ainda não existe). O path `/{uuid}` existe apenas
-para **leitura** (`GET .../{uuid}`) e **histórico** (`GET .../{uuid}/history`), não para comandos.
 
 ## Resposta
 
@@ -59,15 +47,9 @@ para **leitura** (`GET .../{uuid}`) e **histórico** (`GET .../{uuid}/history`),
 ## Comportamento
 
 Segue o [ciclo de vida de um comando](../README.md#ciclo-de-vida-de-um-comando): auth/tenant → carga do
-estado → **autorização por papel (`roles`)** → regra/coordenação no br-service (se o modelo exigir) →
-validação de transição (`fromState`) → validação do estado de destino (`endState`) → gravação do evento
-(notifica es-n) → resposta.
-
-> **A checagem de papel vem antes da regra de negócio.** Usuário sem nenhum dos papéis de
-> `command.<comando>.roles` recebe **`403`** e o comando **não** aciona a regra — então as mensagens da
-> regra não chegam a ele. Mudou em 2026-08-31 (antes: depois da regra, e `510`). Ver
-> [README — autorização por papel](../README.md#autorizacao-por-papel).
+estado → validação de transição (`fromState`) → regra/coordenação no br-service (se o modelo exigir) →
+validação do estado de destino (`endState`) → gravação do evento (notifica es-n) → resposta.
 
 ## Erros
-`400` (corpo inválido), `403` (tenant não autorizado **ou usuário sem papel para o comando**), `510`
-(falha de transição/processamento e demais exceções). Catálogo: [../erros.md](../erros.md).
+`400` (corpo inválido), `403` (tenant não autorizado), `510` (falha de transição/processamento e demais
+exceções). Catálogo: [../erros.md](../erros.md).

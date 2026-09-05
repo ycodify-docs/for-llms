@@ -43,7 +43,8 @@ Atualiza a organização. **Papel:** administrador **na org** (verificado pelo `
 (`alias`, `email`, `status`, `cardIdentifier`). O `client` é definido na **criação** (obrigatório) — não
 faz parte dos campos alteráveis por aqui.
 
-**Resposta:** `200` (sem corpo). `403` se não for administrador da org.
+**Resposta:** `200` (sem corpo) quando gravou · `403` se não for administrador da org · `404` —
+`"Organização não localizada: nenhum dado foi atualizado."`
 
 ## GET /up/org/by/name/{orgName}
 Lê a org pelo nome. **Papéis:** administrador / engenheiro / analista / financeiro.

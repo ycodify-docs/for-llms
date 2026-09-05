@@ -7,6 +7,7 @@
 ## Contents
 - Pré-requisitos do chamador
 - Conceitos próprios
+- Descobrir para onde um tenant projeta
 - Índice de endpoints (matriz de cobertura)
 - Ciclo de vida geral de uma requisição
 - Pontos de coordenação
@@ -57,6 +58,37 @@ O `tenant-id` é **gerado na criação do dataschema** (não é escolhido pelo c
 demais serviços, **obtenha-o** lendo o recurso/listagem correspondente — trate-o como **opaco** (não
 interprete sua estrutura).
 
+<a id="descobrir-para-onde-um-tenant-projeta"></a>
+### Descobrir para onde um tenant projeta
+
+O destino das projeções de um tenant **não** está no `.model.json` nem no `tenant-id`: ele é definido no
+**provisionamento**, pela cadeia de recursos. Para descobri-lo, percorra a cadeia **de trás para frente**,
+com os endpoints autenticados:
+
+```
+tenant-id
+   │  1. listar os modelos do project → a entrada traz { tenantId, dataschema, project, status }
+   ▼
+dataschema  (o esquema de leitura do tenant)
+   │  2. ler o dataschema sob o database que o contém
+   ▼
+database    (o banco de leitura)
+   │  3. ler o database sob a conexão que o contém
+   ▼
+dbconn      (servidor, porta e usuário de conexão)
+```
+
+| Passo | Endpoint | Documento |
+|---|---|---|
+| 1 | `GET /org/{org}/project/{project}/model` | [endpoints/model.md](endpoints/model.md) |
+| 2 | `GET /org/{org}/project/{project}/database/{databaseId}/dataschema` | [endpoints/dataschema.md](endpoints/dataschema.md) |
+| 3 | `GET /org/{org}/dbconn/{dbconnId}/database/{id}` · `GET /org/{org}/dbconn/{id}` | [database](endpoints/database.md) · [dbconn](endpoints/dbconn.md) |
+
+> **Por que isto importa:** dois tenants do mesmo cliente podem projetar em bancos diferentes, e nada no
+> nome do esquema, no `envtype` ou no `tenant-id` revela isso — só a cadeia revela. Antes de qualquer
+> ação com consequência sobre os dados de um tenant (apagar, sobrescrever, migrar), **percorra a cadeia**
+> para saber que banco a ação alcança.
+
 ## Índice de endpoints (matriz de cobertura)
 
 > Caminhos relativos à raiz do serviço. `{org}` = organização; demais chaves entre `{}` são identificadores.
@@ -95,12 +127,7 @@ Vale para todos os endpoints de forger (variações específicas em cada documen
      o efeito físico no banco relacional (criar banco/esquema), com rollback se o efeito físico falhar;
    - `entity`: **compila** a definição (léxica → sintática → semântica → representação intermediária →
      DDL) e aplica a DDL no banco de leitura, de forma transacional;
-   - `model`/`process`: **publica** o documento no cache distribuído (semântica de sobrescrita, **sem
-     prazo de validade** — vale até ser republicado ou removido);
-   - `dataschema` com mudança de `status`: `MODELING → RUNNING` **publica** o modelo de entidades no
-     cache distribuído (permanente, sobrescreve); `RUNNING → MODELING` o **remove**; o `DELETE` do
-     dataschema também remove. Falha no cache **reverte** a operação e responde `500` — ver
-     [dataschema.md](endpoints/dataschema.md#efeito-da-transição-sobre-o-cache-distribuído).
+   - `model`/`process`: **publica** o documento no cache distribuído (semântica de sobrescrita).
 5. **Resposta** — `201` (criação), `200` (leitura/atualização/remoção), `204` (sem conteúdo). Erros
    conforme [erros.md](erros.md).
 

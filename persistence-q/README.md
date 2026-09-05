@@ -9,6 +9,7 @@
 - Pré-requisitos do chamador
 - Índice de endpoints
 - Ciclo de vida de uma consulta
+- Depois de um comando, espere antes de consultar
 - Linguagem de consulta (resumo)
 - Pontos de coordenação
 - Pitfalls
@@ -17,16 +18,6 @@
 
 ## Pré-requisitos do chamador
 
-- **URL externa — escolha o ambiente pelo segmento `t`:** o path deste guia (`POST /`) é **downstream**;
-  o chamador externo o anexa ao prefixo do gateway, que muda conforme o ambiente:
-
-  | Ambiente | Prefixo | Exemplo (consultar) |
-  |---|---|---|
-  | **produção** | `/v3/persistence/q` | `POST /v3/persistence/q/` |
-  | **teste** | `/v3/persistence/t/q` | `POST /v3/persistence/t/q/` |
-
-  O path downstream é **idêntico** nos dois — só muda o segmento `t`. Prefixo fora da allowlist → `404`.
-  Detalhe: [autenticação](../06-autenticacao.md).
 - **Cabeçalhos obrigatórios:** `Authorization` e o **cabeçalho de tenant** `X-Tenant-Id`.
 - **Autorização de tenant:** o `tenant-id` deve pertencer ao usuário; senão → `403`.
 - **Vocabulário do tenant:** os identificadores de consulta e predicados válidos são definidos pelo
@@ -35,14 +26,12 @@
   estiver em `RUNNING`. Em `MODELING` (esquema em edição) a interpretação **não ocorre**. Ver
   [forger/dataschema — gate de status](../forger/endpoints/dataschema.md#atualizar).
 - **Spec carregada por-instância (cache):** a cada consulta o serviço resolve a spec do tenant igual ao
-  write-side — dataschema `RUNNING` via Forger → memória local → `../cache` (não mem-cache db direto) →
-  **se falta no cache, recupera do Forger e repõe** → senão exceção. ⚠️ **Esse "repõe" (self-heal) está em
-  vias de deixar de existir** — o Forger passa a ser o único publicador do modelo, no `MODELING` → `RUNNING`;
-  a partir daí, tenant sem modelo publicado **falha na consulta** em vez de se recuperar sozinho (detalhe na
-  nota de [persistence-crs/README §Carga da spec do tenant](../persistence-crs/README.md)). Alterar o modelo só propaga após
-  **invalidar o cache** (as duas chaves do modelo — read-model + write-model, valores internos) +
-  republicar; **restart sozinho não resolve**. Detalhe:
-  [persistence-crs/README §Carga da spec do tenant](../persistence-crs/README.md).
+  write-side — dataschema `RUNNING` via Forger → memória local → **serviço de cache** (`../cache`) →
+  **se falta no cache, a consulta falha** (`510`, "republique o modelo"). **Não há recuperação
+  automática a partir do Forger:** o modelo entra no cache **só** quando é publicado, e a entrada
+  **não expira** sozinha. Alterar o modelo só propaga após **invalidar o cache** (as duas chaves do
+  modelo — read-model + write-model, valores internos) + republicar; **restart sozinho não resolve**.
+  Detalhe: [persistence-crs/README §Carga da spec do tenant](../persistence-crs/README.md).
 - **Dois identificadores na projeção:** cada linha tem `id` (**Long**, PK da linha) e `aggregateid`
   (**UUID** de 36 chars, o id do agregado; `projecao.aggregateid == aggregate.id`). Filtra-se por
   `aggregateid` para achar a projeção de **um** agregado específico. Para operar o agregado depois
@@ -52,14 +41,12 @@
 
 ## Índice de endpoints
 
-> Paths **downstream** — anexe ao prefixo do ambiente (`/v3/persistence/q` prod · `/v3/persistence/t/q`
-> teste; ver acima). Apenas o endpoint autenticado é documentado. Endpoints internos sem autenticação e
-> endpoints de observabilidade/administração **não** constam aqui.
+> Apenas o endpoint autenticado é documentado. Endpoints internos sem autenticação e endpoints de
+> observabilidade/administração **não** constam aqui.
 
 | Operação | Método · Path | Documento |
 |---|---|---|
 | Consultar projeções | `POST /` | [endpoints/consulta.md](endpoints/consulta.md) |
-| Consultar logs deste serviço (`service=q`) | `GET /logs/service/{crs\|q}/query/{term}/from/{from}/to/{to}` | [persistence-crs/endpoints/logs.md](../persistence-crs/endpoints/logs.md) |
 | Controles da DSL (operadores, paging, sorting, cache, associações) | — | [query-controls.md](query-controls.md) |
 
 Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md).
@@ -79,16 +66,37 @@ Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md).
 A consulta é **idempotente** e **não** modifica estado.
 
 > **Consistência eventual:** a projeção é atualizada de forma assíncrona após cada comando. Logo após
-> um comando bem-sucedido, a consulta pode ainda **não** refletir a mudança por um curto intervalo. O
-> cliente deve tolerar essa breve defasagem (ou reconsultar até obter o estado esperado).
+> um comando bem-sucedido, a consulta pode ainda **não** refletir a mudança por um curto intervalo.
+
+### Depois de um comando, espere antes de consultar
+
+**Regra:** todo polling que consulta este serviço logo após um comando deve começar por um **atraso
+inicial (em milissegundos)** e depois **reconsultar**, com número de tentativas limitado. **Não** dispare
+a primeira consulta junto com a resposta do comando.
+
+**Por que a regra existe:** o mecanismo que persiste a **projeção** é **desvinculado** do mecanismo que
+persiste o **agregado**. São dois caminhos independentes — o comando grava o evento e responde; a
+projeção é aplicada **depois**, por outro caminho (o despacho assíncrono do evento). Logo:
+
+| O que o `200` do comando afirma | O que ele **não** afirma |
+|---|---|
+| o evento foi gravado e a transição era válida | que a linha da projeção já existe ou já está atualizada |
+
+Consequências práticas:
+
+- **Consultar imediatamente devolve o estado anterior** — e isso **não** é erro, nem do comando nem da
+  consulta. Tratar esse resultado como verdade leva à conclusão errada de que o comando falhou.
+- **Não há número universal para o atraso.** Ele varia com a carga do despacho e com o tamanho do
+  modelo. Por isso a regra é *atraso inicial + reconsulta limitada*, nunca uma consulta única.
+- **Reconsultar é seguro:** a consulta é idempotente e não modifica estado.
+- **Uma falha na projeção não aparece na resposta do comando.** Se a linha nunca chegar, a causa está no
+  caminho assíncrono, não na resposta que o cliente recebeu — investigar só a resposta do comando não
+  encontra nada.
 
 ## Linguagem de consulta (resumo)
 
-- Cada **critério** é um objeto com **um** identificador de consulta (o rótulo = nome da projeção)
-  mapeando para um conjunto de **predicados** (pares chave-valor). A combinação é dada por `_connective`
-  (**`AND`** padrão, ou **`OR`**), declarado no **nível raiz** do critério (irmão do rótulo).
-- **Controles** (`_paging`, `_sorting` indexado por `"0"`, `_count`, `_connective`, `_cache`) ficam no
-  **nível raiz** — **não** dentro do objeto de predicados. Detalhe: [query-controls.md](query-controls.md).
+- Cada **critério** é um objeto com **um** identificador de consulta (rótulo escolhido pelo cliente)
+  mapeando para um conjunto de **predicados** (pares chave-valor, combinados por "E").
 - O rótulo aparece **literalmente na resposta**, agrupando os registros encontrados.
 - O **vocabulário** de predicados é definido pelo modelo do tenant; nome desconhecido → erro de
   tradução de critério.

@@ -23,11 +23,10 @@
 - [Arquitetura ponta a ponta](01-arquitetura.md): deploy → comando → despacho → projeção → consulta; de onde vêm as filas; fatos canônicos.
 - [Composição da plataforma](00-plataforma.md): papéis dos oito serviços e como se compõem.
 - [Fluxo de deploy](03-fluxo-de-deploy.md): ordem obrigatória para implantar um sistema do zero.
-- [Acesso — URL base + autenticação + tenant](06-autenticacao.md): **URL base via API Gateway** (prefixo `/v3/<svc>`), cabeçalho Authorization e como obter o tenant-id.
+- [Autenticação e tenant](06-autenticacao.md): cabeçalho Authorization e como obter o tenant-id.
 - [Coordenação entre serviços](coordenacao.md): pontos de articulação (CP-1…CP-12) + os 4 pontos de hook do br-service + uso ideal (advisory).
 - [Antipadrões](05-antipatterns.md): o que mais quebra, por serviço (sintoma → causa → correção).
 - [Isolamento dos agentes + entrega de código](07-isolamento-e-entrega.md): sala trancada por cliente (multi-tenant), a "janela" de 4 destinos, e como o código sai (GEN vs CUSTOM, PR + humano + build + estático).
-- [Pré-visualização do frontend](08-preview-de-frontend.md): onde pôr o app (`application/`), o que ele precisa ter p/ ser montado, e por que ele fala com o BFF em **caminho relativo** (`/api/...`) — sessão e origem dependem disso. Quem dispara é o usuário, não o agente.
 
 ## auth (emissão de token / login) — porta de entrada de identidade
 - [Guia](auth/README.md): papel (emite→valida), domínios `/up`/`/ua`, fluxo de login, claims do token.
@@ -38,13 +37,12 @@
 - `/up`: [organização](orgid/endpoints/up-organizacao.md) · [conta](orgid/endpoints/up-conta.md) · [associação conta-papel-org](orgid/endpoints/up-associacao.md) · [contrato ⚠️ ignorar por ora](orgid/endpoints/up-contrato.md)
 - `/ua`: [conta](orgid/endpoints/ua-conta.md) · [papel](orgid/endpoints/ua-papel.md) · [associação conta-papel](orgid/endpoints/ua-associacao.md)
 - `/open`: [público (existência, registro, hash, e-mail)](orgid/endpoints/publico.md)
-- **Autocadastro de usuário de aplicação** (modo próprio da plataforma — self-service em 2 etapas: conta → registro de domínio): [orgid/README.md](orgid/README.md); pelo BFF, já com as travas de papel público e conta pendente: [bff/README.md](bff/README.md)
 - [Erros](orgid/erros.md) · [Exemplos](orgid/exemplos.md) · [OpenAPI](orgid/openapi.yaml)
 
 ## persistence-crs (comandos, CQRS-ES) — núcleo da modelagem
 - [Gramática do modelo de domínio (.model.json)](persistence-crs/spec/model-format.md): **essencial** — agregado, comando, evento, tipos, identidade, value objects.
 - [Guia](persistence-crs/README.md): pré-requisitos, ciclo do comando, estados/concorrência (regra do `status`), regras de payload.
-- [comando](persistence-crs/endpoints/comando.md) · [leitura de agregado](persistence-crs/endpoints/agregado-leitura.md) · [entidade (CRUD convencional)](persistence-crs/endpoints/entidade.md) · [escrita de projeção](persistence-crs/endpoints/projecao.md) · [consulta de logs](persistence-crs/endpoints/logs.md)
+- [comando](persistence-crs/endpoints/comando.md) · [leitura de agregado](persistence-crs/endpoints/agregado-leitura.md) · [escrita de projeção](persistence-crs/endpoints/projecao.md)
 - [Erros](persistence-crs/erros.md) · [Exemplos](persistence-crs/exemplos.md) · [OpenAPI](persistence-crs/openapi.yaml)
 
 ## forger (implanta recursos) — primeiro serviço usado
@@ -62,25 +60,21 @@
 
 ## br-service (regras e coordenação)
 - [Guia](br-service/README.md): posição no fluxo, três categorias de processador, forma canônica da rota, contrato de resposta.
-- [executar função (/br)](br-service/endpoints/br.md) · [consultar log de execução](br-service/endpoints/logs.md) · [implantar/desfazer processadores](br-service/endpoints/processors-deploy.md) · [Erros](br-service/erros.md) · [Exemplos](br-service/exemplos.md) · [OpenAPI](br-service/openapi.yaml)
+- [Autoria de processadores](br-service/processadores.md): caminho do arquivo → rota, forma do export, o que o processador recebe e devolve, publicação, diagnóstico.
+- [executar função (/br)](br-service/endpoints/br.md) · [Erros](br-service/erros.md) · [Exemplos](br-service/exemplos.md) · [OpenAPI](br-service/openapi.yaml)
 
 ## filer (arquivos anexos a agregados) — serviço transversal
 - [Guia](filer/README.md): convenção de nome (arquivo↔agregado), RBAC por entidade, limites/tipos.
 - [upload](filer/endpoints/upload.md) · [download](filer/endpoints/download.md) · [listar](filer/endpoints/listar.md) · [remover](filer/endpoints/remover.md)
 - [Erros](filer/erros.md) · [Exemplos](filer/exemplos.md) · [OpenAPI](filer/openapi.yaml)
 
-## cache (modelo publicado em cache) — INTERNO, sem endpoint público
-- [Guia](cache/README.md): guarda o modelo publicado do tenant (write/read-model); o **forger** grava ao publicar `.model.json`, persistence-crs/q leem; **atrás do gateway, sem rota** (acesso só interno/plataforma).
-
-## bff (borda de consumo) — camada de aplicação
-- [Guia](bff/README.md): **não fica atrás do gateway** — endereço próprio por instalação, paths na raiz, sem prefixo `/v3/` (ver "Como alcançar o BFF"); sessão (login/cookie httpOnly, papel ativo), **capacidade** do tenant, **proxy** de domínio (comando/consulta/estado/histórico), **autocadastro** `/ua/*` e resolução do miolo. Injeta `Authorization`, `X-Tenant-Id` e `X-Forger-Credential` no servidor. **Serviço próprio**: a casca é o consumidor mais comum, mas atende igualmente **cliente sem UI** (sistema backend/API-only, app móvel, integração) — nesse caso a resolução de miolo não é usada.
-
-## shell (casca universal) — camada de aplicação
-- [Guia](shell/README.md): a aplicação única para todos os clientes; casca fixa; fronteira casca↔miolo; consome os oito serviços via BFF.
+## shell (casca universal + BFF) — camada de aplicação
+- [Guia](shell/README.md): a aplicação única para todos os clientes; casca fixa + BFF; fronteira casca↔miolo; consome os oito serviços via BFF.
 - [Contrato casca↔miolo](shell/contrato-miolo.md): `MioloModule`, `hostContext`, modelo de capacidade.
 - [Injeção do miolo](shell/injecao.md): federação de módulos, resolução tenant→remoto, de onde vem o build do miolo.
 - [Estilo](shell/estilo.md): tokens semânticos, tema claro/escuro, marca sobrescrevível por tenant.
 - [Segurança](shell/seguranca.md): segredo só no BFF; capacidade = UX; revalidação no servidor.
+- [BFF](shell/bff.md): endpoints e contratos.
 
 ## Exemplos
 - [Modelos de domínio](examples/README.md): 6 modelos `.model.json` (1 curado + 5 reais sanitizados), com fluxo ponta a ponta.

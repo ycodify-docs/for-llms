@@ -67,7 +67,7 @@ cache, ou fila assíncrona) e a **dependência** (o que precisa existir antes).
 ### CP-5 — consumidor da fila de projeção atualiza o banco de leitura
 - **Origem → destino:** (fila de projeção) → persistence-crs → banco de leitura
 - **Gatilho:** mensagem na fila de projeção (CP-4).
-- **Meio:** **fila assíncrona**; aplicação idempotente com deduplicação por evento e ordenação configurável. A escrita no banco de leitura é feita com `X-Tenant-Id` (sem `Authorization` — chamada intra-infraestrutura, não originada pelo cliente).
+- **Meio:** **fila assíncrona**; aplicação idempotente com deduplicação por evento e ordenação configurável.
 - **Por quê:** materializa o estado atual do agregado para leitura por persistence-q.
 
 ### CP-6 — persistence-crs chama br-service (regra/coordenação)

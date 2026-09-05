@@ -95,7 +95,7 @@
             },
             "valueObject": {
               "type": "object",
-              "description": "Dados aninhados. Na projeção viram colunas Json: single = objeto JSON; multiple = array de objetos JSON.",
+              "description": "Dados aninhados. Cada VO vira uma coluna na projeção. Grupo de campos: single = objeto JSON, multiple = array de objetos JSON (coluna Json). Atributo tipado direto: single = escalar (coluna do tipo do escalar), multiple = array de escalares (coluna Json).",
               "properties": {
                 "single": { "$ref": "#/$defs/valueObjectGroup" },
                 "multiple": { "$ref": "#/$defs/valueObjectGroup" }
@@ -115,7 +115,7 @@
     },
     "valueObjectGroup": {
       "type": "object",
-      "description": "Mapa nomeVO -> definição do VO. Cada VO vira uma coluna Json na projeção. A definição é um grupo de campos { campo -> atributo } OU um único atributo tipado direto.",
+      "description": "Mapa nomeVO -> definição do VO. A definição é um grupo de campos { campo -> atributo } OU um único atributo tipado direto ({ type, ... }); a presença de 'type' na raiz é o discriminador e determina a forma do valor no comando (ver spec/model-format.md § data.valueObject).",
       "additionalProperties": { "type": "object" }
     },
     "attribute": {

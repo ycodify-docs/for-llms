@@ -6,10 +6,6 @@
 
 Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`.
 
-> **URL externa — o segmento `t` escolhe o ambiente.** Os paths abaixo são **downstream**; via gateway,
-> anexe-os a `/v3/persistence/c` (**produção**) ou `/v3/persistence/t/c` (**teste**). Ver
-> [autenticação](../../06-autenticacao.md).
-
 ## Estado atual
 
 `GET /a/{boundedContext}/{aggregateType}/{id}`

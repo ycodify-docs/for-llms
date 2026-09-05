@@ -20,12 +20,6 @@
 - **Esquecer cabeçalhos** → comando/consulta sem `Authorization` **e** `X-Tenant-Id` → `403`/rejeição.
 - **Achar que o `.model.json` cria filas/tabelas** → não cria: tabelas vêm de `entity`; filas, de
   `process`/es-n. Ver [arquitetura — de onde vêm as filas](01-arquitetura.md#origem-das-filas).
-- **Papel (role) em lowercase** ou com prefixo `ROLE_` → o runtime compara **case-sensitive** e sem prefixo:
-  declare **UPPERCASE** e **sem** `ROLE_` em `command.roles[]`, em `accessControl.{read,write}` e na criação de papel.
-- **App cliente escrever direto na projeção (read-model)** → o read-model só é gravado pela plataforma
-  (persistence-crs, como `MASTER`); o app **envia comando** e a projeção é materializada. Ver [autorização](06-autenticacao.md#autorização-rbac-por-papéis).
-- **Declarar `accessControl` e esquecer `MASTER`** → o campo é **opcional** (default `MASTER`); **se** declarado,
-  `MASTER` deve constar em `read` **e** `write`. Ver [forger/entity](forger/endpoints/entity.md).
 
 ## forger
 
