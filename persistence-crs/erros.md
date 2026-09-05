@@ -12,7 +12,7 @@ publicados de forma assíncrona para o subsistema de monitoração (sem PII).
 | HTTP | Significado | Quando ocorre |
 |---|---|---|
 | `400` | Requisição inválida | Corpo malformado; comando/ação desconhecida; identificador inválido; **valueObject na forma errada** (ver [spec/model-format.md § data.valueObject](spec/model-format.md) — a mensagem diz a forma esperada). |
-| `403` | Não autorizado | `tenant-id` não pertence ao usuário; credencial inválida. |
+| `403` | Não autorizado | `tenant-id` não pertence ao usuário; credencial inválida; **usuário sem papel autorizado para o comando** (os papéis vêm de `command.<cmd>.roles` no modelo). |
 | `510` | Falha de estado/processamento | Transição inválida; conflito de concorrência; **identificador de agregado malformado** (UUID inválido — ex.: enviar a PK `id` Long da projeção onde a URL `/a/{bc}/{type}/{id}` espera o `aggregateid`/UUID → "Invalid UUID string"); falha ao aplicar regra/coordenação; falha de projeção; demais exceções. |
 
 ## Categorias (para diagnóstico)
@@ -22,7 +22,7 @@ As falhas são classificadas em categorias que ajudam o agente a decidir a corre
 | Categoria | Causa | Correção |
 |---|---|---|
 | Validação | Cabeçalho/payload malformado; identificador inválido; forma do `valueObject` divergente da declarada no modelo. | Corrigir a requisição. |
-| Autorização | Tenant fora do escopo do usuário. | Usar credencial/tenant corretos. |
+| Autorização | Tenant fora do escopo do usuário; usuário sem o papel exigido pelo comando. | Usar credencial/tenant corretos; obter o papel declarado em `roles`. |
 | Provisionamento de tenant | Tenant não provisionado / esquema indisponível. | Concluir o deploy (forger) antes de operar. |
 | Busca de modelo | Agregado/comando ausente no modelo publicado. | Publicar/corrigir o **model** do tenant. |
 | Transição de estado | Estado atual não permite o comando (`fromState`). | Enviar o comando adequado ao estado atual. |

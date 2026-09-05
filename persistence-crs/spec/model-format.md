@@ -200,7 +200,10 @@ Atributos aparecem em `command.<cmd>.data.attribute.<campo>`:
   | Declaração | Forma | Valor em `single` | Valor em `multiple` | Coluna |
   |---|---|---|---|---|
   | `{ "<campo>": { "type": … } }` | **grupo de campos** | objeto | array de objetos | `Json` |
-  | `{ "type": …, "length": … }` | **atributo tipado direto** | escalar | **array de escalares** | `multiple`: `Json` · `single`: o tipo do escalar |
+  | `{ "type": …, "length": … }` | **atributo tipado direto** | objeto | array de objetos | `multiple`: `Json` · `single`: o tipo do escalar |
+
+  Repare que a coluna do valor **não muda entre as duas declarações**: seja qual for a forma de declarar,
+  o valor é **objeto** em `single` e **array de objetos** em `multiple`.
 
   ```jsonc
   // grupo de campos                          // atributo tipado direto
@@ -211,18 +214,46 @@ Atributos aparecem em `command.<cmd>.data.attribute.<campo>`:
     }                                         }
   }
   // comando:                                 // comando:
-  // "itens": [ { "nome": "a", "qtd": 1 } ]   // "diassemana": [ "terca" ]
+  // "itens": [ { "nome": "a", "qtd": 1 } ]   // "diassemana": [ { "dia": "terca" } ]
   ```
+
+  > ### Duas formas, e só essas duas
+  >
+  > | | Valor |
+  > |---|---|
+  > | `valueObject.single` | **um objeto** |
+  > | `valueObject.multiple` | **um array de objetos** |
+  >
+  > **Escalar nunca** — nem solto, nem dentro de array. `"diassemana": "terca"` e
+  > `"diassemana": ["terca"]` são recusados com **`400`**.
+  >
+  > **O que existe dentro do objeto é seu.** Um campo ou dez, valores simples ou objetos aninhados: a
+  > plataforma cobra a **forma**, não o conteúdo. Estes são todos válidos:
+  >
+  > ```jsonc
+  > "endereco":   { "rua": "das Flores", "numero": 42 }                       // single, dois campos
+  > "endereco":   { "rua": "das Flores", "cidade": { "nome": "Natal" } }      // single, aninhado
+  > "diassemana": [ { "dia": "terca" }, { "dia": "quinta" } ]                 // multiple
+  > "horarios":   [ { "periodo": { "de": "08:00", "ate": "12:00" } } ]        // multiple, aninhado
+  > ```
+  >
+  > O aninhamento **chega intacto** ao agregado e volta intacto na consulta — nada é achatado nem podado
+  > no caminho.
+  >
+  > ⚠️ **Um único item fora da forma reprova o comando inteiro.** Num `multiple`, basta um escalar no
+  > meio de objetos (`[{"dia":"terca"}, "quinta"]`) para o comando ser recusado. Não há aproveitamento
+  > parcial: ou o payload está na forma, ou é erro.
 
   **Comportamento do persistence-crs ao receber o comando:**
   - **Grupo de campos:** campos do item que **não** estejam declarados no modelo são **descartados**
     silenciosamente — o comando segue com o que foi declarado.
-  - **Tipo direto:** o escalar passa intacto até a projeção (`"diassemana": ["terca"]` grava `["terca"]`).
-    Por compatibilidade, o objeto de chave única `{"<nomeVO>": <escalar>}` também é aceito e
-    **desembrulhado** para o escalar.
-  - **Forma incompatível com a declaração → `400`** com a forma esperada (não `510`): `multiple` que
-    não recebeu array; item escalar onde a declaração é grupo de campos; item objeto que não casa
-    `{"<nomeVO>": <escalar>}` onde a declaração é tipo direto.
+  - **Tipo direto:** o valor é **objeto** (ou array de objetos), e chega assim ou é `400` —
+    `"diassemana": [{"dia": "terca"}]` grava como veio; `"diassemana": ["terca"]` é recusado. O conteúdo
+    do objeto não é filtrado: vai como você mandou. A leitura devolve o que está gravado, sem reembalar
+    — objeto volta objeto, array volta array.
+  - **Forma incompatível → `400`** com a forma esperada (não `510`): `single` que recebeu escalar ou
+    array; `multiple` que não recebeu array; e, em qualquer das duas declarações, item de `multiple` que
+    não seja objeto.
   - **Coluna da projeção:** o valor é gravado como chega. Array e objeto exigem coluna `Json`; um
     `single` de **tipo direto** grava um **escalar**, então declare a coluna com o tipo do escalar
     (`String`, `Integer`, …) — numa coluna `Json`, um escalar de texto não é JSON válido.

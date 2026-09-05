@@ -9,7 +9,7 @@
 
 ```
 POST /br
-{ "route": "vendas/pedido/validar", "data": { "total": 250.0, "cliente": "C-1" } }
+{ "route": "acme/vendas/vendas/pedido/validar", "data": { "total": 250.0, "cliente": "C-1" } }
 
 → 200
 { "total": 250.0, "cliente": "C-1", "descontoAplicado": 0.0, "valido": true }
@@ -17,19 +17,22 @@ POST /br
 
 A resposta é o objeto **direto** do processador; o persistence-crs a usa para enriquecer/validar o comando.
 
-As três categorias diferem pela **rota** (segmento de path) e pelo que retornam em `processedData`
-(ver [README — três categorias](README.md#três-categorias-de-processador)). O retorno real costuma vir
-embrulhado em `{ message, processedData, receivedData, processedBy }`; o que importa para o fluxo é
-`processedData`.
+As três categorias diferem pela **rota** (segmento de path) e pelo que retornam
+(ver [README — três categorias](README.md#três-categorias-de-processador)).
+
+> **Não há envelope.** A resposta é o objeto que o processador devolveu, tal e qual — como no exemplo
+> acima. Um processador de **regra de negócio** devolve os campos do próprio comando: são as chaves desse
+> objeto que o motor de comandos aproveita, e só as que já existiam no comando original. Devolver os dados
+> aninhados dentro de outra chave faz o motor não encontrar nada para aproveitar.
 
 ### 1) Regra de negócio — rota `…/<agregado>/<comando>`
 
-Valida/enriquece os dados do comando; `processedData` volta para o comando antes do evento.
+Valida/enriquece os dados do comando; o objeto devolvido volta para o comando antes do evento.
 
 ```
 função(data):                                  # data = dados do comando
     se !data.cliente: lança erro "cliente obrigatório"
-    retorna { processedData: { ...data, cliente: data.cliente.trim() } }
+    retorna { ...data, cliente: data.cliente.trim() }    # direto, sem envelope
 ```
 
 ### 2) Coordenação (saga) — rota `…/<agregado>/coordination/<alvo>_from_<origem>`
@@ -66,9 +69,21 @@ função(data):                                  # data = estado do agregado de 
 
 ```
 POST /br
-{ "route": "rota/inexistente", "data": {} }
+{ "route": "acme/rota/que/nao/existe", "data": {} }
 
 → 400 { "status": "error", "mensagem": "Invalid route ... Available routes: ...", "tipo": "Error" }
+```
+
+Quando a organização ainda não publicou nenhum processador, a lista vem vazia e a mensagem diz isso, em vez
+de listar rotas que não são publicáveis.
+
+## Corpo inválido (formato de erro diferente)
+
+```
+POST /br
+{ "data": { "total": 250.0 } }            # sem "route"
+
+→ 400 { "erro": "Validacao falhou." }     # um campo só — sem status/mensagem/tipo
 ```
 
 > A rota referenciada deve coincidir com a declarada no **model** do comando/evento (ver

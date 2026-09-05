@@ -35,7 +35,10 @@ O corpo tem **dois modos**, detectados pelo primeiro caractere:
 - Múltiplos predicados combinam por **`_connective`** (padrão **AND**, ou **OR**).
 - Há **controles** por critério: `_paging`, `_sorting`, `_count`, `_cache`, associações. Detalhe e
   operadores em **[query-controls.md](../query-controls.md)**.
-- O **vocabulário** de atributos é o do modelo provisionado para o tenant; nome desconhecido → erro.
+- O **vocabulário** de atributos é o do modelo provisionado para o tenant; nome desconhecido → **`400`**,
+  com os nomes recusados **e** a lista dos declarados na mensagem. Vale em cada nível: o mesmo se aplica
+  aos atributos de uma associação ou de um componente. Chaves de controle (as que começam com `_`) não
+  passam por essa checagem.
 - Como o rótulo é o **nome da projeção**, consultar projeções distintas já dá rótulos únicos; para
   múltiplos critérios sobre a **mesma** projeção, envie um critério por requisição (rótulos repetiriam o
   nome e não se distinguiriam).

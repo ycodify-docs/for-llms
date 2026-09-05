@@ -25,10 +25,20 @@ Uma **entidade convencional** é modelada como qualquer entity ([forger/entity](
 porém **sem** as colunas de projeção de agregado (`aggregateid`, `status`, os `whenAttribute` de evento) —
 elas só são obrigatórias quando a entity **é** projeção de um agregado.
 
-> **⚠️ Não use `/e` numa entity que é projeção de um agregado.** Essas tabelas são mantidas de forma
-> assíncrona pelo caminho comando → es-n → projeção; escrevê-las direto por `/e` **desalinha** a projeção
-> do log de eventos (quebra o invariante CQRS-ES). Esse uso interno de `/e` está descrito em
-> [escrita de projeção](projecao.md).
+> **⚠️ `/e` não recusa nada — nem projeção de agregado, nem linha de outra pessoa.** O controle de
+> acesso do `/e` é inteiro: (a) o token pertence ao tenant; (b) o papel do usuário está na lista
+> `_conf.accessControl.write` da entity. **Não há escopo por linha:** a checagem pergunta apenas *"este
+> usuário tem papel que escreve nesta tabela?"*, nunca *"esta linha é dele?"* — o `id` da linha alvo não
+> chega à função que autoriza. Quem tem o papel escreve em **qualquer** linha, inclusive na de outro
+> usuário do mesmo papel.
+>
+> O `/e` **não é comando**: não consulta `command.roles` e **não chama o processor `br`** — onde vivem as
+> regras de escopo de dono ("só o titular altera seu registro"). Numa entity que **é** projeção de
+> agregado soma-se o dano ao event sourcing: a linha muda **sem evento**, projeção e log de eventos
+> divergem em silêncio, e um replay desfaz a alteração sem aviso.
+>
+> Consequência prática: `/e` é escrita administrativa. Exponha-o só a quem você exporia o banco — a
+> plataforma não tem como distinguir o uso legítimo do abusivo. Ver [escrita de projeção](projecao.md).
 
 ## Requisição
 
@@ -64,8 +74,11 @@ O verbo é escolhido pelo campo `action` (não pelo método HTTP — sempre `POS
   os atributos a mudar.
 - **DELETE** — remove as linhas; cada objeto de `data` identifica a linha por **`id`**.
 
-> Conforme o **controle de acesso** declarado na entity (`_conf.accessControl`), atributos de controle
-> podem ser exigidos no corpo. Ver [forger/entity](../../forger/endpoints/entity.md).
+> **Controle de acesso.** `_conf.accessControl` é uma lista de **papéis** por operação (`read`, `write`).
+> Autoriza a **entidade inteira**, não a linha: basta um papel do usuário constar da lista para que ele
+> escreva em qualquer registro da tabela. Não existe forma de expressar "só a própria linha" no
+> `accessControl` — regra de dono só existe em processor `br`, que o `/e` não executa. Ver
+> [forger/entity](../../forger/endpoints/entity.md).
 
 ## Respostas
 

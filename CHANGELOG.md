@@ -2,6 +2,53 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.17 — 2026-09-05
+
+- **Atributo fora do modelo agora é `400` — antes a consulta devolvia tudo.** A página de consulta já
+  dizia que nome desconhecido dava erro; não dava. O motor percorre o vocabulário da entity e pergunta se
+  o pedido tem aquilo, então o nome que não existe nunca era visitado: o filtro sumia e a consulta rodava
+  sem ele. Quem escrevia `cpff` por engano não recebia erro nem lista vazia — recebia **todos** os
+  registros, acreditando ter filtrado. Agora os nomes desconhecidos são recusados juntos, numa só
+  mensagem, com a lista dos declarados. Chaves de controle (`_`-prefixadas) seguem livres.
+
+- **Rota nova: `POST /e/by` — remoção por predicado.** Até aqui o `/e` só apagava pela chave primária:
+  quem mandasse qualquer outro critério recebia `200` e **nenhuma linha era removida**, em silêncio,
+  porque o montador acrescentava uma condição sobre `id` que nunca casava. A rota nova apaga pelo critério
+  informado, e por apagar **N linhas de uma vez** tem contrato próprio: `where` vazio é recusado,
+  `_connective` é explícito (no `/e` o `AND` implícito inverte o resultado de quem esperava `OR`),
+  `_maxRows` é obrigatório e a contagem acontece **antes** — se o filtro casar mais que o teto, a resposta
+  é `409` e nada é apagado —, e `_dryRun` é `true` por padrão, então a primeira chamada mostra quantas
+  linhas casariam sem tocar em nada. Nova página
+  [`persistence-crs/endpoints/remocao-por-predicado.md`](persistence-crs/endpoints/remocao-por-predicado.md),
+  indexada no `llms.txt` e no guia do serviço.
+
+- **`valueObject`: duas formas, e só essas duas — e escalar passa a ser `400`.** `single` é **um
+  objeto**; `multiple` é **um array de objetos**. Vale para as duas maneiras de declarar (grupo de campos
+  e atributo tipado direto): a forma do valor é a mesma nas duas. **Escalar nunca** — nem solto, nem
+  dentro de array —, então `"diassemana": ["terca"]` deixa de ser aceito. O que existe **dentro** do
+  objeto continua sendo seu: um campo ou dez, com objetos aninhados se o domínio pedir; a plataforma
+  cobra a forma, não o conteúdo, e o aninhamento chega intacto ao agregado e volta intacto na consulta.
+  Num `multiple`, **um único item fora da forma reprova o comando inteiro** — não há aproveitamento
+  parcial. Antes a escrita reduzia tudo a escalar e a leitura tentava ler toda coluna `Json` como lista;
+  as duas pontas discordavam, e o encontro delas era a atualização da projeção — o primeiro comando
+  gravava e o segundo quebrava. Atualizado
+  `persistence-crs/spec/model-format.md`.
+
+- **Consulta de logs: virou `POST`, o segredo vai no corpo, e ele é conferido contra o tenant.** Três
+  mudanças no mesmo endpoint. (1) O que autoriza é o **segredo do seu tenant**, e ele é conferido **contra
+  o `X-Tenant-Id`**: apresentar o segredo de um tenant pedindo o log de outro é `403` — antes, quem tivesse
+  a chave lia o log de qualquer cliente trocando o cabeçalho. (2) O segredo saiu do cabeçalho e foi para o
+  **corpo**, e por isso o verbo passou a ser `POST` — em caminho de URL o segredo apareceria em registro de
+  acesso e em histórico de cliente. A operação continua sendo leitura. Corpo sem `secret` é `400`, não
+  `403`. (3) A URL publicada omitia o segmento `c`: o correto é `/v3/persistence/c/logs/...` (produção) e
+  `/v3/persistence/t/c/logs/...` (teste) — sem o `c` a borda devolve `404`. Entram também o `500` na tabela
+  de erros e a correção sobre o caminho de fila, que **aparece** na consulta.
+
+- **es-n: a garantia de entrega vale para a projeção do próprio contexto, não para os três destinos.**
+  Nos despachos de `triggerProjection` e `triggerCoordination` a falha de publicação não segura o
+  checkpoint e não há reentrega automática. E o envelope leva **os dados do evento**, não o estado atual
+  do agregado — o es-n não reconstitui nada. Atualizado `es-n/README.md`.
+
 ## 1.16 — 2026-09-05
 
 - **Escrita que não acha o alvo responde `404`, não `204` — 31 operações do orgid.** A 1.15 corrigiu um
