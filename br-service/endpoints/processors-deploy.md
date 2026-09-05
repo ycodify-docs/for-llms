@@ -31,7 +31,7 @@ POST /v3/brservice/processors/deploy/{org}
 | `{org}` | minúsculas, dígitos, `-` e `_`; começa por letra ou dígito; até 64 caracteres | a organização — **primeiro segmento da rota** e pasta raiz dos processadores dela |
 
 Fora desse formato o pedido é recusado. Atenção a **maiúsculas**: nomes de organização são minúsculos, e
-`Clubflow` não é o mesmo que `clubflow`.
+`Acme` não é o mesmo que `acme`.
 
 ### Corpo
 
@@ -43,24 +43,36 @@ O **arquivo compactado cru** — não é formulário nem `multipart`, e não vai
 | `Content-Type` | `application/zip` |
 | Tamanho máximo | **5 MB** |
 
-> **O `413` não vem deste serviço.** Pacote acima do teto é barrado na borda da plataforma, antes de
-> chegar ao br-service — a resposta não tem o corpo `{status, mensagem, tipo}` dos erros daqui. Se o seu
-> pacote encostar no limite, o caminho é reduzi-lo (processadores são texto; o que costuma inchar um
-> pacote é arquivo que não deveria estar nele), não reenviar.
+> **O `413` não vem deste serviço, e não vem em JSON.** Pacote acima do teto é barrado na borda da
+> plataforma, antes de chegar ao br-service, e a resposta é uma **página HTML** de erro da borda — não o
+> corpo `{status, mensagem, tipo}` dos erros daqui. **Quem faz parse esperando JSON quebra nesse ponto**;
+> trate `413` pelo código, não pelo corpo. Se o seu pacote encostar no limite, o caminho é reduzi-lo
+> (processadores são texto; o que costuma inchar um pacote é arquivo que não deveria estar nele).
 
-### Cabeçalhos — os dois são obrigatórios
+### Cabeçalhos — os três são obrigatórios
 
-Faltando qualquer um dos dois, a resposta é `401` e **nada** é publicado.
+Faltando qualquer um dos três, a resposta é `401` e **nada** é publicado.
 
 | Cabeçalho | Obrigatório | Valor | Papel |
 |---|---|---|---|
 | `X-Processors-Deploy-Credential` | sim | UUID, entregue no provisionamento | autoriza a **operação** — é a credencial do serviço |
 | `Authorization` | sim | `Bearer <token de acesso>` | diz **quem** publica e **em que organizações** pode publicar |
+| `X-Forger-Credential` | sim | UUID, entregue no provisionamento | exigido pela **borda**, antes de o pedido chegar ao serviço |
 | `Content-Type` | recomendado | `application/zip` | o corpo é lido como binário de qualquer forma |
 
-As duas credenciais são **independentes e cumulativas**: a primeira não substitui a segunda. Uma diz que a
-operação é permitida neste serviço; a outra, que **este portador** pode publicar **nesta organização**. É
-por isso que possuir a credencial não basta para publicar na organização de outro cliente.
+> ⛔ **Nunca envie `X-Tenant-Id` junto com `X-Forger-Credential`.** Os dois no mesmo pedido são recusados
+> pela borda com `400` e `tipo: multiple_headers` — *"Cannot have both X-Tenant-Id and X-Forger-Credential
+> headers simultaneously"*. Nesta rota vai **só** o `X-Forger-Credential`.
+
+> **Por que três cabeçalhos e não dois.** Esta é uma rota **administrativa**, não de execução de modelo. A
+> borda classifica as rotas administrativas e exige `X-Forger-Credential` nelas — `X-Tenant-Id` **não**
+> substitui. Faltando ele, a recusa é `401` com `tipo: missing_forger_credential`, e a mensagem diz qual
+> cabeçalho falta. O pedido nem chega ao br-service, então as credenciais de deploy e o token não são nem
+> avaliados.
+
+As duas credenciais do serviço são **independentes e cumulativas**: a primeira não substitui a segunda. Uma
+diz que a operação é permitida neste serviço; a outra, que **este portador** pode publicar **nesta
+organização**. É por isso que possuir a credencial não basta para publicar na organização de outro cliente.
 
 O token de acesso é o mesmo obtido no login da plataforma — ver
 [autenticação](../../06-autenticacao.md). Sua assinatura é verificada aqui.
@@ -74,13 +86,13 @@ forjado, expirado ou com algoritmo trocado é recusado.
 O conteúdo pode vir de dois jeitos, e o serviço aceita os dois:
 
 ```
-clubflow/pessoal/associado/criar…      ← embrulhado na pasta da organização
-pessoal/associado/criar…               ← já com o conteúdo dela na raiz
+acme/vendas/pedido/criar…      ← embrulhado na pasta da organização
+vendas/pedido/criar…               ← já com o conteúdo dela na raiz
 ```
 
 A decisão é do **conjunto**: o prefixo só é removido se **todas** as entradas o tiverem. O caminho de cada
-arquivo, sem a extensão, vira o resto da rota — `pessoal/associado/criar` publicado em `clubflow` responde
-por `clubflow/pessoal/associado/criar`.
+arquivo, sem a extensão, vira o resto da rota — `vendas/pedido/criar` publicado em `acme` responde
+por `acme/vendas/pedido/criar`.
 
 **Substituição é por organização.** Cada envio troca **toda** a árvore daquela organização: o que não
 estiver no arquivo enviado **deixa de existir**. As outras organizações não são tocadas. É assim que se
@@ -94,46 +106,48 @@ Extensões aceitas: arquivos de processador e `.json` (para dados de apoio). Qua
 nome da organização** na rota. Errar a profundidade não dá erro — publica, e a rota fica diferente da que
 o modelo aciona.
 
-Partindo de uma árvore assim, com a organização `clubflow`:
+Partindo de uma árvore assim, com a organização `acme`:
 
 ```
-clubflow/
-└── pessoal/            ← project
-    └── pessoal/        ← bounded context
-        └── associado/  ← agregado
+acme/
+└── vendas/            ← project
+    └── vendas/        ← bounded context
+        └── pedido/  ← agregado
             ├── criar
             ├── atualizar
-            └── encerrar
+            └── cancelar
 ```
 
 As duas formas de compactar produzem pacotes aceitos — escolha uma:
 
 ```
 # A) de dentro da pasta da organização (o pacote não a contém)
-cd clubflow && zip -r ../clubflow.zip .
+cd acme && zip -r ../acme.zip .
 
 # B) de fora, incluindo a pasta da organização
-zip -r clubflow.zip clubflow
+zip -r acme.zip acme
 ```
 
-Em A, as entradas ficam `pessoal/pessoal/associado/criar…`; em B, `clubflow/pessoal/pessoal/associado/criar…`.
+Em A, as entradas ficam `vendas/vendas/pedido/criar…`; em B, `acme/vendas/vendas/pedido/criar…`.
 O serviço reconhece as duas — na B ele remove o prefixo, e só o faz se **todas** as entradas o tiverem.
 
 **O erro que passa despercebido** é compactar do diretório errado, uma pasta acima:
 
 ```
-# ERRADO: gera "clubflow/clubflow/pessoal/…" quando enviado como forma B
-cd .. && zip -r clubflow.zip meu-projeto/clubflow
+# ERRADO: as entradas começam por "meu-projeto/", não pela pasta da organização
+cd .. && zip -r acme.zip meu-projeto/acme
 ```
 
 O pacote é aceito, os arquivos são gravados — e a rota vira
-`clubflow/meu-projeto/clubflow/pessoal/…`, que **nenhum modelo aciona**. O sintoma é a regra "não rodar"
+`acme/meu-projeto/acme/vendas/…`, que **nenhum modelo aciona**. Repare que o prefixo **não** é removido:
+a remoção só acontece quando **todas** as entradas começam pelo nome da organização, e aqui elas começam
+por `meu-projeto/`. O sintoma é a regra "não rodar"
 sem erro nenhum. Confira sempre a lista `rotas` da resposta contra a `br.route` declarada no modelo.
 
 Confira o conteúdo antes de enviar:
 
 ```
-unzip -l clubflow.zip
+unzip -l acme.zip
 ```
 
 ### Não perder o que não deveria sair
@@ -154,10 +168,18 @@ frequência:
 | Causa | Como aparece |
 |---|---|
 | **Profundidade errada** no pacote | a rota existe, mas com caminho diferente do que o modelo aciona — aparece em `recarga.adicionadas` com um caminho que você não reconhece |
-| **Não exporta uma função de processador** | aparece em `arquivos` e **não** em `recarga.adicionadas` |
+| **Não exporta uma função de processador** | aparece em `arquivos` **e em `rotas`**, e **não** em `recarga.adicionadas` |
+| **Falha ao ser carregado** — o arquivo compila, mas **lança no instante em que é importado**: importa algo que não existe no ambiente, ou executa no topo do arquivo algo que quebra | idêntico ao anterior: aparece em `arquivos` e em `rotas`, e **não** em `recarga.adicionadas`. **Nenhum erro é registrado em lugar nenhum** |
 | **Extensão não aceita** | recusado com `400`; nada é publicado |
 
-Erro de sintaxe **não** entra nessa lista: é barrado antes, com `400`.
+Erro de sintaxe **não** entra nessa lista: é barrado antes, com `400`. Mas atenção ao alcance dessa
+checagem — **ela compila cada arquivo, não o executa**. Um arquivo que compila e só falha ao ser importado
+atravessa a publicação com `200` e é descartado **em silêncio** no carregamento: a rota simplesmente não
+existe, e nada avisa.
+
+> **Como evitar.** Deixe o topo do arquivo sem trabalho — só declarações e importações do que sabidamente
+> existe no ambiente. Tudo que possa falhar vai **dentro** da função exportada, onde a falha vira um `400`
+> visível na chamada, em vez de uma rota que some sem aviso.
 
 ## O que é recusado
 
@@ -171,8 +193,10 @@ Antes de qualquer coisa ser gravada, o pacote inteiro é validado. Falhou uma en
 | Link simbólico | apontaria para fora da árvore |
 | Extensão não aceita | só processador e `.json` entram |
 | **Erro de sintaxe** | cada arquivo é **compilado** (sem executar) antes de entrar |
-| Arquivo maior que o declarado | defesa contra pacote-bomba |
-| Entradas ou bytes acima do teto | idem |
+| Mais de **500 entradas** no pacote | defesa contra pacote-bomba |
+| Um único arquivo acima de **1 MB** descompactado | idem |
+| Conteúdo descompactado acima de **20 MB** no total | idem — este teto é do conteúdo **expandido**, não do arquivo enviado: um pacote bem abaixo dos 5 MB pode estourá-lo |
+| Arquivo maior do que o próprio pacote declara | pacote adulterado |
 | Dois arquivos com o mesmo destino | ambiguidade |
 | Arquivo compactado ilegível | — |
 
@@ -185,15 +209,15 @@ silêncio** no carregamento, e a rota simplesmente não existiria — sem nenhum
 
 ```json
 {
-  "org": "clubflow",
+  "org": "acme",
   "backupId": "<id para desfazer, ou null se não havia árvore anterior>",
   "substituiuArvoreAnterior": true,
-  "arquivos": ["pessoal/associado/criar…"],
-  "rotas": ["clubflow/pessoal/associado/criar"],
+  "arquivos": ["vendas/pedido/criar…"],
+  "rotas": ["acme/vendas/pedido/criar"],
   "recarga": {
     "total": 12,
-    "adicionadas": ["clubflow/pessoal/associado/criar"],
-    "removidas": ["clubflow/pessoal/associado/antigo"]
+    "adicionadas": ["acme/vendas/pedido/criar"],
+    "removidas": ["acme/vendas/pedido/antigo"]
   }
 }
 ```
@@ -201,9 +225,19 @@ silêncio** no carregamento, e a rota simplesmente não existiria — sem nenhum
 > Ilustrativo — `<...>` é placeholder, não JSON literal.
 
 - **As rotas entram em vigor na hora**, sem reinício do serviço.
-- **`recarga` é a confirmação que importa.** `rotas` é o que o pacote pretendia publicar; `recarga.adicionadas`
-  é o que o serviço **de fato** passou a atender. Compare os dois: arquivo que não exporte uma função de
-  processador aparece em `arquivos` e **não** em `recarga.adicionadas`.
+- **`arquivos` e `rotas` descrevem o pacote que você enviou, não o que o serviço carregou.** A segunda é a
+  primeira filtrada por extensão. Um arquivo que **não** exporta uma função de processador, ou que falha ao
+  ser carregado, aparece **nas duas** assim mesmo. **Comparar uma com a outra não diagnostica nada** — a
+  única diferença que a comparação mostra são os arquivos de dados, que nunca seriam rota.
+- **`recarga.adicionadas` é delta, não confirmação de recarga.** Lista as rotas **novas** — as que não
+  existiam antes deste envio. Republicar o conteúdo de uma rota que já existia **não** aparece ali: um
+  envio que só altera regras existentes volta com `adicionadas: []`, e isso é o esperado, não falha.
+- **Para confirmar que a publicação entrou**, use **`recarga.total`** — quantas rotas o serviço atende
+  agora.
+- **Para achar arquivo que não virou rota**, o sinal é a `recarga`, nunca `rotas`: rota **nova** que está em
+  `rotas` e **não** está em `recarga.adicionadas` não foi carregada; rota que já existia e aparece em
+  `recarga.removidas` **mesmo estando no pacote** também não. Se a rota não é nova e você quer certeza,
+  acione-a: rota inexistente responde `400` com a lista das rotas disponíveis.
 - **`recarga.removidas`** lista o que deixou de existir por não estar no pacote.
 - **Guarde o `backupId`** — é o que permite desfazer.
 
@@ -212,8 +246,11 @@ silêncio** no carregamento, e a rota simplesmente não existiria — sem nenhum
 | Código | Quando |
 |---|---|
 | `400` | pacote inválido: caminho suspeito, extensão recusada, erro de sintaxe, teto estourado, corpo vazio, organização com nome inválido |
+| `400` **da borda** | `X-Tenant-Id` enviado junto com `X-Forger-Credential` (`tipo: multiple_headers`) |
+| `401` **da borda** | `X-Forger-Credential` ausente (`tipo: missing_forger_credential`) — o pedido não chega ao serviço |
 | `401` | `X-Processors-Deploy-Credential` ausente/incorreta, ou token ausente, expirado, com assinatura inválida ou algoritmo trocado |
 | `403` | o portador do token **não está vinculado** à organização da URL |
+| `404` | **só no desfazer**: o `backupId` não existe — nunca existiu, já foi usado, ou foi removido pela poda por idade |
 | `500` | falha ao trocar a árvore no destino — o estado anterior é restaurado |
 | `503` | implantação não provisionada neste ambiente (credencial ou verificação de token ausente) |
 
@@ -225,7 +262,7 @@ Corpo de erro: `{ status, mensagem, tipo }`. Catálogo geral: [../erros.md](../e
 POST /v3/brservice/processors/rollback/{org}/{backupId}
 ```
 
-Mesmos dois cabeçalhos e a mesma checagem de organização. Repõe a árvore que estava no lugar antes da
+Mesmos três cabeçalhos e a mesma checagem de organização. Repõe a árvore que estava no lugar antes da
 publicação identificada por `{backupId}` e recarrega as rotas. Responde com a mesma forma de `recarga`.
 
 ### Variáveis de caminho
@@ -237,7 +274,9 @@ publicação identificada por `{backupId}` e recarrega as rotas. Responde com a 
 
 Sobre o `{backupId}`:
 
-- **Não é inventável** — só funciona o que veio numa resposta de publicação.
+- **Não é inventável** — só funciona o que veio numa resposta de publicação. Um `backupId` que não existe
+  responde `404`, e isso inclui o que **já foi usado** (desfazer duas vezes com o mesmo id: a segunda dá
+  `404`) e o que **expirou** — a área de backup é podada por idade, então id antigo deixa de existir.
 - **Pertence a uma organização**: começa pelo nome dela, e usá-lo na URL de outra é recusado. É o que
   impede quem publica numa organização de mexer no histórico de outra.
 - Vem `null` quando a publicação **não** substituiu nada (primeira publicação daquela organização) —
@@ -250,8 +289,9 @@ Sobre o `{backupId}`:
 Publicar:
 
 ```
-POST /v3/brservice/processors/deploy/clubflow
+POST /v3/brservice/processors/deploy/acme
 X-Processors-Deploy-Credential: <uuid>
+X-Forger-Credential: <uuid>
 Authorization: Bearer <token>
 Content-Type: application/zip
 
@@ -263,17 +303,19 @@ Com uma ferramenta de linha de comando, o essencial é enviar o **binário cru**
 ```
 curl -X POST \
   -H 'X-Processors-Deploy-Credential: <uuid>' \
+  -H 'X-Forger-Credential: <uuid>' \
   -H 'Authorization: Bearer <token>' \
   -H 'Content-Type: application/zip' \
-  --data-binary @clubflow.zip \
-  https://<base>/v3/brservice/processors/deploy/clubflow
+  --data-binary @acme.zip \
+  https://<base>/v3/brservice/processors/deploy/acme
 ```
 
 Desfazer a última publicação:
 
 ```
-POST /v3/brservice/processors/rollback/clubflow/<backupId>
+POST /v3/brservice/processors/rollback/acme/<backupId>
 X-Processors-Deploy-Credential: <uuid>
+X-Forger-Credential: <uuid>
 Authorization: Bearer <token>
 ```
 

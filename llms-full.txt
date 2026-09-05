@@ -4,6 +4,7 @@
 > Delimitador por documento: `<!-- ===== <path> ===== -->`. OpenAPI (`*/openapi.yaml`) não concatenado.
 
 
+
 <!-- ===== persistence-crs/spec/model-format.md ===== -->
 
 # Formato do modelo de domínio (`.model.json`)
@@ -572,7 +573,7 @@ persistence-crs, es-n e br-service ponta a ponta.
 
 ---
 
-> **Versão da documentação:** 1.14 · **Última revisão:** 2026-09-03 · Histórico: [CHANGELOG.md](CHANGELOG.md).
+> **Versão da documentação:** 1.15 · **Última revisão:** 2026-09-05 · Histórico: [CHANGELOG.md](CHANGELOG.md).
 > Índice navegável por máquina: [`llms.txt`](llms.txt); corpus completo num arquivo: [`llms-full.txt`](llms-full.txt).
 
 
@@ -1979,6 +1980,7 @@ Ver [coordenação](../coordenacao.md).
 - [ ] Senha nunca volta nas respostas; recuperação é via fluxo de **hash** (`/open/*`).
 - [ ] `name` da organização é o `{org}` dos caminhos do forger — escolha-o cedo e mantenha.
 
+
 <!-- ===== orgid/endpoints/up-organizacao.md ===== -->
 
 # orgid · `/up` · organização
@@ -2077,6 +2079,7 @@ Remove a org. **Papel:** administrador **na org**.
 
 **Resposta:** `200` (sem corpo). `403` se não for administrador.
 
+
 <!-- ===== orgid/endpoints/up-conta.md ===== -->
 
 # orgid · `/up` · conta
@@ -2168,6 +2171,7 @@ Envia uma notificação por e-mail (usuário autenticado).
 
 **Resposta:** `200` — `{}`.
 
+
 <!-- ===== orgid/endpoints/up-associacao.md ===== -->
 
 # orgid · `/up` · associação conta-papel-org
@@ -2258,6 +2262,7 @@ Desassocia a conta da org. **Papel:** administrador na org.
 | `orgName` | nome da organização da qual desassociar |
 
 **Resposta:** `200` (sem corpo).
+
 
 <!-- ===== orgid/endpoints/up-contrato.md ===== -->
 
@@ -2426,6 +2431,7 @@ Lista todas as contas sob um dono de papel. **Papéis:** administrador / engenhe
 
 **Resposta:** `200` — array de contas (senha nula); array vazio `[]` se nenhuma (não `204`).
 
+
 <!-- ===== orgid/endpoints/ua-papel.md ===== -->
 
 # orgid · `/ua` · papel
@@ -2473,7 +2479,7 @@ Atualiza um papel.
 **Corpo** (JSON): os campos do POST **mais** o `id`:
 
 ```json
-{ "id": 101, "name": "ASSOCIADO", "owner": "clubflow", "label": "Associado", "status": "ACTIVE", "ispublic": true }
+{ "id": 101, "name": "ASSOCIADO", "owner": "acme", "label": "Associado", "status": "ACTIVE", "ispublic": true }
 ```
 
 **Resposta:** `200` (sem corpo) quando gravou · `400` se faltar o `id` · `404` se o papel não existe
@@ -2538,6 +2544,7 @@ removido."`
 > ⚠️ Até 2026-09-05 este `DELETE` respondia **`204`** quando o papel não existia. Num `DELETE`, `204` é o
 > código **canônico de sucesso** — a leitura era a oposta da correta, e a remoção que não aconteceu passava
 > por feita. Ver [../erros.md](../erros.md).
+
 
 <!-- ===== orgid/endpoints/ua-associacao.md ===== -->
 
@@ -2629,6 +2636,7 @@ Desassocia um papel de uma conta.
 | `roleOwner` | dono do papel |
 
 **Resposta:** `200` (sem corpo).
+
 
 <!-- ===== orgid/endpoints/publico.md ===== -->
 
@@ -2764,6 +2772,7 @@ Envia uma notificação por e-mail.
 
 **Resposta:** `200` — `{}`.
 
+
 <!-- ===== orgid/erros.md ===== -->
 
 # orgid · catálogo de erros
@@ -2834,6 +2843,7 @@ usuário recebia sucesso e a senha não mudava).
 
 **Se você ainda vir `204` numa escrita, está falando com uma versão antiga do orgid.** Leitura segue em
 `204`, e o `/exists` depende disso — ali `200`/`204` é o contrato, não um erro.
+
 
 <!-- ===== orgid/exemplos.md ===== -->
 
@@ -3111,8 +3121,9 @@ estado → validação de transição (`fromState`) → regra/coordenação no b
 validação do estado de destino (`endState`) → gravação do evento (notifica es-n) → resposta.
 
 ## Erros
-`400` (corpo inválido), `403` (tenant não autorizado), `510` (falha de transição/processamento e demais
-exceções). Catálogo: [../erros.md](../erros.md).
+`400` (corpo inválido, incluindo `valueObject` na forma errada), `403` (tenant não autorizado **ou
+usuário sem o papel exigido pelo comando**), `510` (falha de transição/processamento e demais exceções).
+Catálogo: [../erros.md](../erros.md).
 
 
 <!-- ===== persistence-crs/endpoints/agregado-leitura.md ===== -->
@@ -3157,9 +3168,15 @@ Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`.
 
 # persistence-crs · endpoints · escrita de projeção
 
-> Escrita direta numa **projeção** (criar/atualizar/remover linhas no banco de leitura). Endpoint de
-> **serviço autorizado** — no fluxo normal, projeções são mantidas de forma assíncrona pelo caminho
-> es-n → projeção (CP-5); este endpoint é o ponto de aplicação dessa escrita. Guia: [../README.md](../README.md).
+> Escrita direta numa **projeção** (criar/atualizar/remover linhas no banco de leitura). No fluxo normal,
+> projeções são mantidas de forma assíncrona pelo caminho es-n → projeção (CP-5); este endpoint é o ponto
+> de aplicação dessa escrita. Guia: [../README.md](../README.md).
+>
+> **⚠️ Não é um endpoint de serviço, e não há credencial de serviço.** É o **mesmo** `POST /e` de
+> [entidade](entidade.md) — mesmo controller, mesma autorização: pertencer ao tenant e ter papel em
+> `_conf.accessControl.write`. Qualquer usuário final que satisfaça esses dois pontos escreve aqui, em
+> **qualquer linha**, pulando o comando, o RBAC de comando e o processor `br`. Leia a advertência de
+> [entidade](entidade.md) antes de usar.
 
 ## Requisição
 
@@ -3186,9 +3203,12 @@ Corpo (lote): um **array** de operações no formato acima.
 Ação desconhecida → `400`. Falha de aplicação → `510`.
 
 ## Comportamento
-A operação é aplicada à projeção do tenant no banco de leitura. No fluxo dirigido por eventos, a
-aplicação é **idempotente** (deduplicação por evento) e pode ser **ordenada** (nenhuma/estrita/por
-agregado), conforme o despacho do [es-n](../../es-n/README.md).
+A operação é aplicada à projeção do tenant no banco de leitura, na requisição.
+
+**Idempotência e ordenação são do [es-n](../../es-n/README.md), não desta rota.** No fluxo dirigido por
+eventos, a aplicação é idempotente (deduplicação por evento) e pode ser ordenada (nenhuma/estrita/por
+agregado), conforme o despacho do es-n. Uma chamada `POST /e` **não carrega identificador de evento
+algum** — não há por onde deduplicar, e reenviar aplica de novo.
 
 ## Erros
 `400` (ação/corpo inválido), `403` (tenant), `510` (falha de aplicação — ex.: violação de restrição).
@@ -3211,7 +3231,7 @@ publicados de forma assíncrona para o subsistema de monitoração (sem PII).
 | HTTP | Significado | Quando ocorre |
 |---|---|---|
 | `400` | Requisição inválida | Corpo malformado; comando/ação desconhecida; identificador inválido; **valueObject na forma errada** (ver [spec/model-format.md § data.valueObject](spec/model-format.md) — a mensagem diz a forma esperada). |
-| `403` | Não autorizado | `tenant-id` não pertence ao usuário; credencial inválida. |
+| `403` | Não autorizado | `tenant-id` não pertence ao usuário; credencial inválida; **usuário sem papel autorizado para o comando** (os papéis vêm de `command.<cmd>.roles` no modelo). |
 | `510` | Falha de estado/processamento | Transição inválida; conflito de concorrência; **identificador de agregado malformado** (UUID inválido — ex.: enviar a PK `id` Long da projeção onde a URL `/a/{bc}/{type}/{id}` espera o `aggregateid`/UUID → "Invalid UUID string"); falha ao aplicar regra/coordenação; falha de projeção; demais exceções. |
 
 ## Categorias (para diagnóstico)
@@ -3221,7 +3241,7 @@ As falhas são classificadas em categorias que ajudam o agente a decidir a corre
 | Categoria | Causa | Correção |
 |---|---|---|
 | Validação | Cabeçalho/payload malformado; identificador inválido; forma do `valueObject` divergente da declarada no modelo. | Corrigir a requisição. |
-| Autorização | Tenant fora do escopo do usuário. | Usar credencial/tenant corretos. |
+| Autorização | Tenant fora do escopo do usuário; usuário sem o papel exigido pelo comando. | Usar credencial/tenant corretos; obter o papel declarado em `roles`. |
 | Provisionamento de tenant | Tenant não provisionado / esquema indisponível. | Concluir o deploy (forger) antes de operar. |
 | Busca de modelo | Agregado/comando ausente no modelo publicado. | Publicar/corrigir o **model** do tenant. |
 | Transição de estado | Estado atual não permite o comando (`fromState`). | Enviar o comando adequado ao estado atual. |
@@ -4846,6 +4866,8 @@ comandos** automaticamente (saga), visíveis como novos eventos no histórico do
 - Contrato de resposta
 - Ciclo de vida de uma requisição
 - Autoria de processadores → [processadores.md](processadores.md)
+- Implantar processadores → [endpoints/processors-deploy.md](endpoints/processors-deploy.md)
+- Consultar o log de execução → [endpoints/logs.md](endpoints/logs.md)
 - Pontos de coordenação
 - Pitfalls
 
@@ -4863,11 +4885,18 @@ coordenação (async); no caminho **crítico do comando** (síncrono), evite esc
 
 ## Índice de endpoints
 
-> Apenas o endpoint de contrato é documentado. Endpoints de saúde/observabilidade **não** constam aqui.
+> Endpoints de saúde/observabilidade **não** constam aqui.
 
 | Operação | Método · Path | Documento |
 |---|---|---|
 | Executar função (rota) | `POST /br` | [endpoints/br.md](endpoints/br.md) |
+| Implantar processadores de uma organização | `POST /processors/deploy/{org}` | [endpoints/processors-deploy.md](endpoints/processors-deploy.md) |
+| Desfazer a última publicação | `POST /processors/rollback/{org}/{backupId}` | [endpoints/processors-deploy.md](endpoints/processors-deploy.md) |
+| Consultar o log de execução | `GET /logs/query/…` | [endpoints/logs.md](endpoints/logs.md) |
+
+> **As rotas administrativas exigem um cabeçalho a mais.** Publicação, rollback e consulta de log passam
+> pela borda como rotas administrativas e pedem `X-Forger-Credential` — que **nunca** vai junto com
+> `X-Tenant-Id`. O `POST /br` não é afetado: ele é chamado pelo motor de comandos dentro do cluster.
 
 > **⚠️ `POST /coordination` — pendente (gap de plataforma).** O motor de comandos (persistence-crs)
 > aciona uma coordenação **síncrona no caminho do comando** quando o modelo do comando declara
@@ -4945,7 +4974,7 @@ correspondem aos três pontos onde o modelo referencia uma rota de br:
 > Todas as rotas seguem a [forma canônica](#forma-canônica-da-rota-obrigatória)
 > `<org>/<project>/<bc>/<aggregate>/…`. As colunas abaixo mostram só o **sufixo** que distingue a categoria.
 
-| Categoria | Referenciado em | Sufixo da rota | Entrada | Retorno (em `processedData`) |
+| Categoria | Referenciado em | Sufixo da rota | Entrada | Retorno |
 |---|---|---|---|---|
 | **Regra de negócio** | `command.br.route` | `…/<aggregate>/<comando>` (nome do comando) | dados do comando | os **dados validados/enriquecidos** do comando — mesclados no comando antes de gravar o evento |
 | **Coordenação (saga)** | `event.domainBus.triggerCoordination[].br.route` | `…/<aggregate>/coordination/<alvo_from_origem>` (segmento **`coordination`**) | dados do evento (estado do agregado de origem) | um **`targetCommand`** `{ boundedContext, aggregateType, commandName, data }` — submetido como novo comando no contexto destino (CP-7) |
@@ -5154,7 +5183,7 @@ Corpo:
 { "route": "<rota do processador>", "data": { "...": "..." } }
 ```
 
-- `route` (obrigatório) — caminho textual que identifica o processador (ex.: `vendas/pedido/validar`).
+- `route` (obrigatório) — caminho textual que identifica o processador, na forma canônica, **começando pela organização** (ex.: `acme/vendas/vendas/pedido/validar`).
 - `data` — dados passados ao processador. Se ausente, o corpo inteiro é passado.
 
 ## Resposta
@@ -5165,10 +5194,17 @@ Corpo:
 { "...": "..." }
 ```
 
-- `400` — falha de validação, rota inexistente, ou exceção no processador:
+- `400` — rota inexistente ou exceção no processador:
 
 ```json
 { "status": "error", "mensagem": "<descrição>", "tipo": "<tipo do erro>" }
+```
+
+- `400` — **falha de validação do corpo** (corpo nulo, não-objeto, ou sem `route`). Corpo **diferente**,
+  com um campo só:
+
+```json
+{ "erro": "<descrição>" }
 ```
 
 ## Comportamento
@@ -5178,7 +5214,8 @@ externos próprios).
 
 ## Erros
 `400` em todos os casos de falha (validação, rota desconhecida — com lista de rotas disponíveis —,
-exceção do processador). Catálogo: [../erros.md](../erros.md).
+exceção do processador), mas em **dois formatos de corpo diferentes**: a falha de validação devolve
+`{ erro }` e todo o resto devolve `{ status, mensagem, tipo }`. Catálogo: [../erros.md](../erros.md).
 
 
 <!-- ===== br-service/erros.md ===== -->
@@ -5193,11 +5230,16 @@ exceção do processador). Catálogo: [../erros.md](../erros.md).
 { "status": "error", "mensagem": "<descrição>", "tipo": "<tipo do erro>" }
 ```
 
+> ⚠️ **Uma exceção, e ela quebra quem trata erro pelo campo `tipo`.** A falha de **validação do corpo**
+> responde `400` com um corpo **diferente**: `{ "erro": "<descrição>" }` — um campo só, sem `status`, sem
+> `mensagem` e sem `tipo`. Todos os demais `400` usam o envelope acima. Trate o `400` pelo código HTTP e
+> só leia `tipo` depois de confirmar que o campo existe.
+
 ## Casos
 
 | HTTP | Caso | Mensagem típica | Correção |
 |---|---|---|---|
-| `400` | Validação | corpo nulo / não-objeto / sem `route`. | Enviar `{ "route": "...", "data": {...} }`. |
+| `400` | Validação | **outro corpo** — `{ "erro": "..." }`, sem `status`/`mensagem`/`tipo`. Ocorre com corpo nulo, não-objeto ou sem `route`. | Enviar `{ "route": "...", "data": {...} }`. |
 | `400` | Rota ausente | `route` não informado. | Incluir `route`. |
 | `400` | Rota desconhecida | rota inválida — a resposta lista as rotas disponíveis. | Usar uma rota existente; conferir o nome no model. |
 | `400` | Exceção do processador | mensagem e tipo do erro lançado pelo processador. | Corrigir os dados ou o processador. |
@@ -5221,7 +5263,7 @@ contexto do comando/coordenação.
 
 ```
 POST /br
-{ "route": "vendas/pedido/validar", "data": { "total": 250.0, "cliente": "C-1" } }
+{ "route": "acme/vendas/vendas/pedido/validar", "data": { "total": 250.0, "cliente": "C-1" } }
 
 → 200
 { "total": 250.0, "cliente": "C-1", "descontoAplicado": 0.0, "valido": true }
@@ -5229,19 +5271,22 @@ POST /br
 
 A resposta é o objeto **direto** do processador; o persistence-crs a usa para enriquecer/validar o comando.
 
-As três categorias diferem pela **rota** (segmento de path) e pelo que retornam em `processedData`
-(ver [README — três categorias](README.md#três-categorias-de-processador)). O retorno real costuma vir
-embrulhado em `{ message, processedData, receivedData, processedBy }`; o que importa para o fluxo é
-`processedData`.
+As três categorias diferem pela **rota** (segmento de path) e pelo que retornam
+(ver [README — três categorias](README.md#três-categorias-de-processador)).
+
+> **Não há envelope.** A resposta é o objeto que o processador devolveu, tal e qual — como no exemplo
+> acima. Um processador de **regra de negócio** devolve os campos do próprio comando: são as chaves desse
+> objeto que o motor de comandos aproveita, e só as que já existiam no comando original. Devolver os dados
+> aninhados dentro de outra chave faz o motor não encontrar nada para aproveitar.
 
 ### 1) Regra de negócio — rota `…/<agregado>/<comando>`
 
-Valida/enriquece os dados do comando; `processedData` volta para o comando antes do evento.
+Valida/enriquece os dados do comando; o objeto devolvido volta para o comando antes do evento.
 
 ```
 função(data):                                  # data = dados do comando
     se !data.cliente: lança erro "cliente obrigatório"
-    retorna { processedData: { ...data, cliente: data.cliente.trim() } }
+    retorna { ...data, cliente: data.cliente.trim() }    # direto, sem envelope
 ```
 
 ### 2) Coordenação (saga) — rota `…/<agregado>/coordination/<alvo>_from_<origem>`
@@ -5278,13 +5323,544 @@ função(data):                                  # data = estado do agregado de 
 
 ```
 POST /br
-{ "route": "rota/inexistente", "data": {} }
+{ "route": "acme/rota/que/nao/existe", "data": {} }
 
 → 400 { "status": "error", "mensagem": "Invalid route ... Available routes: ...", "tipo": "Error" }
 ```
 
+Quando a organização ainda não publicou nenhum processador, a lista vem vazia e a mensagem diz isso, em vez
+de listar rotas que não são publicáveis.
+
+## Corpo inválido (formato de erro diferente)
+
+```
+POST /br
+{ "data": { "total": 250.0 } }            # sem "route"
+
+→ 400 { "erro": "Validacao falhou." }     # um campo só — sem status/mensagem/tipo
+```
+
 > A rota referenciada deve coincidir com a declarada no **model** do comando/evento (ver
 > [examples/](../examples/README.md) e [forger/model](../forger/endpoints/model.md)).
+
+
+<!-- ===== br-service/endpoints/processors-deploy.md ===== -->
+
+# br-service · endpoints · implantar processadores
+
+> Publica os **processadores de uma organização** a partir de um arquivo compactado, e desfaz a última
+> publicação. Exige **duas credenciais ao mesmo tempo**. Guia: [../README.md](../README.md).
+
+> ⚠️ Este endpoint publica **código que o serviço vai executar**. Quem consegue publicar numa organização
+> passa a decidir o que roda nas regras de negócio dela. Trate as credenciais como tal.
+
+## Contents
+- Requisição
+- Formato do arquivo
+- Como montar o pacote (inclui **não perder o que não deveria sair** e **não deixar arquivo inalcançável**)
+- O que é recusado
+- Resposta
+- Erros
+- Desfazer
+- Exemplos
+
+---
+
+## Requisição
+
+```
+POST /v3/brservice/processors/deploy/{org}
+```
+
+### Variável de caminho
+
+| Variável | Formato | O que é |
+|---|---|---|
+| `{org}` | minúsculas, dígitos, `-` e `_`; começa por letra ou dígito; até 64 caracteres | a organização — **primeiro segmento da rota** e pasta raiz dos processadores dela |
+
+Fora desse formato o pedido é recusado. Atenção a **maiúsculas**: nomes de organização são minúsculos, e
+`Acme` não é o mesmo que `acme`.
+
+### Corpo
+
+O **arquivo compactado cru** — não é formulário nem `multipart`, e não vai em campo de upload.
+
+| Item | Valor |
+|---|---|
+| Corpo | os bytes do `.zip` |
+| `Content-Type` | `application/zip` |
+| Tamanho máximo | **5 MB** |
+
+> **O `413` não vem deste serviço, e não vem em JSON.** Pacote acima do teto é barrado na borda da
+> plataforma, antes de chegar ao br-service, e a resposta é uma **página HTML** de erro da borda — não o
+> corpo `{status, mensagem, tipo}` dos erros daqui. **Quem faz parse esperando JSON quebra nesse ponto**;
+> trate `413` pelo código, não pelo corpo. Se o seu pacote encostar no limite, o caminho é reduzi-lo
+> (processadores são texto; o que costuma inchar um pacote é arquivo que não deveria estar nele).
+
+### Cabeçalhos — os três são obrigatórios
+
+Faltando qualquer um dos três, a resposta é `401` e **nada** é publicado.
+
+| Cabeçalho | Obrigatório | Valor | Papel |
+|---|---|---|---|
+| `X-Processors-Deploy-Credential` | sim | UUID, entregue no provisionamento | autoriza a **operação** — é a credencial do serviço |
+| `Authorization` | sim | `Bearer <token de acesso>` | diz **quem** publica e **em que organizações** pode publicar |
+| `X-Forger-Credential` | sim | UUID, entregue no provisionamento | exigido pela **borda**, antes de o pedido chegar ao serviço |
+| `Content-Type` | recomendado | `application/zip` | o corpo é lido como binário de qualquer forma |
+
+> ⛔ **Nunca envie `X-Tenant-Id` junto com `X-Forger-Credential`.** Os dois no mesmo pedido são recusados
+> pela borda com `400` e `tipo: multiple_headers` — *"Cannot have both X-Tenant-Id and X-Forger-Credential
+> headers simultaneously"*. Nesta rota vai **só** o `X-Forger-Credential`.
+
+> **Por que três cabeçalhos e não dois.** Esta é uma rota **administrativa**, não de execução de modelo. A
+> borda classifica as rotas administrativas e exige `X-Forger-Credential` nelas — `X-Tenant-Id` **não**
+> substitui. Faltando ele, a recusa é `401` com `tipo: missing_forger_credential`, e a mensagem diz qual
+> cabeçalho falta. O pedido nem chega ao br-service, então as credenciais de deploy e o token não são nem
+> avaliados.
+
+As duas credenciais do serviço são **independentes e cumulativas**: a primeira não substitui a segunda. Uma
+diz que a operação é permitida neste serviço; a outra, que **este portador** pode publicar **nesta
+organização**. É por isso que possuir a credencial não basta para publicar na organização de outro cliente.
+
+O token de acesso é o mesmo obtido no login da plataforma — ver
+[autenticação](../../06-autenticacao.md). Sua assinatura é verificada aqui.
+
+A `{org}` da URL precisa estar entre as organizações do portador do token — senão `403`. É o que impede
+alguém de publicar na organização de outro cliente. O token tem a **assinatura verificada**; token
+forjado, expirado ou com algoritmo trocado é recusado.
+
+## Formato do arquivo
+
+O conteúdo pode vir de dois jeitos, e o serviço aceita os dois:
+
+```
+acme/vendas/pedido/criar…      ← embrulhado na pasta da organização
+vendas/pedido/criar…               ← já com o conteúdo dela na raiz
+```
+
+A decisão é do **conjunto**: o prefixo só é removido se **todas** as entradas o tiverem. O caminho de cada
+arquivo, sem a extensão, vira o resto da rota — `vendas/pedido/criar` publicado em `acme` responde
+por `acme/vendas/pedido/criar`.
+
+**Substituição é por organização.** Cada envio troca **toda** a árvore daquela organização: o que não
+estiver no arquivo enviado **deixa de existir**. As outras organizações não são tocadas. É assim que se
+despublica uma regra — enviando um pacote sem ela.
+
+Extensões aceitas: arquivos de processador e `.json` (para dados de apoio). Qualquer outra é recusada.
+
+## Como montar o pacote
+
+**A regra única:** o caminho de cada arquivo **dentro do pacote**, sem a extensão, é o que vem **depois do
+nome da organização** na rota. Errar a profundidade não dá erro — publica, e a rota fica diferente da que
+o modelo aciona.
+
+Partindo de uma árvore assim, com a organização `acme`:
+
+```
+acme/
+└── vendas/            ← project
+    └── vendas/        ← bounded context
+        └── pedido/  ← agregado
+            ├── criar
+            ├── atualizar
+            └── cancelar
+```
+
+As duas formas de compactar produzem pacotes aceitos — escolha uma:
+
+```
+# A) de dentro da pasta da organização (o pacote não a contém)
+cd acme && zip -r ../acme.zip .
+
+# B) de fora, incluindo a pasta da organização
+zip -r acme.zip acme
+```
+
+Em A, as entradas ficam `vendas/vendas/pedido/criar…`; em B, `acme/vendas/vendas/pedido/criar…`.
+O serviço reconhece as duas — na B ele remove o prefixo, e só o faz se **todas** as entradas o tiverem.
+
+**O erro que passa despercebido** é compactar do diretório errado, uma pasta acima:
+
+```
+# ERRADO: as entradas começam por "meu-projeto/", não pela pasta da organização
+cd .. && zip -r acme.zip meu-projeto/acme
+```
+
+O pacote é aceito, os arquivos são gravados — e a rota vira
+`acme/meu-projeto/acme/vendas/…`, que **nenhum modelo aciona**. Repare que o prefixo **não** é removido:
+a remoção só acontece quando **todas** as entradas começam pelo nome da organização, e aqui elas começam
+por `meu-projeto/`. O sintoma é a regra "não rodar"
+sem erro nenhum. Confira sempre a lista `rotas` da resposta contra a `br.route` declarada no modelo.
+
+Confira o conteúdo antes de enviar:
+
+```
+unzip -l acme.zip
+```
+
+### Não perder o que não deveria sair
+
+A publicação **substitui a árvore inteira da organização**. Por isso:
+
+- **Monte o pacote a partir da árvore completa da organização**, nunca só dos arquivos que você mexeu.
+  Enviar um pacote com um arquivo só **apaga todos os outros** daquela organização.
+- Para **despublicar** uma regra, é o contrário: monte a árvore completa **sem** ela.
+- Depois de publicar, olhe **`recarga.removidas`** na resposta. Se aparecer ali algo que você não queria
+  remover, o pacote estava incompleto — reenvie a árvore completa, ou desfaça pelo `backupId`.
+
+### Não deixar arquivo inalcançável
+
+Um arquivo pode ser gravado com sucesso e mesmo assim **nunca virar rota**. Três causas, em ordem de
+frequência:
+
+| Causa | Como aparece |
+|---|---|
+| **Profundidade errada** no pacote | a rota existe, mas com caminho diferente do que o modelo aciona — aparece em `recarga.adicionadas` com um caminho que você não reconhece |
+| **Não exporta uma função de processador** | aparece em `arquivos` **e em `rotas`**, e **não** em `recarga.adicionadas` |
+| **Falha ao ser carregado** — o arquivo compila, mas **lança no instante em que é importado**: importa algo que não existe no ambiente, ou executa no topo do arquivo algo que quebra | idêntico ao anterior: aparece em `arquivos` e em `rotas`, e **não** em `recarga.adicionadas`. **Nenhum erro é registrado em lugar nenhum** |
+| **Extensão não aceita** | recusado com `400`; nada é publicado |
+
+Erro de sintaxe **não** entra nessa lista: é barrado antes, com `400`. Mas atenção ao alcance dessa
+checagem — **ela compila cada arquivo, não o executa**. Um arquivo que compila e só falha ao ser importado
+atravessa a publicação com `200` e é descartado **em silêncio** no carregamento: a rota simplesmente não
+existe, e nada avisa.
+
+> **Como evitar.** Deixe o topo do arquivo sem trabalho — só declarações e importações do que sabidamente
+> existe no ambiente. Tudo que possa falhar vai **dentro** da função exportada, onde a falha vira um `400`
+> visível na chamada, em vez de uma rota que some sem aviso.
+
+## O que é recusado
+
+Antes de qualquer coisa ser gravada, o pacote inteiro é validado. Falhou uma entrada, **nada** é publicado
+— não existe publicação pela metade.
+
+| Recusa | Por quê |
+|---|---|
+| Entrada com `..` no caminho | escaparia da pasta da organização |
+| Caminho absoluto | idem |
+| Link simbólico | apontaria para fora da árvore |
+| Extensão não aceita | só processador e `.json` entram |
+| **Erro de sintaxe** | cada arquivo é **compilado** (sem executar) antes de entrar |
+| Mais de **500 entradas** no pacote | defesa contra pacote-bomba |
+| Um único arquivo acima de **1 MB** descompactado | idem |
+| Conteúdo descompactado acima de **20 MB** no total | idem — este teto é do conteúdo **expandido**, não do arquivo enviado: um pacote bem abaixo dos 5 MB pode estourá-lo |
+| Arquivo maior do que o próprio pacote declara | pacote adulterado |
+| Dois arquivos com o mesmo destino | ambiguidade |
+| Arquivo compactado ilegível | — |
+
+A checagem de sintaxe importa mais do que parece: um processador que não compila seria **descartado em
+silêncio** no carregamento, e a rota simplesmente não existiria — sem nenhum aviso.
+
+## Resposta
+
+`200` — publicado:
+
+```json
+{
+  "org": "acme",
+  "backupId": "<id para desfazer, ou null se não havia árvore anterior>",
+  "substituiuArvoreAnterior": true,
+  "arquivos": ["vendas/pedido/criar…"],
+  "rotas": ["acme/vendas/pedido/criar"],
+  "recarga": {
+    "total": 12,
+    "adicionadas": ["acme/vendas/pedido/criar"],
+    "removidas": ["acme/vendas/pedido/antigo"]
+  }
+}
+```
+
+> Ilustrativo — `<...>` é placeholder, não JSON literal.
+
+- **As rotas entram em vigor na hora**, sem reinício do serviço.
+- **`arquivos` e `rotas` descrevem o pacote que você enviou, não o que o serviço carregou.** A segunda é a
+  primeira filtrada por extensão. Um arquivo que **não** exporta uma função de processador, ou que falha ao
+  ser carregado, aparece **nas duas** assim mesmo. **Comparar uma com a outra não diagnostica nada** — a
+  única diferença que a comparação mostra são os arquivos de dados, que nunca seriam rota.
+- **`recarga.adicionadas` é delta, não confirmação de recarga.** Lista as rotas **novas** — as que não
+  existiam antes deste envio. Republicar o conteúdo de uma rota que já existia **não** aparece ali: um
+  envio que só altera regras existentes volta com `adicionadas: []`, e isso é o esperado, não falha.
+- **Para confirmar que a publicação entrou**, use **`recarga.total`** — quantas rotas o serviço atende
+  agora.
+- **Para achar arquivo que não virou rota**, o sinal é a `recarga`, nunca `rotas`: rota **nova** que está em
+  `rotas` e **não** está em `recarga.adicionadas` não foi carregada; rota que já existia e aparece em
+  `recarga.removidas` **mesmo estando no pacote** também não. Se a rota não é nova e você quer certeza,
+  acione-a: rota inexistente responde `400` com a lista das rotas disponíveis.
+- **`recarga.removidas`** lista o que deixou de existir por não estar no pacote.
+- **Guarde o `backupId`** — é o que permite desfazer.
+
+## Erros
+
+| Código | Quando |
+|---|---|
+| `400` | pacote inválido: caminho suspeito, extensão recusada, erro de sintaxe, teto estourado, corpo vazio, organização com nome inválido |
+| `400` **da borda** | `X-Tenant-Id` enviado junto com `X-Forger-Credential` (`tipo: multiple_headers`) |
+| `401` **da borda** | `X-Forger-Credential` ausente (`tipo: missing_forger_credential`) — o pedido não chega ao serviço |
+| `401` | `X-Processors-Deploy-Credential` ausente/incorreta, ou token ausente, expirado, com assinatura inválida ou algoritmo trocado |
+| `403` | o portador do token **não está vinculado** à organização da URL |
+| `404` | **só no desfazer**: o `backupId` não existe — nunca existiu, já foi usado, ou foi removido pela poda por idade |
+| `500` | falha ao trocar a árvore no destino — o estado anterior é restaurado |
+| `503` | implantação não provisionada neste ambiente (credencial ou verificação de token ausente) |
+
+Corpo de erro: `{ status, mensagem, tipo }`. Catálogo geral: [../erros.md](../erros.md).
+
+## Desfazer
+
+```
+POST /v3/brservice/processors/rollback/{org}/{backupId}
+```
+
+Mesmos três cabeçalhos e a mesma checagem de organização. Repõe a árvore que estava no lugar antes da
+publicação identificada por `{backupId}` e recarrega as rotas. Responde com a mesma forma de `recarga`.
+
+### Variáveis de caminho
+
+| Variável | Formato | O que é |
+|---|---|---|
+| `{org}` | mesmo do deploy | a organização cuja árvore será reposta |
+| `{backupId}` | o valor **devolvido no campo `backupId`** da resposta da publicação | identifica qual publicação desfazer |
+
+Sobre o `{backupId}`:
+
+- **Não é inventável** — só funciona o que veio numa resposta de publicação. Um `backupId` que não existe
+  responde `404`, e isso inclui o que **já foi usado** (desfazer duas vezes com o mesmo id: a segunda dá
+  `404`) e o que **expirou** — a área de backup é podada por idade, então id antigo deixa de existir.
+- **Pertence a uma organização**: começa pelo nome dela, e usá-lo na URL de outra é recusado. É o que
+  impede quem publica numa organização de mexer no histórico de outra.
+- Vem `null` quando a publicação **não** substituiu nada (primeira publicação daquela organização) —
+  nesse caso não há o que desfazer.
+- Desfazer é uma **troca**, não um apagamento: a árvore que estava no ar é guardada antes de ser
+  substituída pela anterior.
+
+## Exemplos
+
+Publicar:
+
+```
+POST /v3/brservice/processors/deploy/acme
+X-Processors-Deploy-Credential: <uuid>
+X-Forger-Credential: <uuid>
+Authorization: Bearer <token>
+Content-Type: application/zip
+
+<bytes do arquivo .zip>
+```
+
+Com uma ferramenta de linha de comando, o essencial é enviar o **binário cru**:
+
+```
+curl -X POST \
+  -H 'X-Processors-Deploy-Credential: <uuid>' \
+  -H 'X-Forger-Credential: <uuid>' \
+  -H 'Authorization: Bearer <token>' \
+  -H 'Content-Type: application/zip' \
+  --data-binary @acme.zip \
+  https://<base>/v3/brservice/processors/deploy/acme
+```
+
+Desfazer a última publicação:
+
+```
+POST /v3/brservice/processors/rollback/acme/<backupId>
+X-Processors-Deploy-Credential: <uuid>
+X-Forger-Credential: <uuid>
+Authorization: Bearer <token>
+```
+
+Depois de publicar, confirme pela [consulta de log](logs.md) que as execuções da rota nova estão saindo com
+`outcome: success` — o `erroArquivo` aponta o arquivo exato quando não estiverem.
+
+
+<!-- ===== br-service/endpoints/logs.md ===== -->
+
+# br-service · endpoints · consultar o log de execução
+
+> Devolve o **registro das execuções** de regra/coordenação, filtrado por termo e por intervalo de tempo.
+> Autorizado por **chave própria**, não pelo token de usuário. Guia: [../README.md](../README.md).
+
+## Requisição
+
+Duas formas — a segunda acrescenta o filtro por arquivo:
+
+```
+GET /v3/brservice/logs/query/{term}/from/{f}/to/{t}
+GET /v3/brservice/logs/query/{term}/file/{file}/from/{f}/to/{t}
+```
+
+| Parâmetro | O que é |
+|---|---|
+| `term` | texto procurado no registro. Casa por **substring**, sem diferenciar maiúsculas. `*` devolve tudo do intervalo |
+| `file` | trecho do campo `erroArquivo` — **onde o erro foi lançado**. Casa por substring. `*` aceita qualquer arquivo |
+| `f` · `t` | limites do intervalo, **inclusivos**. ISO 8601 (`2026-08-31T00:00:00Z`) ou epoch em **milissegundos** |
+
+> **`term` e `file` somam, não substituem.** Os dois filtros são aplicados juntos: o registro precisa
+> conter o termo **e** ter sido lançado no arquivo indicado. Para filtrar só por arquivo, use `*` no `term`.
+
+> **Não use barra em `file`.** O filtro casa por substring justamente para isso: `atualizar` ou
+> `associado` bastam para achar o caminho inteiro do arquivo. Barra
+> codificada (`%2F`) dentro de um segmento de caminho costuma ser recusada pelos proxies do caminho
+> público, antes mesmo de chegar ao serviço.
+
+> **Filtrar por arquivo implica erro.** Execução bem-sucedida tem `erroArquivo` vazio e não casa nenhum
+> `file` além de `*`.
+
+Os parâmetros são parte do caminho — codifique-os quando contiverem caractere reservado.
+
+### Cabeçalho
+
+| Cabeçalho | Obrigatório | Valor |
+|---|---|---|
+| `X-Logs-Key` | sim | a chave de consulta, no formato UUID, entregue no provisionamento |
+| `X-Forger-Credential` | sim | UUID, entregue no provisionamento | exigido pela **borda**, antes de o pedido chegar ao serviço |
+
+Esta rota **não** usa `Authorization`, e **não** aceita `X-Tenant-Id`.
+
+> ⛔ **Nunca envie `X-Tenant-Id`.** Junto com `X-Forger-Credential` ele é recusado pela borda com `400` e
+> `tipo: multiple_headers`. Aqui vão **só** `X-Logs-Key` e `X-Forger-Credential`.
+
+> **Por que dois cabeçalhos.** São de camadas diferentes: o `X-Forger-Credential` é exigido pela **borda**,
+> que classifica esta rota como administrativa; o `X-Logs-Key` é a credencial do **serviço**, e é ele que
+> autoriza a consulta. Faltando o primeiro, a recusa é `401` da própria borda, com um corpo que nomeia o
+> cabeçalho ausente — o pedido nem chega ao br-service, então a `X-Logs-Key` nem é avaliada.
+
+## Resposta
+
+`200` — objeto com o resultado da busca:
+
+```json
+{
+  "total": 2,
+  "truncado": false,
+  "limite": 1000,
+  "registros": [
+    {
+      "ts": "2026-08-31T02:10:52.494Z",
+      "traceId": "<id de correlação, quando propagado>",
+      "spanId": null,
+      "tenantId": "<tenant>",
+      "route": "<org>/<project>/<bc>/<aggregate>/<função>",
+      "outcome": "success",
+      "durationMs": 4,
+      "bytesIn": 46,
+      "bytesOut": 100,
+      "dataKeys": ["nome"],
+      "erroTipo": null,
+      "erroMensagem": null,
+      "erroArquivo": ""
+    }
+  ]
+}
+```
+
+> Ilustrativo — `<...>` é placeholder, não JSON literal.
+
+| Campo | O que é |
+|---|---|
+| `total` | quantos registros vieram nesta resposta |
+| `truncado` | `true` quando o teto foi atingido e há mais registros no intervalo — estreite o intervalo ou o termo |
+| `limite` | teto de registros por consulta |
+| `registros[].outcome` | `success` · `validation_error` · `processor_error` |
+| `registros[].tenantId` | tenant da execução. **Sempre presente**; vem `""` quando a requisição não trouxe tenant em lugar nenhum |
+| `registros[].dataKeys` | **nomes** dos campos que chegaram em `data` — nunca os valores |
+| `registros[].erroMensagem` | mensagem do erro, **truncada**; o corte é sinalizado no fim do texto |
+| `registros[].erroArquivo` | **onde** o erro foi lançado, no formato `caminho:linha` — aponta o arquivo da função que falhou. `""` quando não houve erro |
+
+> **Como o tenant é encontrado.** Ele não chega sempre no mesmo lugar: em execução **síncrona** vem no
+> cabeçalho da requisição ou junto do corpo; em **coordenação e projeção** vem dentro do próprio payload do
+> evento. A consulta normaliza isso — o campo `tenantId` é preenchido a partir de qualquer uma dessas
+> origens, e só fica vazio quando nenhuma delas trouxe o dado.
+
+### O payload
+
+O registro guarda **sempre** os metadados da execução. Os **dados do comando** — o payload — dependem do
+ambiente:
+
+| Ambiente | O que acontece |
+|---|---|
+| payload **desligado** (padrão) | só metadados. O campo `payload` **não existe** no registro |
+| payload **ligado** | o payload é gravado **mascarado**, e volta em `registros[].payload` na consulta |
+
+**O mascaramento não é opcional e não se desliga.** Mesmo com o payload ligado, um conjunto de campos
+nunca é gravado em claro — vem como `<omitido>`: token de autorização, senha, CPF, e-mail, telefone e data
+de nascimento. O mascaramento desce por objetos aninhados e por listas, até seis níveis de profundidade;
+abaixo disso o valor é gravado como está.
+
+> **Consequência para quem consulta.** Se o ambiente estiver com o payload desligado, nenhuma consulta
+> recupera os dados de uma execução passada — eles nunca foram gravados. Ligar depois não traz o
+> retroativo: vale a partir do momento em que passou a valer.
+
+## Erros
+
+| Código | Quando |
+|---|---|
+| `400` | `f` ou `t` fora de formato, ou `f` posterior a `t` |
+| `400` **da borda** | `X-Tenant-Id` enviado junto com `X-Forger-Credential` (`tipo: multiple_headers`) |
+| `401` **da borda** | `X-Forger-Credential` ausente — o pedido não chega ao serviço. O corpo nomeia o cabeçalho que falta |
+| `401` | `X-Logs-Key` ausente ou incorreta |
+| `503` | consulta de log não provisionada neste ambiente |
+
+Corpo de erro: `{ status, mensagem, tipo }`. Catálogo geral: [../erros.md](../erros.md).
+
+## Alcance e retenção
+
+- Só há registro do que passou pelo **próprio br-service** — execuções de regra, coordenação e projeção.
+  O que acontece no motor de comandos não aparece aqui.
+- O registro é gravado **depois** de a requisição terminar, em qualquer desfecho: sucesso, falha de
+  validação e exceção do processador entram igual.
+- **Sem garantia de retenção indefinida.** O intervalo consultável depende da política de retenção do
+  ambiente; consultas a datas antigas podem voltar vazias mesmo tendo havido execução.
+- **A gravação é de melhor esforço e falha em silêncio.** O registro nunca derruba uma requisição: se a
+  gravação falhar — área de log indisponível, sem espaço, sem permissão —, a execução segue normalmente e
+  **nada é sinalizado**, nem na resposta da execução nem aqui. Se a área de log não puder sequer ser aberta
+  quando o serviço sobe, o registro fica desligado por inteiro e **nenhuma** execução daquele período é
+  gravada.
+- **Portanto, resposta vazia não prova ausência de execução.** Ela quer dizer uma destas três coisas: não
+  houve execução no intervalo; houve e o período já saiu da retenção; ou houve e o registro se perdeu.
+  A consulta não distingue os três casos — para separá-los, é preciso uma fonte independente de tráfego.
+- Correlação com o motor de comandos: quando o chamador propaga um identificador de rastreio, ele aparece
+  em `traceId` — é a chave para juntar os dois lados.
+
+## Exemplos
+
+Tudo o que houve num dia:
+
+```
+GET /v3/brservice/logs/query/*/from/2026-08-31T00:00:00Z/to/2026-08-31T23:59:59Z
+X-Logs-Key: <uuid>
+X-Forger-Credential: <uuid>
+```
+
+Só o que falhou numa rota:
+
+```
+GET /v3/brservice/logs/query/processor_error/from/1756605600000/to/1756692000000
+X-Logs-Key: <uuid>
+X-Forger-Credential: <uuid>
+```
+
+Rastrear uma execução específica pelo identificador de correlação:
+
+```
+GET /v3/brservice/logs/query/<traceId>/from/2026-08-31T02:00:00Z/to/2026-08-31T03:00:00Z
+X-Logs-Key: <uuid>
+X-Forger-Credential: <uuid>
+```
+
+Tudo o que falhou **num arquivo**, no dia:
+
+```
+GET /v3/brservice/logs/query/*/file/atualizar/from/2026-08-31T00:00:00Z/to/2026-08-31T23:59:59Z
+X-Logs-Key: <uuid>
+X-Forger-Credential: <uuid>
+```
+
+Os dois filtros somados — falhas **daquele arquivo** cuja mensagem contém um texto:
+
+```
+GET /v3/brservice/logs/query/obrigat%C3%B3rio/file/atualizar/from/2026-08-31T00:00:00Z/to/2026-08-31T23:59:59Z
+X-Logs-Key: <uuid>
+X-Forger-Credential: <uuid>
+```
 
 
 <!-- ===== filer/README.md ===== -->
@@ -6313,4 +6889,3 @@ Primeira versão consolidada da documentação pública para agentes de IA.
 
 > Para regenerar `llms-full.txt` após editar qualquer `.md`, concatene os arquivos na ordem do
 > `llms.txt`.
-
