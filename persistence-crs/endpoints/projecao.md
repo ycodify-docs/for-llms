@@ -4,10 +4,9 @@
 > [../README.md](../README.md).
 >
 > **⚠️ Esta rota NÃO é o caminho do fluxo por evento.** No fluxo normal (es-n → projeção, CP-5) a linha é
-> gravada por um caminho **interno**: o consumidor de fila do persistence-crs chama, dentro do próprio
-> processo, um endpoint da rede interna (prefixo `/unsec`, alcançável **apenas dentro da DMZ**) que grava
-> sem usuário e sem papel. Não há requisição HTTP externa, e a autorização descrita abaixo não se aplica
-> a ele.
+> gravada por um caminho **interno ao serviço**, que não passa por esta rota nem por requisição externa
+> alguma — e, por ser interno, não usa a autorização descrita abaixo. O que está documentado aqui é a
+> porta **externa**: o que você pode chamar.
 >
 > **⚠️ E esta rota não é um endpoint de serviço:** é o **mesmo** `POST /e` de [entidade](entidade.md),
 > com a mesma e única autorização — pertencer ao tenant e ter papel em `_conf.accessControl.write`. Não

@@ -209,7 +209,10 @@ Atributos aparecem em `command.<cmd>.data.attribute.<campo>`:
   | Declaração | Forma | Valor em `single` | Valor em `multiple` | Coluna |
   |---|---|---|---|---|
   | `{ "<campo>": { "type": … } }` | **grupo de campos** | objeto | array de objetos | `Json` |
-  | `{ "type": …, "length": … }` | **atributo tipado direto** | escalar | **array de escalares** | `multiple`: `Json` · `single`: o tipo do escalar |
+  | `{ "type": …, "length": … }` | **atributo tipado direto** | objeto | array de objetos | `multiple`: `Json` · `single`: o tipo do escalar |
+
+  Repare que a coluna do valor **não muda entre as duas declarações**: seja qual for a forma de declarar,
+  o valor é **objeto** em `single` e **array de objetos** em `multiple`.
 
   ```jsonc
   // grupo de campos                          // atributo tipado direto
@@ -220,18 +223,46 @@ Atributos aparecem em `command.<cmd>.data.attribute.<campo>`:
     }                                         }
   }
   // comando:                                 // comando:
-  // "itens": [ { "nome": "a", "qtd": 1 } ]   // "diassemana": [ "terca" ]
+  // "itens": [ { "nome": "a", "qtd": 1 } ]   // "diassemana": [ { "dia": "terca" } ]
   ```
+
+  > ### Duas formas, e só essas duas
+  >
+  > | | Valor |
+  > |---|---|
+  > | `valueObject.single` | **um objeto** |
+  > | `valueObject.multiple` | **um array de objetos** |
+  >
+  > **Escalar nunca** — nem solto, nem dentro de array. `"diassemana": "terca"` e
+  > `"diassemana": ["terca"]` são recusados com **`400`**.
+  >
+  > **O que existe dentro do objeto é seu.** Um campo ou dez, valores simples ou objetos aninhados: a
+  > plataforma cobra a **forma**, não o conteúdo. Estes são todos válidos:
+  >
+  > ```jsonc
+  > "endereco":   { "rua": "das Flores", "numero": 42 }                       // single, dois campos
+  > "endereco":   { "rua": "das Flores", "cidade": { "nome": "Natal" } }      // single, aninhado
+  > "diassemana": [ { "dia": "terca" }, { "dia": "quinta" } ]                 // multiple
+  > "horarios":   [ { "periodo": { "de": "08:00", "ate": "12:00" } } ]        // multiple, aninhado
+  > ```
+  >
+  > O aninhamento **chega intacto** ao agregado e volta intacto na consulta — nada é achatado nem podado
+  > no caminho.
+  >
+  > ⚠️ **Um único item fora da forma reprova o comando inteiro.** Num `multiple`, basta um escalar no
+  > meio de objetos (`[{"dia":"terca"}, "quinta"]`) para o comando ser recusado. Não há aproveitamento
+  > parcial: ou o payload está na forma, ou é erro.
 
   **Comportamento do persistence-crs ao receber o comando:**
   - **Grupo de campos:** campos do item que **não** estejam declarados no modelo são **descartados**
     silenciosamente — o comando segue com o que foi declarado.
-  - **Tipo direto:** o escalar passa intacto até a projeção (`"diassemana": ["terca"]` grava `["terca"]`).
-    Por compatibilidade, o objeto de chave única `{"<nomeVO>": <escalar>}` também é aceito e
-    **desembrulhado** para o escalar.
-  - **Forma incompatível com a declaração → `400`** com a forma esperada (não `510`): `multiple` que
-    não recebeu array; item escalar onde a declaração é grupo de campos; item objeto que não casa
-    `{"<nomeVO>": <escalar>}` onde a declaração é tipo direto.
+  - **Tipo direto:** o valor é **objeto** (ou array de objetos), e chega assim ou é `400` —
+    `"diassemana": [{"dia": "terca"}]` grava como veio; `"diassemana": ["terca"]` é recusado. O conteúdo
+    do objeto não é filtrado: vai como você mandou. A leitura devolve o que está gravado, sem reembalar
+    — objeto volta objeto, array volta array.
+  - **Forma incompatível → `400`** com a forma esperada (não `510`): `single` que recebeu escalar ou
+    array; `multiple` que não recebeu array; e, em qualquer das duas declarações, item de `multiple` que
+    não seja objeto.
   - **Coluna da projeção:** o valor é gravado como chega. Array e objeto exigem coluna `Json`; um
     `single` de **tipo direto** grava um **escalar**, então declare a coluna com o tipo do escalar
     (`String`, `Integer`, …) — numa coluna `Json`, um escalar de texto não é JSON válido.
@@ -1577,6 +1608,155 @@ Cada cliente tem uma **sala trancada** onde o agente trabalha; a sala só enxerg
 **janela estreita** (documentação, plataforma, API, git-do-cliente); o **comum é o frontend nascer do modelo** (sem
 repo); **código sob medida sai só por PR aprovado por humano**, é compilado **fora** da sala e servido por
 **armazenamento estático**.
+
+
+<!-- ===== 08-preview-de-frontend.md ===== -->
+
+# 08 · Pré-visualização do frontend
+
+Como o frontend que **você** constrói é visto e **testado pelo usuário** antes de qualquer publicação.
+Pré: [`07-isolamento-e-entrega.md`](07-isolamento-e-entrega.md) (a sala trancada) e
+[`bff/README.md`](bff/README.md) (o BFF, que é quem o app consome).
+
+> **Modelo conceitual** — endereços, portas e caminhos absolutos são **configuração de deploy** e não
+> constam aqui. O que está aqui é o **contrato**: onde pôr o código, o que ele precisa ter, e com quem ele fala.
+
+---
+
+## 1. O que é
+
+Você escreve código de frontend dentro da sala. O usuário precisa **ver aquilo rodando** — clicar, navegar,
+preencher formulário, passar pela tela de login que você construiu — para dizer se está certo.
+
+A pré-visualização resolve isso: o ambiente monta o seu app e o serve num endereço próprio, que o usuário abre
+**numa aba separada** do painel. É ambiente de **teste**, não de publicação: nada do que acontece ali vai ao ar.
+
+**Quem dispara é o usuário**, por um botão no painel. Você **não** aciona a pré-visualização, não a comanda e não
+precisa saber quando ela acontece. Seu contrato é só **deixar o app pronto para ser montado**.
+
+## 2. Onde o código vive
+
+Uma organização tem **um sistema**, e um sistema tem **uma pasta-raiz** (a sala). Dentro dela:
+
+```
+   <raiz do sistema>/
+   ├── application/     ← O FRONTEND VAI AQUI. Nome fixo, não é configurável.
+   ├── artifacts/
+   ├── processors/
+   └── ...
+```
+
+**`application/` é convenção fixa.** Não invente `app/`, `web/`, `frontend/`, nem aninhe o projeto mais fundo.
+Se a pasta não existir, a pré-visualização responde ao usuário que **ainda não há app construído** — o que é
+uma resposta correta, não um erro.
+
+## 3. O que `application/` precisa ter
+
+| Precisa | Por quê |
+|---|---|
+| Um **manifesto de dependências** na raiz de `application/` | é por ele que as bibliotecas são instaladas |
+| Uma **rotina de build** declarada nesse manifesto | é o que o ambiente executa para montar o app |
+| O build produzindo **`application/dist/`** | é essa pasta que é servida ao usuário |
+
+O ambiente instala as dependências e executa a rotina de build. Se o build falhar, **o usuário vê o erro** —
+com as últimas linhas do log — e a aba não abre. Um build que quebra é um app que não pode ser avaliado.
+
+### Bibliotecas
+
+Você **pode** escolher e instalar bibliotecas livremente: o registro público de pacotes é alcançável a partir da
+sala (é um dos destinos autorizados da "janela" — ver [`07`](07-isolamento-e-entrega.md) §4).
+
+Há um **depósito compartilhado** entre os sistemas: uma biblioteca já baixada por outro projeto é reaproveitada,
+sem baixar de novo e sem ocupar espaço outra vez. Consequência prática: **não hesite em instalar** o que precisa —
+a segunda instalação de uma biblioteca conhecida é praticamente instantânea.
+
+### Verifique antes de entregar
+
+A sala tem a mesma ferramenta que o ambiente de pré-visualização usa. **Rode o build você mesmo** antes de dizer
+ao usuário que terminou. Um erro de importação, uma dependência esquecida ou um símbolo que não existe aparecem
+em segundos — e é muito melhor você descobrir do que o usuário.
+
+## 4. Com quem o app fala
+
+**O app fala com o BFF, e só com o BFF.** Nunca com os serviços da plataforma diretamente.
+
+```
+   navegador ──▶ /api/...  (mesma origem do app)
+                    │
+                    ▼
+              🔀 repasse
+                    │
+                    ▼
+                 BFF ──▶ serviços da plataforma
+                          (Authorization + tenant compostos no servidor)
+```
+
+Chame **`/api/...` na própria origem** do app — caminho relativo, sem host. O ambiente repassa ao BFF. Duas coisas
+dependem disso, e as duas quebram se você chamar o BFF pelo endereço dele:
+
+- **A sessão.** O BFF entrega a sessão num cookie que o navegador só guarda se a chamada for da mesma origem.
+  Chamando por fora, o usuário loga e a sessão não persiste — a próxima requisição volta como não autenticado.
+- **A permissão de origem.** O BFF só aceita chamadas das origens que conhece. A origem da pré-visualização não é
+  uma delas. Pelo caminho relativo o problema não existe: para o navegador é tudo a mesma origem.
+
+Então: `fetch('/api/session/login', …)`, não `fetch('https://<endereço-do-bff>/session/login', …)`.
+
+> ⚠️ **O host do BFF precisa estar liberado na janela** ([`07`](07-isolamento-e-entrega.md) §4) para você
+> exercitar a integração **de dentro da sala** (teste, diagnóstico, `curl`). Se não estiver, a chamada morre
+> no proxy de saída e o sintoma é enganoso: parece o BFF fora do ar. A liberação é por **host**, e o match é
+> exato ou por sufixo de domínio — liberar o host do gateway **não** cobre o do BFF quando são irmãos
+> (`api.…` não cobre `bff.…`). Isso é configuração de deploy: se der bloqueio, reporte em vez de contornar
+> com dado falso.
+>
+> Nada disso vale para o app rodando no navegador: ali a chamada é `/api` na própria origem e não passa pela
+> janela. É só para o que você executa **dentro da sala**.
+
+O que o BFF oferece — sessão, capacidade, comando, consulta, agregado, histórico, autocadastro — está em
+[`bff/README.md`](bff/README.md). **Nenhum segredo vai para o navegador**: o token vive no servidor.
+
+## 5. Login é parte do que você constrói
+
+O usuário do painel está autenticado como **conta de plataforma**, para *construir* o sistema. Isso não tem
+relação com os usuários da **aplicação** que você está construindo.
+
+Se o sistema tem login, **a tela de login é sua** — você a constrói, e é passando por ela que o usuário vai testar
+a aplicação por dentro. O fluxo de autocadastro e ativação também é do BFF (`/ua/*`). Não presuma usuário já
+logado: comece pela porta da frente, como um usuário real começaria.
+
+## 6. Ciclo de vida (o que você precisa saber)
+
+- A pré-visualização é **temporária**. Fica de pé enquanto está sendo usada e é recolhida sozinha depois de um
+  período sem acesso. Não conte com ela como serviço permanente.
+- **Cada pedido remonta o app.** O usuário sempre vê o estado atual do seu trabalho — não há cache do build
+  anterior. Você não precisa avisar ninguém para "atualizar".
+- **É por sistema, não por sessão de chat.** Duas conversas sobre o mesmo sistema veem a mesma pré-visualização.
+
+## 7. O que a pré-visualização NÃO é
+
+| Não é | Por quê |
+|---|---|
+| **Publicação** | nada ali vai ao ar. O caminho de publicação continua sendo o de [`07`](07-isolamento-e-entrega.md) §7: proposta → revisão humana → build fora → armazenamento estático. |
+| **Ambiente do usuário final** | roda na máquina de quem está construindo, alcançável só dali. |
+| **Coisa que você aciona** | quem decide ver é o usuário. Você deixa pronto; ele olha quando quiser. |
+| **Substituto do modelo** | o caminho comum do frontend continua sendo o `.model.json` + a casca ([`07`](07-isolamento-e-entrega.md) §6). Construir app próprio é a exceção, não o padrão. |
+
+## 8. Antipadrões
+
+| ❌ | ✅ |
+|---|---|
+| Pôr o app em `app/`, `web/` ou fora da raiz | `application/`, na raiz do sistema |
+| Chamar o BFF pelo endereço dele | caminho relativo `/api/...` |
+| Chamar a plataforma direto do navegador | sempre pelo BFF |
+| Guardar token/credencial no navegador | o BFF guarda no servidor; o app não vê |
+| Cravar endereço de serviço no código | endereço é configuração de deploy |
+| Entregar sem rodar o build | rode o build na sala; o erro aparece em segundos |
+| Supor o usuário já autenticado | construa e exercite a tela de login |
+| Pedir ao usuário para "subir o preview" | o botão é dele; você só deixa pronto |
+
+## 9. Em uma frase
+
+Escreva o app em **`application/`**, garanta que ele **monta** e que fala com a plataforma **só pelo BFF em
+caminho relativo** — o resto (montar, servir, abrir, recolher) é do ambiente, e quem decide olhar é o usuário.
 
 
 <!-- ===== auth/README.md ===== -->
@@ -2965,7 +3145,10 @@ Headers: Authorization: ...
 | Executar comando | `POST /a/{boundedContext}/{aggregateType}` | [endpoints/comando.md](endpoints/comando.md) |
 | Ler estado do agregado | `GET /a/{boundedContext}/{aggregateType}/{id}` | [endpoints/agregado-leitura.md](endpoints/agregado-leitura.md) |
 | Ler histórico de eventos | `GET /a/{boundedContext}/{aggregateType}/{id}/history` | [endpoints/agregado-leitura.md](endpoints/agregado-leitura.md) |
-| Escrever projeção (serviço) | `POST /e` | [endpoints/projecao.md](endpoints/projecao.md) |
+| Escrever/remover linha de entidade | `POST /e` | [endpoints/entidade.md](endpoints/entidade.md) |
+| Remover linhas por predicado | `POST /e/by` | [endpoints/remocao-por-predicado.md](endpoints/remocao-por-predicado.md) |
+| Escrever projeção (mesma rota `/e`) | `POST /e` | [endpoints/projecao.md](endpoints/projecao.md) |
+| Consultar logs do serviço | `GET /logs/service/{service}/query/…` | [endpoints/logs.md](endpoints/logs.md) |
 
 Gramática do modelo de domínio: **[spec/model-format.md](spec/model-format.md)** (estrutura do
 `.model.json`: agregado, comando, evento, tipos). Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md).
@@ -3164,17 +3347,225 @@ Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`.
 `403` (tenant não autorizado), `510` (falha de processamento). Catálogo: [../erros.md](../erros.md).
 
 
+<!-- ===== persistence-crs/endpoints/entidade.md ===== -->
+
+# persistence-crs · endpoints · entidade (CRUD convencional)
+
+> CRUD **direto** de linhas numa **entidade convencional** — uma tabela do domínio que **não** é
+> projeção de um agregado event-sourced. Escreve/atualiza/remove o registro em uma chamada, sem comando
+> nem evento. Para agregados (event-sourced), use [comando](comando.md); para consultar, use
+> [persistence-q](../../persistence-q/README.md).
+> Pré-requisitos: [conceitos](../../02-conceitos.md), [autenticação](../../06-autenticacao.md),
+> a entity precisa existir no esquema do tenant ([forger/entity](../../forger/endpoints/entity.md)).
+> Guia: [../README.md](../README.md).
+
+> **URL externa — o segmento `t` escolhe o ambiente.** `POST /e` é o path **downstream**; via gateway:
+> **produção** `POST /v3/persistence/c/e` · **teste** `POST /v3/persistence/t/c/e`. Ver
+> [autenticação](../../06-autenticacao.md).
+
+## Quando usar
+
+Duas formas de escrever no domínio:
+
+| Você quer… | Use | Como identifica a linha |
+|---|---|---|
+| Gravar um **agregado** (máquina de estados, histórico de eventos) | `POST /a/...` ([comando](comando.md)) | `aggregateid` (UUID) |
+| Gravar uma **entidade convencional** (tabela simples, sem event-sourcing) | `POST /e` (este doc) | `id` (chave primária) |
+
+Uma **entidade convencional** é modelada como qualquer entity ([forger/entity](../../forger/endpoints/entity.md)),
+porém **sem** as colunas de projeção de agregado (`aggregateid`, `status`, os `whenAttribute` de evento) —
+elas só são obrigatórias quando a entity **é** projeção de um agregado.
+
+> **⚠️ `/e` não recusa nada — nem projeção de agregado, nem linha de outra pessoa.** O controle de
+> acesso do `/e` é inteiro: (a) o token pertence ao tenant; (b) o papel do usuário está na lista
+> `_conf.accessControl.write` da entity. **Não há escopo por linha:** a checagem pergunta apenas *"este
+> usuário tem papel que escreve nesta tabela?"*, nunca *"esta linha é dele?"* — o `id` da linha alvo não
+> chega à função que autoriza. Quem tem o papel escreve em **qualquer** linha, inclusive na de outro
+> usuário do mesmo papel.
+>
+> O `/e` **não é comando**: não consulta `command.roles` e **não chama o processor `br`** — onde vivem as
+> regras de escopo de dono ("só o titular altera seu registro"). Numa entity que **é** projeção de
+> agregado soma-se o dano ao event sourcing: a linha muda **sem evento**, projeção e log de eventos
+> divergem em silêncio, e um replay desfaz a alteração sem aviso.
+>
+> Consequência prática: `/e` é escrita administrativa. Exponha-o só a quem você exporia o banco — a
+> plataforma não tem como distinguir o uso legítimo do abusivo. Ver [escrita de projeção](projecao.md).
+
+## Requisição
+
+`POST /e`
+
+Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`; `Content-Type: application/json`.
+
+> ⚠️ Os blocos abaixo são **ilustrativos**: `<...>` são placeholders, não JSON literal pronto para envio.
+
+Corpo (operação única) — `data` é **sempre um array** de linhas:
+
+```json
+{ "action": "CREATE | UPDATE | DELETE", "data": [ { "<atributo>": "<valor>" } ] }
+```
+
+Corpo (lote) — um **array** de operações no formato acima, aplicadas na ordem:
+
+```json
+[
+  { "action": "CREATE", "data": [ { "<atributo>": "<valor>" } ] },
+  { "action": "UPDATE", "data": [ { "id": "<pk>", "<atributo>": "<novo valor>" } ] },
+  { "action": "DELETE", "data": [ { "id": "<pk>" } ] }
+]
+```
+
+## Operações
+
+O verbo é escolhido pelo campo `action` (não pelo método HTTP — sempre `POST`):
+
+- **CREATE** — insere as linhas de `data`. A chave primária **`id`** é **gerada pela plataforma**
+  (omita-a). Devolve as linhas criadas com o `id` preenchido.
+- **UPDATE** — atualiza as linhas; cada objeto de `data` **deve conter `id`** (a linha a alterar) mais
+  os atributos a mudar.
+- **DELETE** — remove as linhas; cada objeto de `data` identifica a linha por **`id`**.
+
+> **Controle de acesso.** `_conf.accessControl` é uma lista de **papéis** por operação (`read`, `write`).
+> Autoriza a **entidade inteira**, não a linha: basta um papel do usuário constar da lista para que ele
+> escreva em qualquer registro da tabela. Não existe forma de expressar "só a própria linha" no
+> `accessControl` — regra de dono só existe em processor `br`, que o `/e` não executa. Ver
+> [forger/entity](../../forger/endpoints/entity.md).
+
+## Respostas
+
+| Ação | Sucesso | Corpo |
+|---|---|---|
+| `CREATE` | `201` | linhas criadas, com `id` gerado |
+| `UPDATE` | `200` | vazio |
+| `DELETE` | `200` | vazio |
+| lote (array) | `200` | vazio |
+
+Ação desconhecida → `400`. Falha de aplicação → `510`.
+
+## Comportamento
+
+A operação é aplicada **diretamente** à tabela da entity no banco do tenant, na requisição — **sem**
+comando, **sem** evento e **sem** validação de transição de estado. Não há reconstituição de agregado:
+é escrita de estado (linha), identificada pela chave primária `id`.
+
+## Ler (R)
+
+A leitura **não** é feita por `/e`. Para ler entidades (por chave, por critério, paginado), use
+[persistence-q — consulta](../../persistence-q/endpoints/consulta.md).
+
+## Erros
+
+`400` (ação/corpo inválido; identificador ausente), `403` (tenant não autorizado), `510` (falha de
+aplicação — ex.: violação de restrição, dado inconsistente; categoria **Aplicação de projeção**).
+Catálogo: [../erros.md](../erros.md).
+
+
+<!-- ===== persistence-crs/endpoints/remocao-por-predicado.md ===== -->
+
+# persistence-crs · endpoints · remoção por predicado
+
+> Remove **N linhas** de uma entidade pelo critério que você informar — não pela chave primária. Rota
+> própria, separada do [`/e`](entidade.md), porque o risco é outro: aqui um filtro errado alcança muitas
+> linhas de uma vez. Por isso a rota **conta antes**, exige um teto e, por padrão, **não apaga na primeira
+> chamada**.
+> Pré-requisitos: [conceitos](../../02-conceitos.md), [autenticação](../../06-autenticacao.md).
+> Guia: [../README.md](../README.md). Para apagar **uma** linha por `id`, use [entidade](entidade.md).
+
+> **URL externa.** `POST /e/by` é o path downstream; via gateway: **produção**
+> `POST /v3/persistence/c/e/by` · **teste** `POST /v3/persistence/t/c/e/by`.
+
+## Quando usar
+
+| Você quer… | Use |
+|---|---|
+| apagar **uma** linha, que você identifica por `id` | `POST /e` com `action: DELETE` ([entidade](entidade.md)) |
+| apagar **as linhas que casam um critério** | `POST /e/by` (este doc) |
+
+⚠️ Vale aqui a mesma advertência de [entidade](entidade.md): esta rota **não é comando**. Não passa pelo
+RBAC de comando nem pelo processor `br`, e a projeção de um agregado escrita por aqui fica fora do log de
+eventos.
+
+## Requisição
+
+`POST /e/by`
+
+Cabeçalhos: `Authorization` + `X-Tenant-Id`; `Content-Type: application/json`.
+
+> ⚠️ Bloco **ilustrativo**: `<...>` são placeholders, não JSON literal pronto para envio.
+
+```json
+{
+  "entity":      "<nome da entity>",
+  "where":       { "<atributo>": "<valor>" },
+  "_connective": "AND",
+  "_maxRows":    50,
+  "_dryRun":     true
+}
+```
+
+| Campo | Obrigatório | O que é |
+|---|---|---|
+| `entity` | **sim** | a entidade cujas linhas serão removidas |
+| `where` | **sim**, e **não pode ser vazio** | o critério. Mesmos operadores da [consulta](../../persistence-q/query-controls.md) |
+| `_connective` | **sim** | `AND` ou `OR` — como os critérios se combinam. **Explícito de propósito**: no `/e` o `AND` é implícito e inverte o resultado de quem esperava `OR` |
+| `_maxRows` | **sim**, `> 0` | quantas linhas você **aceita** apagar. Se o filtro casar mais que isso, a resposta é `409` e **nada é apagado** |
+| `_dryRun` | não — **default `true`** | `true` conta e mostra, sem apagar. Para apagar, mande `false` |
+
+## Respostas
+
+| Situação | Código | Corpo |
+|---|---|---|
+| ensaio (`_dryRun: true`) | `200` | `{"dryRun":true,"entity":…,"matched":N,"maxRows":M,"deleted":0}` |
+| removeu | `200` | `{"dryRun":false,"entity":…,"matched":N,"deleted":N}` |
+| o filtro casa mais que o teto | `409` | `{"error":…,"entity":…,"matched":N,"maxRows":M}` — **nada foi apagado** |
+| corpo inválido | `400` | `{"error":…}` com o que falta |
+| tenant não autorizado | `403` | — |
+| falha de aplicação | `510` | ex.: violação de restrição |
+
+## Comportamento
+
+- **A contagem vem do mesmo comando que apagaria.** O serviço monta o `DELETE`, converte-o em
+  `SELECT count(*)` e é esse número que aparece em `matched` — ele não pode divergir do que seria
+  removido.
+- **`where` vazio é recusado.** Não existe "apague tudo" por omissão nesta rota.
+- **Critério que não monta filtro nenhum também é recusado** (`400`) — por exemplo, um atributo que não
+  existe no modelo da entity. Sem essa recusa o comando sairia sem `WHERE`.
+- A remoção é aplicada **na requisição**, direto na tabela do tenant: sem comando, sem evento e sem
+  validação de transição de estado.
+- Só entidade **relacional**. Entidade não relacional é recusada com `400`.
+
+## Autorização — leia antes de expor esta rota
+
+A mesma do [`/e`](entidade.md): pertencer ao tenant **e** ter papel em `_conf.accessControl.write` da
+entity. **Não há escopo por linha** — a checagem olha o papel de quem chama e nunca a linha alvo, então
+quem pode apagar uma linha pode apagar as de todas as pessoas. Regra de dono ("só o titular mexe no seu
+registro") vive em processor `br`, e esta rota não o executa.
+
+Trate `POST /e/by` como operação administrativa: exponha-a a quem você exporia o banco.
+
+## Erros
+
+`400` (corpo inválido; `where` vazio; `_connective` ausente ou diferente de `AND`/`OR`; `_maxRows`
+ausente ou `<= 0`; critério que não monta filtro; entidade não relacional), `403` (tenant),
+`409` (teto excedido — nada apagado), `510` (falha de aplicação).
+Catálogo: [../erros.md](../erros.md).
+
+
 <!-- ===== persistence-crs/endpoints/projecao.md ===== -->
 
 # persistence-crs · endpoints · escrita de projeção
 
-> Escrita direta numa **projeção** (criar/atualizar/remover linhas no banco de leitura). No fluxo normal,
-> projeções são mantidas de forma assíncrona pelo caminho es-n → projeção (CP-5); este endpoint é o ponto
-> de aplicação dessa escrita. Guia: [../README.md](../README.md).
+> Escrita direta numa **projeção** (criar/atualizar/remover linhas no banco de leitura). Guia:
+> [../README.md](../README.md).
 >
-> **⚠️ Não é um endpoint de serviço, e não há credencial de serviço.** É o **mesmo** `POST /e` de
-> [entidade](entidade.md) — mesmo controller, mesma autorização: pertencer ao tenant e ter papel em
-> `_conf.accessControl.write`. Qualquer usuário final que satisfaça esses dois pontos escreve aqui, em
+> **⚠️ Esta rota NÃO é o caminho do fluxo por evento.** No fluxo normal (es-n → projeção, CP-5) a linha é
+> gravada por um caminho **interno ao serviço**, que não passa por esta rota nem por requisição externa
+> alguma — e, por ser interno, não usa a autorização descrita abaixo. O que está documentado aqui é a
+> porta **externa**: o que você pode chamar.
+>
+> **⚠️ E esta rota não é um endpoint de serviço:** é o **mesmo** `POST /e` de [entidade](entidade.md),
+> com a mesma e única autorização — pertencer ao tenant e ter papel em `_conf.accessControl.write`. Não
+> existe credencial de serviço. Qualquer usuário final que satisfaça esses dois pontos escreve aqui, em
 > **qualquer linha**, pulando o comando, o RBAC de comando e o processor `br`. Leia a advertência de
 > [entidade](entidade.md) antes de usar.
 
@@ -3205,14 +3596,192 @@ Ação desconhecida → `400`. Falha de aplicação → `510`.
 ## Comportamento
 A operação é aplicada à projeção do tenant no banco de leitura, na requisição.
 
-**Idempotência e ordenação são do [es-n](../../es-n/README.md), não desta rota.** No fluxo dirigido por
-eventos, a aplicação é idempotente (deduplicação por evento) e pode ser ordenada (nenhuma/estrita/por
+**Idempotência e ordenação são do [es-n](../../es-n/README.md) e do caminho interno, não desta rota.** No
+fluxo dirigido por eventos a aplicação é deduplicada por evento e pode ser ordenada (nenhuma/estrita/por
 agregado), conforme o despacho do es-n. Uma chamada `POST /e` **não carrega identificador de evento
 algum** — não há por onde deduplicar, e reenviar aplica de novo.
 
 ## Erros
 `400` (ação/corpo inválido), `403` (tenant), `510` (falha de aplicação — ex.: violação de restrição).
 Catálogo: [../erros.md](../erros.md).
+
+
+<!-- ===== persistence-crs/endpoints/logs.md ===== -->
+
+# persistence-crs · endpoints · consulta de logs
+
+> Recupera os **registros de log** produzidos pelo próprio serviço, filtrados por **serviço** (`crs` ou `q`),
+> **termo** e **recorte temporal**. Serve para diagnóstico de uma operação já executada — não é endpoint de
+> domínio e **não** usa o token de acesso: a autorização é o **segredo do seu tenant**, enviado no corpo.
+> O mesmo endpoint atende os dois lados da persistência; o serviço desejado vai no path.
+> Guia: [../README.md](../README.md).
+
+> **É `POST`, e a operação é de leitura.** O verbo não indica mudança de estado: ele existe porque a
+> requisição leva um **corpo**, e é no corpo que vai o segredo — em caminho de URL ele apareceria em
+> registro de acesso, em intermediário de rede e no histórico do cliente.
+
+> ⚠️ Blocos abaixo são **ilustrativos**: `<...>` são placeholders, não valores literais.
+
+## Requisição
+
+```
+POST /logs/service/{service}/query/{term}/from/{from}/to/{to}
+```
+
+| Item | Valor |
+|---|---|
+| Cabeçalhos | **`X-Tenant-Id`** — **obrigatório**: de qual tenant se quer o log. `Content-Type: application/json`. **Não** use o `Authorization` do domínio: este endpoint não o consulta |
+| Corpo | **obrigatório**: `{ "secret": "<segredo do seu tenant>" }` |
+| `{service}` | `crs` (lado de escrita) ou `q` (lado de leitura) — seleciona de quais registros se trata |
+| `{term}` | texto a procurar no registro. Vale `*` para "qualquer". Só precisa de URL-encoding se contiver caractere que quebra o path — barra, espaço, `:` ou `%` |
+| `{from}` / `{to}` | início e fim do recorte temporal (ver formatos aceitos abaixo) |
+
+### Autorização — os dois valores, conferidos um contra o outro
+
+**Nenhum dos dois autoriza sozinho.** O `X-Tenant-Id` diz de qual tenant se quer o log; o `secret` do
+corpo é o **segredo daquele tenant** — o mesmo que o identifica no provisionamento; peça-o a quem
+administra a sua organização. O serviço confere se **o par é o que está registrado**.
+
+Consequência, e é o ponto: **apresentar o segredo de um tenant pedindo o log de outro é `403`.** Não
+basta o segredo ser válido, nem o tenant existir. Trocar o `X-Tenant-Id` deixou de ser caminho para o log
+alheio.
+
+Existe ainda uma **chave de operação** da plataforma, que alcança qualquer tenant e serve ao suporte
+diagnosticar de fora; ela é a exceção à regra do par, e continua exigindo o `X-Tenant-Id` para saber qual
+log ler.
+
+Corpo sem `secret` é **`400`** (erro de payload), não `403` — quem errou o corpo precisa saber disso.
+Segredo que não confere é `403`. Não existe modo aberto por omissão.
+
+> ⚠️ **Mande `X-Tenant-Id` sozinho — nunca junto com `X-Forger-Credential`.** O gateway recusa qualquer
+> requisição que traga os dois cabeçalhos ao mesmo tempo, com **`400`** e corpo vazio, **antes** de chegar
+> a este serviço (violação `multiple_headers`). Como o caminho fica sob `/v3/persistence/`, ele é
+> rota-de-engine: identifica-se pelo tenant, não pela credencial. É um erro fácil de cometer, porque a
+> credencial é o que se usa em outras rotas da plataforma — e o `400` resultante **não** vem deste
+> endpoint, então não corresponde a nenhuma linha da tabela de erros abaixo.
+
+**Formatos aceitos em `{from}`/`{to}`** (os dois podem usar formatos diferentes):
+
+| Forma | Exemplo |
+|---|---|
+| epoch em milissegundos | `1756607400000` |
+| data-hora com fuso | `2026-08-31T01:30:00.000-03:00` |
+| data-hora sem fuso (assume o fuso do serviço) | `2026-08-31T01:30:00.000` |
+| só a data (início do dia) | `2026-08-31` |
+
+### URL externa — teste e produção
+
+O endpoint vive nos dois ambientes, e em **ambos ele fica sob o prefixo `c`** — o mesmo do comando. Não
+existe prefixo `logs` próprio na borda: o que a borda encaminha é `.../c/**`, e ela remove esse prefixo
+inteiro antes de entregar ao serviço, de modo que o `logs/...` do fim do caminho é o que o serviço recebe.
+(ver [autenticação — URL base](../../06-autenticacao.md)):
+
+| Ambiente | URL |
+|---|---|
+| **Teste** | `/v3/persistence/t/c/logs/service/{service}/query/{term}/from/{from}/to/{to}` |
+| **Produção** | `/v3/persistence/c/logs/service/{service}/query/{term}/from/{from}/to/{to}` |
+
+> ⚠️ **O `c` não é opcional.** Sem ele — `/v3/persistence/logs/...` ou `/v3/persistence/t/logs/...` — o
+> caminho não casa nenhuma rota da borda e a resposta é `404` do gateway, não deste endpoint. Versões
+> anteriores desta página publicavam a URL sem o `c`; estavam erradas.
+
+> **Disponibilidade:** os dois ambientes estão publicados — a rota de produção **existe** e não precisa de
+> liberação nova, porque não é caminho novo na borda: é o prefixo `c`, que já era encaminhado. O que muda
+> entre eles é o volume: o nível de log em produção é mais restritivo que o de teste, então a maior parte
+> dos registros de detalhe não existe lá.
+
+### Exemplo (ambiente de teste)
+
+Substitua `<segredo>` e `<tenant>` pelos valores do seu ambiente. Note: **só** `X-Tenant-Id`, sem
+credencial de domínio.
+
+```bash
+curl -s -X POST "<base>/v3/persistence/t/c/logs/service/crs/query/*/from/2026-08-31T00:00:00Z/to/2026-08-31T23:59:59Z" \
+  -H "X-Tenant-Id: <tenant>" \
+  -H "Content-Type: application/json" \
+  -d '{"secret":"<segredo>"}'
+```
+
+Respostas que se deve esperar deste comando, e o que cada uma significa:
+
+| Resposta | Leitura |
+|---|---|
+| `200` + corpo | há registros no recorte |
+| `204` sem corpo | consulta válida, nada casou — ver a nota abaixo antes de suspeitar de falha |
+| `403` | o segredo não é o daquele tenant |
+| `400` **com corpo** | corpo sem `secret`; ou algo no path: serviço inválido, data irreconhecível, `to` antes de `from`, tenant malformado |
+| `400` **sem corpo** | mandou credencial junto com o tenant — tire o `X-Forger-Credential` |
+
+## Resposta
+
+`200` — objeto com o recorte e os registros encontrados:
+
+```json
+{
+  "service":  "crs",
+  "tenantId": "<tenant consultado>",
+  "term":     "<termo procurado>",
+  "from":     "<início do recorte>",
+  "to":       "<fim do recorte>",
+  "matched":  128,
+  "returned": 128,
+  "truncated": false,
+  "records": [ "<registro>", "<registro>" ]
+}
+```
+
+- **`matched`** — quantos registros casaram o filtro.
+- **`returned`** — quantos vieram nesta resposta.
+- **`truncated`** — `true` quando `matched` passou do teto por resposta; refine o recorte ou o termo.
+
+`204` — nenhum registro casou o filtro (não é erro).
+
+> **Serviço recém-implantado devolve `204` com frequência**, e isso não indica defeito: logo após um
+> reinício só existem registros de inicialização, que **não** carregam tenant e por isso ficam de fora (ver
+> `## Comportamento`). Para ver resultado, consulte um recorte que contenha atividade real — uma operação
+> autenticada de `crs`/`q` — e lembre que o nível de log do ambiente limita o que chega a ser gravado.
+
+## Comportamento
+
+- Um **registro** pode ocupar várias linhas (por exemplo, quando traz o rastro de uma falha). O endpoint
+  devolve o registro **inteiro** como um item, não linha a linha.
+- O filtro é conjuntivo: o registro precisa ser **do tenant informado**, estar **dentro do recorte**,
+  pertencer ao **serviço** pedido **e** conter o **termo**.
+- **Registro sem tenant não é devolvido.** Nem todo registro carrega a marca do tenant — os produzidos
+  fora de uma requisição (inicialização do serviço, mensagens de framework) não a têm. Esses **ficam de
+  fora**, por segurança: é preferível omitir a arriscar devolver operação de outro cliente.
+- **O caminho assíncrono da projeção APARECE.** O consumidor de fila carimba o tenant nos seus registros,
+  então o que acontece depois do comando — a projeção sendo aplicada — é consultável por aqui. (Versões
+  anteriores desta página diziam o contrário.)
+- **O alcance da consulta termina na rotação do arquivo, não no início do serviço.** O arquivo de log é
+  rotacionado por tamanho e por idade; um recorte temporal que caia antes da rotação não acha nada, mesmo
+  que o serviço estivesse no ar naquele momento.
+- A consulta é **somente leitura** e não altera estado.
+- O alcance é o do **próprio serviço**: registros anteriores ao início do serviço em execução podem não estar
+  disponíveis.
+
+## Erros
+
+| Código | Quando |
+|---|---|
+| `400` | corpo ausente, não-JSON, ou sem `secret`; `X-Tenant-Id` ausente ou malformado; `{service}` diferente de `crs`/`q`; data em formato não reconhecido; `to` anterior a `from` |
+| `403` | o `secret` do corpo não é o segredo do tenant informado — inclusive quando é o segredo **de outro** tenant |
+| `500` | o arquivo de log existe mas não pôde ser lido |
+| `503` | o serviço não tem registros acessíveis para consultar |
+
+**Respostas que não vêm deste endpoint** — úteis para não procurar defeito no lugar errado:
+
+| Código | De onde vem | Quando |
+|---|---|---|
+| `400` **com corpo vazio** | gateway | `X-Tenant-Id` e `X-Forger-Credential` enviados juntos (ver aviso no topo). O `400` deste endpoint sempre traz corpo. |
+| `403` **com `{"error":"Forbidden","message":"Access denied."}`** | borda da plataforma | o caminho não está publicado no ambiente consultado |
+| `404` **do gateway** | borda da plataforma | faltou o `c` no caminho (`/v3/persistence/logs/...` em vez de `/v3/persistence/c/logs/...`) |
+| `404` | fallback do gateway | a rota não casou — caminho digitado errado, ou ambiente sem a rota |
+
+Catálogo: [../erros.md](../erros.md).
+
+> **A chave é secreta.** Não a coloque em repositório, em exemplo copiado nem em log de cliente. Sem a chave
+> configurada no serviço, o endpoint **nega todas** as chamadas — não existe modo aberto por omissão.
 
 
 <!-- ===== persistence-crs/erros.md ===== -->
@@ -4377,7 +4946,10 @@ O corpo tem **dois modos**, detectados pelo primeiro caractere:
 - Múltiplos predicados combinam por **`_connective`** (padrão **AND**, ou **OR**).
 - Há **controles** por critério: `_paging`, `_sorting`, `_count`, `_cache`, associações. Detalhe e
   operadores em **[query-controls.md](../query-controls.md)**.
-- O **vocabulário** de atributos é o do modelo provisionado para o tenant; nome desconhecido → erro.
+- O **vocabulário** de atributos é o do modelo provisionado para o tenant; nome desconhecido → **`400`**,
+  com os nomes recusados **e** a lista dos declarados na mensagem. Vale em cada nível: o mesmo se aplica
+  aos atributos de uma associação ou de um componente. Chaves de controle (as que começam com `_`) não
+  passam por essa checagem.
 - Como o rótulo é o **nome da projeção**, consultar projeções distintas já dá rótulos únicos; para
   múltiplos critérios sobre a **mesma** projeção, envie um critério por requisição (rótulos repetiriam o
   nome e não se distinguiriam).
@@ -4642,26 +5214,39 @@ mudança de estado (persistence-crs grava evento)
    es-n: lê eventos pendentes ──▶ avança checkpoint (exatamente-uma-vez)
         │
         ▼
-   reconstitui agregado (JSON)
+   monta o envelope com os dados daquele evento
         │
         ▼
    despacha para fila(s) do broker de mensagens  ──▶ (ver "três tipos de despacho")
 ```
 
 O **checkpoint** registra até onde os eventos de cada tenant/tipo de agregado já foram processados.
-O avanço só ocorre **após** o despacho bem-sucedido; uma falha **não** avança o checkpoint, garantindo
-reprocessamento sem perda e sem duplicação indevida.
+
+> ⚠️ **A garantia abaixo vale para o despacho da projeção do próprio contexto — não para os outros
+> dois.** Só a falha desse primeiro despacho segura o checkpoint. Nos despachos de `triggerProjection` e
+> `triggerCoordination` a falha de publicação é tratada **por item, em best-effort**: ela não impede o
+> avanço do checkpoint, e **não há reentrega automática** — o evento fica marcado como processado sem ter
+> chegado ao destino. Isso só ocorre se a publicação no broker falhar (broker indisponível, exchange
+> ausente), não se o consumidor falhar depois. Vale lembrar que esses dois despachos **só existem quando
+> o modelo os declara**, e cada item declarado é decidido individualmente.
+
+O avanço só ocorre **após** o despacho da projeção do próprio contexto ser bem-sucedido; uma falha nesse
+despacho **não** avança o checkpoint, garantindo reprocessamento sem perda e sem duplicação indevida.
 
 **Mecânica (comportamento):** o checkpoint guarda a posição do último evento processado. A leitura de
 eventos pendentes reserva o trabalho de forma a permitir **múltiplos processadores concorrentes** sem
 que dois processem o mesmo evento. O avanço do checkpoint é **atômico** com o processamento: se o
-despacho falha, o checkpoint permanece, e o evento é **reprocessado** numa próxima passagem (replay
-seguro). Combinado com a deduplicação na projeção, isso dá **exatamente-uma-vez** na aplicação.
+despacho da projeção do próprio contexto falha, o checkpoint permanece, e o evento é **reprocessado** numa
+próxima passagem (replay seguro). Combinado com a deduplicação na projeção, isso dá
+**exatamente-uma-vez** na aplicação **dessa** projeção. O checkpoint avança **independentemente** do
+`domainBus`: eventos sem despacho declarado não são reprocessados, e os despachos de `triggerProjection`
+e `triggerCoordination` não o seguram.
 
-**Envelope do evento:** ao despachar, o es-n monta o **estado atual do agregado** em JSON e o envolve
-com os dados necessários ao consumidor (identificador do agregado, identificador do evento, contexto e
-tenant, e o carimbo de tempo do evento já formatado). O consumidor recebe esse envelope pronto, sem
-precisar reconstituir o agregado.
+**Envelope do evento:** ao despachar, o es-n monta um JSON com **os dados daquele evento** — o que o
+comando trouxe — e o envolve com o que o consumidor precisa (identificador do agregado, identificador do
+evento, contexto e tenant, e o carimbo de tempo do evento já formatado). **Não é o estado atual do
+agregado:** o es-n não relê o histórico nem reconstitui nada; quem precisa do estado completo consulta a
+projeção ou a leitura de agregado do persistence-crs.
 
 ## Os três tipos de despacho
 
@@ -6197,6 +6782,33 @@ GET  /api/file/download?filename=acme-vendas-pedido-42-inexistente.pdf → 404
 > convencionalmente classificados por **atributo**. Ver [README](README.md) e [coordenação](../coordenacao.md).
 
 
+<!-- ===== cache/README.md ===== -->
+
+# cache — guia do serviço
+
+> **Papel:** serviço de **cache distribuído** (mem-cache db) da plataforma. Guarda o **modelo publicado** de cada
+> tenant (chaves de **write-model** e **read-model**) que os serviços de execução leem em runtime. É **interno** —
+> **atrás do gateway, sem rota/endpoint público**; acessado apenas pela própria plataforma (não pelo cliente).
+> Pré-requisitos: [conceitos](../02-conceitos.md), [arquitetura](../01-arquitetura.md).
+
+## Papel no fluxo
+
+- O **[forger](../forger/README.md)**, ao **publicar** um `.model.json`
+  (`POST /v3/forger/org/{org}/project/{project}/tenant/{tenantId}/model`), **grava o modelo no cache** (chave do
+  write-model). Criar dataschemas/entidades (projeções dos agregados) também é via forger.
+- **[persistence-crs](../persistence-crs/README.md)** e **[persistence-q](../persistence-q/README.md)** **leem** o
+  modelo do cache a cada request (spec por-instância, com TTL e self-heal) — detalhe do ciclo em
+  [persistence-crs — carga da spec do tenant](../persistence-crs/README.md#carga-da-spec-do-tenant-cache-por-instância).
+
+## Acesso
+
+- **Sem endpoint público**: não é chamável via gateway (não há prefixo `/v3/cache`). Os serviços o acessam
+  **internamente** (referido como `../cache` — **não** mem-cache db direto).
+- **Invalidação do modelo**: alterar um modelo em runtime exige **republicá-lo** (forger) **+ invalidar as duas
+  chaves** (read-model e write-model); reiniciar o serviço sozinho não basta — ver a seção de refresh em
+  [persistence-crs](../persistence-crs/README.md#carga-da-spec-do-tenant-cache-por-instância).
+
+
 <!-- ===== shell/README.md ===== -->
 
 # shell — guia da casca universal + BFF
@@ -6474,6 +7086,139 @@ casca ──registra + carrega + mount(hostContext)──▶ MIOLO renderiza no 
 - [ ] **Identificadores técnicos em monoespaçada** (tenant/papel/estado).
 
 
+<!-- ===== shell/Principios de Design - Shell Universal.md ===== -->
+
+# Princípios de design da Shell Universal
+
+> **Fundamentos de construção** — Ycodify · Shell Universal
+> Guia de identidade e governança visual · Direção Atlas · v1.0 · jul/2026
+> Documento vivo — revisar a cada release maior.
+
+Este documento define os **valores, princípios e estruturas** que orientam a construção da casca de aplicação da Ycodify — a moldura única que hospeda qualquer produto, para qualquer organização (tenant), preservando uma só identidade visual.
+
+Ele é a **fonte da verdade**. À medida que a aplicação evolui — novos módulos, novas telas, novos tenants — as decisões aqui registradas devem ser respeitadas para manter uniformidade e coerência. Divergências são permitidas apenas quando promovidas a nova regra neste guia.
+
+---
+
+## 01 — Filosofia
+
+### A casca se molda ao tenant, não o contrário
+
+A Shell é uma estrutura estável e reconhecível dentro da qual o conteúdo varia. O usuário entra uma vez e navega entre organizações, projetos e módulos sem reaprender a interface. A identidade da Ycodify permanece constante; o que muda é o *dado*, o *papel* do usuário e, no limite, a *cor de marca* do tenant.
+
+Toda decisão de design responde a uma pergunta: **isso ajuda a casca a acomodar o desconhecido sem perder a própria identidade?**
+
+---
+
+## 02 — Valores
+
+### Cinco compromissos inegociáveis
+
+| # | Valor | Compromisso |
+|---|-------|-------------|
+| **V1** | Familiaridade acima de novidade | Um padrão previsível vale mais que um efeito inédito. Reuso de componente antes de invenção. |
+| **V2** | Clareza acima de densidade | Ar, hierarquia e cantos macios. Nunca encher a tela porque há espaço — cada elemento deve justificar sua presença. |
+| **V3** | Contexto sempre visível | O usuário nunca se pergunta em qual organização, papel ou tela está. A barra superior responde antes da dúvida. |
+| **V4** | Um token, um sistema | Nenhuma cor, espaçamento ou raio literal no código de tela. Tudo deriva dos tokens semânticos — a única via de mudança. |
+| **V5** | Todo estado é projetado | Pronto, vazio, carregando e erro não são acidentes — são quatro telas desenhadas com o mesmo cuidado. Uma feature só está pronta quando os quatro existem. |
+
+---
+
+## 03 — Identidade visual
+
+### Marca e cor
+
+O verde Ycodify é o único primitivo de marca. Todos os tons de acento derivam dele. O tenant pode sobrescrever `--yc-brand` em runtime e a casca inteira recolore — sem recompilar, sem quebrar contraste.
+
+| Token | Hex | Uso |
+|-------|-----|-----|
+| `--yc-brand` | `#00d676` | Verde de marca (sobrescrevível pelo tenant) |
+| `--accent-ink` | `#07935a` | Texto de acento sobre fundo claro |
+| `--accent-weak` | `#dcf7e9` | Fundo suave de acento |
+| `--accent-fg` | `#043019` | Texto sobre o verde cheio |
+
+> **Regra:** o verde cheio nunca recebe texto que não seja `--accent-fg`. Para texto de acento sobre fundo claro, use sempre `--accent-ink`, nunca o verde puro (contraste insuficiente).
+
+#### Cores de estado (semânticas, não decorativas)
+
+| Estado | Token | Hex |
+|--------|-------|-----|
+| Sucesso | `--ok` | `#1f7a4d` |
+| Atenção | `--warn` | `#9a6412` |
+| Informação | `--info` | `#1f6f9a` |
+| Erro | `--danger` | `#b23b34` |
+
+### Tipografia
+
+- **Manrope** (400 · 500 · 600 · 700 · 800) — interface inteira: títulos, corpo, rótulos, botões. Peso 800 para títulos, 700 para ênfase, 500–600 para corpo e controles.
+- **IBM Plex Mono** (400 · 500 · 600) — metadados técnicos: identificadores, códigos de org, atalhos, timestamps, rótulos em caixa-alta. Nunca para corpo de leitura.
+
+> Duas famílias, sem exceção. Uma terceira fonte só entra por decisão registrada neste guia. Corpo mínimo de interface: 13px; texto de leitura longa: 14–15px com entrelinha 1.6.
+
+### Espaço, raio e elevação
+
+| Dimensão | Regra | Valores |
+|----------|-------|---------|
+| Espaçamento | Grade de 4px; sempre múltiplos | 6 · 10 · 12 · 18 · 24 |
+| Raio | Macio por padrão; pílula p/ ações e chips | 10 · 14 controles · 999 pílula |
+| Altura de controle | Toque confortável; alvo mín. 38px | 38 · 42 (perfil) |
+| Bordas | 1px, tom de borda semântico | `--border` · `--border-2` |
+| Elevação | Uma sombra só (popovers/menus); nunca empilhar | `--shadow` |
+
+> Sombra é sinal de camada flutuante, não de decoração. Superfícies base (cards, painéis) usam borda, não sombra.
+
+---
+
+## 04 — Estrutura
+
+### Anatomia da casca
+
+A moldura é fixa. O conteúdo é o que respira dentro dela.
+
+- **Barra superior — sempre presente:** marca · seletor de organização · busca/comando (⌘K) · tema · notificações · perfil.
+- **Navegação lateral:** reconstruída a partir dos papéis org-scoped do token. O menu é do usuário, não fixo.
+- **Área de conteúdo:** o único espaço que varia por módulo. Herda todos os tokens; nunca introduz cor ou fonte própria.
+
+> O menu não é uma constante desenhada: é derivado dos papéis que o token do usuário carrega naquela organização. Ao trocar de org, a navegação se reconstrói.
+
+### Os quatro estados de toda tela
+
+- **Pronto** — o caso feliz. Dados carregados, ações disponíveis. Densidade equilibrada, sem sobrecarga.
+- **Vazio** — nunca uma tela em branco. Explica o que aparecerá ali e oferece a primeira ação.
+- **Carregando** — esqueleto com a forma do conteúdo real (shimmer), não um spinner solto. Preserva o layout.
+- **Erro** — diz o que falhou em linguagem humana e oferece um caminho de recuperação. Nunca um código cru.
+
+---
+
+## 05 — Governança
+
+### Regras para evoluir sem perder identidade
+
+**✓ Faça**
+
+- Derive toda cor, espaço e raio dos tokens semânticos.
+- Projete os quatro estados antes de considerar a feature pronta.
+- Reuse um componente existente antes de criar um novo.
+- Teste claro e escuro em toda tela nova.
+- Promova qualquer padrão novo a regra neste guia.
+
+**✕ Não faça**
+
+- Escrever cor/medida literal (hex, px de cor) na tela.
+- Introduzir uma terceira fonte ou nova família de cor.
+- Empilhar sombras ou usar sombra como decoração.
+- Entregar uma tela em branco como estado vazio.
+- Alterar a moldura (barra, navegação) por módulo.
+
+### O teste de identidade
+
+Coloque a tela nova ao lado de qualquer tela existente. Se um usuário não conseguir dizer que pertencem ao mesmo produto — sem olhar o logo — a tela nova ainda não está pronta. **Uniformidade é o recurso, não o acabamento.**
+
+---
+
+*Este é um documento vivo. Toda decisão que amplia ou altera o sistema deve ser refletida aqui na mesma entrega — o guia e o produto nunca divergem. Referência técnica de tokens: `react-reference/theme.css`.*
+
+
 <!-- ===== shell/seguranca.md ===== -->
 
 # shell · segurança
@@ -6620,11 +7365,358 @@ BFF. Leitura por qualquer membro **ativo**; escrita **só por MASTER-na-org** (r
 - [ ] Endereços de serviço = **config de deploy**, nunca hardcode nem em doc pública.
 
 
+<!-- ===== bff/README.md ===== -->
+
+# bff — guia do serviço (endpoints e contratos)
+
+> O **BFF** (Backend-for-Frontend) é a **borda de consumo** da plataforma: faz o login, guarda o token
+> (cookie httpOnly), **deriva a capacidade** do tenant, **resolve o miolo** por tenant e faz **proxy** ao
+> gateway injetando as credenciais **no servidor**. Quem consome fala **só** com o BFF — nenhum segredo
+> sai para o cliente.
+>
+> **Não é exclusivo de frontend.** A casca universal é o consumidor mais comum, mas o BFF atende
+> igualmente **cliente sem UI** (sistema backend/API-only, app móvel, integração de terceiro): a
+> resolução de miolo simplesmente não é usada, e sessão/capacidade/proxy valem igual. Por isso vive aqui
+> como **serviço próprio**, e não sob `shell/`.
+>
+> Pré: [06-autenticacao](../06-autenticacao.md). Para o uso com casca+miolo:
+> [shell/README](../shell/README.md), [shell/seguranca](../shell/seguranca.md).
+
+## Como alcançar o BFF
+
+**O BFF não segue a regra de endereçamento dos oito serviços.** Aqueles ficam atrás do API Gateway e
+se resolvem por uma base + o prefixo `/v3/<svc>` ([06-autenticacao](../06-autenticacao.md)). O BFF
+**não**:
+
+| | oito serviços da plataforma | BFF |
+|---|---|---|
+| atrás do gateway | sim | **não** |
+| prefixo `/v3/<svc>` | sim | **não** — os paths ficam na raiz |
+| registro no service discovery | sim | **não** |
+| quantos existem | um de cada, para todos | **um por instalação** |
+
+O motivo é o que a introdução diz: o BFF é **camada de aplicação**, não serviço da plataforma. Cada
+instalação sobe o seu, com domínio próprio. Procurá-lo no gateway ou na configuração da plataforma
+**não encontra nada** — e isso é o esperado, não um defeito.
+
+**Onde ele está, então:** o endereço é **informado por quem publica a instalação**. Não há como
+derivá-lo, nem convenção a adivinhar.
+
+| instalação | endereço |
+|---|---|
+| `yc.app` (casca universal "Stager") | `https://bff.stager.ycodify.com` |
+
+**Como chamar** — os paths deste documento vão **na raiz**, sem prefixo nenhum:
+
+```
+POST https://bff.stager.ycodify.com/session/login     ✅
+POST https://api.ycodify.com/v3/bff/session/login     ❌ não existe
+```
+
+E **toda** chamada precisa mandar o cookie de sessão (`credentials: 'include'` no browser, jar de
+cookies fora dele): a sessão vive num cookie httpOnly, não num cabeçalho. Sem isso, tudo depois do
+login responde `401`.
+
+> Os endereços dos **serviços da plataforma** que o BFF consome continuam sendo configuração de deploy
+> e não constam aqui — ver o operacional em `yc.app/docs`.
+
+## Sessão
+
+| Operação | Método · Path | Corpo / Query | Resposta |
+|---|---|---|---|
+| Login | `POST /session/login` | `{ username, password }` | identidade + **árvore de tenants** + papéis; **cookie httpOnly** (token). **Sem token no corpo.** |
+| Sessão atual | `GET /session/me` | — | mesma projeção segura, ou `401` sem sessão |
+| Papel ativo | `PUT /session/active-role` | `{ org, role }` | mesma projeção segura, com `activeRole` · `403` se o papel não for do usuário naquela org |
+| Encerrar | `POST /session/logout` | — | limpa o cookie |
+
+`POST /session/login` chama o [auth](../auth/README.md) (`/ua/sign-in`), guarda o token e devolve **só a
+projeção segura**:
+
+```jsonc
+{
+  "identity":   { "username": "...", "name": "...", "email": "...", "status": "...", "exp": 0 },
+  "orgs":       [ { "owner": "...", "name": "...", "alias": "...", "status": "..." } ],
+  "roles":      [ { "role": "...", "org": "...", "status": "...", "alias": "..." } ],
+  "tenants":    [ /* tuplas org:project:boundedContext:dataschema:tenant */ ],
+  "tenantTree": [ { "org": "...", "projects": [ { "project": "...", "boundedContexts": [ { "boundedContext": "...", "tenantId": "..." } ] } ] } ],
+  "activeRole": null
+}
+```
+
+**`activeRole`** é o papel que o usuário escolheu **para esta sessão** — serve a quem tem mais de um
+papel na org e entra por um portal específico. É **filtro de apresentação, não autorização**: o BFF
+aceita apenas um papel que o portador de fato tenha **ativo naquela org**, e comando/consulta seguem
+revalidando o conjunto **completo** de papéis a cada chamada. Guardá-lo não restringe o que o usuário
+pode fazer.
+
+## Capacidade
+
+| Operação | Método · Path | Resposta |
+|---|---|---|
+| Capacidade do tenant | `GET /session/capabilities?tenant={tenantId}` | **modelo de capacidade** (ver [contrato-miolo](../shell/contrato-miolo.md#modelo-de-capacidade)) |
+
+O BFF lê o **modelo publicado** do tenant no **serviço de cache** — **não** no forger (o
+forger é quem **grava** ali ao publicar o `.model.json`) — e cruza com os **papéis org-scoped** do token
+→ devolve **só** os comandos autorizados. Só para tenant que **consta no token**; senão `404`.
+
+> ⚠️ **A capacidade depende do modelo estar VIVO no cache.** O modelo publicado tem **TTL**: ao expirar,
+> o cache não devolve mais (204) e a capacidade do bounded context **some** — `GET /session/capabilities`
+> deixa de listar os comandos daquele tenant, **mesmo com o sistema provisionado e o dataschema
+> `RUNNING`**. Não é falha do BFF: é o modelo que saiu do cache. Remediação: **republicar** o
+> `.model.json` (`POST forger .../tenant/<id>/model`, sobrescrita idempotente). Vale para **qualquer**
+> consumidor — casca ou cliente sem UI.
+>
+> Quem define esse TTL é **o forger, no momento da publicação** (é ele que grava a chave com prazo); o
+> cache apenas honra o que recebeu. O prazo é **configuração de deploy** do forger — em ambiente de
+> desenvolvimento, um sistema que fica dias sem republicar perde a capacidade sozinho.
+
+## Miolo
+
+| Operação | Método · Path | Resposta |
+|---|---|---|
+| Manifesto do miolo | `GET /tenant/{tenantId}/miolo-manifest` | `{ "tenantId": "...", "manifestUrl": "..." }` |
+
+Resolve `tenant → URL` do miolo (ver [injecao](../shell/injecao.md)). Só para tenant do usuário.
+
+> **Única operação exclusiva de quem usa a casca.** Consumidor **sem UI** (app móvel, integração,
+> serviço) **não** chama este endpoint — não há miolo a injetar. Sessão, capacidade e proxy valem
+> integralmente para ele.
+
+## Proxy de domínio
+
+O BFF expõe escrita e leitura de domínio ao consumidor (no caso da casca, via `api` do hostContext),
+fazendo **proxy** ao [persistence-crs](../persistence-crs/README.md) e ao
+[persistence-q](../persistence-q/README.md) — **injetando `Authorization` + `X-Tenant-Id` no servidor**.
+O consumidor **não** compõe esses cabeçalhos nem conhece o token.
+
+| Operação | Método · Path | Corpo | Vai para |
+|---|---|---|---|
+| Executar comando | `POST /session/command` | `{ tenantId, aggregate, command, data, id?, status? }` | persistence-crs (escrita) |
+| Consultar projeção | `POST /session/query` | `{ tenantId, aggregate, predicates?, paging?, sorting? }` | persistence-q (leitura) |
+| Estado atual do agregado | `POST /session/aggregate` | `{ tenantId, aggregate, id }` | persistence-crs (leitura) |
+| Histórico do agregado | `POST /session/history` | `{ tenantId, aggregate, id }` | persistence-crs (`/history`) |
+
+- `aggregate` é `"<boundedContext>.<tipo>"`; `id` é o **UUID do agregado** (`aggregateid` da projeção),
+  nunca a PK `Long` da linha — ver [antipadrões](../05-antipatterns.md).
+- O BFF **re-deriva a capacidade** antes de encaminhar um comando e recusa (`403`) o que não estiver
+  autorizado ao papel; o persistence-crs revalida de novo. Ver [seguranca](../shell/seguranca.md).
+  **Isso vale para o comando. Leitura é outra história — ver abaixo.**
+- **Value object viaja no comando.** `data` carrega, no **mesmo nível** dos atributos escalares, cada
+  `valueObject` declarado pelo comando no modelo (ver
+  [model-format](../persistence-crs/spec/model-format.md#datavalueobject)): `single` → o valor daquele
+  VO; `multiple` → lista. Quando o VO é declarado como **atributo tipado direto** (`{type,…}`, sem
+  sub-campos), o valor é um **escalar** — e `multiple`, uma lista de escalares. Forma incompatível é
+  recusada com `400` dizendo o que se esperava, **nunca omitida em silêncio**. O BFF não coage os
+  campos internos: repassa o valor como recebeu.
+- `/session/aggregate` existe porque a **projeção é assíncrona**: para carregar o estado autoritativo de
+  um agregado (ex.: preencher um form de transição) não se deve ler o read model.
+
+### Quem autoriza a leitura
+
+Escrita e leitura **não** são governadas do mesmo jeito, e a diferença é deliberada:
+
+| Rota | Quem decide | Como |
+|---|---|---|
+| `POST /session/command` | BFF **e** persistence-crs | papéis do token × `command.roles` do modelo; recusa `403` |
+| `POST /session/query` | **persistence-q**, sozinho | `_conf.accessControl.read` da entity |
+| `POST /session/aggregate` · `/session/history` | BFF | mesma derivação de capacidade do comando |
+
+`POST /session/query` **não aplica portão de papel**. O BFF confere que o `tenantId` pertence ao
+portador e encaminha; quem autoriza é o persistence-q, pela política de leitura declarada na entity.
+A razão é de domínio: **ler não é executar**. Amarrar leitura aos papéis dos comandos tornava
+impossível um papel **somente-leitor** — para ver um catálogo, alguém teria de ganhar um comando que
+não deveria ter, falsificando o modelo e afrouxando a escrita.
+
+> ⚠️ **O default é restritivo.** Entity **sem** `_conf.accessControl.read` declarado, ou com a lista
+> vazia, **não é legível** — o persistence-q recusa. Autorizar leitura é ato explícito: declarar o
+> papel na política da entity, o que vale de imediato, sem republicar modelo nem reiniciar serviço.
+
+`/session/aggregate` e `/session/history` **mantêm** o portão de capacidade porque batem no
+persistence-crs, que valida **tenant**, não leitura por papel — sem o portão, estado e histórico de
+qualquer agregado ficariam ao alcance de qualquer portador de sessão daquele tenant.
+
+### `predicates` é a forma do persistence-q — não há dialeto do BFF
+
+`predicates` é o **objeto de predicados** do
+[persistence-q](../persistence-q/endpoints/consulta.md), repassado como está. O BFF só acrescenta o
+**rótulo** (o nome da entity, derivado de `aggregate`) e os controles; ele **não traduz** nada.
+
+```json
+{
+  "tenantId": "…", "aggregate": "pessoal.associado",
+  "predicates": { "status": { "neq": "encerrado" } },
+  "paging":  { "_maxRegisters": 50, "_firstRegister": 0 },
+  "sorting": { "_orderBy": "criadaem", "_order": "DESC" }
+}
+```
+
+- Cada predicado é `{ "<atributo>": "<valor>" }` (igualdade) ou `{ "<atributo>": { "<op>": "<valor>" } }`,
+  com `<op>` em `eq/neq/gt/gte/lt/lte/like/ilike/in` — **minúsculas**. O vocabulário de atributos é o do
+  modelo provisionado; nome desconhecido é rejeitado pelo persistence-q (`510`).
+- ⚠️ **`predicates` é objeto. Array é recusado com `400`** e mensagem dizendo a forma esperada. Uma
+  lista de descritores (`[{attribute, operator, value}]`) **não** é aceita: espalhá-la geraria a chave
+  `"0"`, que o persistence-q leria como atributo do modelo — rejeição indecifrável no melhor caso,
+  filtro silenciosamente diferente do pedido no pior.
+- `paging`/`sorting` são conveniências do BFF, que os coloca no **nível raiz** do critério (irmãos do
+  rótulo) e indexa `sorting` por posição, como exige
+  [query-controls](../persistence-q/query-controls.md). O consumidor envia a forma plana acima.
+- **Erro do upstream chega inteiro.** Em `/session/query`, `/session/aggregate` e `/session/history`, um
+  não-2xx do persistence-q/-crs é repassado com **o status e o corpo de erro reais**. O consumidor
+  **nunca** recebe status de erro com corpo em forma de sucesso — `{ records: [] }`, `{ state }` e
+  `{ events }` só existem no caminho de sucesso, e `204` (vazio) continua virando `200` com lista vazia.
+
+## Autocadastro (`/ua/*`)
+
+Fluxo público de **auto-registro de conta externa**, proxy dos endpoints `/open/ua/*` e `/ua/open/*` do
+[orgid](../orgid/README.md). Sem `Authorization` — o BFF injeta `X-Forger-Credential` no servidor.
+Contrato de origem: [orgid/publico](../orgid/endpoints/publico.md) e [orgid/ua-papel](../orgid/endpoints/ua-papel.md).
+
+| Operação | Método · Path | Corpo / Query | Resposta |
+|---|---|---|---|
+| Papéis oferecíveis | `GET /ua/roles?owner={org}` | — | `{ roles: [{ name, label }] }` — só `ispublic=true` |
+| Conta já existe? | `GET /ua/exists?username={u}` | — | `{ exists: true\|false }` |
+| Registrar | `POST /ua/register` | `{ account: {username,password,email,name?}, role: {name,owner} }` | `200` criado · `403` papel fora do cardápio · `409` papel inexistente |
+| Pedir hash (e-mail) | `GET /ua/hash?action={R\|PR}&username={u}` | — | repassa o orgid |
+| Ativar / recuperar | `PUT /ua/activate` | `{ username, action: R\|PR, hash, password? }` | repassa o orgid |
+
+> ⚠️ **Duas travas ficam no BFF, porque o orgid não as faz.**
+> 1. **O papel é validado contra o cardápio público** (`GET /ua/roles`, que lista só `ispublic=true`).
+>    O orgid **ignora** `role.ispublic` no corpo e associa **qualquer papel existente** — sem esta
+>    checagem, um registro público pediria um papel privilegiado e o receberia. Fora do cardápio → `403`.
+> 2. **A conta nasce sempre `PENDING`.** O contrato do orgid aceita `account.status: ACTIVE` (e a chave
+>    `from` na raiz) para pular a ativação; o BFF força `PENDING` e não repassa `from`, de modo que só o
+>    fluxo de hash por e-mail ativa a conta.
+>
+> O `204` do orgid **não é sucesso** (significa papel inexistente e nada criado, transação revertida) —
+> o BFF o converte em `409` para não ser lido como ok.
+
+Monte a tela de cadastro a partir de `GET /ua/roles`: são exatamente os papéis que o servidor aceita.
+
+## Preferências da organização (org-scoped)
+
+Preferências de **apresentação por organização** — valem para **todos** os usuários da org, persistidas no
+BFF. Leitura por qualquer membro **ativo**; escrita **só por MASTER-na-org** (revalidada no servidor).
+
+| Operação | Método · Path | Corpo / Query | Resposta |
+|---|---|---|---|
+| Ler prefs | `GET /session/org-preferences?org={org}` | — | `{ org, prefs, canConfigure }` |
+| Alterar prefs | `PUT /session/org-preferences` | `{ org, formMode?, colorScheme? }` (**patch parcial**) | `{ org, prefs, canConfigure: true }` |
+
+```jsonc
+// prefs
+{ "formMode": "inline" | "modal",           // layout do form de comando no miolo
+  "colorScheme": "verde" | "azul" | "ambar" | "roxo" | "cinza" }  // esquema de cor da casca (ver ../shell/estilo.md)
+```
+
+- **Patch parcial**: o `PUT` aceita `formMode` e/ou `colorScheme`; campos ausentes mantêm o valor atual.
+  Valores fora do catálogo → `400`. `canConfigure` = o portador é MASTER **naquela** org.
+- O catálogo de `colorScheme` é **contrato** — espelhado no shell (catálogo/UI) e no BFF (validação).
+  Ver [estilo](../shell/estilo.md#esquemas-de-cor-nomeados-paleta-completa-por-organização).
+
+## Cabeçalhos que o BFF injeta (contrato de saída)
+
+Tudo composto **no servidor**. Nenhum deles é montado — nem visto — pelo browser ou pelo miolo.
+
+| Cabeçalho | Em quê | De onde vem |
+|---|---|---|
+| `Authorization: Bearer …` | comando, consulta, agregado, histórico, capacidade | token da sessão (no store server-side) |
+| `X-Tenant-Id` | comando, consulta, agregado, histórico | tenant da requisição, conferido contra os tenants do token |
+| `X-Forger-Credential` | **login** (`/ua/sign-in`) e **autocadastro** (`/ua/*`) | credencial de gateway, de configuração de deploy |
+
+> **`X-Forger-Credential` é pré-autenticação.** O gateway a exige **antes** de existir token — o próprio
+> `sign-in` passa por ele (ver [06-autenticacao](../06-autenticacao.md)). Por isso o BFF precisa dela em
+> configuração: **sem ela, o login falha com `401` no gateway**, e não por credencial de usuário inválida.
+> É segredo: nunca vai ao browser, nunca em código, nunca em doc.
+
+## Erros
+
+| HTTP | Quando |
+|---|---|
+| `400` | falta parâmetro (ex.: `username`/`password`, `tenant`), ou campo obrigatório do comando ausente |
+| `401` | sem sessão / sessão inválida / credencial inválida — ver `reason` abaixo |
+| `403` | comando não autorizado ao papel · papel fora do cardápio público no autocadastro · papel que não é do usuário na org (`active-role`) |
+| `404` | tenant não pertence ao usuário / miolo não registrado / **modelo do tenant ausente ou expirado no cache** |
+| `409` | autocadastro: papel inexistente — nada foi criado (o `204` do orgid, traduzido) |
+| `500` | configuração ausente no servidor (ex.: o path do endpoint de cache não configurado) |
+| `502` | falha ao falar com um serviço da plataforma |
+
+### `401` diz **por que** não há sessão
+
+O corpo do `401` de sessão traz `reason`, para que o consumidor distinga o que antes era indistinguível:
+
+| `reason` | Significado | O que o consumidor deve fazer |
+|---|---|---|
+| `no-session` | não há sessão — ninguém entrou ainda | pedir login, normalmente |
+| `expired` | o prazo da sessão acabou | pedir login de novo |
+| `evicted` | a sessão **desapareceu do servidor antes de expirar** | pedir login **e preservar o destino**: o portador não fez nada errado |
+| `unknown` | não foi possível determinar | tratar como `expired` |
+
+`evicted` é o caso que não pode ficar mudo: o portador estava trabalhando e perdeu a sessão sem causa
+atribuível a ele. Uma interface que trate os quatro como o mesmo `401` seco devolve o usuário ao início
+sem explicação — e ninguém consegue medir a frequência do problema.
+
+## Checklist do agente
+
+- [ ] O browser fala **só** com o BFF — nunca com a plataforma direto.
+- [ ] O token **nunca** vai no corpo — só em **cookie httpOnly**.
+- [ ] `Authorization`, `X-Tenant-Id` **e `X-Forger-Credential`** são compostos **no BFF**
+      (ver [seguranca](../shell/seguranca.md)).
+- [ ] No autocadastro, ofereça só o que `GET /ua/roles` devolve — o servidor recusa o resto.
+- [ ] Endereços de serviço = **config de deploy**, nunca hardcode nem em doc pública.
+
+
 <!-- ===== CHANGELOG.md ===== -->
 
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.17 — 2026-09-05
+
+- **Atributo fora do modelo agora é `400` — antes a consulta devolvia tudo.** A página de consulta já
+  dizia que nome desconhecido dava erro; não dava. O motor percorre o vocabulário da entity e pergunta se
+  o pedido tem aquilo, então o nome que não existe nunca era visitado: o filtro sumia e a consulta rodava
+  sem ele. Quem escrevia `cpff` por engano não recebia erro nem lista vazia — recebia **todos** os
+  registros, acreditando ter filtrado. Agora os nomes desconhecidos são recusados juntos, numa só
+  mensagem, com a lista dos declarados. Chaves de controle (`_`-prefixadas) seguem livres.
+
+- **Rota nova: `POST /e/by` — remoção por predicado.** Até aqui o `/e` só apagava pela chave primária:
+  quem mandasse qualquer outro critério recebia `200` e **nenhuma linha era removida**, em silêncio,
+  porque o montador acrescentava uma condição sobre `id` que nunca casava. A rota nova apaga pelo critério
+  informado, e por apagar **N linhas de uma vez** tem contrato próprio: `where` vazio é recusado,
+  `_connective` é explícito (no `/e` o `AND` implícito inverte o resultado de quem esperava `OR`),
+  `_maxRows` é obrigatório e a contagem acontece **antes** — se o filtro casar mais que o teto, a resposta
+  é `409` e nada é apagado —, e `_dryRun` é `true` por padrão, então a primeira chamada mostra quantas
+  linhas casariam sem tocar em nada. Nova página
+  [`persistence-crs/endpoints/remocao-por-predicado.md`](persistence-crs/endpoints/remocao-por-predicado.md),
+  indexada no `llms.txt` e no guia do serviço.
+
+- **`valueObject`: duas formas, e só essas duas — e escalar passa a ser `400`.** `single` é **um
+  objeto**; `multiple` é **um array de objetos**. Vale para as duas maneiras de declarar (grupo de campos
+  e atributo tipado direto): a forma do valor é a mesma nas duas. **Escalar nunca** — nem solto, nem
+  dentro de array —, então `"diassemana": ["terca"]` deixa de ser aceito. O que existe **dentro** do
+  objeto continua sendo seu: um campo ou dez, com objetos aninhados se o domínio pedir; a plataforma
+  cobra a forma, não o conteúdo, e o aninhamento chega intacto ao agregado e volta intacto na consulta.
+  Num `multiple`, **um único item fora da forma reprova o comando inteiro** — não há aproveitamento
+  parcial. Antes a escrita reduzia tudo a escalar e a leitura tentava ler toda coluna `Json` como lista;
+  as duas pontas discordavam, e o encontro delas era a atualização da projeção — o primeiro comando
+  gravava e o segundo quebrava. Atualizado
+  `persistence-crs/spec/model-format.md`.
+
+- **Consulta de logs: virou `POST`, o segredo vai no corpo, e ele é conferido contra o tenant.** Três
+  mudanças no mesmo endpoint. (1) O que autoriza é o **segredo do seu tenant**, e ele é conferido **contra
+  o `X-Tenant-Id`**: apresentar o segredo de um tenant pedindo o log de outro é `403` — antes, quem tivesse
+  a chave lia o log de qualquer cliente trocando o cabeçalho. (2) O segredo saiu do cabeçalho e foi para o
+  **corpo**, e por isso o verbo passou a ser `POST` — em caminho de URL o segredo apareceria em registro de
+  acesso e em histórico de cliente. A operação continua sendo leitura. Corpo sem `secret` é `400`, não
+  `403`. (3) A URL publicada omitia o segmento `c`: o correto é `/v3/persistence/c/logs/...` (produção) e
+  `/v3/persistence/t/c/logs/...` (teste) — sem o `c` a borda devolve `404`. Entram também o `500` na tabela
+  de erros e a correção sobre o caminho de fila, que **aparece** na consulta.
+
+- **es-n: a garantia de entrega vale para a projeção do próprio contexto, não para os três destinos.**
+  Nos despachos de `triggerProjection` e `triggerCoordination` a falha de publicação não segura o
+  checkpoint e não há reentrega automática. E o envelope leva **os dados do evento**, não o estado atual
+  do agregado — o es-n não reconstitui nada. Atualizado `es-n/README.md`.
 
 ## 1.16 — 2026-09-05
 

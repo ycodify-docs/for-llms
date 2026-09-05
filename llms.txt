@@ -43,6 +43,7 @@
 - [Gramática do modelo de domínio (.model.json)](persistence-crs/spec/model-format.md): **essencial** — agregado, comando, evento, tipos, identidade, value objects.
 - [Guia](persistence-crs/README.md): pré-requisitos, ciclo do comando, estados/concorrência (regra do `status`), regras de payload.
 - [comando](persistence-crs/endpoints/comando.md) · [leitura de agregado](persistence-crs/endpoints/agregado-leitura.md) · [escrita de projeção](persistence-crs/endpoints/projecao.md)
+- CRUD de entidade: [entidade (`/e`)](persistence-crs/endpoints/entidade.md) · [remoção por predicado (`/e/by`)](persistence-crs/endpoints/remocao-por-predicado.md) · [consulta de logs](persistence-crs/endpoints/logs.md)
 - [Erros](persistence-crs/erros.md) · [Exemplos](persistence-crs/exemplos.md) · [OpenAPI](persistence-crs/openapi.yaml)
 
 ## forger (implanta recursos) — primeiro serviço usado

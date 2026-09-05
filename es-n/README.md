@@ -35,26 +35,39 @@ mudança de estado (persistence-crs grava evento)
    es-n: lê eventos pendentes ──▶ avança checkpoint (exatamente-uma-vez)
         │
         ▼
-   reconstitui agregado (JSON)
+   monta o envelope com os dados daquele evento
         │
         ▼
    despacha para fila(s) do broker de mensagens  ──▶ (ver "três tipos de despacho")
 ```
 
 O **checkpoint** registra até onde os eventos de cada tenant/tipo de agregado já foram processados.
-O avanço só ocorre **após** o despacho bem-sucedido; uma falha **não** avança o checkpoint, garantindo
-reprocessamento sem perda e sem duplicação indevida.
+
+> ⚠️ **A garantia abaixo vale para o despacho da projeção do próprio contexto — não para os outros
+> dois.** Só a falha desse primeiro despacho segura o checkpoint. Nos despachos de `triggerProjection` e
+> `triggerCoordination` a falha de publicação é tratada **por item, em best-effort**: ela não impede o
+> avanço do checkpoint, e **não há reentrega automática** — o evento fica marcado como processado sem ter
+> chegado ao destino. Isso só ocorre se a publicação no broker falhar (broker indisponível, exchange
+> ausente), não se o consumidor falhar depois. Vale lembrar que esses dois despachos **só existem quando
+> o modelo os declara**, e cada item declarado é decidido individualmente.
+
+O avanço só ocorre **após** o despacho da projeção do próprio contexto ser bem-sucedido; uma falha nesse
+despacho **não** avança o checkpoint, garantindo reprocessamento sem perda e sem duplicação indevida.
 
 **Mecânica (comportamento):** o checkpoint guarda a posição do último evento processado. A leitura de
 eventos pendentes reserva o trabalho de forma a permitir **múltiplos processadores concorrentes** sem
 que dois processem o mesmo evento. O avanço do checkpoint é **atômico** com o processamento: se o
-despacho falha, o checkpoint permanece, e o evento é **reprocessado** numa próxima passagem (replay
-seguro). Combinado com a deduplicação na projeção, isso dá **exatamente-uma-vez** na aplicação.
+despacho da projeção do próprio contexto falha, o checkpoint permanece, e o evento é **reprocessado** numa
+próxima passagem (replay seguro). Combinado com a deduplicação na projeção, isso dá
+**exatamente-uma-vez** na aplicação **dessa** projeção. O checkpoint avança **independentemente** do
+`domainBus`: eventos sem despacho declarado não são reprocessados, e os despachos de `triggerProjection`
+e `triggerCoordination` não o seguram.
 
-**Envelope do evento:** ao despachar, o es-n monta o **estado atual do agregado** em JSON e o envolve
-com os dados necessários ao consumidor (identificador do agregado, identificador do evento, contexto e
-tenant, e o carimbo de tempo do evento já formatado). O consumidor recebe esse envelope pronto, sem
-precisar reconstituir o agregado.
+**Envelope do evento:** ao despachar, o es-n monta um JSON com **os dados daquele evento** — o que o
+comando trouxe — e o envolve com o que o consumidor precisa (identificador do agregado, identificador do
+evento, contexto e tenant, e o carimbo de tempo do evento já formatado). **Não é o estado atual do
+agregado:** o es-n não relê o histórico nem reconstitui nada; quem precisa do estado completo consulta a
+projeção ou a leitura de agregado do persistence-crs.
 
 ## Os três tipos de despacho
 
