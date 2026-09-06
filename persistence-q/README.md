@@ -22,10 +22,15 @@
 - **Autorização de tenant:** o `tenant-id` deve pertencer ao usuário; senão → `403`.
 - **Vocabulário do tenant:** os identificadores de consulta e predicados válidos são definidos pelo
   **model**/projeções provisionados para o tenant (não inventar predicados).
-- **Dataschema em `RUNNING`:** a consulta **só é interpretada/executada** se o dataschema do tenant
-  estiver em `RUNNING`. Em `MODELING` (esquema em edição) a interpretação **não ocorre**. Ver
-  [forger/dataschema — gate de status](../forger/endpoints/dataschema.md#atualizar).
-- **Spec carregada por-instância (cache):** a cada consulta o serviço resolve a spec do tenant igual ao
+- **Dataschema em `RUNNING`, verificado uma vez por instância:** a consulta só é atendida se o
+  dataschema do tenant estiver em `RUNNING` — mas essa checagem acontece **na primeira requisição
+  daquele tenant em cada instância do serviço**, não a cada consulta. Depois disso a instância atende o
+  tenant sem reavaliar o estado. Consequência: **voltar o dataschema para `MODELING` não interrompe**
+  quem já está sendo atendido, e a mesma mudança pode "pegar" numa instância e não noutra. Se a
+  alteração precisa valer imediatamente em todo lugar, trate-a como operação de implantação. Ver
+  [forger/dataschema — gate de status](../forger/endpoints/dataschema.md#atualizar) e
+  [query-controls §Quando o modelo é lido](query-controls.md#quando-o-modelo-é-lido).
+- **Spec carregada por-instância (cache):** o serviço resolve a spec do tenant igual ao
   write-side — dataschema `RUNNING` via Forger → memória local → **serviço de cache** (`../cache`) →
   **se falta no cache, a consulta falha** (`510`, "republique o modelo"). **Não há recuperação
   automática a partir do Forger:** o modelo entra no cache **só** quando é publicado, e a entrada

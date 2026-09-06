@@ -146,6 +146,12 @@ Respostas que se deve esperar deste comando, e o que cada uma significa:
 - **O alcance da consulta termina na rotação do arquivo, não no início do serviço.** O arquivo de log é
   rotacionado por tamanho e por idade; um recorte temporal que caia antes da rotação não acha nada, mesmo
   que o serviço estivesse no ar naquele momento.
+- ⚠️ **`204` não distingue "não houve" de "a rotação levou".** A resposta é a mesma nos dois casos, e o
+  endpoint não tem como dizer qual foi. Antes de concluir que a operação procurada não aconteceu, verifique
+  se o recorte pedido ainda está dentro da janela que o arquivo cobre.
+- ⚠️ **O teto de 5000 registros é do endpoint, não do tamanho do arquivo.** Um recorte largo devolve
+  `truncated: true` mesmo num arquivo pequeno — e o que vem são os **primeiros** registros que casaram, não
+  uma amostra. Estreite o recorte ou o termo; aumentar a retenção do arquivo não muda isto.
 - A consulta é **somente leitura** e não altera estado.
 - O alcance é o do **próprio serviço**: registros anteriores ao início do serviço em execução podem não estar
   disponíveis.

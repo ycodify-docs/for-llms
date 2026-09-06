@@ -2,6 +2,94 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.19 — 2026-09-05
+
+- **A resposta passa a dizer quando veio cortada.** Toda consulta tem teto — o `_maxRegisters` que você
+  mandou, ou o padrão (**500** no modo array, **1000** no modo objeto). Até aqui o corte era invisível:
+  uma lista de 500 itens era indistinguível de uma tabela com 500 registros, e a tela mostrava uma parte
+  acreditando ser o todo. Agora, **quando há mais além do teto**, o item da resposta traz
+  `_truncated: true` e `_maxRegisters`. A marca só aparece quando sobrou algo — **a ausência dela é a
+  garantia de que a lista está inteira**, inclusive quando ela tem exatamente o tamanho do teto. Ao
+  percorrer as chaves do item, pule as que começam com `_`: o rótulo da entidade é a que não começa.
+
+- **`_count` devolve `totalRegisters` — o campo que a doc prometia e o código nunca escrevia.** A
+  contagem vinha como número solto sob o rótulo, e a constante do nome existia sem nenhum uso: quem
+  seguia a doc procurava um campo que não chegava, sem erro para denunciar. Agora a resposta é
+  `{"<rótulo>": {"totalRegisters": N}}`, respeitando o mesmo filtro da consulta. É o caminho para saber
+  quantos existem antes de decidir como paginar.
+
+- **`204` volta a existir no modo objeto.** A decisão usava o número de **consultas** do lote, que é
+  sempre ≥ 1 — então resultado vazio saía como `200` com `[{"<rótulo>": []}]`, contrariando a garantia
+  publicada. O modo array já fazia a verificação certa; agora os dois fazem.
+
+- **A seção "Garantias da resposta" dizia "registros encontrados", e isso afirmava completude.** Sob
+  truncamento a frase era falsa, e a página do endpoint sequer mencionava a existência de um teto — o
+  aviso morava só em `query-controls.md`, e o ponteiro daqui apontava para o vazio. A garantia foi
+  reescrita, o teto e a marca de corte entraram na página do endpoint, e a descrição do `200` no
+  contrato de máquina (`openapi.yaml`) deixou de omiti-los.
+
+- **`_associations`, `_populating`, `_level` e `_as` saíram da doc: nenhum deles é lido pelo código.**
+  A página os descrevia como o jeito de popular relacionados, inclusive com "profundidade de
+  população" — os quatro eram inertes, e como toda chave `_` é isenta da validação de vocabulário, nem
+  `400` havia. No lugar entrou o mecanismo real: a associação vem junto quando entra no critério, como
+  objeto aninhado sob o nome dela.
+
+- **Critério de associação com mais de um item passa a ser `400`.** Só o primeiro era visitado; os
+  demais eram descartados em silêncio e a resposta parecia completa. Enquanto atender vários não for
+  possível, a recusa é explícita — "envie uma consulta por item".
+
+## 1.18 — 2026-09-05
+
+- **Os controles de consulta são irmãos do rótulo, não filhos dele — a doc dizia o contrário.** A página
+  mandava pôr `_paging`, `_sorting`, `_count`, `_connective` e `_cache` **dentro** do objeto do rótulo;
+  o motor os lê no **mesmo nível** do rótulo. Quem seguiu a doc não recebeu erro: o controle era
+  **ignorado em silêncio** e a consulta rodava com o padrão — página de 50 virava a página padrão,
+  `OR` virava `AND`. A validação de nome de atributo não pega isso, porque isenta toda chave `_`. É a
+  correção mais importante desta revisão: qualquer cliente escrito pela página anterior está com os
+  controles inertes. Atualizados [`persistence-q/query-controls.md`](persistence-q/query-controls.md) e
+  [`persistence-q/endpoints/consulta.md`](persistence-q/endpoints/consulta.md).
+
+- **Controle que a plataforma não vai honrar passa a ser `400` na entrada.** Sete situações que antes
+  saíam como `510` de origem obscura, ou — pior — rodavam devolvendo coisa diferente da pedida:
+  `_connective` fora de `AND`/`OR` maiúsculo corrompia o filtro; `_paging` pela metade (inclusive `{}`)
+  produzia consulta **sem limite nenhum**, trazendo a tabela inteira; `_sorting` na forma plana era
+  aceito e a consulta saía **sem ordenação**, sem aviso; `_order` fora de `ASC`/`DESC` e `_orderBy` fora
+  do modelo iam crus para dentro da ordenação; `in` com lista vazia estourava; operador diferente de
+  `eq`/`like`/`ilike` num atributo `Json` virava **igualdade em silêncio** — quem pedia `gt` recebia o
+  resultado de `=`. E `_count` numa consulta simples produzia consulta inválida. Todos recusados ou
+  corrigidos, com mensagem que nomeia o controle e diz a forma esperada.
+
+- **O que o motor sempre fez e a página nunca contou.** Passa a estar documentado: o operador
+  `distinct`; o limite padrão quando `_paging` é omitido (**500** no modo array, **1000** no modo
+  objeto) — omitir não traz tudo; o `%` **obrigatório** em `like`/`ilike` e a restrição a atributo
+  textual; o `%` num valor simples virando busca textual **sem você pedir**; a forma indexada do
+  `_sorting` e o fato de só `"0"`, `"1"` e `"2"` serem lidos; entidade particionada **ignorando** o seu
+  `_orderBy`; a **faixa** formada por dois operadores no mesmo atributo (só `gt`/`gte` com `lt`/`lte`) e
+  a chave `CONNECTIVE` em maiúsculas que inverte a junção dela; o `_connective` ser **global** e
+  propagar para associações e componentes; valor vazio não virando filtro **nem coluna** no resultado; o
+  `_ttl` obrigatório com `_cache: use`; `_cache` sem `_behavior` sendo ignorado e comportamento
+  desconhecido sendo `400`.
+
+- **`_cache`: a chave inclui os controles que você mandou, e o `evict` voltou a funcionar.** A chave da
+  entrada é formada **antes** de `_paging`, `_sorting`, `_connective` e `_count` serem retirados — então
+  a mesma consulta gravada **com** `_paging` explícito e relida **sem** ele produz chaves diferentes, e o
+  resultado não é reaproveitado. O `evict` deixou de ser inócuo: ele e o `use` passaram a formar a chave
+  do mesmo jeito, então a invalidação alcança o que foi gravado (desde que mandada com os mesmos
+  controles). O aviso sobre o `use` foi reescrito para descrever o que de fato acontece: na **falta** a
+  resposta vem **sem os registros e a consulta sequer é executada** (o serviço não distingue "não achei"
+  de "achei"); no **acerto** o cliente recebe o invólucro da entrada; e no **modo objeto** ainda sobra um
+  segundo item, porque a consulta roda mesmo assim.
+
+- **O rótulo é o nome exato da projeção.** Os exemplos usavam o plural (`"pedidos"`), que só funciona se
+  a projeção tiver sido modelada com esse nome. Corrigidos para o nome no singular, e a regra ficou
+  escrita: rótulo fora do modelo é `400`, com a lista dos nomes declarados na mensagem.
+
+- **O estado `RUNNING` é conferido uma vez por tenant em cada instância, não a cada consulta.** A página
+  apresentava a checagem como se valesse por requisição. Não vale: depois da primeira requisição daquele
+  tenant, a instância continua atendendo sem reavaliar o estado. Então **voltar o modelo para edição não
+  interrompe** quem já está sendo atendido, e a mesma mudança pode "pegar" numa instância e não noutra.
+  Atualizado [`persistence-q/README.md`](persistence-q/README.md).
+
 ## 1.17 — 2026-09-05
 
 - **Atributo fora do modelo agora é `400` — antes a consulta devolvia tudo.** A página de consulta já
