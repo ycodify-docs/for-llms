@@ -7583,6 +7583,370 @@ BFF. Leitura por qualquer membro **ativo**; escrita **só por MASTER-na-org** (r
 - [ ] `Authorization`/`X-Tenant-Id` são compostos **no BFF** (ver [seguranca](seguranca.md)).
 - [ ] Endereços de serviço = **config de deploy**, nunca hardcode nem em doc pública.
 
+<!-- ===== gateway/README.md ===== -->
+
+# gateway — guia da borda
+
+> **Papel:** **borda da plataforma** — o único ponto por onde requisições externas entram. Não é um
+> serviço de negócio e **não tem endpoint próprio exposto ao cliente**: encaminha para os serviços e,
+> antes disso, decide se a requisição sequer chega a eles. Toda resposta que você recebe passou por
+> aqui, e **parte delas nasce aqui** — este guia existe para você saber distinguir uma da outra.
+> Pré-requisitos: [conceitos](../02-conceitos.md), [autenticação](../06-autenticacao.md).
+
+> **Nem todo serviço fica atrás da borda.** O de **arquivos estáticos** responde por domínio
+> próprio, direto no servidor de entrada. Resposta dele **nunca** traz cabeçalho da borda — e a
+> ausência deles ali não significa que a borda deixou passar, e sim que ela **nunca viu** a
+> requisição. Ver [erros.md](erros.md#serviços-que-não-passam-pela-borda).
+
+## Por que este documento importa
+
+Um erro devolvido pela borda e um erro devolvido pelo serviço chegam ao cliente pelo mesmo canal e,
+em vários casos, com o **mesmo código HTTP**. Sem saber separá-los, procura-se o defeito no serviço
+errado. O catálogo em [erros.md](erros.md) é a peça central: ele diz, para cada resposta, **quem a
+produziu** e o que fazer.
+
+## Caminho de uma requisição
+
+A borda aplica, em ordem, um conjunto de verificações. Cada uma pode encerrar a requisição — e nesse
+caso **o serviço de destino nunca é chamado**:
+
+1. **Origem** — endereços não autorizados são recusados antes de qualquer outra coisa.
+2. **Tamanho** — corpo e cabeçalhos têm teto, e o teto **varia por serviço de destino**.
+3. **Vazão por origem** — volume anômalo de um mesmo endereço.
+4. **Cabeçalhos de identificação** — regra detalhada abaixo.
+5. **Conteúdo malicioso** — tentativas de injeção são recusadas com resposta deliberadamente opaca.
+6. **Vazão por tenant** — limite da aplicação.
+7. **Rota conhecida** — o caminho precisa casar uma rota publicada. Caminho desconhecido termina em
+   `404` produzido pela borda (ver [erros.md](erros.md#404)).
+8. **Encaminhamento** — só aqui a requisição chega ao serviço, via **registro de serviços**.
+
+> **A ordem importa para o diagnóstico, e surpreende.** A verificação de rota é das **últimas**, não
+> das primeiras: uma requisição para caminho inexistente **com corpo grande demais** recebe `413`, não
+> `404` — o teto é aplicado antes de a borda sequer decidir se a rota existe. E como caminho
+> desconhecido cai no **teto mais restritivo**, o `413` aparece com folga. Quem recebe `413` numa rota
+> nova deve conferir **se a rota está publicada** antes de olhar o tamanho do payload.
+
+Na volta, a borda **normaliza os cabeçalhos de origem cruzada (CORS)**: remove os que o serviço tenha
+emitido e aplica os seus. Serviços **não devem** emitir CORS — dois valores para o mesmo cabeçalho
+fazem o navegador recusar a resposta inteira.
+
+## Cabeçalhos de identificação — exatamente um, nunca dois
+
+Toda requisição de cliente carrega **um** destes dois cabeçalhos, **nunca os dois juntos e nunca
+nenhum**:
+
+| Cabeçalho | O que identifica |
+|---|---|
+| `X-Tenant-Id` | o tenant cuja sala a requisição acessa |
+| `X-Forger-Credential` | a credencial de quem administra recursos |
+
+Qual dos dois depende da rota:
+
+| Rota | Exige |
+|---|---|
+| rotas de autenticação (`/auth/`) | **um dos dois**, à sua escolha |
+| rotas de execução — persistência, coordenação, arquivos | **`X-Tenant-Id`** |
+| demais rotas | **`X-Forger-Credential`** |
+
+> **O erro mais comum é mandar os dois.** A intuição de "mando os dois e deixo o servidor escolher"
+> falha aqui: a borda recusa com `400`. Ver [erros.md](erros.md#400).
+
+**Exceção — abertura de canal persistente, em rotas nomeadas.** O aperto de mão que abre um canal
+bidirecional de longa duração no **serviço conversacional** não carrega esses cabeçalhos: a
+autenticação viaja **no primeiro quadro do próprio canal** e é validada por aquele serviço, não pela
+borda. A borda deixa passar o aperto de mão; quem autoriza é o serviço.
+
+> A isenção vale para **caminhos específicos, listados um a um** — não para "qualquer canal
+> persistente". Abrir um canal em outra rota **não** dispensa o cabeçalho de identificação, e a
+> requisição é recusada como qualquer outra.
+
+## Forma dos caminhos
+
+```
+/v{versão}/{serviço}/{resto}
+```
+
+A borda conhece uma **lista fechada** de segmentos de serviço. Caminho cujo segundo segmento não
+esteja nessa lista recebe `404` **da borda**, com corpo genérico que **não revela** quais serviços
+existem — é deliberado, para não entregar o mapa da plataforma a quem sonda.
+
+Alguns serviços exigem um **terceiro segmento** específico; sem ele, o `404` também vem da borda,
+ainda que o serviço exista. É a causa mais frequente de "a rota existe, mas dá 404": ver
+[erros.md](erros.md#404).
+
+## Reincidência
+
+Origens que insistem em caminhos inexistentes são marcadas como suspeitas e depois **banidas por 7
+dias** (padrão configurável). Um cliente legítimo não chega lá; um varredor, sim. Se um ambiente de
+testes começar a receber recusa em tudo depois de uma bateria de chamadas a caminhos errados, é
+este mecanismo — e a correção é parar de gerar os caminhos errados, não aumentar limite. O
+banimento responde `403`, não `429`: ver [erros.md](erros.md#reincidência--banimento-por-tempo).
+
+## O que **não** está aqui
+
+- **Endpoints administrativos da borda** (configuração de limites, listas de origem, estado dos
+  disjuntores) existem, mas são **restritos por origem** e não fazem parte da superfície do cliente.
+  Por isso não são documentados aqui: a convenção do repositório cobre apenas endpoints autenticados
+  e expostos ao cliente.
+- **Arquitetura interna da borda** — organização do código, ordem interna das verificações,
+  tecnologia empregada. Fora do escopo desta documentação, que é independente de tecnologia.
+
+## Relacionados
+
+- [Autenticação e tenant](../06-autenticacao.md) — como obter o tenant e o token.
+- [Antipadrões](../05-antipatterns.md) — o que mais quebra, por serviço.
+- [Erros da borda](erros.md) · [Exemplos](exemplos.md)
+
+<!-- ===== gateway/erros.md ===== -->
+
+# gateway — catálogo de erros da borda
+
+> Toda resposta abaixo é **produzida pela borda**: o serviço de destino **não foi chamado**. Se o
+> erro que você recebeu está aqui, procurar o defeito no serviço é procurar no lugar errado.
+> Voltar ao [guia da borda](README.md).
+
+## Como saber que a resposta veio da borda
+
+Respostas geradas aqui trazem cabeçalhos que o serviço não emite. **Não é um cabeçalho só — cada
+verificação assina de um jeito**, e procurar o cabeçalho errado leva à conclusão errada:
+
+| Cabeçalho | Aparece em | Significa |
+|---|---|---|
+| `X-Blocked-Reason` | rota não reconhecida, origem não autorizada, endpoint administrativo negado | por que foi encerrada |
+| `X-Blocked-By` | rota não reconhecida, validação de requisição | qual verificação encerrou |
+| `X-Security-Warning` | validação de requisição | a validação recusou |
+| `X-Size-Limit-Exceeded` · `X-Max-Size-Allowed` · `X-Actual-Size` | **corpo ou cabeçalhos grandes demais** | o teto e o tamanho recebido |
+| `X-RateLimit-…` | **vazão excedida e origem banida** | o limite atingido e o motivo |
+
+> ⚠️ **Não procure `X-Blocked-By` numa resposta de tamanho ou de vazão — ele não está lá.** Um `413`
+> da borda se reconhece por `X-Size-Limit-Exceeded`; um `429` ou um `403` de banimento, por
+> `X-RateLimit-…`. Concluir "não tem `X-Blocked-By`, logo não foi a borda" é o erro mais fácil de
+> cometer com este catálogo.
+
+**A regra geral que vale sempre:** se a resposta traz **qualquer** cabeçalho `X-` da tabela acima,
+foi a borda. Nenhum serviço os emite.
+
+> **Corpo da resposta.** Desde 2026-09-04, quando a recusa é **erro de quem chamou** — cabeçalho
+> ausente, cabeçalhos conflitantes, formato inválido —, **o motivo vem no corpo e também em
+> `X-Blocked-Reason`**. Quando a recusa é **detecção de ataque**, o corpo continua opaco e o motivo
+> **não** é revelado: dizer ao atacante qual padrão disparou a defesa é ajudá-lo a contorná-la.
+> Documentação que descreva as recusas da borda como "corpo sempre vazio" está desatualizada.
+
+---
+
+## 401 — falta o cabeçalho de identificação
+
+| Situação | Correção |
+|---|---|
+| não veio nem `X-Tenant-Id` nem `X-Forger-Credential` | mande **um** dos dois |
+| rota de execução sem `X-Tenant-Id` | rotas de persistência, coordenação e arquivos exigem `X-Tenant-Id` |
+| rota administrativa sem `X-Forger-Credential` | as demais rotas exigem `X-Forger-Credential` |
+
+Ver a tabela de qual rota exige qual em [README.md](README.md#cabeçalhos-de-identificação--exatamente-um-nunca-dois).
+
+## 400 — cabeçalhos conflitantes, formato inválido, ou conteúdo recusado
+
+| Situação | Como reconhecer | Correção |
+|---|---|---|
+| **`X-Tenant-Id` e `X-Forger-Credential` enviados juntos** | motivo no corpo e em `X-Blocked-Reason` | mande **exatamente um**. É o erro mais comum contra a borda |
+| formato do tenant ou da credencial fora do padrão | motivo no corpo | conferir o valor; a borda valida a forma antes de encaminhar |
+| conteúdo com padrão de injeção (SQL, script, travessia de caminho, caracteres de controle) | **só `X-Security-Warning`**, sem motivo | revisar o que está sendo enviado. **O corpo não dirá qual padrão disparou** |
+
+## 403 — três origens diferentes, e os cabeçalhos as separam
+
+| Origem | Como reconhecer |
+|---|---|
+| **origem não autorizada** a acessar a plataforma | `X-Blocked-Reason` |
+| **endpoint administrativo** chamado de origem não autorizada | `X-Blocked-Reason` |
+| **origem banida** por reincidência (ver abaixo) | `X-RateLimit-…` — **não** `X-Blocked-*` |
+| caminho marcado como não protegido | `X-Security-Warning` |
+
+> **`403` sem nenhum desses cabeçalhos não veio da borda** — veio do servidor de entrada à frente
+> dela, que recusa caminhos sem rota publicada **antes** de a requisição chegar aqui. É um sintoma
+> diferente, com correção diferente: falta publicar a rota lá, não aqui.
+
+## 404 — a borda não reconheceu a rota
+
+**Este é o `404` que mais engana**, porque é indistinguível, à primeira vista, do `404` de um recurso
+inexistente dentro do serviço. O corpo é genérico e **não revela** quais rotas existem.
+
+| Causa | Correção |
+|---|---|
+| segundo segmento do caminho não é um serviço conhecido | conferir o nome do serviço no caminho |
+| **falta um segmento obrigatório** depois do serviço | vários serviços exigem um terceiro segmento; sem ele, a borda recusa **antes** de chegar ao serviço |
+| a rota não existe **naquele ambiente** | a mesma chamada pode funcionar em outro ambiente |
+
+> **Regra de bolso:** `404` **com** `X-Blocked-By` e `X-Blocked-Reason` veio da borda e o serviço
+> nunca soube da requisição. `404` **sem** esses cabeçalhos veio do serviço, e aí sim o recurso é que
+> não existe.
+
+## 413 — corpo ou cabeçalhos grandes demais
+
+Reconhece-se por **`X-Size-Limit-Exceeded: true`**, acompanhado de `X-Max-Size-Allowed` e
+`X-Actual-Size` — que dizem, em números, o teto e o que foi recebido.
+
+O teto **varia por serviço de destino**, e não é um número único da plataforma. Serviços que recebem
+carga binária (publicação de artefatos, anexos) têm teto próprio, maior.
+
+> **Caminho que a borda não reconhece cai no teto mais restritivo.** Um `413` inesperado em rota nova
+> costuma ser sintoma de **rota não publicada**, não de payload realmente grande.
+
+Um `413` **sem** `X-Size-Limit-Exceeded` veio do servidor de entrada à frente da borda, não daqui.
+
+## 431 — cabeçalhos grandes demais
+
+A soma dos cabeçalhos excedeu o teto. Costuma ser efeito de token muito grande ou de acúmulo de
+cabeçalhos de rastreamento adicionados em cadeia.
+
+## 429 — vazão excedida
+
+Reconhece-se pelos cabeçalhos `X-RateLimit-…`. Dois limites independentes, mesma resposta:
+
+| Limite | Quando aparece |
+|---|---|
+| por **origem** | proteção de infraestrutura contra volume anômalo |
+| por **tenant** | limite da aplicação, configurável |
+
+Reduza a taxa. Se o volume é legítimo e recorrente, o limite por tenant é ajustável — o por origem
+não deve ser contornado.
+
+> **Insistir depois do `429` muda o código, não só o corpo.** Origem que continua chamando passa a
+> receber **`403`** (banimento), também com `X-RateLimit-…`. Quem só trata `429` no cliente vê o
+> erro "mudar de natureza" sem explicação.
+
+## Reincidência — banimento por tempo
+
+Origens que insistem em **caminhos inexistentes** são marcadas como suspeitas e, na sequência,
+**banidas por 7 dias** (padrão configurável). Um cliente legítimo não chega lá; um varredor, sim.
+
+Se um ambiente de testes começar a receber recusa em tudo depois de uma bateria de chamadas a
+caminhos errados, é este mecanismo. A correção é **parar de gerar os caminhos errados** — não
+aumentar limite.
+
+## 503 — serviço indisponível
+
+O serviço de destino não está registrado, ou o **disjuntor** daquele serviço está aberto após falhas
+sucessivas. A borda respondeu porque não havia a quem encaminhar. **Vem com corpo em JSON** dizendo
+qual serviço e qual caminho — diferente das recusas de segurança, que são deliberadamente econômicas.
+
+---
+
+## Erro de origem cruzada no navegador
+
+Sintoma: o navegador recusa a resposta alegando **mais de um valor** para o cabeçalho de origem
+permitida.
+
+Causa: o serviço emitiu os seus próprios cabeçalhos de origem cruzada **além** dos da borda. A borda
+**remove** os do serviço e aplica os seus antes de a resposta ser escrita — mas serviço que os emita
+em caminho não coberto ainda produz duplicidade.
+
+Correção: **o serviço para de emitir cabeçalhos de origem cruzada.** Não é ajuste na borda.
+
+---
+
+## Serviços que **não** passam pela borda
+
+Nem todo serviço da plataforma fica atrás da borda. O de **arquivos estáticos** responde por um
+domínio próprio, direto no servidor de entrada.
+
+**Consequência para o diagnóstico:** uma resposta dele **nunca** traz cabeçalho da borda — e a
+ausência deles ali **não** significa "a borda deixou passar", significa que **a borda nunca viu a
+requisição**. Não generalize a regra de bolso deste catálogo para domínios que não sejam o da API.
+
+<!-- ===== gateway/exemplos.md ===== -->
+
+# gateway — exemplos
+
+> Exemplos do que a **borda** faz com uma requisição antes de ela chegar ao serviço. Para os
+> endpoints de cada serviço, ver o `exemplos.md` do serviço.
+> Voltar ao [guia da borda](README.md) · [catálogo de erros](erros.md).
+
+## Requisição bem formada
+
+Exatamente **um** cabeçalho de identificação. Rota de execução → `X-Tenant-Id`:
+
+```bash
+curl -X POST "$BORDA/v3/persistence/c/e" \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-Id: 550e8400-e29b-41d4-a716-446655440000" \
+  -d '{ }'
+```
+
+Rota administrativa → `X-Forger-Credential`:
+
+```bash
+curl "$BORDA/v3/forger/..." \
+  -H "X-Forger-Credential: <credencial>"
+```
+
+## Os dois cabeçalhos juntos — recusado
+
+```bash
+curl "$BORDA/v3/persistence/c/e" \
+  -H "X-Tenant-Id: <tenant>" \
+  -H "X-Forger-Credential: <credencial>"      # ← os dois: erro
+```
+
+Devolve **`400`**, com o motivo no corpo e `X-Blocked-By` nos cabeçalhos. Mandar os dois **não** é
+mais permissivo que mandar um: é recusa.
+
+## Distinguir o `404` da borda do `404` do serviço
+
+Inspecione os cabeçalhos de resposta — é a única forma confiável:
+
+```bash
+curl -sS -o /dev/null -D - "$BORDA/v3/<servico>/<caminho>" \
+  -H "X-Tenant-Id: <tenant>" | grep -i "^HTTP/\|^x-blocked"
+```
+
+| Saída | Leitura |
+|---|---|
+| `HTTP/1.1 404` **+** `x-blocked-by:` … | a **borda** recusou; o serviço nunca foi chamado |
+| `HTTP/1.1 404` **sem** `x-blocked-*` | o **serviço** respondeu; o recurso é que não existe |
+
+## Segmento obrigatório faltando
+
+Vários serviços exigem um segmento além do nome. O caminho abaixo parece plausível e mesmo assim
+morre na borda:
+
+```bash
+# sem o segmento obrigatório depois do serviço → 404 DA BORDA
+curl "$BORDA/v3/persistence/logs/..."   -H "X-Tenant-Id: <tenant>"
+
+# com o segmento → chega ao serviço
+curl "$BORDA/v3/persistence/c/logs/..." -H "X-Tenant-Id: <tenant>"
+```
+
+Se o `404` trouxer `X-Blocked-By`, é este caso — não adianta investigar o serviço.
+
+## Corpo grande
+
+```bash
+curl -X POST "$BORDA/v3/<servico>/<caminho>" \
+  -H "X-Forger-Credential: <credencial>" \
+  --data-binary @arquivo.zip
+```
+
+`413` **com `X-Size-Limit-Exceeded: true`** veio da borda — e vem acompanhado de
+`X-Max-Size-Allowed` e `X-Actual-Size`, que dizem em números o teto e o que foi recebido. `413`
+**sem** esse cabeçalho veio do servidor de entrada à frente dela.
+
+> **Não procure `X-Blocked-By` aqui — ele não aparece em resposta de tamanho.** Cada verificação
+> da borda assina com um cabeçalho próprio.
+
+O teto **varia por serviço**: rotas que recebem carga binária têm teto maior que rotas de JSON, e
+caminho que a borda não reconhece cai no teto mais restritivo.
+
+## Verificar se a borda está no ar
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' "$BORDA/"
+```
+
+Responder **não** significa que a plataforma está sã: a borda pode estar de pé com serviços
+indisponíveis atrás dela — nesse caso as rotas devolvem `503`. Para saber se um serviço específico
+responde, chame um endpoint dele.
+
 <!-- ===== bff/README.md ===== -->
 
 # bff — guia do serviço (endpoints e contratos)
