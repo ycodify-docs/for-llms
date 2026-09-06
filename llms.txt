@@ -77,7 +77,8 @@
 - [Injeção do miolo](shell/injecao.md): federação de módulos, resolução tenant→remoto, de onde vem o build do miolo.
 - [Estilo](shell/estilo.md): tokens semânticos, tema claro/escuro, marca sobrescrevível por tenant.
 - [Segurança](shell/seguranca.md): segredo só no BFF; capacidade = UX; revalidação no servidor.
-- [BFF](shell/bff.md): endpoints e contratos.
+- [BFF — endpoints e contratos](bff/README.md): sessão e `401` com `reason`; capacidade; resolução do miolo; proxy de domínio (comando, consulta, agregado, histórico); quem autoriza a **leitura**; `paging` obrigatório na prática; autocadastro `/ua/*`; erros.
+- [BFF (página antiga)](shell/bff.md): ponteiro para `bff/README.md` — mantido porque outras páginas de `shell/` ainda apontam para ele.
 
 ## gateway (borda da plataforma) — por onde toda requisição entra
 - [Guia da borda](gateway/README.md): o que a borda decide antes de o serviço ser chamado; a regra de **um só** cabeçalho de identificação (`X-Tenant-Id` **ou** `X-Forger-Credential`, nunca os dois); forma dos caminhos.
