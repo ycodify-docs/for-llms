@@ -2,6 +2,35 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.21 — 2026-09-06
+
+- **Errata na doc da borda: cada verificação assina com um cabeçalho próprio.** A versão 1.20 dizia
+  que resposta da borda se reconhece por `X-Blocked-By`. **É falso para tamanho e para vazão:** um
+  `413` da borda traz `X-Size-Limit-Exceeded` (com `X-Max-Size-Allowed` e `X-Actual-Size`), e um `429`
+  traz `X-RateLimit-…`. Quem procurasse `X-Blocked-By` num `413` não o acharia e concluiria que a
+  resposta veio do servidor de entrada — errando exatamente no discriminador que a página existe para
+  dar.
+
+- **Insistir depois do `429` muda o código para `403`.** Origem que continua chamando é banida por
+  **7 dias** e passa a receber `403` com `X-RateLimit-…`, não `429`. Cliente que só trata `429` vê o
+  erro mudar de natureza sem explicação.
+
+- **A ordem das verificações não é a intuitiva, e muda o erro que você recebe.** A checagem de rota é
+  das **últimas**, não das primeiras: caminho inexistente **com corpo grande** recebe `413`, não
+  `404` — e como caminho desconhecido cai no teto mais restritivo, o `413` aparece com folga. Quem
+  receber `413` em rota nova deve conferir **se a rota está publicada** antes de olhar o payload.
+
+- **`403` tem quatro origens distintas**, e os cabeçalhos as separam — inclusive uma que **não é da
+  borda**: `403` sem nenhum cabeçalho `X-` vem do servidor de entrada, que recusa caminho sem rota
+  publicada antes de a requisição chegar à borda. Correção diferente, lugar diferente.
+
+- **Nem todo serviço fica atrás da borda.** O de arquivos estáticos responde por domínio próprio.
+  Ausência de cabeçalho da borda ali **não** significa que ela deixou passar — significa que ela
+  nunca viu a requisição.
+
+- **A isenção de cabeçalho para canal persistente vale para caminhos nomeados**, não para "qualquer
+  canal": a 1.20 generalizava, e abrir canal em outra rota é recusado como qualquer requisição.
+
 ## 1.20 — 2026-09-06
 
 - **A borda ganha documentação própria, e ela responde a uma pergunta que hoje não tem resposta:

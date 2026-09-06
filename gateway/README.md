@@ -6,6 +6,11 @@
 > aqui, e **parte delas nasce aqui** — este guia existe para você saber distinguir uma da outra.
 > Pré-requisitos: [conceitos](../02-conceitos.md), [autenticação](../06-autenticacao.md).
 
+> **Nem todo serviço fica atrás da borda.** O de **arquivos estáticos** responde por domínio
+> próprio, direto no servidor de entrada. Resposta dele **nunca** traz cabeçalho da borda — e a
+> ausência deles ali não significa que a borda deixou passar, e sim que ela **nunca viu** a
+> requisição. Ver [erros.md](erros.md#serviços-que-não-passam-pela-borda).
+
 ## Por que este documento importa
 
 Um erro devolvido pela borda e um erro devolvido pelo serviço chegam ao cliente pelo mesmo canal e,
@@ -19,13 +24,20 @@ A borda aplica, em ordem, um conjunto de verificações. Cada uma pode encerrar 
 caso **o serviço de destino nunca é chamado**:
 
 1. **Origem** — endereços não autorizados são recusados antes de qualquer outra coisa.
-2. **Rota conhecida** — o caminho precisa casar uma rota publicada. Caminho desconhecido termina em
+2. **Tamanho** — corpo e cabeçalhos têm teto, e o teto **varia por serviço de destino**.
+3. **Vazão por origem** — volume anômalo de um mesmo endereço.
+4. **Cabeçalhos de identificação** — regra detalhada abaixo.
+5. **Conteúdo malicioso** — tentativas de injeção são recusadas com resposta deliberadamente opaca.
+6. **Vazão por tenant** — limite da aplicação.
+7. **Rota conhecida** — o caminho precisa casar uma rota publicada. Caminho desconhecido termina em
    `404` produzido pela borda (ver [erros.md](erros.md#404)).
-3. **Cabeçalhos de identificação** — regra detalhada abaixo.
-4. **Conteúdo malicioso** — tentativas de injeção são recusadas com resposta deliberadamente opaca.
-5. **Tamanho** — corpo e cabeçalhos têm teto, e o teto **varia por serviço de destino**.
-6. **Vazão** — há limite por endereço de origem e limite por tenant.
-7. **Encaminhamento** — só aqui a requisição chega ao serviço, via **registro de serviços**.
+8. **Encaminhamento** — só aqui a requisição chega ao serviço, via **registro de serviços**.
+
+> **A ordem importa para o diagnóstico, e surpreende.** A verificação de rota é das **últimas**, não
+> das primeiras: uma requisição para caminho inexistente **com corpo grande demais** recebe `413`, não
+> `404` — o teto é aplicado antes de a borda sequer decidir se a rota existe. E como caminho
+> desconhecido cai no **teto mais restritivo**, o `413` aparece com folga. Quem recebe `413` numa rota
+> nova deve conferir **se a rota está publicada** antes de olhar o tamanho do payload.
 
 Na volta, a borda **normaliza os cabeçalhos de origem cruzada (CORS)**: remove os que o serviço tenha
 emitido e aplica os seus. Serviços **não devem** emitir CORS — dois valores para o mesmo cabeçalho
@@ -52,10 +64,14 @@ Qual dos dois depende da rota:
 > **O erro mais comum é mandar os dois.** A intuição de "mando os dois e deixo o servidor escolher"
 > falha aqui: a borda recusa com `400`. Ver [erros.md](erros.md#400).
 
-**Exceção — abertura de canal persistente.** O aperto de mão que abre um canal bidirecional de longa
-duração não carrega esses cabeçalhos: a autenticação viaja **no primeiro quadro do próprio canal** e
-é validada pelo serviço que o atende, não pela borda. A borda deixa passar o aperto de mão; quem
-autoriza é o serviço.
+**Exceção — abertura de canal persistente, em rotas nomeadas.** O aperto de mão que abre um canal
+bidirecional de longa duração no **serviço conversacional** não carrega esses cabeçalhos: a
+autenticação viaja **no primeiro quadro do próprio canal** e é validada por aquele serviço, não pela
+borda. A borda deixa passar o aperto de mão; quem autoriza é o serviço.
+
+> A isenção vale para **caminhos específicos, listados um a um** — não para "qualquer canal
+> persistente". Abrir um canal em outra rota **não** dispensa o cabeçalho de identificação, e a
+> requisição é recusada como qualquer outra.
 
 ## Forma dos caminhos
 
@@ -73,10 +89,11 @@ ainda que o serviço exista. É a causa mais frequente de "a rota existe, mas d�
 
 ## Reincidência
 
-Origens que insistem em caminhos inexistentes passam a ser **bloqueadas por um período**. Um cliente
-legítimo não chega lá; um varredor, sim. Se um ambiente de testes começar a receber recusa em tudo
-depois de uma bateria de chamadas a caminhos errados, é este mecanismo — e a correção é parar de
-gerar os caminhos errados, não aumentar limite.
+Origens que insistem em caminhos inexistentes são marcadas como suspeitas e depois **banidas por 7
+dias** (padrão configurável). Um cliente legítimo não chega lá; um varredor, sim. Se um ambiente de
+testes começar a receber recusa em tudo depois de uma bateria de chamadas a caminhos errados, é
+este mecanismo — e a correção é parar de gerar os caminhos errados, não aumentar limite. O
+banimento responde `403`, não `429`: ver [erros.md](erros.md#reincidência--banimento-por-tempo).
 
 ## O que **não** está aqui
 

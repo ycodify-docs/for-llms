@@ -70,8 +70,15 @@ curl -X POST "$BORDA/v3/<servico>/<caminho>" \
   --data-binary @arquivo.zip
 ```
 
-`413` com `X-Blocked-By` veio da borda; `413` sem ele veio do proxy à frente dela. O teto **varia por
-serviço**: rotas que recebem carga binária têm teto maior que rotas de JSON.
+`413` **com `X-Size-Limit-Exceeded: true`** veio da borda — e vem acompanhado de
+`X-Max-Size-Allowed` e `X-Actual-Size`, que dizem em números o teto e o que foi recebido. `413`
+**sem** esse cabeçalho veio do servidor de entrada à frente dela.
+
+> **Não procure `X-Blocked-By` aqui — ele não aparece em resposta de tamanho.** Cada verificação
+> da borda assina com um cabeçalho próprio.
+
+O teto **varia por serviço**: rotas que recebem carga binária têm teto maior que rotas de JSON, e
+caminho que a borda não reconhece cai no teto mais restritivo.
 
 ## Verificar se a borda está no ar
 
