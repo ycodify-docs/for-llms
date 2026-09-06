@@ -2,6 +2,32 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.20 — 2026-09-06
+
+- **A borda ganha documentação própria, e ela responde a uma pergunta que hoje não tem resposta:
+  quem produziu este erro?** Uma recusa da borda e uma recusa do serviço chegam pelo mesmo canal e,
+  em vários casos, com o **mesmo código HTTP** — e quem investiga procura o defeito no serviço que
+  nunca foi chamado. O novo [catálogo de erros da borda](gateway/erros.md) dá o discriminador: os
+  cabeçalhos `X-Blocked-By` e `X-Blocked-Reason` só existem em resposta gerada pela borda. `404` com
+  eles é rota não reconhecida antes do encaminhamento; `404` sem eles é recurso inexistente dentro do
+  serviço. Vale igual para o `413`, que pode vir da borda ou do proxy à frente dela.
+
+- **A regra de um só cabeçalho de identificação passa a estar escrita.** Toda requisição carrega
+  `X-Tenant-Id` **ou** `X-Forger-Credential` — **nunca os dois, nunca nenhum** —, e qual dos dois
+  depende da rota: execução exige o tenant, administração exige a credencial, autenticação aceita
+  qualquer um. Mandar os dois não é mais permissivo: é `400`. Era o erro mais comum contra a borda e
+  só estava documentado de lado, dentro da página de outro serviço.
+
+- **Errata de comportamento:** desde 2026-09-04 a borda **põe o motivo no corpo** quando a recusa é
+  erro de quem chamou (cabeçalho ausente, cabeçalhos conflitantes, formato inválido). Detecção de
+  ataque continua opaca de propósito. Descrições de que a borda responde sempre com corpo vazio
+  estão desatualizadas.
+
+- **Escopo declarado:** a borda **não tem endpoint próprio exposto ao cliente**, então não há
+  `endpoints/` — os endpoints administrativos dela são restritos por origem e ficam fora da
+  convenção, que cobre apenas endpoints autenticados e expostos ao cliente. Segue o precedente de
+  `cache`, componente sem rota pública que também é documentado por guia.
+
 ## 1.19 — 2026-09-05
 
 - **A resposta passa a dizer quando veio cortada.** Toda consulta tem teto — o `_maxRegisters` que você

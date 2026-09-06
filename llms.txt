@@ -79,6 +79,11 @@
 - [Segurança](shell/seguranca.md): segredo só no BFF; capacidade = UX; revalidação no servidor.
 - [BFF](shell/bff.md): endpoints e contratos.
 
+## gateway (borda da plataforma) — por onde toda requisição entra
+- [Guia da borda](gateway/README.md): o que a borda decide antes de o serviço ser chamado; a regra de **um só** cabeçalho de identificação (`X-Tenant-Id` **ou** `X-Forger-Credential`, nunca os dois); forma dos caminhos.
+- [Erros da borda](gateway/erros.md): **quem produziu a resposta** — borda ou serviço. Como distinguir o `404` da borda do `404` do serviço pelos cabeçalhos `X-Blocked-By`/`X-Blocked-Reason`; `401`/`400` de cabeçalho; `413` por serviço; `429`; `503`; CORS duplicado.
+- [Exemplos](gateway/exemplos.md): requisição bem formada, o erro comum de mandar os dois cabeçalhos, e como inspecionar a resposta para saber a origem do erro.
+
 ## Exemplos
 - [Modelos de domínio](examples/README.md): 6 modelos `.model.json` (1 curado + 5 reais sanitizados), com fluxo ponta a ponta.
 
