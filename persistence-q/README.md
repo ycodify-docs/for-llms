@@ -11,6 +11,7 @@
 - Ciclo de vida de uma consulta
 - Depois de um comando, espere antes de consultar
 - Linguagem de consulta (resumo)
+- Recorte de leitura por titular
 - Pontos de coordenação
 - Pitfalls
 
@@ -108,6 +109,25 @@ Consequências práticas:
 
 Detalhe e exemplos: [endpoints/consulta.md](endpoints/consulta.md).
 
+## Recorte de leitura por titular
+
+Uma entity pode declarar que um **papel** lê apenas as linhas de que o usuário é **titular**. Quando
+isso está declarado, o serviço acrescenta o recorte ao critério que você enviou — não é preciso pedi-lo,
+e não é possível desligá-lo.
+
+- **Quem não declara não muda.** Entity sem a declaração responde exatamente como antes.
+- **É por papel, na mesma entity.** Um papel pode ler a tabela inteira e outro só as linhas dele.
+- **Vários papéis: o menos restritivo vence.** Se qualquer papel autorizado do usuário está fora do
+  recorte, não há recorte — quem acumula um papel amplo não é cortado pelo papel menor.
+- **O recorte não negocia com o seu critério.** O que você envia fica isolado, e o recorte entra por
+  "E": `_connective: "OR"` **não** o transforma em alternativa, e um `ilike` amplo continua recortado.
+- **`_count` conta o conjunto já recortado**, não a tabela.
+- **`204` continua significando "nenhum resultado".** Sob recorte, lista vazia pode querer dizer
+  "nenhuma linha é sua" — não é erro, e não há como distinguir os dois casos pela resposta.
+
+Quem **declara** a chave é o forger, no `_conf` da entity — ver
+[forger — entity](../forger/endpoints/entity.md). Aqui só se descreve o efeito na **consulta**.
+
 ## Pontos de coordenação
 - **CP-2** — consulta as projeções (tabelas) criadas pelo forger.
 - **CP-5** — lê o que o fluxo es-n → projeção mantém atualizado.
@@ -121,3 +141,5 @@ Ver [coordenação](../coordenacao.md).
 - [ ] Tolerar **atraso de propagação**: logo após um comando, a projeção pode ainda não refletir a
       mudança (atualização assíncrona).
 - [ ] Tratar `204` como "nenhum resultado", não como erro.
+- [ ] Sob **recorte por titular**, não concluir "a tabela está vazia" a partir de uma lista vazia — ela
+      pode significar apenas "nenhuma linha é sua".
