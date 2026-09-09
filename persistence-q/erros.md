@@ -30,7 +30,7 @@ Valem **apenas** para entity que declara recorte; entity sem a declaração não
 |---|---|---|
 | `403` | A consulta chega **sem credencial**, ou com credencial que não traz identificação do titular. | Consultar com credencial de usuário; o recorte não tem contra quem comparar. |
 | `510` | A entity recorta por um atributo **que não existe** no modelo dela. | Corrigir a declaração no forger. |
-| `510` | A entity recorta por **coluna de metadado** (`loguser`, `logversion`). | Usar um atributo de titular. `loguser` registra **quem escreveu** a linha, não de quem ela é. |
+| `510` | A entity recorta por **metadado da plataforma** — `id`, `loguser`, `logrole`, `logversion`, `logdate`. | Usar um atributo de titular. Esses registram **quem escreveu** a linha (ou qual linha é), não **de quem** ela é. É a mesma lista que o forger recusa na publicação. |
 | `510` | A entity recorta para um **papel que não está** em `accessControl.read`. | Fazer as duas listas concordarem — normalmente é erro de digitação no nome do papel. |
 
 > As três de `510` são erro de **modelo**, não de requisição: a mesma consulta falha para todo mundo até
