@@ -37,7 +37,9 @@ Valem **apenas** para entity que declara recorte; entity sem a declaração não
 > a declaração ser corrigida. Elas existem porque o silêncio, aqui, seria pior — um papel escrito errado
 > não recortaria nada e a tabela inteira sairia com `200`.
 
-> **Consulta sem credencial nenhuma não é recusada — e não é recortada.** As rotas internas de cluster
+> **Consulta sem credencial nenhuma não é recusada — e não é recortada, a partir de
+> `yc-interpreter:amd64-260909b`.** Na imagem anterior do mesmo dia (`amd64-260909`, sem o `b`) ela era
+> recusada com `403`. As rotas internas de cluster
 > não têm usuário por construção, e ali a fronteira é **topológica**: elas não são expostas fora do
 > cluster. O recorte é controle **por usuário**; onde não há usuário, ele não se aplica — do mesmo modo
 > que o `accessControl` por papel também não se aplica nesse caminho. É por isso que o processor do
