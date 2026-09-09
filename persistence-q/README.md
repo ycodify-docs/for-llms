@@ -124,6 +124,11 @@ e não é possível desligá-lo.
 - **`_count` conta o conjunto já recortado**, não a tabela.
 - **`204` continua significando "nenhum resultado".** Sob recorte, lista vazia pode querer dizer
   "nenhuma linha é sua" — não é erro, e não há como distinguir os dois casos pela resposta.
+- **Recorte em entity alcançada por associação muda o conjunto devolvido.** Se a entity **associada**
+  é a que declara o recorte, o filtro dela entra no `WHERE` — não no `ON` do join. Consequência: a linha
+  principal cuja associação **não é sua** (ou é nula) **não aparece**, em vez de aparecer com a
+  associação vazia. Não é vazamento — é mais restritivo —, mas quem espera "o associado aparece, o
+  professor vem em branco" recebe outra coisa.
 
 Quem **declara** a chave é o forger, no `_conf` da entity — ver
 [forger — entity](../forger/endpoints/entity.md). Aqui só se descreve o efeito na **consulta**.
