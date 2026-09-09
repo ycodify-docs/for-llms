@@ -327,7 +327,6 @@ Atributos aparecem em `command.<cmd>.data.attribute.<campo>`:
 - Publicar o `.model.json` pelo forger ([model](../../forger/endpoints/model.md)) **não cria filas nem
   tabelas**: as projeções (tabelas) vêm das `entity` do forger; as filas, do deploy de processo.
 
-
 <!-- ===== examples/README.md ===== -->
 
 # Exemplos — modelo de domínio
@@ -403,7 +402,6 @@ Este exemplo é **genérico e autocontido**, por design: a documentação é pub
 incorpora modelos de produção (que carregam identificadores internos). Os padrões aqui — estados,
 transições, regra de negócio, projeção e saga — cobrem o que um agente precisa para modelar um domínio
 real.
-
 
 <!-- ===== 04-walkthrough.md ===== -->
 
@@ -528,7 +526,6 @@ Tolere a breve defasagem de propagação (reconsulte se necessário). Ver
 [ ] 10   consulta retorna o estado esperado
 ```
 
-
 <!-- ===== README.md ===== -->
 
 # Documentação da plataforma (para agentes)
@@ -606,7 +603,6 @@ persistence-crs, es-n e br-service ponta a ponta.
 
 > **Versão da documentação:** 1.15 · **Última revisão:** 2026-09-05 · Histórico: [CHANGELOG.md](CHANGELOG.md).
 > Índice navegável por máquina: [`llms.txt`](llms.txt); corpus completo num arquivo: [`llms-full.txt`](llms-full.txt).
-
 
 <!-- ===== 02-conceitos.md ===== -->
 
@@ -797,7 +793,6 @@ infraestrutura são referidos por papéis abstratos:
 > Esta documentação **não revela** produtos, versões de stack, nomes de filas/exchanges, nomes de
 > classes, hosts, cabeçalhos internos ou variáveis de ambiente. Quando um detalhe desses seria
 > necessário, ele é substituído pelo papel abstrato correspondente acima.
-
 
 <!-- ===== 01-arquitetura.md ===== -->
 
@@ -1004,7 +999,6 @@ a **fonte da verdade** de cada um é:
 
 Ao corrigir um desses fatos, **edite primeiro o documento canônico** e propague.
 
-
 <!-- ===== 00-plataforma.md ===== -->
 
 # A plataforma — composição
@@ -1052,7 +1046,6 @@ os demais operam sobre eles em tempo de execução.
 O detalhamento do fluxo ponta-a-ponta está em [arquitetura](01-arquitetura.md). A ordem obrigatória de
 implantação está em [fluxo de deploy](03-fluxo-de-deploy.md). Os pontos de articulação entre serviços
 estão consolidados em [coordenação](coordenacao.md).
-
 
 <!-- ===== 03-fluxo-de-deploy.md ===== -->
 
@@ -1156,7 +1149,6 @@ Cada recurso admite **leitura**, **atualização** e **remoção** (esta última
 dependentes). Reenviar um **model** ou um **process** **substitui** o publicado (semântica de
 sobrescrita). Detalhes por endpoint em [forger](forger/README.md).
 
-
 <!-- ===== 06-autenticacao.md ===== -->
 
 # Autenticação e identificação de tenant
@@ -1195,7 +1187,6 @@ sobrescrita). Detalhes por endpoint em [forger](forger/README.md).
 | persistence-q · consulta | sim | **sim** |
 | br-service · `/br` | (chamado pelo persistence-crs) | propagado pelo chamador |
 | es-n · acionar processamento | operacional/interno | tenant no caminho |
-
 
 <!-- ===== coordenacao.md ===== -->
 
@@ -1360,7 +1351,6 @@ Os pontos de br-service são **hooks de código** (funções **JavaScript** inje
 > Este inventário é atualizado conforme cada serviço é documentado em detalhe. Cada `CP-n` é referenciado
 > pelos `README.md` dos serviços envolvidos.
 
-
 <!-- ===== 05-antipatterns.md ===== -->
 
 # Antipadrões — o que mais quebra (por serviço)
@@ -1447,7 +1437,6 @@ Os pontos de br-service são **hooks de código** (funções **JavaScript** inje
 - **Devolver envelope em vez do objeto direto** → o sucesso (`200`) é o **objeto do processador** sem envelope.
 - **Efeito colateral de escrita no caminho crítico** → processadores devem ser idempotentes; leitura de
   enriquecimento é aceitável, escrita externa não.
-
 
 <!-- ===== 07-isolamento-e-entrega.md ===== -->
 
@@ -1609,7 +1598,6 @@ Cada cliente tem uma **sala trancada** onde o agente trabalha; a sala só enxerg
 repo); **código sob medida sai só por PR aprovado por humano**, é compilado **fora** da sala e servido por
 **armazenamento estático**.
 
-
 <!-- ===== 08-preview-de-frontend.md ===== -->
 
 # 08 · Pré-visualização do frontend
@@ -1758,7 +1746,6 @@ logado: comece pela porta da frente, como um usuário real começaria.
 Escreva o app em **`application/`**, garanta que ele **monta** e que fala com a plataforma **só pelo BFF em
 caminho relativo** — o resto (montar, servir, abrir, recolher) é do ambiente, e quem decide olhar é o usuário.
 
-
 <!-- ===== auth/README.md ===== -->
 
 # auth — guia do serviço
@@ -1858,7 +1845,6 @@ Ver [coordenação](../coordenacao.md) e [autenticação](../06-autenticacao.md)
 - [ ] **Login novo invalida o anterior** (sessão única) — não mantenha dois tokens ativos do mesmo usuário.
 - [ ] Não inspecione/derive do conteúdo do token — trate-o como opaco.
 
-
 <!-- ===== auth/endpoints/sign-in.md ===== -->
 
 # auth · endpoints · login (sign-in)
@@ -1909,7 +1895,6 @@ Catálogo: [../erros.md](../erros.md).
 Segue o [fluxo de login](../README.md#fluxo-de-login-ciclo-de-vida): valida (via identidade) → descobre
 contexto/tenants → emite token → registra sessão (login novo **invalida** sessões anteriores do usuário).
 
-
 <!-- ===== auth/endpoints/renovar.md ===== -->
 
 # auth · endpoints · renovar token
@@ -1941,7 +1926,6 @@ Sem corpo.
 
 Catálogo: [../erros.md](../erros.md).
 
-
 <!-- ===== auth/erros.md ===== -->
 
 # auth · catálogo de erros
@@ -1964,7 +1948,6 @@ Em erro, a resposta tem o **status HTTP** e um corpo com `status` + mensagem.
 - O login (`sign-in`) é **público** (sem token). A **renovação** exige `Authorization`.
 - A senha **nunca** é devolvida. O token é de **curta duração** — trate `401` por expiração com renovação.
 - **Sessão única:** um login novo invalida sessões anteriores do mesmo usuário.
-
 
 <!-- ===== auth/exemplos.md ===== -->
 
@@ -2020,7 +2003,6 @@ GET  /up/sign-in/renew   (sem token ou token expirado)             → 401
 
 > Sequência típica: **auth** (login → token) → usar o token nos serviços (com `X-Tenant-Id` quando for
 > dado por tenant). Como obter o `X-Tenant-Id`: [06-autenticacao.md](../06-autenticacao.md).
-
 
 <!-- ===== orgid/README.md ===== -->
 
@@ -2160,7 +2142,6 @@ Ver [coordenação](../coordenacao.md).
 - [ ] Senha nunca volta nas respostas; recuperação é via fluxo de **hash** (`/open/*`).
 - [ ] `name` da organização é o `{org}` dos caminhos do forger — escolha-o cedo e mantenha.
 
-
 <!-- ===== orgid/endpoints/up-organizacao.md ===== -->
 
 # orgid · `/up` · organização
@@ -2259,7 +2240,6 @@ Remove a org. **Papel:** administrador **na org**.
 
 **Resposta:** `200` (sem corpo). `403` se não for administrador.
 
-
 <!-- ===== orgid/endpoints/up-conta.md ===== -->
 
 # orgid · `/up` · conta
@@ -2350,7 +2330,6 @@ Envia uma notificação por e-mail (usuário autenticado).
 | `body` | string | sim | Corpo (texto). |
 
 **Resposta:** `200` — `{}`.
-
 
 <!-- ===== orgid/endpoints/up-associacao.md ===== -->
 
@@ -2443,7 +2422,6 @@ Desassocia a conta da org. **Papel:** administrador na org.
 
 **Resposta:** `200` (sem corpo).
 
-
 <!-- ===== orgid/endpoints/up-contrato.md ===== -->
 
 # orgid · `/up` · contrato
@@ -2523,7 +2501,6 @@ Lista contratos da org. **Papéis:** administrador / financeiro (posse).
 | `orgName` | organização |
 
 **Resposta:** `200` — array de contratos; `204` se vazio.
-
 
 <!-- ===== orgid/endpoints/ua-conta.md ===== -->
 
@@ -2610,7 +2587,6 @@ Lista todas as contas sob um dono de papel. **Papéis:** administrador / engenhe
 | `roleOwner` | dono do papel |
 
 **Resposta:** `200` — array de contas (senha nula); array vazio `[]` se nenhuma (não `204`).
-
 
 <!-- ===== orgid/endpoints/ua-papel.md ===== -->
 
@@ -2725,7 +2701,6 @@ removido."`
 > código **canônico de sucesso** — a leitura era a oposta da correta, e a remoção que não aconteceu passava
 > por feita. Ver [../erros.md](../erros.md).
 
-
 <!-- ===== orgid/endpoints/ua-associacao.md ===== -->
 
 # orgid · `/ua` · associação conta-papel
@@ -2816,7 +2791,6 @@ Desassocia um papel de uma conta.
 | `roleOwner` | dono do papel |
 
 **Resposta:** `200` (sem corpo).
-
 
 <!-- ===== orgid/endpoints/publico.md ===== -->
 
@@ -2952,7 +2926,6 @@ Envia uma notificação por e-mail.
 
 **Resposta:** `200` — `{}`.
 
-
 <!-- ===== orgid/erros.md ===== -->
 
 # orgid · catálogo de erros
@@ -3023,7 +2996,6 @@ usuário recebia sucesso e a senha não mudava).
 
 **Se você ainda vir `204` numa escrita, está falando com uma versão antiga do orgid.** Leitura segue em
 `204`, e o `/exists` depende disso — ali `200`/`204` é o contrato, não um erro.
-
 
 <!-- ===== orgid/exemplos.md ===== -->
 
@@ -3103,7 +3075,6 @@ Headers: Authorization: ...
 
 > O `name` da org (`acme`) é o `{org}` dos caminhos do forger. Papéis `/up` são `API_*`; papéis `/ua`
 > têm `owner` (espaço de nomes). Ver [README](README.md) e [coordenação](../coordenacao.md).
-
 
 <!-- ===== persistence-crs/README.md ===== -->
 
@@ -3248,7 +3219,6 @@ Ver [coordenação](../coordenacao.md).
 - [ ] Não assumir leitura imediata: após o comando, a **projeção** é atualizada de forma assíncrona —
       para ler, use [persistence-q](../persistence-q/README.md), tolerando um curto atraso.
 
-
 <!-- ===== persistence-crs/endpoints/comando.md ===== -->
 
 # persistence-crs · endpoints · comando
@@ -3261,7 +3231,7 @@ Ver [coordenação](../coordenacao.md).
 
 | Item | Valor |
 |---|---|
-| Cabeçalhos | `Authorization`, `X-Tenant-Id` (cabeçalho de tenant), `Content-Type: application/json` |
+| Cabeçalhos | `Authorization`, `X-Tenant-Id` (cabeçalho de tenant), `Content-Type: application/json`, `Content-Length` — o serviço o exige; cliente HTTP que use `Transfer-Encoding: chunked` sem `Content-Length` não casa a rota |
 | `{boundedContext}` | contexto delimitado do agregado |
 | `{aggregateType}` | tipo do agregado |
 
@@ -3274,10 +3244,17 @@ Corpo: o **comando** identificado pelo seu nome, com os dados:
 O nome do comando, seus campos e as transições válidas são definidos no **model** publicado para o
 tenant (ver [forger/model](../../forger/endpoints/model.md) e [examples/](../../examples/README.md)).
 
-> **Campos de `valueObject`:** a forma do valor segue a forma **declarada** no modelo — grupo de campos
-> recebe objeto (`single`) ou array de objetos (`multiple`); atributo tipado direto recebe escalar
-> (`single`) ou **array de escalares** (`multiple`, ex.: `"diassemana": ["terca"]`). Forma divergente →
-> `400` dizendo a forma esperada. Ver
+> **`id` (obrigatório, exceto na criação):** todo comando que **não** é de criação envia também o `id`
+> (UUID) do agregado alvo — é ele que diz sobre qual agregado o comando age. O comando de **criação**
+> (`fromState: []`) **não** o envia: o `id` é gerado pela plataforma e volta na resposta. Comando de
+> transição sem `id` **não** é executado.
+
+> **Campos de `valueObject` — duas formas, e só essas duas:** `single` recebe **um objeto**, `multiple`
+> recebe **um array de objetos**. Vale para as **duas** maneiras de declarar o VO no modelo; a forma do
+> valor é a mesma nas duas. **Escalar nunca** — nem solto, nem dentro de array: `"diassemana": ["terca"]`
+> é recusado com `400`; a forma válida é `"diassemana": [{"<campo>": "terca"}]`. O que existe **dentro**
+> do objeto é do seu domínio (um campo ou dez, com aninhamento). Num `multiple`, **um único item fora da
+> forma reprova o comando inteiro**. Ver
 > [spec/model-format.md § data.valueObject](../spec/model-format.md).
 
 > **Campo `status` (obrigatório, exceto na criação):** todo comando envia `status` = **estado atual**
@@ -3299,15 +3276,39 @@ tenant (ver [forger/model](../../forger/endpoints/model.md) e [examples/](../../
 
 ## Comportamento
 
-Segue o [ciclo de vida de um comando](../README.md#ciclo-de-vida-de-um-comando): auth/tenant → carga do
-estado → validação de transição (`fromState`) → regra/coordenação no br-service (se o modelo exigir) →
-validação do estado de destino (`endState`) → gravação do evento (notifica es-n) → resposta.
+A ordem real, que importa para entender o que já rodou quando um erro chega:
+
+1. **autenticação e tenant** — o chamador tem de pertencer ao tenant do cabeçalho;
+2. **carga do estado** do agregado;
+3. **autorização por papel** (`command.<cmd>.roles`) — **antes** da regra de negócio. Quem não tem o
+   papel recebe `403` **sem** o processor do br-service ter sido executado;
+4. **regra/coordenação no br-service**, se o modelo declarar;
+5. **validação da transição** (`fromState` contra o `status` enviado);
+6. **gravação do evento**, que notifica o es-n;
+7. resposta.
+
+> A ordem entre 3 e 4 mudou em 2026-09-05. Antes o br-service rodava primeiro e a checagem de papel vinha
+> depois — quem não tinha o papel fazia a regra executar inteira e recebia as mensagens dela de volta.
+> Se você depende de ver a mensagem do processor para diagnosticar permissão, esse caminho não existe
+> mais: sem papel, o `403` vem antes.
+
+> **Não existe validação do estado de destino (`endState`).** Versões anteriores desta página descreviam
+> um passo que compararia o estado resultante com o `endState` do modelo; ele não existe no serviço. O
+> que é verificado é a **origem** (`fromState`), no passo 5.
 
 ## Erros
-`400` (corpo inválido, incluindo `valueObject` na forma errada), `403` (tenant não autorizado **ou
-usuário sem o papel exigido pelo comando**), `510` (falha de transição/processamento e demais exceções).
-Catálogo: [../erros.md](../erros.md).
 
+| Código | Quando |
+|---|---|
+| `400` | `valueObject` na forma errada (a causa mais comum) |
+| `403` | tenant não autorizado, **ou** usuário sem o papel exigido pelo comando |
+| `510` | falha de transição (`fromState` não casa o `status` enviado) **e o resto**: corpo malformado, agregado ou comando desconhecido, `id` ausente num comando de transição |
+
+⚠️ **`510` não significa "erro do servidor" aqui.** Boa parte dos erros de payload cai nele — corpo
+malformado, nome de comando inexistente, `id` faltando. Antes de suspeitar de indisponibilidade, leia a
+mensagem: ela costuma dizer exatamente qual campo está errado.
+
+Catálogo: [../erros.md](../erros.md).
 
 <!-- ===== persistence-crs/endpoints/agregado-leitura.md ===== -->
 
@@ -3345,7 +3346,6 @@ Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`.
 
 ## Erros
 `403` (tenant não autorizado), `510` (falha de processamento). Catálogo: [../erros.md](../erros.md).
-
 
 <!-- ===== persistence-crs/endpoints/entidade.md ===== -->
 
@@ -3459,7 +3459,6 @@ A leitura **não** é feita por `/e`. Para ler entidades (por chave, por critér
 aplicação — ex.: violação de restrição, dado inconsistente; categoria **Aplicação de projeção**).
 Catálogo: [../erros.md](../erros.md).
 
-
 <!-- ===== persistence-crs/endpoints/remocao-por-predicado.md ===== -->
 
 # persistence-crs · endpoints · remoção por predicado
@@ -3550,7 +3549,6 @@ ausente ou `<= 0`; critério que não monta filtro; entidade não relacional), `
 `409` (teto excedido — nada apagado), `510` (falha de aplicação).
 Catálogo: [../erros.md](../erros.md).
 
-
 <!-- ===== persistence-crs/endpoints/projecao.md ===== -->
 
 # persistence-crs · endpoints · escrita de projeção
@@ -3605,7 +3603,6 @@ algum** — não há por onde deduplicar, e reenviar aplica de novo.
 `400` (ação/corpo inválido), `403` (tenant), `510` (falha de aplicação — ex.: violação de restrição).
 Catálogo: [../erros.md](../erros.md).
 
-
 <!-- ===== persistence-crs/endpoints/logs.md ===== -->
 
 # persistence-crs · endpoints · consulta de logs
@@ -3653,8 +3650,8 @@ log ler.
 Corpo sem `secret` é **`400`** (erro de payload), não `403` — quem errou o corpo precisa saber disso.
 Segredo que não confere é `403`. Não existe modo aberto por omissão.
 
-> ⚠️ **Mande `X-Tenant-Id` sozinho — nunca junto com `X-Forger-Credential`.** O gateway recusa qualquer
-> requisição que traga os dois cabeçalhos ao mesmo tempo, com **`400`** e corpo vazio, **antes** de chegar
+> ⚠️ **Mande `X-Tenant-Id` sozinho — nunca junto com `X-Forger-Credential`.** A borda da plataforma recusa
+> qualquer requisição que traga os dois cabeçalhos ao mesmo tempo, com **`400`**, **antes** de chegar
 > a este serviço (violação `multiple_headers`). Como o caminho fica sob `/v3/persistence/`, ele é
 > rota-de-engine: identifica-se pelo tenant, não pela credencial. É um erro fácil de cometer, porque a
 > credencial é o que se usa em outras rotas da plataforma — e o `400` resultante **não** vem deste
@@ -3756,6 +3753,12 @@ Respostas que se deve esperar deste comando, e o que cada uma significa:
 - **O alcance da consulta termina na rotação do arquivo, não no início do serviço.** O arquivo de log é
   rotacionado por tamanho e por idade; um recorte temporal que caia antes da rotação não acha nada, mesmo
   que o serviço estivesse no ar naquele momento.
+- ⚠️ **`204` não distingue "não houve" de "a rotação levou".** A resposta é a mesma nos dois casos, e o
+  endpoint não tem como dizer qual foi. Antes de concluir que a operação procurada não aconteceu, verifique
+  se o recorte pedido ainda está dentro da janela que o arquivo cobre.
+- ⚠️ **O teto de 5000 registros é do endpoint, não do tamanho do arquivo.** Um recorte largo devolve
+  `truncated: true` mesmo num arquivo pequeno — e o que vem são os **primeiros** registros que casaram, não
+  uma amostra. Estreite o recorte ou o termo; aumentar a retenção do arquivo não muda isto.
 - A consulta é **somente leitura** e não altera estado.
 - O alcance é o do **próprio serviço**: registros anteriores ao início do serviço em execução podem não estar
   disponíveis.
@@ -3773,7 +3776,7 @@ Respostas que se deve esperar deste comando, e o que cada uma significa:
 
 | Código | De onde vem | Quando |
 |---|---|---|
-| `400` **com corpo vazio** | gateway | `X-Tenant-Id` e `X-Forger-Credential` enviados juntos (ver aviso no topo). O `400` deste endpoint sempre traz corpo. |
+| `400` **da borda** | antes deste endpoint | `X-Tenant-Id` e `X-Forger-Credential` enviados juntos (ver aviso no topo). O corpo **traz o motivo** quando a recusa é erro de quem chamou |
 | `403` **com `{"error":"Forbidden","message":"Access denied."}`** | borda da plataforma | o caminho não está publicado no ambiente consultado |
 | `404` **do gateway** | borda da plataforma | faltou o `c` no caminho (`/v3/persistence/logs/...` em vez de `/v3/persistence/c/logs/...`) |
 | `404` | fallback do gateway | a rota não casou — caminho digitado errado, ou ambiente sem a rota |
@@ -3782,7 +3785,6 @@ Catálogo: [../erros.md](../erros.md).
 
 > **A chave é secreta.** Não a coloque em repositório, em exemplo copiado nem em log de cliente. Sem a chave
 > configurada no serviço, o endpoint **nega todas** as chamadas — não existe modo aberto por omissão.
-
 
 <!-- ===== persistence-crs/erros.md ===== -->
 
@@ -3823,7 +3825,6 @@ As falhas são classificadas em categorias que ajudam o agente a decidir a corre
 ## Nota
 Um erro de **transição** ou de **concorrência** não é falha de rede: é resposta de domínio. O agente
 deve tratá-los como sinais de fluxo (ajustar o comando ou reenviar), não como indisponibilidade.
-
 
 <!-- ===== persistence-crs/exemplos.md ===== -->
 
@@ -3876,7 +3877,6 @@ GET /a/vendas/pedido/<uuid>/history
 Depois de um comando bem-sucedido, **consultar a projeção** ([persistence-q](../persistence-q/README.md))
 pode levar um curto intervalo até refletir a mudança — a projeção é atualizada de forma assíncrona
 (ver [arquitetura](../01-arquitetura.md)).
-
 
 <!-- ===== forger/README.md ===== -->
 
@@ -4030,7 +4030,6 @@ Ver [coordenação](../coordenacao.md).
 - [ ] Reenviar **model**/**process** **sobrescreve** o publicado; é a forma de versionar.
 - [ ] Nomes de recursos seguem formatos restritos (minúsculas, comprimento limitado) — validar antes.
 
-
 <!-- ===== forger/endpoints/dbconn.md ===== -->
 
 # forger · endpoints · dbconn
@@ -4093,7 +4092,6 @@ Operação só de metadados (não cria banco físico aqui — isso ocorre ao cri
 ## Coordenação
 Habilita a criação de **database** ([database.md](database.md)), passo seguinte do deploy.
 
-
 <!-- ===== forger/endpoints/database.md ===== -->
 
 # forger · endpoints · database
@@ -4141,7 +4139,6 @@ Metadados + efeito físico transacional (criação do banco). Ver [ciclo de vida
 
 ## Coordenação
 Necessário (junto com **project**) para criar **dataschema** ([dataschema.md](dataschema.md)).
-
 
 <!-- ===== forger/endpoints/project.md ===== -->
 
@@ -4193,7 +4190,6 @@ Os identificadores de tenant retornados pertencem ao contexto. Erros: `400`, `40
 
 ## Coordenação
 Necessário (junto com **database**) para criar **dataschema** ([dataschema.md](dataschema.md)).
-
 
 <!-- ===== forger/endpoints/dataschema.md ===== -->
 
@@ -4260,7 +4256,6 @@ identidade de tenant para comandos/eventos/consultas.
 - **CP-1/CP-2:** o `tenant-id` deste esquema é a chave usada por persistence-crs, es-n e persistence-q;
   as projeções (entities) deste esquema serão consultadas por persistence-q.
 Habilita criar **entity** ([entity.md](entity.md)) e publicar **model** ([model.md](model.md)).
-
 
 <!-- ===== forger/endpoints/entity.md ===== -->
 
@@ -4486,7 +4481,6 @@ associações — nunca combinados na mesma chamada. Misturar escopos é erro co
 **CP-2:** as tabelas criadas aqui são as projeções que **persistence-q** consulta e que **persistence-crs**
 (via es-n) atualiza. Crie as entities **antes** de publicar o **model**.
 
-
 <!-- ===== forger/endpoints/model.md ===== -->
 
 # forger · endpoints · model
@@ -4545,7 +4539,6 @@ publicação no cache (criar/atualizar) → resposta.
 **CP-1:** o modelo publicado aqui é a **fonte da verdade** lida por **persistence-crs** (quais comandos/
 transições existem, quando chamar regra/coordenação), **es-n** (marcadores de despacho do evento) e
 **persistence-q** (quais projeções existem). Publique **após** criar as entities.
-
 
 <!-- ===== forger/endpoints/process.md ===== -->
 
@@ -4612,7 +4605,6 @@ mensageria → publicação no cache → resposta.
 > Endpoints de **transformação sem autenticação** (conversão de diagrama sem publicar) existem para uso
 > interno e **não** fazem parte desta documentação pública.
 
-
 <!-- ===== forger/endpoints/email.md ===== -->
 
 # forger · endpoints · email
@@ -4643,7 +4635,6 @@ Resposta `201`: `{ "id": <número>, "message": "..." }`. Erros: `400`, `403`, `5
 
 ## Remover
 `DELETE /org/{org}/project/{project}/email/{id}` → `200`/`404`.
-
 
 <!-- ===== forger/erros.md ===== -->
 
@@ -4678,7 +4669,6 @@ críticos retorna também o relatório de análise.)
   revertidos — o recurso não fica num estado parcial.
 - **Remoção bloqueada:** qualquer recurso com dependentes não pode ser removido (cadeia
   dbconn ⟶ database ⟶ dataschema ⟶ entity; project ⟶ dataschema).
-
 
 <!-- ===== forger/exemplos.md ===== -->
 
@@ -4747,7 +4737,6 @@ POST /org/acme/project/vendas/tenant/<tenant-id>/model
 Após o passo 6, o sistema aceita **comandos** (persistence-crs) e **consultas** (persistence-q).
 Ver [arquitetura](../01-arquitetura.md) e os exemplos de modelo em [examples/](../examples/README.md).
 
-
 <!-- ===== forger/bnfs/README.md ===== -->
 
 # Gramáticas BNF dos payloads do forger
@@ -4784,7 +4773,6 @@ Ver [arquitetura](../01-arquitetura.md) e os exemplos de modelo em [examples/](.
 - As gramáticas descrevem o **contrato de entrada**; o comportamento e os efeitos de cada endpoint
   estão no documento em prosa correspondente.
 
-
 <!-- ===== persistence-q/README.md ===== -->
 
 # persistence-q — guia do serviço
@@ -4811,10 +4799,15 @@ Ver [arquitetura](../01-arquitetura.md) e os exemplos de modelo em [examples/](.
 - **Autorização de tenant:** o `tenant-id` deve pertencer ao usuário; senão → `403`.
 - **Vocabulário do tenant:** os identificadores de consulta e predicados válidos são definidos pelo
   **model**/projeções provisionados para o tenant (não inventar predicados).
-- **Dataschema em `RUNNING`:** a consulta **só é interpretada/executada** se o dataschema do tenant
-  estiver em `RUNNING`. Em `MODELING` (esquema em edição) a interpretação **não ocorre**. Ver
-  [forger/dataschema — gate de status](../forger/endpoints/dataschema.md#atualizar).
-- **Spec carregada por-instância (cache):** a cada consulta o serviço resolve a spec do tenant igual ao
+- **Dataschema em `RUNNING`, verificado uma vez por instância:** a consulta só é atendida se o
+  dataschema do tenant estiver em `RUNNING` — mas essa checagem acontece **na primeira requisição
+  daquele tenant em cada instância do serviço**, não a cada consulta. Depois disso a instância atende o
+  tenant sem reavaliar o estado. Consequência: **voltar o dataschema para `MODELING` não interrompe**
+  quem já está sendo atendido, e a mesma mudança pode "pegar" numa instância e não noutra. Se a
+  alteração precisa valer imediatamente em todo lugar, trate-a como operação de implantação. Ver
+  [forger/dataschema — gate de status](../forger/endpoints/dataschema.md#atualizar) e
+  [query-controls §Quando o modelo é lido](query-controls.md#quando-o-modelo-é-lido).
+- **Spec carregada por-instância (cache):** o serviço resolve a spec do tenant igual ao
   write-side — dataschema `RUNNING` via Forger → memória local → **serviço de cache** (`../cache`) →
   **se falta no cache, a consulta falha** (`510`, "republique o modelo"). **Não há recuperação
   automática a partir do Forger:** o modelo entra no cache **só** quando é publicado, e a entrada
@@ -4906,7 +4899,6 @@ Ver [coordenação](../coordenacao.md).
       mudança (atualização assíncrona).
 - [ ] Tratar `204` como "nenhum resultado", não como erro.
 
-
 <!-- ===== persistence-q/endpoints/consulta.md ===== -->
 
 # persistence-q · endpoints · consulta
@@ -4925,27 +4917,35 @@ O corpo tem **dois modos**, detectados pelo primeiro caractere:
 
 ```json
 [
-  { "<rótulo_1>": { "<predicado>": "<valor>" } },
-  { "<rótulo_2>": { "<predicado>": "<valor>", "<predicado2>": "<valor2>" } }
+  { "<rótulo_1>": { "<predicado>": "<valor>" }, "_connective": "AND" },
+  { "<rótulo_2>": { "<predicado>": "<valor>", "<predicado2>": "<valor2>" }, "_connective": "OR" }
 ]
 ```
+
+Os controles ficam ao lado do rótulo, dentro do **mesmo item** do array — cada item tem os seus.
 
 ### Modo object (critério único) — primeiro caractere `{`
 
 ```json
-{ "<rótulo>": { "<predicado>": "<valor>" } }
+{
+  "<rótulo>": { "<predicado>": "<valor>" },
+  "_paging": { "_maxRegisters": 50, "_firstRegister": 0 }
+}
 ```
 
 ### Regras
-- Cada item do array tem **exatamente um** par no nível raiz: o **rótulo** → objeto de **predicados**.
+- Cada item do array tem **exatamente um** par de critério no nível raiz: o **rótulo** → objeto de
+  **predicados**. As demais chaves daquele nível são os controles, todas com prefixo `_`.
 - ⚠️ **O rótulo NÃO é livre**: DEVE ser o **nome da projeção (entidade) provisionada** para o tenant
   (ex.: `pedido`) — é a projeção sobre a qual a consulta roda. Um rótulo arbitrário **falha** (`510`,
   projeção de nome `<rótulo>` inexistente). O rótulo também nomeia a chave correspondente na resposta.
 - Cada predicado é `{ "<atributo>": "<valor>" }` (igualdade) ou `{ "<atributo>": { "<op>": "<valor>" } }`
   (operadores: `eq/neq/gt/gte/lt/lte/like/ilike/in`).
 - Múltiplos predicados combinam por **`_connective`** (padrão **AND**, ou **OR**).
-- Há **controles** por critério: `_paging`, `_sorting`, `_count`, `_cache`, associações. Detalhe e
-  operadores em **[query-controls.md](../query-controls.md)**.
+- Os **controles** — `_paging`, `_sorting`, `_count`, `_connective`, `_cache` — são **irmãos do
+  rótulo**, no mesmo nível dele, e **não** vão dentro do objeto de predicados. Controle posto dentro do
+  rótulo é **ignorado em silêncio**, sem erro. Detalhe e operadores em
+  **[query-controls.md](../query-controls.md)**.
 - O **vocabulário** de atributos é o do modelo provisionado para o tenant; nome desconhecido → **`400`**,
   com os nomes recusados **e** a lista dos declarados na mensagem. Vale em cada nível: o mesmo se aplica
   aos atributos de uma associação ou de um componente. Chaves de controle (as que começam com `_`) não
@@ -4956,8 +4956,8 @@ O corpo tem **dois modos**, detectados pelo primeiro caractere:
 
 ## Resposta
 
-Sempre um **array no topo** (mesmo no modo object), na **mesma ordem** dos critérios. Cada item é o
-rótulo → lista de registros encontrados:
+**Uma forma só, nos dois modos:** array no topo, na **mesma ordem** dos critérios, cada item sendo o
+`rótulo` → lista de registros.
 
 ```json
 [
@@ -4966,17 +4966,58 @@ rótulo → lista de registros encontrados:
 ]
 ```
 
+No **modo object** o array tem um único item, com o mesmo formato — o rótulo continua presente.
+
 Garantias da resposta:
 - **Ordem preservada** — o i-ésimo item da resposta corresponde ao i-ésimo critério da requisição.
 - **Itens vazios aparecem como `[]`** — num `200`, um critério sem resultados ainda ocupa sua posição
   com lista vazia (o cliente deve tratar resultados mistos: alguns preenchidos, outros vazios).
 - `200` — há **ao menos um** critério com resultado.
-- `204` — **todos** os critérios retornaram vazio.
+- `204` — **todos** os critérios retornaram vazio. Vale nos **dois** modos.
+- **A lista pode não ser tudo.** Ela é limitada pelo teto de registros; quando há mais além do teto, o
+  item traz `_truncated` (logo abaixo). **A ausência de `_truncated` é a garantia de que a lista está
+  inteira.**
+
+### ⚠️ Toda consulta tem teto — e omitir `_paging` não desliga o teto
+
+Se você não mandar `_paging`, um limite padrão é aplicado: **500** registros no modo array, **1000** no
+modo objeto. Uma consulta que casaria 4000 linhas devolve as primeiras 500, com `200`.
+
+**Como distinguir "é isso tudo" de "foi cortado":** quando há mais além do teto, o item da resposta traz
+`_truncated`, ao lado do rótulo:
+
+```json
+[
+  {
+    "<rótulo>": [ "..." ],
+    "_truncated": true,
+    "_maxRegisters": 500
+  }
+]
+```
+
+- A marca **só** aparece quando há mais — inclusive uma lista com exatamente o tamanho do teto vem
+  **sem** ela, porque nesse caso não sobrou nada.
+- Para continuar, repita a consulta avançando `_firstRegister` em `_maxRegisters`.
+- **Ao percorrer as chaves do item, pule as que começam com `_`.** O rótulo da entidade é a que não
+  começa; `_truncated` e `_maxRegisters` são controle de resposta, não dados.
+- Para saber **quantos existem** antes de paginar, use `_count` — ele devolve
+  `{"<rótulo>": {"totalRegisters": N}}` respeitando o mesmo filtro.
+
+Detalhe dos controles em [query-controls.md](../query-controls.md).
+
+> ⚠️ **`204` é decidido por haver REGISTRO, não por haver envelope.** Uma resposta que teria a forma
+> `[{"<rótulo>": []}]` — envelope presente, lista vazia — é `204` **sem corpo**, não `200` com o envelope
+> vazio. Só se algum critério trouxer ao menos um registro é que a resposta vem com corpo; nesse caso os
+> demais aparecem com `[]`, como descrito acima.
+
+> **Atributo do tipo `Json` volta como está gravado.** Objeto volta objeto; array de objetos volta array
+> de objetos, com o aninhamento inteiro. Nada é achatado nem reembalado na leitura — é a mesma forma que
+> o comando exige na escrita (ver [comando](../../persistence-crs/endpoints/comando.md)).
 
 ## Erros
 `400` (JSON inválido), `401`/`403` (autorização), `510` (falha de execução da consulta).
 Catálogo: [../erros.md](../erros.md).
-
 
 <!-- ===== persistence-q/query-controls.md ===== -->
 
@@ -4987,13 +5028,47 @@ Catálogo: [../erros.md](../erros.md).
 > (modos array/object) e [README](README.md). Guia do serviço: [README.md](README.md).
 
 ## Contents
+- Onde os controles ficam (leia primeiro)
+- O rótulo é o nome da projeção
 - Predicados e operadores
 - Conectivo (AND/OR)
 - Paginação · ordenação · contagem
 - Cache
 - Associações (popular relacionados)
+- Quando o modelo é lido
 
 ---
+
+## Onde os controles ficam (leia primeiro)
+
+**Os controles são irmãos do rótulo, não filhos dele.** Ficam no mesmo nível do nome da projeção, ao
+lado dele — nunca dentro do objeto de critério.
+
+```jsonc
+{
+  "pedido": { "status": "criada" },                              // ← o critério
+  "_connective": "AND",                                          // ← controles, IRMÃOS do rótulo
+  "_paging":  { "_maxRegisters": 50, "_firstRegister": 0 },
+  "_sorting": { "0": { "_orderBy": "criadaem", "_order": "DESC" } },
+  "_count":   false
+}
+```
+
+⚠️ **Controle escrito dentro do objeto do rótulo é ignorado em silêncio.** Não há erro: a consulta roda
+com o valor padrão, e quem pediu página de 50 recebe a página padrão sem saber. A validação de nome de
+atributo **não pega isso** — ela isenta toda chave iniciada por `_`, justamente para que controle novo
+não quebre consulta que funciona.
+
+Se a sua consulta ignora a paginação, a ordenação ou o conectivo que você mandou, **é quase sempre isto.**
+
+## O rótulo é o nome da projeção
+
+O rótulo tem de ser **exatamente** o nome da projeção no modelo. Não é um apelido livre nem o plural do
+nome: `"pedido"` e `"pedidos"` são coisas diferentes, e o segundo não existe a menos que você o tenha
+modelado assim.
+
+Nome fora do modelo é recusado com **`400`**, e a mensagem lista os nomes declarados — use-a para achar a
+grafia certa. A mesma regra vale para cada atributo dentro do critério.
 
 ## Predicados e operadores
 
@@ -5005,7 +5080,7 @@ ou com um **operador**:
 { "<atributo>": { "<op>": "<valor>" } }     // operador explícito
 ```
 
-Operadores (exaustivo): `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `like`, `ilike`, `in`.
+Operadores (exaustivo): `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `like`, `ilike`, `in`, `distinct`.
 
 | Operador | Significado |
 |---|---|
@@ -5015,68 +5090,197 @@ Operadores (exaustivo): `eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `like`, `ilike`, 
 | `like` | padrão textual (case-sensitive); use curingas `%` (ex.: `"%ABC%"`) |
 | `ilike` | como `like`, **case-insensitive** |
 | `in` | pertence a um conjunto (lista de valores) |
+| `distinct` | não filtra: pede os **valores distintos** daquele atributo. Substitui a seleção inteira — o resultado passa a ser a lista de valores únicos, não os registros |
 
 Exemplo:
 ```jsonc
-{ "pedidos": { "total": { "gte": 1000 }, "cor": { "ilike": "%verm%" } } }
+{ "pedido": { "total": { "gte": 1000 }, "cor": { "ilike": "%verm%" } } }
 ```
+
+### Regras que valem para todos os predicados
+
+- **`like` e `ilike` exigem o `%`.** Sem nenhum `%` no valor, a resposta é **`400`** — o serviço não
+  adivinha se você queria início, fim ou contém.
+- **`like` e `ilike` só valem para atributo textual.** Em qualquer outro tipo, **`400`**.
+- **`%` num valor simples vira busca textual sem você pedir.** Na forma sem operador
+  (`{"nome": "%ana%"}`), um valor que **começa** com `%` ou **termina** com `%` é tratado como
+  `ilike`, não como igualdade. É o único lugar onde a plataforma troca o operador por conta própria —
+  se você quer igualdade com um `%` literal, use `eq`.
+- **`in` exige ao menos um valor.** Lista vazia é **`400`**.
+- **Valor vazio ou só espaços não vira nada.** `{"cor": ""}` não filtra **e não traz a coluna** no
+  resultado. Não é erro; é omissão silenciosa. Para "campo vazio", use `eq` com o valor que você quer
+  comparar.
+
+### Faixa (dois operadores no mesmo atributo)
+
+Dois operadores no mesmo atributo formam uma **faixa**, e só nesta combinação:
+
+```jsonc
+{ "pedido": { "total": { "gte": 100, "lte": 500 } } }
+```
+
+- O primeiro tem de ser `gt` **ou** `gte` (limite inferior); o segundo, `lt` **ou** `lte` (limite
+  superior). Qualquer outra dupla é **`400`**.
+- Os dois lados são combinados por `AND`. Para combiná-los por `OR`, acrescente ao objeto do atributo a
+  chave **`CONNECTIVE`** — em maiúsculas, sem o `_` — com valor `"OR"`. É a única chave de controle da
+  DSL que não usa o prefixo `_`.
+- Três ou mais operadores no mesmo atributo não são suportados.
 
 ## Conectivo (AND/OR)
 
-Múltiplos predicados num critério são combinados por `_connective` (padrão **`AND`**):
+`_connective` diz como os predicados se combinam. Padrão: **`AND`**.
 
 ```jsonc
-{ "pedidos": { "_connective": "OR", "status": "criada", "cor": "azul" } }
+{
+  "pedido": { "status": "criada", "cor": "azul" },
+  "_connective": "OR"
+}
 ```
+
+- **Só `AND` e `OR`, em maiúsculas.** Qualquer outro valor — inclusive `"and"` minúsculo — é **`400`**.
+- **É global.** Vale para o critério inteiro e **propaga** para associações e componentes trazidos junto:
+  não há como usar `AND` na entidade e `OR` numa associação dela na mesma consulta.
 
 ## Paginação · ordenação · contagem
 
-Controles (chaves reservadas, prefixo `_`) dentro do critério:
+Os três são **irmãos do rótulo** (veja a primeira seção).
+
+### `_paging`
 
 ```jsonc
-{ "pedidos": {
-    "status": "criada",
-    "_paging":  { "_maxRegisters": 50, "_firstRegister": 0 },   // tamanho da página, deslocamento
-    "_sorting": { "_orderBy": "criadaem", "_order": "DESC" },    // _order: ASC | DESC
-    "_count":   false                                            // true → retorna a contagem (totalRegisters)
-} }
+"_paging": { "_maxRegisters": 50, "_firstRegister": 0 }
 ```
 
-- **`_paging`** — `_maxRegisters` = nº máximo de registros; `_firstRegister` = registro inicial (deslocamento).
-- **`_sorting`** — `_orderBy` = campo; `_order` = `ASC`|`DESC`. Padrão: `_orderBy: id`, `_order: ASC`.
-- **`_count`** — `true` devolve a **contagem** (`totalRegisters`) em vez das linhas.
+- `_maxRegisters` = nº máximo de registros; `_firstRegister` = registro inicial (deslocamento).
+- **Os dois campos são obrigatórios juntos.** Mandar só um é **`400`** — sem os dois a consulta sairia
+  sem limite nenhum.
+- **Omitir `_paging` não traz tudo:** um limite padrão é aplicado. Ele depende do modo da requisição —
+  **500** no modo array, **1000** no modo objeto (veja [endpoints/consulta.md](endpoints/consulta.md)).
+  Se você precisa de um número previsível, **mande `_paging`**.
+
+#### Como saber que a resposta veio cortada
+
+Quando existem mais registros do que o teto — o seu `_maxRegisters` ou o padrão —, o item da resposta
+traz **`_truncated`**, ao lado do rótulo:
+
+```jsonc
+{
+  "pedido": [ /* ... o teto de registros ... */ ],
+  "_truncated": true,
+  "_maxRegisters": 500        // o teto que foi aplicado
+}
+```
+
+- **A marca só aparece quando há mais.** Ausência dela quer dizer **lista inteira** — inclusive quando a
+  lista tem exatamente o tamanho do teto.
+- Para continuar, repita a consulta avançando `_firstRegister` em `_maxRegisters`.
+- **`_truncated` e `_maxRegisters` não são rótulo de entidade.** Se você percorre as chaves do item,
+  pule as que começam com `_` — a entidade é a que não começa.
+
+### `_sorting`
+
+A forma é **indexada por posição**, com as chaves em string:
+
+```jsonc
+"_sorting": {
+  "0": { "_orderBy": "criadaem", "_order": "DESC" },
+  "1": { "_orderBy": "id",       "_order": "ASC"  }
+}
+```
+
+- **Só as posições `"0"`, `"1"` e `"2"` são lidas** — no máximo três critérios de ordenação. Uma quarta
+  posição é aceita e ignorada.
+- **A forma plana (`{"_orderBy": …, "_order": …}` direto) é `400`.** Antes ela era aceita e a consulta
+  saía **sem ordenação nenhuma**, sem aviso.
+- `_orderBy` tem de ser um atributo **declarado no modelo** da entidade; fora dele, **`400`**.
+- `_order` aceita apenas `ASC` e `DESC`. Ausente, vale `ASC`. Qualquer outro valor é **`400`**.
+- Omitir `_sorting` ordena por `id`, `ASC`.
+- ⚠️ **Entidade particionada ignora o seu `_orderBy`.** Se o modelo declara partição, a ordenação usa o
+  campo da partição, seja qual for o atributo que você pediu. O `_order` que você mandou continua valendo.
+
+### `_count`
+
+```jsonc
+"_count": true
+```
+
+`true` devolve a **contagem** em vez das linhas. O envelope é o mesmo; muda o que há dentro dele:
+
+```jsonc
+[ { "pedido": { "totalRegisters": 4217 } } ]
+```
+
+- O total vem sob **`totalRegisters`**, e não como um número solto.
+- **A contagem respeita o mesmo filtro da consulta** — é o total que a consulta traria sem teto.
+- Com `_count: true`, **`_paging` e `_sorting` não se aplicam** — contar não pagina nem ordena. Também
+  não há `_truncated`: não há lista para cortar.
+- Serve, portanto, para saber **quantos existem** antes de decidir como paginar.
 
 ## Cache
 
 ```jsonc
-{ "pedidos": { "status": "criada", "_cache": { "_behavior": "use", "_ttl": <tempo> } } }
+{
+  "pedido": { "status": "criada" },
+  "_cache": { "_behavior": "use", "_ttl": <tempo> }
+}
 ```
 
 - **`_behavior`**: `use` (usa/popula o cache), `evict` (invalida), `ignore` (não usa).
-- **`_ttl`**: tempo de vida da entrada em cache.
+- **`_ttl`**: tempo de vida da entrada em cache. **Obrigatório com `_behavior: "use"`** — sem ele a
+  chamada falha com erro de aplicação, não com `400`.
+- **`_cache` sem `_behavior` é ignorado** por inteiro, sem erro. `_behavior` com valor desconhecido é
+  **`400`**.
 
-> ⚠️ **`_behavior: "use"` não está entregando resultado correto — não use este controle por ora.**
-> Defeito conhecido, nos **dois** caminhos: quando a entrada **não** existe, a resposta vem sem os
-> registros **e a consulta sequer é executada**; quando existe, o cliente recebe o **invólucro** da
-> entrada em vez do resultado — ou seja, formato **diferente** do da mesma consulta sem cache. O alcance
-> é limitado porque o controle é **opt-in**: só afeta quem o declara. **Enquanto não houver correção,
-> omita `_cache` ou use `_behavior: "ignore"`** — a consulta sem cache responde corretamente.
+⚠️ **A chave da entrada inclui os controles que você mandou explicitamente.** Ela é formada a partir do
+corpo da consulta **antes** de `_paging`, `_sorting`, `_connective` e `_count` serem retirados. Efeito
+prático: a mesma consulta gravada **com** `_paging` explícito e relida **sem** ele produz chaves
+diferentes — o resultado não é reaproveitado, e um `evict` mandado com controles diferentes dos da
+gravação não alcança a entrada. **Para o cache funcionar, mande sempre o mesmo conjunto de controles.**
+
+> ⚠️ **`_behavior: "use"` não devolve resultado correto em nenhum dos dois casos — não use este controle
+> por ora.**
+>
+> - Na **falta** (a entrada não existe) a resposta vem **sem os registros e a consulta sequer é
+>   executada**: o serviço não distingue "não achei" de "achei", e trata a ausência como acerto.
+> - No **acerto** (a entrada existe) o cliente recebe o **invólucro** da entrada em vez do resultado —
+>   formato diferente do da mesma consulta sem cache.
+> - No **modo objeto**, além disso, a consulta ainda roda depois: a resposta volta com **dois** itens.
+>
+> O alcance é limitado porque o controle é **opt-in**: só afeta quem o declara. **Enquanto não houver
+> correção, omita `_cache` ou use `_behavior: "ignore"`** — a consulta sem cache responde corretamente.
+> O `evict` funciona: ele apaga a entrada, e passou a formar a chave do mesmo jeito que o `use` a formou
+> (desde que mandado com os mesmos controles).
 
 ## Associações (popular relacionados)
 
-Para trazer entidades **associadas** junto do resultado, use os controles de população, limitando a
-profundidade por `_level`:
+**Não há controle declarativo de população.** A associação vem junto quando você a inclui no critério,
+como um objeto aninhado sob o nome dela:
 
 ```jsonc
-{ "pedidos": { "status": "criada", "_associations": [...], "_populating": true, "_level": 1 } }
+{ "pedido": { "status": "criada", "itens": [ { "quantidade": { "gte": 1 } } ] } }
 ```
 
-- **`_associations`** / **`_populating`** — quais associações popular e se popula.
-- **`_level`** — profundidade de população (evita expansão excessiva).
-- **`_as`** — alias para o resultado.
+- **Um item por consulta.** O critério de uma associação é atendido para **um** item; mandar dois ou
+  mais é **`400`**. Antes o segundo era descartado em silêncio, e a resposta parecia completa.
+- O `_connective` do topo **propaga** para a associação (veja a seção do conectivo).
+- O vocabulário da associação é cobrado como o da entidade: nome fora do modelo é **`400`**.
 
 > As chaves de controle têm prefixo `_`; nomes de atributo são `^[a-z]+$` (sem `_`), portanto não colidem.
 
+## Quando o modelo é lido
+
+A consulta só é atendida se o modelo do tenant estiver **ativo**. Esse estado é verificado **uma vez por
+tenant em cada instância do serviço** — na primeira requisição daquele tenant —, não a cada consulta.
+
+Consequências que importam na prática:
+
+- **Voltar o modelo para edição não interrompe quem já está sendo atendido.** Uma instância que já
+  atendeu aquele tenant continua respondendo às consultas dele com o modelo que carregou.
+- **A mesma mudança pode "pegar" numa instância e não noutra**, conforme cada uma já tenha atendido o
+  tenant ou não.
+- **Mudança de modelo só vale com certeza para todos depois que as instâncias recarregam.** Se você
+  precisa que a alteração valha imediatamente em todo lugar, trate isso como uma operação de
+  implantação, não como um efeito da própria alteração.
 
 <!-- ===== persistence-q/erros.md ===== -->
 
@@ -5106,7 +5310,6 @@ profundidade por `_level`:
 
 ## Nota
 `204` **não** é erro: significa "nenhum resultado". A consulta é idempotente e segura para repetição.
-
 
 <!-- ===== persistence-q/exemplos.md ===== -->
 
@@ -5173,7 +5376,6 @@ POST /
 > O conjunto de rótulos e predicados válidos vem do **model**/projeções do tenant (ver
 > [examples/](../examples/README.md)). A leitura reflete o estado materializado pelo fluxo
 > es-n → projeção, que é **assíncrono** após cada comando.
-
 
 <!-- ===== es-n/README.md ===== -->
 
@@ -5321,7 +5523,6 @@ Ver [coordenação](../coordenacao.md).
 - [ ] Lembrar que a projeção é **assíncrona**: não há garantia de leitura imediata após o comando.
 - [ ] Tornar processadores de coordenação/projeção **idempotentes** — pode haver reentrega.
 
-
 <!-- ===== es-n/endpoints/processar-eventos.md ===== -->
 
 # es-n · endpoints · processar eventos de um tenant
@@ -5352,7 +5553,6 @@ Corpo de resposta: objeto com `status` e `message` (e o `tenantId` em caso de su
 Dispara o [pipeline de eventos](../README.md#pipeline-de-eventos) para o tenant: leitura dos eventos
 pendentes a partir do checkpoint, reconstituição do agregado e despacho. O avanço do checkpoint é
 **exatamente-uma-vez**; uma falha não avança o checkpoint (haverá reprocessamento seguro).
-
 
 <!-- ===== es-n/erros.md ===== -->
 
@@ -5387,7 +5587,6 @@ Agrupadas por etapa do pipeline (sem expor detalhes de infraestrutura):
 ## Nota
 Como o checkpoint só avança após despacho bem-sucedido, falhas transitórias resultam em
 **reprocessamento** seguro (com idempotência na aplicação da projeção), não em perda de eventos.
-
 
 <!-- ===== es-n/exemplos.md ===== -->
 
@@ -5432,7 +5631,6 @@ POST /api/event-processor/tenants/<tenant-id>/process
 Após o despacho, a **projeção** no banco de leitura reflete o novo estado e pode ser consultada via
 [persistence-q](../persistence-q/README.md). Eventos com `triggerCoordination` podem gerar **novos
 comandos** automaticamente (saga), visíveis como novos eventos no histórico do agregado-alvo.
-
 
 <!-- ===== br-service/README.md ===== -->
 
@@ -5619,7 +5817,6 @@ Ver [coordenação](../coordenacao.md).
 - [ ] A resposta de sucesso é o objeto **direto** do processador (sem envelope) — modelar de acordo.
 - [ ] Callback a persistence-q/crs: **hook async → endpoint interno de cluster + `X-Tenant-Id`, SEM JWT**; hook síncrono pode usar `body.authToken`. ⛔ **NUNCA hardcodar JWT nem o path do endpoint interno** (vêm de env injetada no deploy).
 
-
 <!-- ===== br-service/processadores.md ===== -->
 
 # br-service · autoria de processadores
@@ -5750,7 +5947,6 @@ Quando o arquivo foi aceito mas a rota não apareceu, o teste local é importar 
 conferir que o export é uma **função** (e não um objeto): o erro que a importação levantar aí é o mesmo
 que a carga engoliu.
 
-
 <!-- ===== br-service/endpoints/br.md ===== -->
 
 # br-service · endpoints · executar função (rota)
@@ -5802,7 +5998,6 @@ externos próprios).
 exceção do processador), mas em **dois formatos de corpo diferentes**: a falha de validação devolve
 `{ erro }` e todo o resto devolve `{ status, mensagem, tipo }`. Catálogo: [../erros.md](../erros.md).
 
-
 <!-- ===== br-service/erros.md ===== -->
 
 # br-service · catálogo de erros
@@ -5833,7 +6028,6 @@ exceção do processador), mas em **dois formatos de corpo diferentes**: a falha
 O br-service responde sempre de forma **síncrona** ao persistence-crs. Como é um transformador puro,
 não há estados intermediários a recuperar: em falha, o chamador (persistence-crs) trata o erro no
 contexto do comando/coordenação.
-
 
 <!-- ===== br-service/exemplos.md ===== -->
 
@@ -5927,7 +6121,6 @@ POST /br
 
 > A rota referenciada deve coincidir com a declarada no **model** do comando/evento (ver
 > [examples/](../examples/README.md) e [forger/model](../forger/endpoints/model.md)).
-
 
 <!-- ===== br-service/endpoints/processors-deploy.md ===== -->
 
@@ -6255,7 +6448,6 @@ Authorization: Bearer <token>
 Depois de publicar, confirme pela [consulta de log](logs.md) que as execuções da rota nova estão saindo com
 `outcome: success` — o `erroArquivo` aponta o arquivo exato quando não estiverem.
 
-
 <!-- ===== br-service/endpoints/logs.md ===== -->
 
 # br-service · endpoints · consultar o log de execução
@@ -6447,7 +6639,6 @@ X-Logs-Key: <uuid>
 X-Forger-Credential: <uuid>
 ```
 
-
 <!-- ===== filer/README.md ===== -->
 
 # filer — guia do serviço
@@ -6555,7 +6746,6 @@ Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md). Contrato de f
 - [ ] `entityId` é o **id do agregado** (`aggregateid`); use o mesmo da projeção/comando.
 - [ ] Vários arquivos por agregado são esperados — organize-os por **atributo** na chave.
 
-
 <!-- ===== filer/endpoints/upload.md ===== -->
 
 # filer · endpoints · upload
@@ -6593,7 +6783,6 @@ Catálogo: [../erros.md](../erros.md).
 Segue o [ciclo de vida](../README.md#ciclo-de-vida-uploaddownload). Reenviar a mesma chave **substitui**
 o arquivo. `entityId` = id do agregado (`aggregateid`).
 
-
 <!-- ===== filer/endpoints/download.md ===== -->
 
 # filer · endpoints · download
@@ -6629,7 +6818,6 @@ Catálogo: [../erros.md](../erros.md).
 ## Comportamento
 Exige a chave **completa** (com extensão) — diferente de listar/remover, que aceitam prefixo parcial.
 
-
 <!-- ===== filer/endpoints/listar.md ===== -->
 
 # filer · endpoints · listar
@@ -6658,7 +6846,6 @@ Requer permissão de **leitura** no agregado (entity).
 
 ## Erros
 `400` (prefixo ausente/inválido — menos de 3 partes), `401`, `403`, `500`. Catálogo: [../erros.md](../erros.md).
-
 
 <!-- ===== filer/endpoints/remover.md ===== -->
 
@@ -6698,7 +6885,6 @@ Requer permissão de **escrita** no agregado (entity).
 
 Catálogo: [../erros.md](../erros.md).
 
-
 <!-- ===== filer/erros.md ===== -->
 
 # filer · catálogo de erros
@@ -6726,7 +6912,6 @@ envelope JSON.
 - **Lote** (prefixo) não retorna `404`: ausência de correspondências é `200` com `deleted: 0` / `[]`.
 - Autorização por **operação**: leitura (download/list) vs escrita (upload/delete), conforme o controle
   de acesso do agregado no modelo do tenant.
-
 
 <!-- ===== filer/exemplos.md ===== -->
 
@@ -6781,7 +6966,6 @@ GET  /api/file/download?filename=acme-vendas-pedido-42-inexistente.pdf → 404
 > `entityId` (`42`) é o **id do agregado** (`aggregateid`). Um agregado pode ter vários arquivos,
 > convencionalmente classificados por **atributo**. Ver [README](README.md) e [coordenação](../coordenacao.md).
 
-
 <!-- ===== cache/README.md ===== -->
 
 # cache — guia do serviço
@@ -6807,7 +6991,6 @@ GET  /api/file/download?filename=acme-vendas-pedido-42-inexistente.pdf → 404
 - **Invalidação do modelo**: alterar um modelo em runtime exige **republicá-lo** (forger) **+ invalidar as duas
   chaves** (read-model e write-model); reiniciar o serviço sozinho não basta — ver a seção de refresh em
   [persistence-crs](../persistence-crs/README.md#carga-da-spec-do-tenant-cache-por-instância).
-
 
 <!-- ===== shell/README.md ===== -->
 
@@ -6885,7 +7068,6 @@ browser ──▶ casca (app) ──▶ BFF ──▶ plataforma (gateway: auth/
 - [ ] **Papéis são org-scoped** — a capacidade é calculada com os papéis **da organização** do tenant
       selecionado, nunca globalmente (ver [autenticação](../06-autenticacao.md)).
 
-
 <!-- ===== shell/contrato-miolo.md ===== -->
 
 # shell · contrato casca ↔ miolo
@@ -6909,20 +7091,62 @@ O contrato **mínimo obrigatório** é `mount` (e o `dispose` que ele devolve). 
 
 ```jsonc
 {
-  "tenant":     { "org": "...", "project": "...", "boundedContext": "...", "tenantId": "..." },
-  "capability": { /* modelo de capacidade — abaixo */ },
-  "identity":   { "username": "...", "name": "...", "email": "..." },
-  "api":        "<cliente HTTP ligado ao BFF>",
-  "navigation": "<API de navegação da casca>",
-  "i18n":       "<API de i18n da casca>"
+  "tenant":       { "org": "...", "project": "...", "boundedContext": "...", "tenantId": "..." },
+  "capability":   { /* modelo de capacidade — abaixo */ },
+  "identity":     { "username": "...", "name": "...", "email": "..." },
+  "api":          { "command": "…", "query": "…", "aggregate": "…", "history": "…" },
+  "prefs":        { "formMode": "inline" | "modal" },
+  "canConfigure": false,
+  "savePrefs":    "(formMode) => Promise<void>"
 }
 ```
 
 - **`tenant`** — o bounded context selecionado (org/projeto/BC + `tenantId` **opaco**).
 - **`capability`** — o **modelo de capacidade** (abaixo): o que o usuário pode fazer ali.
 - **`identity`** — dados **não-sensíveis** do usuário. **Sem token, sem senha.**
-- **`api`** — cliente HTTP que fala **só com o BFF**. O miolo **não** compõe `Authorization` nem
-  `X-Tenant-Id` — o BFF injeta isso no servidor (ver [seguranca](seguranca.md), [bff](bff.md)).
+- **`api`** — as quatro operações de domínio, todas contra o **BFF** (nunca a plataforma direto):
+
+  | Método | Para quê |
+  |---|---|
+  | `command({ tenantId, aggregate, command, data, id?, status? })` | dispara um comando (escrita) |
+  | `query({ tenantId, aggregate, predicates?, paging?, sorting? })` | consulta a projeção (leitura) |
+  | `aggregate({ tenantId, aggregate, id })` | **estado autoritativo** do agregado |
+  | `history({ tenantId, aggregate, id })` | histórico de eventos do agregado |
+
+  O miolo **não** compõe `Authorization` nem `X-Tenant-Id` — o BFF injeta no servidor (ver
+  [seguranca](seguranca.md), [bff](../bff/README.md)).
+
+  > ⚠️ **`paging` é opcional na assinatura, não na prática.** Sem ele o read model aplica um **limite
+  > padrão** (500 registros no modo array) e **não avisa**: a lista chega cortada, e a tela a exibe
+  > como se estivesse completa. Um miolo que lista registros **manda `paging` sempre**.
+  >
+  > | campo | forma |
+  > |---|---|
+  > | `paging` | `{ _maxRegisters, _firstRegister }` — **os dois**, inteiros ≥ 0 |
+  > | `sorting` | `{ _orderBy, _order }`, com `_order` em `ASC`/`DESC` **maiúsculo** |
+  >
+  > **Meio `paging` é pior que nenhum**: incompleto, a consulta roda **sem limite** e devolve a tabela
+  > inteira do tenant. O BFF recusa a forma incompleta com `400` antes de ir à rede. Onde esses
+  > controles ficam no critério e o que mais é recusado: [persistence-q —
+  > query-controls](../persistence-q/query-controls.md).
+  >
+  > **Saber se há mais** sem uma segunda consulta: peça `_maxRegisters` registros; se vierem
+  > exatamente esse tanto, provavelmente há mais. `_count: true` devolve o total **no lugar** das
+  > linhas, então totalizar custa outra ida à rede.
+
+  > Use `aggregate()` — não `query()` — para carregar o estado de um agregado antes de uma transição:
+  > a projeção é **assíncrona** e pode ainda não refletir o último comando. Depois de escrever,
+  > **reconsulte** `query()` até o estado esperado aparecer (read-your-writes).
+
+- **`prefs`** — preferência de apresentação **da organização** (hoje: `formMode`, o layout do form de
+  comando). Vale para todos os usuários da org. Ver [bff](../bff/README.md).
+- **`canConfigure`** — se **este** usuário pode alterar a preferência (é `MASTER` na org). É dica de
+  UX: o BFF **revalida** no servidor.
+- **`savePrefs(formMode)`** — persiste a preferência da org. Só tem efeito se o BFF confirmar o papel.
+
+> **Ainda não providos:** `navigation` (navegação da casca) e `i18n` estiveram previstos neste
+> contrato, mas **não existem** na implementação. Um miolo não deve contar com eles. Quando forem
+> implementados, entram aqui **e** na casca na mesma mudança.
 
 ## Modelo de capacidade
 
@@ -6966,7 +7190,6 @@ não diz **como se vê** (isso é o miolo).
 - **Nada de segredo no miolo**: toda escrita/leitura de domínio passa pelo `api` → **BFF** → plataforma,
   que **revalida** a autorização no servidor.
 - **Ciclo de vida**: `mount` ao selecionar o bounded context; `dispose` ao trocar de BC ou encerrar.
-
 
 <!-- ===== shell/injecao.md ===== -->
 
@@ -7016,7 +7239,6 @@ casca ──registra + carrega + mount(hostContext)──▶ MIOLO renderiza no 
   para evitar duplicação e divergência de versão.
 - A resolução `tenant → URL` é responsabilidade do **BFF** (ver [bff](bff.md)) — nunca do browser.
 - Só se resolve o miolo de um tenant que **pertence ao usuário** (consta no token) — ver [seguranca](seguranca.md).
-
 
 <!-- ===== shell/estilo.md ===== -->
 
@@ -7084,7 +7306,6 @@ casca ──registra + carrega + mount(hostContext)──▶ MIOLO renderiza no 
 - [ ] Suportar **claro e escuro** — todo componente novo funciona nas duas camadas.
 - [ ] **Marca só via `--yc-brand`** — não referenciar o verde direto; usar `accent*`.
 - [ ] **Identificadores técnicos em monoespaçada** (tenant/papel/estado).
-
 
 <!-- ===== shell/Principios de Design - Shell Universal.md ===== -->
 
@@ -7218,7 +7439,6 @@ Coloque a tela nova ao lado de qualquer tela existente. Se um usuário não cons
 
 *Este é um documento vivo. Toda decisão que amplia ou altera o sistema deve ser refletida aqui na mesma entrega — o guia e o produto nunca divergem. Referência técnica de tokens: `react-reference/theme.css`.*
 
-
 <!-- ===== shell/seguranca.md ===== -->
 
 # shell · segurança
@@ -7267,7 +7487,6 @@ Coloque a tela nova ao lado de qualquer tela existente. Se um usuário não cons
 - [ ] Nunca tratar o gating da UI como segurança — o servidor **revalida**.
 - [ ] Nunca resolver tenant fora do token do usuário.
 - [ ] Nunca escrever segredo/credencial/endereço sensível em documentação pública.
-
 
 <!-- ===== shell/bff.md ===== -->
 
@@ -7363,7 +7582,6 @@ BFF. Leitura por qualquer membro **ativo**; escrita **só por MASTER-na-org** (r
 - [ ] O token **nunca** vai no corpo — só em **cookie httpOnly**.
 - [ ] `Authorization`/`X-Tenant-Id` são compostos **no BFF** (ver [seguranca](seguranca.md)).
 - [ ] Endereços de serviço = **config de deploy**, nunca hardcode nem em doc pública.
-
 
 <!-- ===== bff/README.md ===== -->
 
@@ -7664,12 +7882,463 @@ sem explicação — e ninguém consegue medir a frequência do problema.
 - [ ] No autocadastro, ofereça só o que `GET /ua/roles` devolve — o servidor recusa o resto.
 - [ ] Endereços de serviço = **config de deploy**, nunca hardcode nem em doc pública.
 
+<!-- ===== gateway/README.md ===== -->
+
+# gateway — guia da borda
+
+> **Papel:** **borda da plataforma** — o único ponto por onde requisições externas entram. Não é um
+> serviço de negócio e **não tem endpoint próprio exposto ao cliente**: encaminha para os serviços e,
+> antes disso, decide se a requisição sequer chega a eles. Toda resposta que você recebe passou por
+> aqui, e **parte delas nasce aqui** — este guia existe para você saber distinguir uma da outra.
+> Pré-requisitos: [conceitos](../02-conceitos.md), [autenticação](../06-autenticacao.md).
+
+> **Nem todo serviço fica atrás da borda.** O de **arquivos estáticos** responde por domínio
+> próprio, direto no servidor de entrada. Resposta dele **nunca** traz cabeçalho da borda — e a
+> ausência deles ali não significa que a borda deixou passar, e sim que ela **nunca viu** a
+> requisição. Ver [erros.md](erros.md#serviços-que-não-passam-pela-borda).
+
+## Por que este documento importa
+
+Um erro devolvido pela borda e um erro devolvido pelo serviço chegam ao cliente pelo mesmo canal e,
+em vários casos, com o **mesmo código HTTP**. Sem saber separá-los, procura-se o defeito no serviço
+errado. O catálogo em [erros.md](erros.md) é a peça central: ele diz, para cada resposta, **quem a
+produziu** e o que fazer.
+
+## Caminho de uma requisição
+
+A borda aplica, em ordem, um conjunto de verificações. Cada uma pode encerrar a requisição — e nesse
+caso **o serviço de destino nunca é chamado**:
+
+1. **Origem** — endereços não autorizados são recusados antes de qualquer outra coisa.
+2. **Tamanho** — corpo e cabeçalhos têm teto, e o teto **varia por serviço de destino**.
+3. **Vazão por origem** — volume anômalo de um mesmo endereço.
+4. **Cabeçalhos de identificação** — regra detalhada abaixo.
+5. **Conteúdo malicioso** — tentativas de injeção são recusadas com resposta deliberadamente opaca.
+6. **Vazão por tenant** — limite da aplicação.
+7. **Rota conhecida** — o caminho precisa casar uma rota publicada. Caminho desconhecido termina em
+   `404` produzido pela borda (ver [erros.md](erros.md#404)).
+8. **Encaminhamento** — só aqui a requisição chega ao serviço, via **registro de serviços**.
+
+> **A ordem importa para o diagnóstico, e surpreende.** A verificação de rota é das **últimas**, não
+> das primeiras: uma requisição para caminho inexistente **com corpo grande demais** recebe `413`, não
+> `404` — o teto é aplicado antes de a borda sequer decidir se a rota existe. E como caminho
+> desconhecido cai no **teto mais restritivo**, o `413` aparece com folga. Quem recebe `413` numa rota
+> nova deve conferir **se a rota está publicada** antes de olhar o tamanho do payload.
+
+Na volta, a borda **normaliza os cabeçalhos de origem cruzada (CORS)**: remove os que o serviço tenha
+emitido e aplica os seus. Serviços **não devem** emitir CORS — dois valores para o mesmo cabeçalho
+fazem o navegador recusar a resposta inteira.
+
+## Cabeçalhos de identificação — exatamente um, nunca dois
+
+Toda requisição de cliente carrega **um** destes dois cabeçalhos, **nunca os dois juntos e nunca
+nenhum**:
+
+| Cabeçalho | O que identifica |
+|---|---|
+| `X-Tenant-Id` | o tenant cuja sala a requisição acessa |
+| `X-Forger-Credential` | a credencial de quem administra recursos |
+
+Qual dos dois depende da rota:
+
+| Rota | Exige |
+|---|---|
+| rotas de autenticação (`/auth/`) | **um dos dois**, à sua escolha |
+| rotas de execução — persistência, coordenação, arquivos | **`X-Tenant-Id`** |
+| demais rotas | **`X-Forger-Credential`** |
+
+> **O erro mais comum é mandar os dois.** A intuição de "mando os dois e deixo o servidor escolher"
+> falha aqui: a borda recusa com `400`. Ver [erros.md](erros.md#400).
+
+**Exceção — abertura de canal persistente, em rotas nomeadas.** O aperto de mão que abre um canal
+bidirecional de longa duração no **serviço conversacional** não carrega esses cabeçalhos: a
+autenticação viaja **no primeiro quadro do próprio canal** e é validada por aquele serviço, não pela
+borda. A borda deixa passar o aperto de mão; quem autoriza é o serviço.
+
+> A isenção vale para **caminhos específicos, listados um a um** — não para "qualquer canal
+> persistente". Abrir um canal em outra rota **não** dispensa o cabeçalho de identificação, e a
+> requisição é recusada como qualquer outra.
+
+## Forma dos caminhos
+
+```
+/v{versão}/{serviço}/{resto}
+```
+
+A borda conhece uma **lista fechada** de segmentos de serviço. Caminho cujo segundo segmento não
+esteja nessa lista recebe `404` **da borda**, com corpo genérico que **não revela** quais serviços
+existem — é deliberado, para não entregar o mapa da plataforma a quem sonda.
+
+Alguns serviços exigem um **terceiro segmento** específico; sem ele, o `404` também vem da borda,
+ainda que o serviço exista. É a causa mais frequente de "a rota existe, mas dá 404": ver
+[erros.md](erros.md#404).
+
+## Reincidência
+
+Origens que insistem em caminhos inexistentes são marcadas como suspeitas e depois **banidas por 7
+dias** (padrão configurável). Um cliente legítimo não chega lá; um varredor, sim. Se um ambiente de
+testes começar a receber recusa em tudo depois de uma bateria de chamadas a caminhos errados, é
+este mecanismo — e a correção é parar de gerar os caminhos errados, não aumentar limite. O
+banimento responde `403`, não `429`: ver [erros.md](erros.md#reincidência--banimento-por-tempo).
+
+## O que **não** está aqui
+
+- **Endpoints administrativos da borda** (configuração de limites, listas de origem, estado dos
+  disjuntores) existem, mas são **restritos por origem** e não fazem parte da superfície do cliente.
+  Por isso não são documentados aqui: a convenção do repositório cobre apenas endpoints autenticados
+  e expostos ao cliente.
+- **Arquitetura interna da borda** — organização do código, ordem interna das verificações,
+  tecnologia empregada. Fora do escopo desta documentação, que é independente de tecnologia.
+
+## Relacionados
+
+- [Autenticação e tenant](../06-autenticacao.md) — como obter o tenant e o token.
+- [Antipadrões](../05-antipatterns.md) — o que mais quebra, por serviço.
+- [Erros da borda](erros.md) · [Exemplos](exemplos.md)
+
+<!-- ===== gateway/erros.md ===== -->
+
+# gateway — catálogo de erros da borda
+
+> Toda resposta abaixo é **produzida pela borda**: o serviço de destino **não foi chamado**. Se o
+> erro que você recebeu está aqui, procurar o defeito no serviço é procurar no lugar errado.
+> Voltar ao [guia da borda](README.md).
+
+## Como saber que a resposta veio da borda
+
+Respostas geradas aqui trazem cabeçalhos que o serviço não emite. **Não é um cabeçalho só — cada
+verificação assina de um jeito**, e procurar o cabeçalho errado leva à conclusão errada:
+
+| Cabeçalho | Aparece em | Significa |
+|---|---|---|
+| `X-Blocked-Reason` | rota não reconhecida, origem não autorizada, endpoint administrativo negado | por que foi encerrada |
+| `X-Blocked-By` | rota não reconhecida, validação de requisição | qual verificação encerrou |
+| `X-Security-Warning` | validação de requisição | a validação recusou |
+| `X-Size-Limit-Exceeded` · `X-Max-Size-Allowed` · `X-Actual-Size` | **corpo ou cabeçalhos grandes demais** | o teto e o tamanho recebido |
+| `X-RateLimit-…` | **vazão excedida e origem banida** | o limite atingido e o motivo |
+
+> ⚠️ **Não procure `X-Blocked-By` numa resposta de tamanho ou de vazão — ele não está lá.** Um `413`
+> da borda se reconhece por `X-Size-Limit-Exceeded`; um `429` ou um `403` de banimento, por
+> `X-RateLimit-…`. Concluir "não tem `X-Blocked-By`, logo não foi a borda" é o erro mais fácil de
+> cometer com este catálogo.
+
+**A regra geral que vale sempre:** se a resposta traz **qualquer** cabeçalho `X-` da tabela acima,
+foi a borda. Nenhum serviço os emite.
+
+> **Corpo da resposta.** Desde 2026-09-04, quando a recusa é **erro de quem chamou** — cabeçalho
+> ausente, cabeçalhos conflitantes, formato inválido —, **o motivo vem no corpo e também em
+> `X-Blocked-Reason`**. Quando a recusa é **detecção de ataque**, o corpo continua opaco e o motivo
+> **não** é revelado: dizer ao atacante qual padrão disparou a defesa é ajudá-lo a contorná-la.
+> Documentação que descreva as recusas da borda como "corpo sempre vazio" está desatualizada.
+
+---
+
+## 401 — falta o cabeçalho de identificação
+
+| Situação | Correção |
+|---|---|
+| não veio nem `X-Tenant-Id` nem `X-Forger-Credential` | mande **um** dos dois |
+| rota de execução sem `X-Tenant-Id` | rotas de persistência, coordenação e arquivos exigem `X-Tenant-Id` |
+| rota administrativa sem `X-Forger-Credential` | as demais rotas exigem `X-Forger-Credential` |
+
+Ver a tabela de qual rota exige qual em [README.md](README.md#cabeçalhos-de-identificação--exatamente-um-nunca-dois).
+
+## 400 — cabeçalhos conflitantes, formato inválido, ou conteúdo recusado
+
+| Situação | Como reconhecer | Correção |
+|---|---|---|
+| **`X-Tenant-Id` e `X-Forger-Credential` enviados juntos** | motivo no corpo e em `X-Blocked-Reason` | mande **exatamente um**. É o erro mais comum contra a borda |
+| formato do tenant ou da credencial fora do padrão | motivo no corpo | conferir o valor; a borda valida a forma antes de encaminhar |
+| conteúdo com padrão de injeção (SQL, script, travessia de caminho, caracteres de controle) | **só `X-Security-Warning`**, sem motivo | revisar o que está sendo enviado. **O corpo não dirá qual padrão disparou** |
+
+## 403 — três origens diferentes, e os cabeçalhos as separam
+
+| Origem | Como reconhecer |
+|---|---|
+| **origem não autorizada** a acessar a plataforma | `X-Blocked-Reason` |
+| **endpoint administrativo** chamado de origem não autorizada | `X-Blocked-Reason` |
+| **origem banida** por reincidência (ver abaixo) | `X-RateLimit-…` — **não** `X-Blocked-*` |
+| caminho marcado como não protegido | `X-Security-Warning` |
+
+> **`403` sem nenhum desses cabeçalhos não veio da borda** — veio do servidor de entrada à frente
+> dela, que recusa caminhos sem rota publicada **antes** de a requisição chegar aqui. É um sintoma
+> diferente, com correção diferente: falta publicar a rota lá, não aqui.
+
+## 404 — a borda não reconheceu a rota
+
+**Este é o `404` que mais engana**, porque é indistinguível, à primeira vista, do `404` de um recurso
+inexistente dentro do serviço. O corpo é genérico e **não revela** quais rotas existem.
+
+| Causa | Correção |
+|---|---|
+| segundo segmento do caminho não é um serviço conhecido | conferir o nome do serviço no caminho |
+| **falta um segmento obrigatório** depois do serviço | vários serviços exigem um terceiro segmento; sem ele, a borda recusa **antes** de chegar ao serviço |
+| a rota não existe **naquele ambiente** | a mesma chamada pode funcionar em outro ambiente |
+
+> **Regra de bolso:** `404` **com** `X-Blocked-By` e `X-Blocked-Reason` veio da borda e o serviço
+> nunca soube da requisição. `404` **sem** esses cabeçalhos veio do serviço, e aí sim o recurso é que
+> não existe.
+
+## 413 — corpo ou cabeçalhos grandes demais
+
+Reconhece-se por **`X-Size-Limit-Exceeded: true`**, acompanhado de `X-Max-Size-Allowed` e
+`X-Actual-Size` — que dizem, em números, o teto e o que foi recebido.
+
+O teto **varia por serviço de destino**, e não é um número único da plataforma. Serviços que recebem
+carga binária (publicação de artefatos, anexos) têm teto próprio, maior.
+
+> **Caminho que a borda não reconhece cai no teto mais restritivo.** Um `413` inesperado em rota nova
+> costuma ser sintoma de **rota não publicada**, não de payload realmente grande.
+
+Um `413` **sem** `X-Size-Limit-Exceeded` veio do servidor de entrada à frente da borda, não daqui.
+
+## 431 — cabeçalhos grandes demais
+
+A soma dos cabeçalhos excedeu o teto. Costuma ser efeito de token muito grande ou de acúmulo de
+cabeçalhos de rastreamento adicionados em cadeia.
+
+## 429 — vazão excedida
+
+Reconhece-se pelos cabeçalhos `X-RateLimit-…`. Dois limites independentes, mesma resposta:
+
+| Limite | Quando aparece |
+|---|---|
+| por **origem** | proteção de infraestrutura contra volume anômalo |
+| por **tenant** | limite da aplicação, configurável |
+
+Reduza a taxa. Se o volume é legítimo e recorrente, o limite por tenant é ajustável — o por origem
+não deve ser contornado.
+
+> **Insistir depois do `429` muda o código, não só o corpo.** Origem que continua chamando passa a
+> receber **`403`** (banimento), também com `X-RateLimit-…`. Quem só trata `429` no cliente vê o
+> erro "mudar de natureza" sem explicação.
+
+## Reincidência — banimento por tempo
+
+Origens que insistem em **caminhos inexistentes** são marcadas como suspeitas e, na sequência,
+**banidas por 7 dias** (padrão configurável). Um cliente legítimo não chega lá; um varredor, sim.
+
+Se um ambiente de testes começar a receber recusa em tudo depois de uma bateria de chamadas a
+caminhos errados, é este mecanismo. A correção é **parar de gerar os caminhos errados** — não
+aumentar limite.
+
+## 503 — serviço indisponível
+
+O serviço de destino não está registrado, ou o **disjuntor** daquele serviço está aberto após falhas
+sucessivas. A borda respondeu porque não havia a quem encaminhar. **Vem com corpo em JSON** dizendo
+qual serviço e qual caminho — diferente das recusas de segurança, que são deliberadamente econômicas.
+
+---
+
+## Erro de origem cruzada no navegador
+
+Sintoma: o navegador recusa a resposta alegando **mais de um valor** para o cabeçalho de origem
+permitida.
+
+Causa: o serviço emitiu os seus próprios cabeçalhos de origem cruzada **além** dos da borda. A borda
+**remove** os do serviço e aplica os seus antes de a resposta ser escrita — mas serviço que os emita
+em caminho não coberto ainda produz duplicidade.
+
+Correção: **o serviço para de emitir cabeçalhos de origem cruzada.** Não é ajuste na borda.
+
+---
+
+## Serviços que **não** passam pela borda
+
+Nem todo serviço da plataforma fica atrás da borda. O de **arquivos estáticos** responde por um
+domínio próprio, direto no servidor de entrada.
+
+**Consequência para o diagnóstico:** uma resposta dele **nunca** traz cabeçalho da borda — e a
+ausência deles ali **não** significa "a borda deixou passar", significa que **a borda nunca viu a
+requisição**. Não generalize a regra de bolso deste catálogo para domínios que não sejam o da API.
+
+<!-- ===== gateway/exemplos.md ===== -->
+
+# gateway — exemplos
+
+> Exemplos do que a **borda** faz com uma requisição antes de ela chegar ao serviço. Para os
+> endpoints de cada serviço, ver o `exemplos.md` do serviço.
+> Voltar ao [guia da borda](README.md) · [catálogo de erros](erros.md).
+
+## Requisição bem formada
+
+Exatamente **um** cabeçalho de identificação. Rota de execução → `X-Tenant-Id`:
+
+```bash
+curl -X POST "$BORDA/v3/persistence/c/e" \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-Id: 550e8400-e29b-41d4-a716-446655440000" \
+  -d '{ }'
+```
+
+Rota administrativa → `X-Forger-Credential`:
+
+```bash
+curl "$BORDA/v3/forger/..." \
+  -H "X-Forger-Credential: <credencial>"
+```
+
+## Os dois cabeçalhos juntos — recusado
+
+```bash
+curl "$BORDA/v3/persistence/c/e" \
+  -H "X-Tenant-Id: <tenant>" \
+  -H "X-Forger-Credential: <credencial>"      # ← os dois: erro
+```
+
+Devolve **`400`**, com o motivo no corpo e `X-Blocked-By` nos cabeçalhos. Mandar os dois **não** é
+mais permissivo que mandar um: é recusa.
+
+## Distinguir o `404` da borda do `404` do serviço
+
+Inspecione os cabeçalhos de resposta — é a única forma confiável:
+
+```bash
+curl -sS -o /dev/null -D - "$BORDA/v3/<servico>/<caminho>" \
+  -H "X-Tenant-Id: <tenant>" | grep -i "^HTTP/\|^x-blocked"
+```
+
+| Saída | Leitura |
+|---|---|
+| `HTTP/1.1 404` **+** `x-blocked-by:` … | a **borda** recusou; o serviço nunca foi chamado |
+| `HTTP/1.1 404` **sem** `x-blocked-*` | o **serviço** respondeu; o recurso é que não existe |
+
+## Segmento obrigatório faltando
+
+Vários serviços exigem um segmento além do nome. O caminho abaixo parece plausível e mesmo assim
+morre na borda:
+
+```bash
+# sem o segmento obrigatório depois do serviço → 404 DA BORDA
+curl "$BORDA/v3/persistence/logs/..."   -H "X-Tenant-Id: <tenant>"
+
+# com o segmento → chega ao serviço
+curl "$BORDA/v3/persistence/c/logs/..." -H "X-Tenant-Id: <tenant>"
+```
+
+Se o `404` trouxer `X-Blocked-By`, é este caso — não adianta investigar o serviço.
+
+## Corpo grande
+
+```bash
+curl -X POST "$BORDA/v3/<servico>/<caminho>" \
+  -H "X-Forger-Credential: <credencial>" \
+  --data-binary @arquivo.zip
+```
+
+`413` **com `X-Size-Limit-Exceeded: true`** veio da borda — e vem acompanhado de
+`X-Max-Size-Allowed` e `X-Actual-Size`, que dizem em números o teto e o que foi recebido. `413`
+**sem** esse cabeçalho veio do servidor de entrada à frente dela.
+
+> **Não procure `X-Blocked-By` aqui — ele não aparece em resposta de tamanho.** Cada verificação
+> da borda assina com um cabeçalho próprio.
+
+O teto **varia por serviço**: rotas que recebem carga binária têm teto maior que rotas de JSON, e
+caminho que a borda não reconhece cai no teto mais restritivo.
+
+## Verificar se a borda está no ar
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' "$BORDA/"
+```
+
+Responder **não** significa que a plataforma está sã: a borda pode estar de pé com serviços
+indisponíveis atrás dela — nesse caso as rotas devolvem `503`. Para saber se um serviço específico
+responde, chame um endpoint dele.
 
 <!-- ===== CHANGELOG.md ===== -->
 
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.19 — 2026-09-05
+
+- **A resposta passa a dizer quando veio cortada.** Toda consulta tem teto — o `_maxRegisters` que você
+  mandou, ou o padrão (**500** no modo array, **1000** no modo objeto). Até aqui o corte era invisível:
+  uma lista de 500 itens era indistinguível de uma tabela com 500 registros, e a tela mostrava uma parte
+  acreditando ser o todo. Agora, **quando há mais além do teto**, o item da resposta traz
+  `_truncated: true` e `_maxRegisters`. A marca só aparece quando sobrou algo — **a ausência dela é a
+  garantia de que a lista está inteira**, inclusive quando ela tem exatamente o tamanho do teto. Ao
+  percorrer as chaves do item, pule as que começam com `_`: o rótulo da entidade é a que não começa.
+
+- **`_count` devolve `totalRegisters` — o campo que a doc prometia e o código nunca escrevia.** A
+  contagem vinha como número solto sob o rótulo, e a constante do nome existia sem nenhum uso: quem
+  seguia a doc procurava um campo que não chegava, sem erro para denunciar. Agora a resposta é
+  `{"<rótulo>": {"totalRegisters": N}}`, respeitando o mesmo filtro da consulta. É o caminho para saber
+  quantos existem antes de decidir como paginar.
+
+- **`204` volta a existir no modo objeto.** A decisão usava o número de **consultas** do lote, que é
+  sempre ≥ 1 — então resultado vazio saía como `200` com `[{"<rótulo>": []}]`, contrariando a garantia
+  publicada. O modo array já fazia a verificação certa; agora os dois fazem.
+
+- **A seção "Garantias da resposta" dizia "registros encontrados", e isso afirmava completude.** Sob
+  truncamento a frase era falsa, e a página do endpoint sequer mencionava a existência de um teto — o
+  aviso morava só em `query-controls.md`, e o ponteiro daqui apontava para o vazio. A garantia foi
+  reescrita, o teto e a marca de corte entraram na página do endpoint, e a descrição do `200` no
+  contrato de máquina (`openapi.yaml`) deixou de omiti-los.
+
+- **`_associations`, `_populating`, `_level` e `_as` saíram da doc: nenhum deles é lido pelo código.**
+  A página os descrevia como o jeito de popular relacionados, inclusive com "profundidade de
+  população" — os quatro eram inertes, e como toda chave `_` é isenta da validação de vocabulário, nem
+  `400` havia. No lugar entrou o mecanismo real: a associação vem junto quando entra no critério, como
+  objeto aninhado sob o nome dela.
+
+- **Critério de associação com mais de um item passa a ser `400`.** Só o primeiro era visitado; os
+  demais eram descartados em silêncio e a resposta parecia completa. Enquanto atender vários não for
+  possível, a recusa é explícita — "envie uma consulta por item".
+
+## 1.18 — 2026-09-05
+
+- **Os controles de consulta são irmãos do rótulo, não filhos dele — a doc dizia o contrário.** A página
+  mandava pôr `_paging`, `_sorting`, `_count`, `_connective` e `_cache` **dentro** do objeto do rótulo;
+  o motor os lê no **mesmo nível** do rótulo. Quem seguiu a doc não recebeu erro: o controle era
+  **ignorado em silêncio** e a consulta rodava com o padrão — página de 50 virava a página padrão,
+  `OR` virava `AND`. A validação de nome de atributo não pega isso, porque isenta toda chave `_`. É a
+  correção mais importante desta revisão: qualquer cliente escrito pela página anterior está com os
+  controles inertes. Atualizados [`persistence-q/query-controls.md`](persistence-q/query-controls.md) e
+  [`persistence-q/endpoints/consulta.md`](persistence-q/endpoints/consulta.md).
+
+- **Controle que a plataforma não vai honrar passa a ser `400` na entrada.** Sete situações que antes
+  saíam como `510` de origem obscura, ou — pior — rodavam devolvendo coisa diferente da pedida:
+  `_connective` fora de `AND`/`OR` maiúsculo corrompia o filtro; `_paging` pela metade (inclusive `{}`)
+  produzia consulta **sem limite nenhum**, trazendo a tabela inteira; `_sorting` na forma plana era
+  aceito e a consulta saía **sem ordenação**, sem aviso; `_order` fora de `ASC`/`DESC` e `_orderBy` fora
+  do modelo iam crus para dentro da ordenação; `in` com lista vazia estourava; operador diferente de
+  `eq`/`like`/`ilike` num atributo `Json` virava **igualdade em silêncio** — quem pedia `gt` recebia o
+  resultado de `=`. E `_count` numa consulta simples produzia consulta inválida. Todos recusados ou
+  corrigidos, com mensagem que nomeia o controle e diz a forma esperada.
+
+- **O que o motor sempre fez e a página nunca contou.** Passa a estar documentado: o operador
+  `distinct`; o limite padrão quando `_paging` é omitido (**500** no modo array, **1000** no modo
+  objeto) — omitir não traz tudo; o `%` **obrigatório** em `like`/`ilike` e a restrição a atributo
+  textual; o `%` num valor simples virando busca textual **sem você pedir**; a forma indexada do
+  `_sorting` e o fato de só `"0"`, `"1"` e `"2"` serem lidos; entidade particionada **ignorando** o seu
+  `_orderBy`; a **faixa** formada por dois operadores no mesmo atributo (só `gt`/`gte` com `lt`/`lte`) e
+  a chave `CONNECTIVE` em maiúsculas que inverte a junção dela; o `_connective` ser **global** e
+  propagar para associações e componentes; valor vazio não virando filtro **nem coluna** no resultado; o
+  `_ttl` obrigatório com `_cache: use`; `_cache` sem `_behavior` sendo ignorado e comportamento
+  desconhecido sendo `400`.
+
+- **`_cache`: a chave inclui os controles que você mandou, e o `evict` voltou a funcionar.** A chave da
+  entrada é formada **antes** de `_paging`, `_sorting`, `_connective` e `_count` serem retirados — então
+  a mesma consulta gravada **com** `_paging` explícito e relida **sem** ele produz chaves diferentes, e o
+  resultado não é reaproveitado. O `evict` deixou de ser inócuo: ele e o `use` passaram a formar a chave
+  do mesmo jeito, então a invalidação alcança o que foi gravado (desde que mandada com os mesmos
+  controles). O aviso sobre o `use` foi reescrito para descrever o que de fato acontece: na **falta** a
+  resposta vem **sem os registros e a consulta sequer é executada** (o serviço não distingue "não achei"
+  de "achei"); no **acerto** o cliente recebe o invólucro da entrada; e no **modo objeto** ainda sobra um
+  segundo item, porque a consulta roda mesmo assim.
+
+- **O rótulo é o nome exato da projeção.** Os exemplos usavam o plural (`"pedidos"`), que só funciona se
+  a projeção tiver sido modelada com esse nome. Corrigidos para o nome no singular, e a regra ficou
+  escrita: rótulo fora do modelo é `400`, com a lista dos nomes declarados na mensagem.
+
+- **O estado `RUNNING` é conferido uma vez por tenant em cada instância, não a cada consulta.** A página
+  apresentava a checagem como se valesse por requisição. Não vale: depois da primeira requisição daquele
+  tenant, a instância continua atendendo sem reavaliar o estado. Então **voltar o modelo para edição não
+  interrompe** quem já está sendo atendido, e a mesma mudança pode "pegar" numa instância e não noutra.
+  Atualizado [`persistence-q/README.md`](persistence-q/README.md).
 
 ## 1.17 — 2026-09-05
 

@@ -26,7 +26,7 @@ paths:
                 - { $ref: '#/components/schemas/Criterio' }
       responses:
         '200':
-          description: "Array no topo, mesma ordem dos critérios; itens vazios como []."
+          description: "Array no topo, mesma ordem dos critérios; itens vazios como []. A lista é limitada por um teto (o _maxRegisters enviado, ou o padrão: 500 no modo array, 1000 no modo objeto); quando há mais além do teto, o item traz _truncated: true e _maxRegisters. A ausência de _truncated significa lista inteira."
           content: { application/json: { schema: { type: array, items: { type: object } } } }
         '204': { description: Todos os critérios vazios }
         '400': { $ref: '#/components/responses/BadRequest' }

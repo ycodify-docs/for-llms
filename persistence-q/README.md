@@ -11,6 +11,7 @@
 - Ciclo de vida de uma consulta
 - Depois de um comando, espere antes de consultar
 - Linguagem de consulta (resumo)
+- Recorte de leitura por titular
 - Pontos de coordenação
 - Pitfalls
 
@@ -22,10 +23,15 @@
 - **Autorização de tenant:** o `tenant-id` deve pertencer ao usuário; senão → `403`.
 - **Vocabulário do tenant:** os identificadores de consulta e predicados válidos são definidos pelo
   **model**/projeções provisionados para o tenant (não inventar predicados).
-- **Dataschema em `RUNNING`:** a consulta **só é interpretada/executada** se o dataschema do tenant
-  estiver em `RUNNING`. Em `MODELING` (esquema em edição) a interpretação **não ocorre**. Ver
-  [forger/dataschema — gate de status](../forger/endpoints/dataschema.md#atualizar).
-- **Spec carregada por-instância (cache):** a cada consulta o serviço resolve a spec do tenant igual ao
+- **Dataschema em `RUNNING`, verificado uma vez por instância:** a consulta só é atendida se o
+  dataschema do tenant estiver em `RUNNING` — mas essa checagem acontece **na primeira requisição
+  daquele tenant em cada instância do serviço**, não a cada consulta. Depois disso a instância atende o
+  tenant sem reavaliar o estado. Consequência: **voltar o dataschema para `MODELING` não interrompe**
+  quem já está sendo atendido, e a mesma mudança pode "pegar" numa instância e não noutra. Se a
+  alteração precisa valer imediatamente em todo lugar, trate-a como operação de implantação. Ver
+  [forger/dataschema — gate de status](../forger/endpoints/dataschema.md#atualizar) e
+  [query-controls §Quando o modelo é lido](query-controls.md#quando-o-modelo-é-lido).
+- **Spec carregada por-instância (cache):** o serviço resolve a spec do tenant igual ao
   write-side — dataschema `RUNNING` via Forger → memória local → **serviço de cache** (`../cache`) →
   **se falta no cache, a consulta falha** (`510`, "republique o modelo"). **Não há recuperação
   automática a partir do Forger:** o modelo entra no cache **só** quando é publicado, e a entrada
@@ -103,6 +109,30 @@ Consequências práticas:
 
 Detalhe e exemplos: [endpoints/consulta.md](endpoints/consulta.md).
 
+## Recorte de leitura por titular
+
+Uma entity pode declarar que um **papel** lê apenas as linhas de que o usuário é **titular**. Quando
+isso está declarado, o serviço acrescenta o recorte ao critério que você enviou — não é preciso pedi-lo,
+e não é possível desligá-lo.
+
+- **Quem não declara não muda.** Entity sem a declaração responde exatamente como antes.
+- **É por papel, na mesma entity.** Um papel pode ler a tabela inteira e outro só as linhas dele.
+- **Vários papéis: o menos restritivo vence.** Se qualquer papel autorizado do usuário está fora do
+  recorte, não há recorte — quem acumula um papel amplo não é cortado pelo papel menor.
+- **O recorte não negocia com o seu critério.** O que você envia fica isolado, e o recorte entra por
+  "E": `_connective: "OR"` **não** o transforma em alternativa, e um `ilike` amplo continua recortado.
+- **`_count` conta o conjunto já recortado**, não a tabela.
+- **`204` continua significando "nenhum resultado".** Sob recorte, lista vazia pode querer dizer
+  "nenhuma linha é sua" — não é erro, e não há como distinguir os dois casos pela resposta.
+- **Recorte em entity alcançada por associação muda o conjunto devolvido.** Se a entity **associada**
+  é a que declara o recorte, o filtro dela entra no `WHERE` — não no `ON` do join. Consequência: a linha
+  principal cuja associação **não é sua** (ou é nula) **não aparece**, em vez de aparecer com a
+  associação vazia. Não é vazamento — é mais restritivo —, mas quem espera "o associado aparece, o
+  professor vem em branco" recebe outra coisa.
+
+Quem **declara** a chave é o forger, no `_conf` da entity — ver
+[forger — entity](../forger/endpoints/entity.md). Aqui só se descreve o efeito na **consulta**.
+
 ## Pontos de coordenação
 - **CP-2** — consulta as projeções (tabelas) criadas pelo forger.
 - **CP-5** — lê o que o fluxo es-n → projeção mantém atualizado.
@@ -116,3 +146,5 @@ Ver [coordenação](../coordenacao.md).
 - [ ] Tolerar **atraso de propagação**: logo após um comando, a projeção pode ainda não refletir a
       mudança (atualização assíncrona).
 - [ ] Tratar `204` como "nenhum resultado", não como erro.
+- [ ] Sob **recorte por titular**, não concluir "a tabela está vazia" a partir de uma lista vazia — ela
+      pode significar apenas "nenhuma linha é sua".

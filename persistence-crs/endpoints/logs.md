@@ -43,8 +43,8 @@ log ler.
 Corpo sem `secret` é **`400`** (erro de payload), não `403` — quem errou o corpo precisa saber disso.
 Segredo que não confere é `403`. Não existe modo aberto por omissão.
 
-> ⚠️ **Mande `X-Tenant-Id` sozinho — nunca junto com `X-Forger-Credential`.** O gateway recusa qualquer
-> requisição que traga os dois cabeçalhos ao mesmo tempo, com **`400`** e corpo vazio, **antes** de chegar
+> ⚠️ **Mande `X-Tenant-Id` sozinho — nunca junto com `X-Forger-Credential`.** A borda da plataforma recusa
+> qualquer requisição que traga os dois cabeçalhos ao mesmo tempo, com **`400`**, **antes** de chegar
 > a este serviço (violação `multiple_headers`). Como o caminho fica sob `/v3/persistence/`, ele é
 > rota-de-engine: identifica-se pelo tenant, não pela credencial. É um erro fácil de cometer, porque a
 > credencial é o que se usa em outras rotas da plataforma — e o `400` resultante **não** vem deste
@@ -146,6 +146,12 @@ Respostas que se deve esperar deste comando, e o que cada uma significa:
 - **O alcance da consulta termina na rotação do arquivo, não no início do serviço.** O arquivo de log é
   rotacionado por tamanho e por idade; um recorte temporal que caia antes da rotação não acha nada, mesmo
   que o serviço estivesse no ar naquele momento.
+- ⚠️ **`204` não distingue "não houve" de "a rotação levou".** A resposta é a mesma nos dois casos, e o
+  endpoint não tem como dizer qual foi. Antes de concluir que a operação procurada não aconteceu, verifique
+  se o recorte pedido ainda está dentro da janela que o arquivo cobre.
+- ⚠️ **O teto de 5000 registros é do endpoint, não do tamanho do arquivo.** Um recorte largo devolve
+  `truncated: true` mesmo num arquivo pequeno — e o que vem são os **primeiros** registros que casaram, não
+  uma amostra. Estreite o recorte ou o termo; aumentar a retenção do arquivo não muda isto.
 - A consulta é **somente leitura** e não altera estado.
 - O alcance é o do **próprio serviço**: registros anteriores ao início do serviço em execução podem não estar
   disponíveis.
@@ -163,7 +169,7 @@ Respostas que se deve esperar deste comando, e o que cada uma significa:
 
 | Código | De onde vem | Quando |
 |---|---|---|
-| `400` **com corpo vazio** | gateway | `X-Tenant-Id` e `X-Forger-Credential` enviados juntos (ver aviso no topo). O `400` deste endpoint sempre traz corpo. |
+| `400` **da borda** | antes deste endpoint | `X-Tenant-Id` e `X-Forger-Credential` enviados juntos (ver aviso no topo). O corpo **traz o motivo** quando a recusa é erro de quem chamou |
 | `403` **com `{"error":"Forbidden","message":"Access denied."}`** | borda da plataforma | o caminho não está publicado no ambiente consultado |
 | `404` **do gateway** | borda da plataforma | faltou o `c` no caminho (`/v3/persistence/logs/...` em vez de `/v3/persistence/c/logs/...`) |
 | `404` | fallback do gateway | a rota não casou — caminho digitado errado, ou ambiente sem a rota |

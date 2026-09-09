@@ -71,13 +71,22 @@
 - [upload](filer/endpoints/upload.md) · [download](filer/endpoints/download.md) · [listar](filer/endpoints/listar.md) · [remover](filer/endpoints/remover.md)
 - [Erros](filer/erros.md) · [Exemplos](filer/exemplos.md) · [OpenAPI](filer/openapi.yaml)
 
+## cache (modelo publicado em memória) — serviço interno
+- [Guia](cache/README.md): papel de **cache distribuído**; guarda o **modelo publicado** de cada tenant (chaves de write-model e read-model) que os serviços de execução leem em runtime. **Sem endpoint público** — não há prefixo `/v3/cache`; é acessado internamente pela plataforma, não pelo cliente. Quem grava é o [forger](forger/README.md) ao publicar o `.model.json`; quem lê são [persistence-crs](persistence-crs/README.md) e [persistence-q](persistence-q/README.md), com TTL e self-heal.
+
 ## shell (casca universal + BFF) — camada de aplicação
 - [Guia](shell/README.md): a aplicação única para todos os clientes; casca fixa + BFF; fronteira casca↔miolo; consome os oito serviços via BFF.
 - [Contrato casca↔miolo](shell/contrato-miolo.md): `MioloModule`, `hostContext`, modelo de capacidade.
 - [Injeção do miolo](shell/injecao.md): federação de módulos, resolução tenant→remoto, de onde vem o build do miolo.
 - [Estilo](shell/estilo.md): tokens semânticos, tema claro/escuro, marca sobrescrevível por tenant.
 - [Segurança](shell/seguranca.md): segredo só no BFF; capacidade = UX; revalidação no servidor.
-- [BFF](shell/bff.md): endpoints e contratos.
+- [BFF — endpoints e contratos](bff/README.md): sessão e `401` com `reason`; capacidade; resolução do miolo; proxy de domínio (comando, consulta, agregado, histórico); quem autoriza a **leitura**; `paging` obrigatório na prática; autocadastro `/ua/*`; erros.
+- [BFF (página antiga)](shell/bff.md): ponteiro para `bff/README.md` — mantido porque outras páginas de `shell/` ainda apontam para ele.
+
+## gateway (borda da plataforma) — por onde toda requisição entra
+- [Guia da borda](gateway/README.md): o que a borda decide antes de o serviço ser chamado; a regra de **um só** cabeçalho de identificação (`X-Tenant-Id` **ou** `X-Forger-Credential`, nunca os dois); forma dos caminhos.
+- [Erros da borda](gateway/erros.md): **quem produziu a resposta** — borda ou serviço. Como distinguir o `404` da borda do `404` do serviço pelos cabeçalhos `X-Blocked-By`/`X-Blocked-Reason`; `401`/`400` de cabeçalho; `413` por serviço; `429`; `503`; CORS duplicado.
+- [Exemplos](gateway/exemplos.md): requisição bem formada, o erro comum de mandar os dois cabeçalhos, e como inspecionar a resposta para saber a origem do erro.
 
 ## Exemplos
 - [Modelos de domínio](examples/README.md): 6 modelos `.model.json` (1 curado + 5 reais sanitizados), com fluxo ponta a ponta.

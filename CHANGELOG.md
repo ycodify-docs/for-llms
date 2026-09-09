@@ -2,6 +2,149 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.21 — 2026-09-06
+
+- **Errata na doc da borda: cada verificação assina com um cabeçalho próprio.** A versão 1.20 dizia
+  que resposta da borda se reconhece por `X-Blocked-By`. **É falso para tamanho e para vazão:** um
+  `413` da borda traz `X-Size-Limit-Exceeded` (com `X-Max-Size-Allowed` e `X-Actual-Size`), e um `429`
+  traz `X-RateLimit-…`. Quem procurasse `X-Blocked-By` num `413` não o acharia e concluiria que a
+  resposta veio do servidor de entrada — errando exatamente no discriminador que a página existe para
+  dar.
+
+- **Insistir depois do `429` muda o código para `403`.** Origem que continua chamando é banida por
+  **7 dias** e passa a receber `403` com `X-RateLimit-…`, não `429`. Cliente que só trata `429` vê o
+  erro mudar de natureza sem explicação.
+
+- **A ordem das verificações não é a intuitiva, e muda o erro que você recebe.** A checagem de rota é
+  das **últimas**, não das primeiras: caminho inexistente **com corpo grande** recebe `413`, não
+  `404` — e como caminho desconhecido cai no teto mais restritivo, o `413` aparece com folga. Quem
+  receber `413` em rota nova deve conferir **se a rota está publicada** antes de olhar o payload.
+
+- **`403` tem quatro origens distintas**, e os cabeçalhos as separam — inclusive uma que **não é da
+  borda**: `403` sem nenhum cabeçalho `X-` vem do servidor de entrada, que recusa caminho sem rota
+  publicada antes de a requisição chegar à borda. Correção diferente, lugar diferente.
+
+- **Nem todo serviço fica atrás da borda.** O de arquivos estáticos responde por domínio próprio.
+  Ausência de cabeçalho da borda ali **não** significa que ela deixou passar — significa que ela
+  nunca viu a requisição.
+
+- **A isenção de cabeçalho para canal persistente vale para caminhos nomeados**, não para "qualquer
+  canal": a 1.20 generalizava, e abrir canal em outra rota é recusado como qualquer requisição.
+
+## 1.20 — 2026-09-06
+
+- **A borda ganha documentação própria, e ela responde a uma pergunta que hoje não tem resposta:
+  quem produziu este erro?** Uma recusa da borda e uma recusa do serviço chegam pelo mesmo canal e,
+  em vários casos, com o **mesmo código HTTP** — e quem investiga procura o defeito no serviço que
+  nunca foi chamado. O novo [catálogo de erros da borda](gateway/erros.md) dá o discriminador: os
+  cabeçalhos `X-Blocked-By` e `X-Blocked-Reason` só existem em resposta gerada pela borda. `404` com
+  eles é rota não reconhecida antes do encaminhamento; `404` sem eles é recurso inexistente dentro do
+  serviço. Vale igual para o `413`, que pode vir da borda ou do proxy à frente dela.
+
+- **A regra de um só cabeçalho de identificação passa a estar escrita.** Toda requisição carrega
+  `X-Tenant-Id` **ou** `X-Forger-Credential` — **nunca os dois, nunca nenhum** —, e qual dos dois
+  depende da rota: execução exige o tenant, administração exige a credencial, autenticação aceita
+  qualquer um. Mandar os dois não é mais permissivo: é `400`. Era o erro mais comum contra a borda e
+  só estava documentado de lado, dentro da página de outro serviço.
+
+- **Errata de comportamento:** desde 2026-09-04 a borda **põe o motivo no corpo** quando a recusa é
+  erro de quem chamou (cabeçalho ausente, cabeçalhos conflitantes, formato inválido). Detecção de
+  ataque continua opaca de propósito. Descrições de que a borda responde sempre com corpo vazio
+  estão desatualizadas.
+
+- **Escopo declarado:** a borda **não tem endpoint próprio exposto ao cliente**, então não há
+  `endpoints/` — os endpoints administrativos dela são restritos por origem e ficam fora da
+  convenção, que cobre apenas endpoints autenticados e expostos ao cliente. Segue o precedente de
+  `cache`, componente sem rota pública que também é documentado por guia.
+
+## 1.19 — 2026-09-05
+
+- **A resposta passa a dizer quando veio cortada.** Toda consulta tem teto — o `_maxRegisters` que você
+  mandou, ou o padrão (**500** no modo array, **1000** no modo objeto). Até aqui o corte era invisível:
+  uma lista de 500 itens era indistinguível de uma tabela com 500 registros, e a tela mostrava uma parte
+  acreditando ser o todo. Agora, **quando há mais além do teto**, o item da resposta traz
+  `_truncated: true` e `_maxRegisters`. A marca só aparece quando sobrou algo — **a ausência dela é a
+  garantia de que a lista está inteira**, inclusive quando ela tem exatamente o tamanho do teto. Ao
+  percorrer as chaves do item, pule as que começam com `_`: o rótulo da entidade é a que não começa.
+
+- **`_count` devolve `totalRegisters` — o campo que a doc prometia e o código nunca escrevia.** A
+  contagem vinha como número solto sob o rótulo, e a constante do nome existia sem nenhum uso: quem
+  seguia a doc procurava um campo que não chegava, sem erro para denunciar. Agora a resposta é
+  `{"<rótulo>": {"totalRegisters": N}}`, respeitando o mesmo filtro da consulta. É o caminho para saber
+  quantos existem antes de decidir como paginar.
+
+- **`204` volta a existir no modo objeto.** A decisão usava o número de **consultas** do lote, que é
+  sempre ≥ 1 — então resultado vazio saía como `200` com `[{"<rótulo>": []}]`, contrariando a garantia
+  publicada. O modo array já fazia a verificação certa; agora os dois fazem.
+
+- **A seção "Garantias da resposta" dizia "registros encontrados", e isso afirmava completude.** Sob
+  truncamento a frase era falsa, e a página do endpoint sequer mencionava a existência de um teto — o
+  aviso morava só em `query-controls.md`, e o ponteiro daqui apontava para o vazio. A garantia foi
+  reescrita, o teto e a marca de corte entraram na página do endpoint, e a descrição do `200` no
+  contrato de máquina (`openapi.yaml`) deixou de omiti-los.
+
+- **`_associations`, `_populating`, `_level` e `_as` saíram da doc: nenhum deles é lido pelo código.**
+  A página os descrevia como o jeito de popular relacionados, inclusive com "profundidade de
+  população" — os quatro eram inertes, e como toda chave `_` é isenta da validação de vocabulário, nem
+  `400` havia. No lugar entrou o mecanismo real: a associação vem junto quando entra no critério, como
+  objeto aninhado sob o nome dela.
+
+- **Critério de associação com mais de um item passa a ser `400`.** Só o primeiro era visitado; os
+  demais eram descartados em silêncio e a resposta parecia completa. Enquanto atender vários não for
+  possível, a recusa é explícita — "envie uma consulta por item".
+
+## 1.18 — 2026-09-05
+
+- **Os controles de consulta são irmãos do rótulo, não filhos dele — a doc dizia o contrário.** A página
+  mandava pôr `_paging`, `_sorting`, `_count`, `_connective` e `_cache` **dentro** do objeto do rótulo;
+  o motor os lê no **mesmo nível** do rótulo. Quem seguiu a doc não recebeu erro: o controle era
+  **ignorado em silêncio** e a consulta rodava com o padrão — página de 50 virava a página padrão,
+  `OR` virava `AND`. A validação de nome de atributo não pega isso, porque isenta toda chave `_`. É a
+  correção mais importante desta revisão: qualquer cliente escrito pela página anterior está com os
+  controles inertes. Atualizados [`persistence-q/query-controls.md`](persistence-q/query-controls.md) e
+  [`persistence-q/endpoints/consulta.md`](persistence-q/endpoints/consulta.md).
+
+- **Controle que a plataforma não vai honrar passa a ser `400` na entrada.** Sete situações que antes
+  saíam como `510` de origem obscura, ou — pior — rodavam devolvendo coisa diferente da pedida:
+  `_connective` fora de `AND`/`OR` maiúsculo corrompia o filtro; `_paging` pela metade (inclusive `{}`)
+  produzia consulta **sem limite nenhum**, trazendo a tabela inteira; `_sorting` na forma plana era
+  aceito e a consulta saía **sem ordenação**, sem aviso; `_order` fora de `ASC`/`DESC` e `_orderBy` fora
+  do modelo iam crus para dentro da ordenação; `in` com lista vazia estourava; operador diferente de
+  `eq`/`like`/`ilike` num atributo `Json` virava **igualdade em silêncio** — quem pedia `gt` recebia o
+  resultado de `=`. E `_count` numa consulta simples produzia consulta inválida. Todos recusados ou
+  corrigidos, com mensagem que nomeia o controle e diz a forma esperada.
+
+- **O que o motor sempre fez e a página nunca contou.** Passa a estar documentado: o operador
+  `distinct`; o limite padrão quando `_paging` é omitido (**500** no modo array, **1000** no modo
+  objeto) — omitir não traz tudo; o `%` **obrigatório** em `like`/`ilike` e a restrição a atributo
+  textual; o `%` num valor simples virando busca textual **sem você pedir**; a forma indexada do
+  `_sorting` e o fato de só `"0"`, `"1"` e `"2"` serem lidos; entidade particionada **ignorando** o seu
+  `_orderBy`; a **faixa** formada por dois operadores no mesmo atributo (só `gt`/`gte` com `lt`/`lte`) e
+  a chave `CONNECTIVE` em maiúsculas que inverte a junção dela; o `_connective` ser **global** e
+  propagar para associações e componentes; valor vazio não virando filtro **nem coluna** no resultado; o
+  `_ttl` obrigatório com `_cache: use`; `_cache` sem `_behavior` sendo ignorado e comportamento
+  desconhecido sendo `400`.
+
+- **`_cache`: a chave inclui os controles que você mandou, e o `evict` voltou a funcionar.** A chave da
+  entrada é formada **antes** de `_paging`, `_sorting`, `_connective` e `_count` serem retirados — então
+  a mesma consulta gravada **com** `_paging` explícito e relida **sem** ele produz chaves diferentes, e o
+  resultado não é reaproveitado. O `evict` deixou de ser inócuo: ele e o `use` passaram a formar a chave
+  do mesmo jeito, então a invalidação alcança o que foi gravado (desde que mandada com os mesmos
+  controles). O aviso sobre o `use` foi reescrito para descrever o que de fato acontece: na **falta** a
+  resposta vem **sem os registros e a consulta sequer é executada** (o serviço não distingue "não achei"
+  de "achei"); no **acerto** o cliente recebe o invólucro da entrada; e no **modo objeto** ainda sobra um
+  segundo item, porque a consulta roda mesmo assim.
+
+- **O rótulo é o nome exato da projeção.** Os exemplos usavam o plural (`"pedidos"`), que só funciona se
+  a projeção tiver sido modelada com esse nome. Corrigidos para o nome no singular, e a regra ficou
+  escrita: rótulo fora do modelo é `400`, com a lista dos nomes declarados na mensagem.
+
+- **O estado `RUNNING` é conferido uma vez por tenant em cada instância, não a cada consulta.** A página
+  apresentava a checagem como se valesse por requisição. Não vale: depois da primeira requisição daquele
+  tenant, a instância continua atendendo sem reavaliar o estado. Então **voltar o modelo para edição não
+  interrompe** quem já está sendo atendido, e a mesma mudança pode "pegar" numa instância e não noutra.
+  Atualizado [`persistence-q/README.md`](persistence-q/README.md).
+
 ## 1.17 — 2026-09-05
 
 - **Atributo fora do modelo agora é `400` — antes a consulta devolvia tudo.** A página de consulta já
