@@ -216,14 +216,20 @@ Declara que um **papel** lê apenas as linhas de que o usuário é titular. Sem 
 sabe dizer "este papel lê esta tabela" ou "não lê" — não existia forma de dizer "lê só o que é dele".
 
 > **Disponibilidade:** no ar desde **2026-09-09**, em `yc-composer:amd64-260909` (`forger@421a8b8`), com
-> a outra metade — o motor que honra o recorte — em `yc-interpreter:amd64-260909`. **É opt-in:** enquanto
-> nenhuma entity declarar `accessControl.scope`, nada muda para ninguém.
+> a outra metade — o motor que honra o recorte — em **`yc-interpreter:amd64-260909b`**. **É opt-in:**
+> enquanto nenhuma entity declarar `accessControl.scope`, nada muda para ninguém.
+>
+> **⚠️ O sufixo `b` importa, e não é detalhe de nomenclatura.** Houve duas imagens do interpreter no
+> mesmo dia. Na primeira, `amd64-260909`, uma entity com recorte alcançada pela rota interna era
+> **recusada com `403`** — declarar o `scope` ali quebraria os processors. A recusa saiu em
+> `amd64-260909b`, e **só a partir dela o recorte é utilizável**. Se a sua superfície ainda está na
+> imagem sem o `b`, **não declare o `scope`**.
 
 ```json
 "_conf": {
   "accessControl": {
     "read": ["MASTER", "ADMIN", "OPERADOR"],
-    "write": ["MASTER"],
+    "write": ["MASTER", "ADMIN"],
     "scope": {
       "read": { "OPERADOR": { "rows": { "by": "username" } } }
     }
@@ -235,6 +241,11 @@ Mora **dentro** do `accessControl` porque é controle de acesso. Isso só é seg
 `accessControl` mescla: se ele ainda substituísse o bloco, um `PUT` que trocasse papéis apagaria o
 recorte da tabela inteira — e essa perda é **aberta**, a resposta continuaria `200` e com dados.
 
+> **A regra, numa linha: `scope` só ESTREITA o que o `read` já permitiu.** Ele nunca concede acesso —
+> papel que não está em `accessControl.read` não lê nada, e portanto nunca chega ao recorte. Por isso
+> declarar `scope` para um papel fora do `read` é recusado (veja a tabela abaixo): não é o recorte que
+> abre a porta, é o `read`; o recorte só decide **quanto** passa por ela.
+
 **Semântica**
 
 - papel **ausente** de `scope.read` lê sem recorte;
@@ -243,6 +254,26 @@ recorte da tabela inteira — e essa perda é **aberta**, a resposta continuaria
 - **`MASTER` nunca entra** no `scope` — ele é exigido nas duas listas e nunca é recortado;
 - `by` nomeia um **atributo declarado** da entity, que guarda o titular da linha;
 - para **remover** o recorte, envie `scope` vazio (`{}`) — isso não mexe nos papéis.
+
+**O que o `rows.by` precisa ser — e isto é decisão de modelagem, não de configuração**
+
+O atributo tem de satisfazer as duas condições abaixo. Nenhuma delas é verificada na publicação: o
+forger confere que o atributo **existe**, não o que ele **contém**.
+
+1. **Conter o mesmo valor que identifica o usuário no token.** O recorte compara o conteúdo da coluna
+   com a identidade de quem consulta; se a entity guarda `matricula` e o token identifica por
+   `username`, a comparação nunca casa e o titular não vê as próprias linhas.
+2. **Estar preenchido em toda linha que deva ser vista.** Linha com esse campo vazio não pertence a
+   ninguém: ela **desaparece** para o próprio dono.
+
+> **⚠️ As duas falham FECHADO, e é isso que as torna traiçoeiras:** a resposta é `200` com lista vazia,
+> indistinguível de "não há dado". Ninguém recebe erro, nem quem consulta nem quem publicou a entity.
+> Se um titular relata que "sumiu tudo", verifique estas duas antes de qualquer outra coisa.
+
+Vale também para o caminho de escrita: se as linhas são criadas por outra pessoa que não o titular —
+uma ficha de instrutor criada pelo administrador, por exemplo —, o atributo de titular precisa ser
+**preenchido explicitamente com o titular**. É por isso que os metadados de auditoria não servem aqui:
+eles registram quem escreveu.
 
 **Recusado com `400` nesta versão**
 

@@ -28,7 +28,7 @@ Valem **apenas** para entity que declara recorte; entity sem a declaração não
 
 | HTTP | Quando | Correção |
 |---|---|---|
-| `403` | A consulta chega **sem credencial**, ou com credencial que não traz identificação do titular. | Consultar com credencial de usuário; o recorte não tem contra quem comparar. |
+| `403` | A credencial existe mas **não traz identificação do titular** (usuário sem `username`). | O recorte não tem contra quem comparar, e comparar com nulo devolveria lista vazia em silêncio. |
 | `510` | A entity recorta por um atributo **que não existe** no modelo dela. | Corrigir a declaração no forger. |
 | `510` | A entity recorta por **metadado da plataforma** — `id`, `loguser`, `logrole`, `logversion`, `logdate`. | Usar um atributo de titular. Esses registram **quem escreveu** a linha (ou qual linha é), não **de quem** ela é. É a mesma lista que o forger recusa na publicação. |
 | `510` | A entity recorta para um **papel que não está** em `accessControl.read`. | Fazer as duas listas concordarem — normalmente é erro de digitação no nome do papel. |
@@ -36,6 +36,14 @@ Valem **apenas** para entity que declara recorte; entity sem a declaração não
 > As três de `510` são erro de **modelo**, não de requisição: a mesma consulta falha para todo mundo até
 > a declaração ser corrigida. Elas existem porque o silêncio, aqui, seria pior — um papel escrito errado
 > não recortaria nada e a tabela inteira sairia com `200`.
+
+> **Consulta sem credencial nenhuma não é recusada — e não é recortada, a partir de
+> `yc-interpreter:amd64-260909b`.** Na imagem anterior do mesmo dia (`amd64-260909`, sem o `b`) ela era
+> recusada com `403`. As rotas internas de cluster
+> não têm usuário por construção, e ali a fronteira é **topológica**: elas não são expostas fora do
+> cluster. O recorte é controle **por usuário**; onde não há usuário, ele não se aplica — do mesmo modo
+> que o `accessControl` por papel também não se aplica nesse caminho. É por isso que o processor do
+> br-service continua lendo a projeção pela rota interna sem tropeçar no recorte.
 
 ## Nota
 `204` **não** é erro: significa "nenhum resultado". A consulta é idempotente e segura para repetição.

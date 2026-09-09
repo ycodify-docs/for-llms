@@ -11,7 +11,7 @@
 - Ciclo de vida de uma consulta
 - Depois de um comando, espere antes de consultar
 - Linguagem de consulta (resumo)
-- Recorte de leitura por titular
+- Recorte de leitura por titular (como se faz · o que torna uma linha sua · `read` × `scope` · processors)
 - Pontos de coordenação
 - Pitfalls
 
@@ -111,14 +111,116 @@ Detalhe e exemplos: [endpoints/consulta.md](endpoints/consulta.md).
 
 ## Recorte de leitura por titular
 
-Uma entity pode declarar que um **papel** lê apenas as linhas de que o usuário é **titular**. Quando
-isso está declarado, o serviço acrescenta o recorte ao critério que você enviou — não é preciso pedi-lo,
-e não é possível desligá-lo.
+Uma entity pode declarar que um **papel** lê apenas as linhas de que o usuário é **titular** — o resto
+da tabela deixa de existir para ele. O serviço acrescenta esse recorte ao critério que você enviou:
+não é preciso pedi-lo, e não é possível desligá-lo.
+
+> **⚠️ Versão importa, e o sufixo não é detalhe de nomenclatura.** Esta seção descreve o comportamento
+> a partir de **`yc-interpreter:amd64-260909b`**. Houve **duas** imagens no mesmo dia: na primeira
+> (`amd64-260909`, sem o `b`) a entity com recorte alcançada pela **rota interna de cluster** era
+> recusada com `403` — o que quebra qualquer processor que leia a projeção. **Não declare o recorte
+> contra superfície que ainda esteja na imagem sem o `b`.**
+
+### Como se faz — o percurso inteiro
+
+O objetivo, dito em uma frase: *"quem tem o papel `OPERADOR` vê só a própria ficha; quem tem `ADMIN` vê
+todas"*.
+
+**1 · O modelo declara.** No `_conf` da entity, publicado pelo forger — ver
+[forger — entity](../forger/endpoints/entity.md), que é onde a forma e as recusas estão descritas:
+
+```jsonc
+"_conf": {
+  "accessControl": {
+    "read":  ["MASTER", "ADMIN", "OPERADOR"],   // quem pode ler a entity
+    "write": ["MASTER", "ADMIN"],
+    "scope": {
+      "read": {
+        "OPERADOR": { "rows": { "by": "username" } }   // e OPERADOR, só as linhas dele
+      }
+    }
+  }
+}
+```
+
+`ADMIN` não aparece no `scope` — logo lê tudo. `OPERADOR` aparece — logo lê só o que é dele. O atributo
+`username` da entity é o que amarra a linha ao titular; a próxima seção trata disso.
+
+**2 · A consulta não muda.** O cliente envia o mesmo corpo de sempre. Não há nada a acrescentar ao
+pedido, e nada que o desligue:
+
+```jsonc
+{ "pessoa": { } }        // "me devolva as pessoas"
+```
+
+**3 · O que volta depende de quem perguntou.** A mesma requisição, três chamadores:
+
+| Quem chama | Recebe |
+|---|---|
+| `ana.silva`, papel `OPERADOR` | **uma** linha — aquela cujo `username` é `ana.silva` |
+| `chefe`, papel `ADMIN` | **todas** as linhas |
+| alguém sem papel em `read` | `403` — nunca chega ao recorte |
+
+### O que torna uma linha "sua"
+
+O recorte compara **o atributo declarado em `rows.by`** com **quem está chamando**. Hoje "quem está
+chamando" é o **`username` do token** — então o atributo precisa conter esse mesmo valor.
+
+Três consequências práticas, e a terceira é a que mais morde:
+
+- **o atributo é escolha de quem modela.** Pode chamar-se `username`, `login`, `titular`: o que importa
+  é o **valor** ser o do token, não o nome da coluna;
+- **metadado da plataforma não serve** — `id`, `loguser`, `logrole`, `logversion` e `logdate` são
+  recusados. `loguser` registra **quem escreveu** a linha, não **de quem** ela é: ficha cadastrada por um
+  administrador levaria o login dele, e o recorte devolveria zero linhas ao dono da ficha;
+- ⚠️ **atributo vazio = ficha invisível para o próprio dono.** Se a linha existe e o campo não foi
+  preenchido, ela não casa com ninguém — e a resposta é `200` com lista vazia, **indistinguível de "não
+  existe"**. Quando a ficha é criada por outra pessoa, garantir que esse campo seja preenchido é parte da
+  modelagem, não detalhe de implementação.
+
+### `read` e `scope`, conjugados
+
+A regra que explica todo o resto: **`scope` nunca concede acesso, só estreita o que o `read` já
+permitiu.**
+
+| Situação do papel | Resultado |
+|---|---|
+| **fora** de `accessControl.read` | `403` — nunca chega ao recorte |
+| em `read`, **fora** de `scope.read` | lê a tabela inteira |
+| em `read`, **dentro** de `scope.read` | lê só as linhas dele |
+| **vários papéis**, um deles fora do `scope` | lê tudo — o menos restritivo vence |
+
+A última linha decorre das outras, e não é exceção: se um dos papéis já autorizava a tabela inteira, o
+recorte de outro papel não tem o que tirar.
+
+### Quando quem consulta é um processor, e não uma pessoa
+
+Processor do br-service que lê a projeção **não** é usuário, e a distinção decide o que ele recebe:
+
+| O processor precisa ver… | Use |
+|---|---|
+| só o que é do usuário que disparou o comando | o `authToken` do corpo, no endpoint seguro — **o recorte se aplica** |
+| **além** do usuário — validar contra dado de terceiro | o **endpoint interno de cluster**, que não tem usuário e **não recorta** |
+
+No caminho **assíncrono** não há escolha: não há JWT, e o endpoint interno é o único caminho. Detalhe
+do contrato em [br-service](../br-service/README.md).
+
+O endpoint interno **não recortar** vale a partir de `amd64-260909b` — antes dela ele era recusado com
+`403`, que é a razão de a versão importar aqui mais que em qualquer outra seção deste documento.
+
+> ⚠️ Usar o token do usuário para uma regra que precisa enxergar dado de outra pessoa devolve **lista
+> vazia com `200`** — não um erro. É o engano mais fácil de cometer aqui.
+
+### O que muda na consulta
 
 - **Quem não declara não muda.** Entity sem a declaração responde exatamente como antes.
 - **É por papel, na mesma entity.** Um papel pode ler a tabela inteira e outro só as linhas dele.
 - **Vários papéis: o menos restritivo vence.** Se qualquer papel autorizado do usuário está fora do
   recorte, não há recorte — quem acumula um papel amplo não é cortado pelo papel menor.
+  **Acumular papéis sempre amplia, nunca restringe**, e isso é decisão de desenho, não efeito colateral:
+  sem ela, quem tem um papel administrativo perderia o alcance dele por também ter um papel comum. A
+  consequência a considerar ao atribuir papéis: a pessoa que acumula um papel recortado e um não
+  recortado **na mesma entity** lê pelo não recortado.
 - **O recorte não negocia com o seu critério.** O que você envia fica isolado, e o recorte entra por
   "E": `_connective: "OR"` **não** o transforma em alternativa, e um `ilike` amplo continua recortado.
 - **`_count` conta o conjunto já recortado**, não a tabela.
