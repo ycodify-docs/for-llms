@@ -216,14 +216,20 @@ Declara que um **papel** lê apenas as linhas de que o usuário é titular. Sem 
 sabe dizer "este papel lê esta tabela" ou "não lê" — não existia forma de dizer "lê só o que é dele".
 
 > **Disponibilidade:** no ar desde **2026-09-09**, em `yc-composer:amd64-260909` (`forger@421a8b8`), com
-> a outra metade — o motor que honra o recorte — em `yc-interpreter:amd64-260909`. **É opt-in:** enquanto
-> nenhuma entity declarar `accessControl.scope`, nada muda para ninguém.
+> a outra metade — o motor que honra o recorte — em **`yc-interpreter:amd64-260909b`**. **É opt-in:**
+> enquanto nenhuma entity declarar `accessControl.scope`, nada muda para ninguém.
+>
+> **⚠️ O sufixo `b` importa, e não é detalhe de nomenclatura.** Houve duas imagens do interpreter no
+> mesmo dia. Na primeira, `amd64-260909`, uma entity com recorte alcançada pela rota interna era
+> **recusada com `403`** — declarar o `scope` ali quebraria os processors. A recusa saiu em
+> `amd64-260909b`, e **só a partir dela o recorte é utilizável**. Se a sua superfície ainda está na
+> imagem sem o `b`, **não declare o `scope`**.
 
 ```json
 "_conf": {
   "accessControl": {
     "read": ["MASTER", "ADMIN", "OPERADOR"],
-    "write": ["MASTER"],
+    "write": ["MASTER", "ADMIN"],
     "scope": {
       "read": { "OPERADOR": { "rows": { "by": "username" } } }
     }
