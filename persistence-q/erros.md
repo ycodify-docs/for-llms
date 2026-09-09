@@ -28,13 +28,12 @@ Valem **apenas** para entity que declara recorte; entity sem a declaração não
 
 | HTTP | Quando | Correção |
 |---|---|---|
-| `403` | A consulta chega **sem credencial**. | Consultar com credencial de usuário. |
 | `403` | A credencial existe mas **não traz identificação do titular** (usuário sem `username`). | O recorte não tem contra quem comparar, e comparar com nulo devolveria lista vazia em silêncio. |
 
-> **Os dois `403` são checagens distintas, e a ordem entre elas explica o comportamento.** O conjunto de
-> papéis do chamador é avaliado **antes** de qualquer checagem por papel: sem credencial ele é vazio, e a
-> recusa sai aí — não por o papel não estar no recorte. Por isso "sem credencial" nunca cai no caminho de
-> "papel não recortado, lê tudo".
+> **Consulta sem credencial nenhuma não é recusada — e não é recortada.** As rotas internas de cluster
+> não têm usuário por construção, e ali a fronteira é **topológica**: elas não são expostas fora do
+> cluster. O recorte é controle **por usuário**; onde não há usuário, ele não se aplica — do mesmo modo
+> que o `accessControl` por papel também não se aplica nesse caminho.
 | `510` | A entity recorta por um atributo **que não existe** no modelo dela. | Corrigir a declaração no forger. |
 | `510` | A entity recorta por **metadado da plataforma** — `id`, `loguser`, `logrole`, `logversion`, `logdate`. | Usar um atributo de titular. Esses registram **quem escreveu** a linha (ou qual linha é), não **de quem** ela é. É a mesma lista que o forger recusa na publicação. |
 | `510` | A entity recorta para um **papel que não está** em `accessControl.read`. | Fazer as duas listas concordarem — normalmente é erro de digitação no nome do papel. |
