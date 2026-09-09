@@ -119,6 +119,10 @@ e não é possível desligá-lo.
 - **É por papel, na mesma entity.** Um papel pode ler a tabela inteira e outro só as linhas dele.
 - **Vários papéis: o menos restritivo vence.** Se qualquer papel autorizado do usuário está fora do
   recorte, não há recorte — quem acumula um papel amplo não é cortado pelo papel menor.
+  **Acumular papéis sempre amplia, nunca restringe**, e isso é decisão de desenho, não efeito colateral:
+  sem ela, quem tem um papel administrativo perderia o alcance dele por também ter um papel comum. A
+  consequência a considerar ao atribuir papéis: a pessoa que acumula um papel recortado e um não
+  recortado **na mesma entity** lê pelo não recortado.
 - **O recorte não negocia com o seu critério.** O que você envia fica isolado, e o recorte entra por
   "E": `_connective: "OR"` **não** o transforma em alternativa, e um `ilike` amplo continua recortado.
 - **`_count` conta o conjunto já recortado**, não a tabela.
