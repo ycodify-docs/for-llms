@@ -215,9 +215,9 @@ Requisição sem efeito responde `200` com `totalChanges: 0` e `applied: []`.
 Declara que um **papel** lê apenas as linhas de que o usuário é titular. Sem ele, `accessControl` só
 sabe dizer "este papel lê esta tabela" ou "não lê" — não existia forma de dizer "lê só o que é dele".
 
-> **⚠️ Disponibilidade, em 2026-09-09:** a chave está no contrato de publicação (`forger@421a8b8`, no
-> `develop`), e o forger **implantado ainda não a conhece**. Declará-la hoje contra a superfície no ar
-> é recusado. Esta seção descreve o contrato; confirme a versão implantada antes de integrar.
+> **Disponibilidade:** no ar desde **2026-09-09**, em `yc-composer:amd64-260909` (`forger@421a8b8`), com
+> a outra metade — o motor que honra o recorte — em `yc-interpreter:amd64-260909`. **É opt-in:** enquanto
+> nenhuma entity declarar `accessControl.scope`, nada muda para ninguém.
 
 ```json
 "_conf": {
