@@ -25,6 +25,7 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
 - Ciclo de vida (criar/atualizar)
 - Chave única: `attribute.unique` vs `_conf.uniqueKey`
 - Semântica do `PUT`: ausente vs vazio
+- Recorte de leitura por titular: `accessControl.scope`
 - Regra de escopo único no `PUT`
 - Saída de `analyze` / `validate`
 
@@ -56,7 +57,8 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
   "_conf": {
     "comment": "string", "concurrencyControl": true,
     "uniqueKey": ["string"], "indexKey": ["string"],
-    "accessControl": {}, "superEntity": "string", "superEntityStrategy": "string"
+    "accessControl": { "read": ["MASTER"], "write": ["MASTER"], "scope": {} },
+    "superEntity": "string", "superEntityStrategy": "string"
   }
 }
 ```
@@ -174,8 +176,12 @@ Vale igual para atributos e associações: declarar um atributo só com `nullabl
 Três detalhes que costumam morder:
 
 - **`null` explícito conta como ausente.** Para limpar, use o vazio do tipo (`[]`, `""`), não `null`.
-- **`accessControl` é substituído por inteiro**, não mesclado chave a chave: enviar só `read` reseta
-  `write` para `["MASTER"]`. Não existe entity sem controle de acesso — `MASTER` é o piso.
+- **`accessControl` é mesclado**, não substituído em bloco: enviar só `read` **preserva** o `write`
+  corrente, e vice-versa. Não existe entity sem controle de acesso — `MASTER` continua sendo o piso, e
+  lista enviada vazia volta a `["MASTER"]`.
+  *(Até **2026-09-09** o bloco era substituído por inteiro, e mandar só `read` zerava o `write` para
+  `["MASTER"]` sem avisar. Se você integrou antes dessa data e manda as duas listas sempre "porque
+  senão apaga", isso não é mais necessário — mas continua correto.)*
 - **`_conf` é opcional no `PUT`.** Uma requisição que só toca atributos não precisa mencioná-lo.
   (Na **criação** ele continua obrigatório.) `name` é sempre obrigatório e deve casar com o caminho.
 
@@ -203,6 +209,56 @@ O `200` informa o que foi aplicado — uma alteração que remove uma constraint
 ```
 
 Requisição sem efeito responde `200` com `totalChanges: 0` e `applied: []`.
+
+## Recorte de leitura por titular: `accessControl.scope`
+
+Declara que um **papel** lê apenas as linhas de que o usuário é titular. Sem ele, `accessControl` só
+sabe dizer "este papel lê esta tabela" ou "não lê" — não existia forma de dizer "lê só o que é dele".
+
+> **⚠️ Disponibilidade, em 2026-09-09:** a chave está no contrato de publicação (`forger@421a8b8`, no
+> `develop`), e o forger **implantado ainda não a conhece**. Declará-la hoje contra a superfície no ar
+> é recusado. Esta seção descreve o contrato; confirme a versão implantada antes de integrar.
+
+```json
+"_conf": {
+  "accessControl": {
+    "read": ["MASTER", "ADMIN", "OPERADOR"],
+    "write": ["MASTER"],
+    "scope": {
+      "read": { "OPERADOR": { "rows": { "by": "username" } } }
+    }
+  }
+}
+```
+
+Mora **dentro** do `accessControl` porque é controle de acesso. Isso só é seguro porque o `PUT` do
+`accessControl` mescla: se ele ainda substituísse o bloco, um `PUT` que trocasse papéis apagaria o
+recorte da tabela inteira — e essa perda é **aberta**, a resposta continuaria `200` e com dados.
+
+**Semântica**
+
+- papel **ausente** de `scope.read` lê sem recorte;
+- `accessControl` **sem** `scope` é o comportamento de sempre;
+- vários papéis casando, o **menos restritivo vence**;
+- **`MASTER` nunca entra** no `scope` — ele é exigido nas duas listas e nunca é recortado;
+- `by` nomeia um **atributo declarado** da entity, que guarda o titular da linha;
+- para **remover** o recorte, envie `scope` vazio (`{}`) — isso não mexe nos papéis.
+
+**Recusado com `400` nesta versão**
+
+| O que | Por quê |
+|---|---|
+| `scope.write` não vazio | o motor honra o recorte apenas na **leitura**; aceitar publicaria entity que se lê como protegida na escrita sem estar |
+| `MASTER` no `scope` | é o piso de toda entity e nunca é recortado |
+| papel em `scope.read` fora de `accessControl.read` | papel que não lê não tem o que recortar — e um erro de digitação aqui significaria "sem recorte", falhando **aberto** |
+| `rows.by` ausente | o recorte precisa saber por qual atributo cortar |
+| `rows.by` com **caminho** (`assoc.atributo`) | reservado no formato, ainda não honrado pelo motor |
+| `rows.by` nomeando `id`, `loguser`, `logrole`, `logversion`, `logdate` | são metadados da plataforma: registram **quem escreveu**, não **de quem é** a linha |
+| `rows.by` que não é atributo declarado | — |
+| a dimensão `attributes` | reservada no formato, ainda não honrada pelo motor |
+
+O **efeito na consulta** — como o recorte se combina com filtros, `_connective` e `_count` — é do
+`persistence-q`: veja a doc dele. Quem **declara** a chave é o forger; quem a **honra** é o motor.
 
 ## Regra de escopo único no `PUT`
 Uma atualização (`PUT`) altera **um** escopo por requisição: **ou** `_conf`, **ou** atributos, **ou**
