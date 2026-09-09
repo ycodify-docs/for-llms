@@ -102,11 +102,44 @@ validação e do JSON publicado) e o grid de interpretação (persistence-crs/es
 - **`strategy`** — define o **tipo do `id`** do agregado. `"uuid"` ⇒ o `id` é um UUID **gerado pela
   plataforma**; **não** o envie no comando de criação.
 - **`fields`** — **vetor de strings**, em que **cada elemento é o nome de um atributo** declarado sob
-  `command.…​.data.attribute`. Declara uma **constraint de unicidade composta**: a **combinação dos
-  valores** desses atributos deve ser **única** entre os registros do agregado (não pode haver dois
-  registros com a mesma combinação). `[]` = sem restrição de unicidade adicional além do `id`.
-  - Ex.: `"fields": ["cnpj"]` → não há dois agregados com o mesmo `cnpj`.
-  - Ex.: `"fields": ["razaosocial", "segmento"]` → o par (`razaosocial`, `segmento`) é único.
+  `command.…​.data.attribute`. Declara **qual combinação de valores identifica o agregado no negócio** —
+  a resposta a *"o que faz dois destes serem o mesmo?"*. `[]` = nenhuma; o agregado é identificado só
+  pelo `id`.
+  - Ex.: `"fields": ["cnpj"]` → dois agregados com o mesmo `cnpj` são o mesmo.
+  - Ex.: `"fields": ["razaosocial", "segmento"]` → o par identifica.
+
+> **⚠️ ERRATA, 2026-09-09 — esta seção afirmava uma garantia que a plataforma NÃO dá.** O texto anterior
+> dizia que `fields` "declara uma constraint de unicidade composta" e que "não pode haver dois registros
+> com a mesma combinação". **Não é o que acontece.** Medido: **nada no processamento do comando lê
+> `identity`** — a criação do agregado não compara `fields` com nada, e **dois agregados com a mesma
+> combinação são aceitos**. Hoje `fields` é uma **declaração de intenção**, consumida na derivação da
+> projeção (é dela que saem as chaves da entity projetada). Quem modelou confiando na frase antiga
+> confiou em algo que não ocorre — e vale reconferir o que dependia disso.
+>
+> Quando a imposição existir, será anunciada **por versão**, e esta errata sai.
+
+#### Como escolher os `fields` — e o erro que a escolha ingênua produz
+
+A pergunta a responder não é *"quais campos são obrigatórios?"*, é **"o que faz dois destes serem o
+mesmo?"**. E há uma armadilha frequente: **recriar depois de encerrar costuma ser legítimo.**
+
+Exemplo. Uma matrícula com `fields: ["aulaid", "alunoid"]`:
+
+| Quando | O que acontece | Com essa chave |
+|---|---|---|
+| março | o aluno se matricula na turma | ok |
+| junho | o aluno sai; a matrícula é encerrada | ok |
+| agosto | o aluno **volta para a mesma turma** | **seria recusado** — mesma combinação |
+
+Voltar em agosto é uma matrícula **nova e legítima**. Se a chave não a distingue da de março, a
+imposição — quando existir — passaria a recusar operação correta, que é pior do que aceitar a repetida.
+
+**A correção é de modelagem, não da plataforma:** a chave precisa conter o que separa uma da outra —
+o período letivo, a data de início, a temporada. Se duas coisas podem coexistir legitimamente com os
+mesmos valores, **os `fields` estão incompletos**.
+
+> A plataforma garante *"esta combinação não se repete"*. **Quais campos formam a combinação é decisão
+> de quem modela** — e é onde o domínio entra.
 
 ### Identificação na projeção (leitura)
 
