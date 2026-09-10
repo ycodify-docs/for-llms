@@ -108,15 +108,20 @@ validação e do JSON publicado) e o grid de interpretação (persistence-crs/es
   - Ex.: `"fields": ["cnpj"]` → dois agregados com o mesmo `cnpj` são o mesmo.
   - Ex.: `"fields": ["razaosocial", "segmento"]` → o par identifica.
 
-> **⚠️ ERRATA, 2026-09-09 — esta seção afirmava uma garantia que a plataforma NÃO dá.** O texto anterior
-> dizia que `fields` "declara uma constraint de unicidade composta" e que "não pode haver dois registros
-> com a mesma combinação". **Não é o que acontece.** Medido: **nada no processamento do comando lê
-> `identity`** — a criação do agregado não compara `fields` com nada, e **dois agregados com a mesma
-> combinação são aceitos**. Hoje `fields` é uma **declaração de intenção**, consumida na derivação da
-> projeção (é dela que saem as chaves da entity projetada). Quem modelou confiando na frase antiga
-> confiou em algo que não ocorre — e vale reconferir o que dependia disso.
+**A combinação é imposta na criação:** um segundo agregado com a mesma combinação de valores é
+**recusado** — não nasce. Modelo com `fields: []` não tem essa restrição.
+
+> **⚠️ Vigência, e ela importa para quem modelou antes.** Até `yc-interpreter:amd64-260909b` esta
+> declaração **não era imposta**: nada no processamento do comando lia `identity`, e **dois agregados
+> com a mesma combinação eram aceitos** — a documentação prometia uma unicidade que não ocorria. **A
+> partir de `amd64-260909c` ela é imposta.**
 >
-> Quando a imposição existir, será anunciada **por versão**, e esta errata sai.
+> Consequência para quem já tem dados: **os registros criados até ali não foram verificados** e podem
+> conter combinações repetidas. Se algo seu dependia dessa unicidade, vale reconferir.
+
+**O que acontece na colisão.** A criação do segundo é recusada e o agregado não nasce. Quando a
+criação parte de uma **coordenação**, a plataforma reconhece a recusa como *"o alvo já existe"* e
+considera a coordenação **concluída** — não é erro, e não vai para fila de descarte.
 
 #### Como escolher os `fields` — e o erro que a escolha ingênua produz
 
