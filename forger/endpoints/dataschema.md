@@ -44,9 +44,36 @@ Erros: `400`, `403`, `500`.
 > | **`RUNNING`** | **congelado** — o **forger rejeita** criar/alterar `entity` neste estado | **ocorre** — persistence-crs/persistence-q interpretam e executam o modelo |
 >
 > **Regra para o agente:** para **editar schema** (criar/alterar entity), o dataschema precisa estar em
-> `MODELING`; para **operar** (comandos/consultas via persistence-crs/persistence-q), em `RUNNING`. Para
-> alterar o schema de um sistema já em operação: transite `RUNNING → MODELING` (via `PUT` no `status`),
-> edite as entities, e volte a `MODELING → RUNNING`.
+> `MODELING`; para **operar** (comandos/consultas via persistence-crs/persistence-q), em `RUNNING`.
+
+### O que a transição faz com o modelo no cache
+
+A transição de `status` **não é só um rótulo no banco**: ela publica e remove os modelos que o motor
+consome. Isso muda o roteiro de alterar um schema em operação, e é a parte que costuma ser feita à mão
+sem necessidade.
+
+| Transição | O que acontece |
+|---|---|
+| **`RUNNING → MODELING`** | **as duas chaves do modelo são removidas** — a spec de entidades (read model) e o modelo de escrita (`.model.json`). O motor passa a recusar **consulta e comando** com `510`, e é assim de propósito: o tenant está declaradamente em remodelagem |
+| **`MODELING → RUNNING`** | a spec de entidades é **republicada pela plataforma**, remontada da definição que vive no banco. O modelo de escrita **não** é reconstruído — veja o pré-requisito abaixo |
+
+> ⚠️ **Pré-requisito para voltar a `RUNNING`: o `.model.json` tem de estar publicado.** Se não estiver, o
+> `PUT` é recusado com `400`, **nada é gravado** e o dataschema **continua em `MODELING`**. Republique-o
+> (`POST .../tenant/{tenantId}/model`, aceito com o dataschema em `MODELING`) e repita a transição.
+>
+> A assimetria tem motivo: a spec de entidades a plataforma sabe remontar, porque ela deriva do que está
+> no banco. O `.model.json` é **artefato seu** — a plataforma não guarda outra cópia dele, e quem o repõe
+> é quem o tem.
+
+**Roteiro completo, para alterar o schema de um sistema já em operação:**
+
+1. `RUNNING → MODELING` (`PUT` no `status`) — as duas chaves caem, o tenant para de operar;
+2. edite as entities;
+3. **republique o `.model.json`**;
+4. `MODELING → RUNNING` — a spec volta sozinha, e o passo 3 é verificado.
+
+**Não invalide cache manualmente em nenhum ponto.** A publicação e a remoção são da plataforma, e nenhum
+dos dois modelos expira por tempo: o que os tira do cache é remoção, nunca prazo.
 
 ## Remover
 
