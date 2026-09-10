@@ -35,11 +35,9 @@
   **serviço de cache** (`../cache`) → **se falta no cache, a consulta falha** (`510`, "republique o
   modelo"). **Não há recuperação automática a partir do Forger:** o modelo entra no cache **só**
   quando é publicado, e a entrada **não expira** sozinha. Um `510` aqui significa que o modelo nunca
-  foi publicado, que a entrada foi removida, ou que **o dataschema está em `MODELING`** — nessa janela
-  o modelo de leitura não existe, e volta ao fechar a edição. *(A partir do forger `f45b22c`, ainda não
-  implantado em 2026-09-10, a entrada da edição derruba também o modelo de escrita, e a volta a
-  `RUNNING` exige que ele esteja republicado — ver
-  [forger/dataschema](../forger/endpoints/dataschema.md#o-que-a-transição-faz-com-o-modelo-no-cache).)*
+  foi publicado, que a entrada foi removida, ou que **o dataschema está em edição** (`MODELING`).
+  **Quem publica e quem remove o modelo é o forger** — procedimento e pré-requisitos na fatia dele:
+  [forger/dataschema](../forger/endpoints/dataschema.md#o-que-a-transição-faz-com-o-modelo-no-cache).
   **Não invalide cache à mão para propagar alteração:** fechar a edição do dataschema republica o
   modelo de leitura, e republicar o `.model.json` sobrescreve o de escrita. **Restart nunca foi
   remédio.** *(Este item dizia, até 2026-09-10, que era preciso "invalidar o cache — as duas chaves do

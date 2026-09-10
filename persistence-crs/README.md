@@ -116,37 +116,24 @@ A cada requisição (com `X-Tenant-Id`), o serviço resolve a spec do tenant (en
 > Como a entrada **não expira** por conta própria, um miss significa que o modelo nunca foi publicado
 > ou que a entrada foi removida — e a saída é **republicar**, não reiniciar nem esperar.
 
-### Depois de alterar o modelo — o que você precisa fazer
+### Depois de alterar o modelo
 
-**São dois modelos, não duas cópias do mesmo**, e cada um tem o seu gatilho:
+**Quem publica e quem remove os modelos do cache é o forger, e o procedimento é a fatia dele:**
+[forger/dataschema — o que a transição faz com o modelo no cache](../forger/endpoints/dataschema.md#o-que-a-transição-faz-com-o-modelo-no-cache).
+Lá está o roteiro completo e o pré-requisito para voltar a `RUNNING`. **Não repito aqui:** mecanismo com
+duas casas diverge, e quando diverge as duas parecem autoridade.
 
-| O que você alterou | O que repõe | Você precisa |
-|---|---|---|
-| **entities** (projeção, `_conf`) — o **modelo de leitura** | fechar a edição do dataschema (`MODELING` → `RUNNING`) republica | **fechar a edição** — e ver o pré-requisito abaixo |
-| **`.model.json`** (agregados e comandos) — o **modelo de escrita** | republicar sobrescreve o anterior | **republicar** |
+**O que é meu, e é só isto: o que este serviço faz quando o modelo não está no cache.**
 
-> ⚠️ **Não invalide cache à mão.** Republicar **sobrescreve**; apagar antes não adianta e não é passo do
-> procedimento. O procedimento da edição de entities está em
-> [forger/dataschema](../forger/endpoints/dataschema.md#atualizar).
->
-> **Isto corrige o que este documento dizia até 2026-09-10**, quando mandava "invalidar as DUAS chaves do
-> modelo" antes de republicar. Era trabalho desnecessário: a plataforma já repõe. Se você seguia aquele
-> texto, pode parar.
+- **Falha explícito, com `510`**, e a mensagem manda **republicar o modelo**. Não há degradação
+  silenciosa: o serviço nunca responde `200` com menos dado porque o modelo faltava.
+- Vale para **comando e consulta**, e vale **enquanto o dataschema estiver em edição** (`MODELING`) — é
+  nessa janela que o modelo não está publicado. **O que morde não é editar: é deixar a edição aberta.**
 
-**Enquanto o dataschema está em `MODELING`, o modelo não existe** — ele cai na entrada da edição e só
-volta no fechamento. Requisição nessa janela falha com `510`. **O que morde não é editar: é deixar a
-edição aberta.**
-
-> **Quanto disso vale hoje.** A entrada da edição sempre derrubou o **modelo de leitura**, então a
-> **consulta** falha nessa janela desde antes. Passam a cair **as duas chaves** — e portanto também o
-> **comando** — e a volta a `RUNNING` passa a **exigir o `.model.json` publicado**, recusando com `400` e
-> deixando o dataschema em `MODELING`, a partir da versão do forger que carregar `f45b22c`
-> (mergeado em `09dbfcb`, **ainda não implantado** em 2026-09-10). O roteiro em quatro passos e o
-> pré-requisito estão na fatia de quem os executa:
-> [forger/dataschema — o que a transição faz com o modelo no cache](../forger/endpoints/dataschema.md#o-que-a-transição-faz-com-o-modelo-no-cache).
->
-> Do meu lado não há caminho silencioso: modelo ausente **falha explícito** com `510` e a mensagem manda
-> republicar — nunca degrada devolvendo menos.
+> ⚠️ **Não invalide cache à mão para propagar uma alteração.** A publicação e a remoção são da
+> plataforma. **Isto corrige o que este documento dizia até 2026-09-10**, quando mandava "invalidar as
+> DUAS chaves do modelo" antes de republicar — trabalho desnecessário. Se você seguia aquele texto, pode
+> parar.
 
 **Sobre cópia em memória do serviço.** Até `2026-09-10` cada instância guardava o modelo em memória por
 até uma hora, e a alteração podia "pegar" numa instância e não noutra. **Na instância de teste
