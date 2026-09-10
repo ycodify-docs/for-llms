@@ -20,6 +20,15 @@
   `MODELING` o modelo de leitura não existe, e a consulta falha com `510`. Ele volta ao fechar. Isso não
   estava dito em lugar nenhum, e a ausência fazia o `510` parecer defeito.
 
+- **A edição de um schema passa a fechar o tenant inteiro, e a volta ganha pré-requisito.** Até aqui,
+  entrar em edição derrubava só o modelo de leitura: a consulta falhava e **o comando continuava sendo
+  aceito** sobre um modelo em remodelagem. Passam a cair **as duas chaves**, e voltar a `RUNNING` só é
+  autorizado com o **`.model.json` publicado** — senão `400`, nada gravado, e o dataschema **continua em
+  `MODELING`**. Roteiro e pré-requisito em
+  [forger/dataschema](forger/endpoints/dataschema.md#o-que-a-transição-faz-com-o-modelo-no-cache).
+  **Vigência:** a partir da versão do forger que carregar `f45b22c` — **ainda não implantada** em
+  2026-09-10.
+
 - **A cópia em memória de cada instância deixou de existir na instância de teste.** Até 2026-09-10 cada
   instância guardava o modelo por até uma hora, e uma alteração podia "pegar" numa e não noutra. No
   `tinterpreter`, desde a imagem `amd64-260910`, essas cópias estão **desligadas**: o modelo é relido a
