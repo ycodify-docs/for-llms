@@ -102,11 +102,49 @@ validação e do JSON publicado) e o grid de interpretação (persistence-crs/es
 - **`strategy`** — define o **tipo do `id`** do agregado. `"uuid"` ⇒ o `id` é um UUID **gerado pela
   plataforma**; **não** o envie no comando de criação.
 - **`fields`** — **vetor de strings**, em que **cada elemento é o nome de um atributo** declarado sob
-  `command.…​.data.attribute`. Declara uma **constraint de unicidade composta**: a **combinação dos
-  valores** desses atributos deve ser **única** entre os registros do agregado (não pode haver dois
-  registros com a mesma combinação). `[]` = sem restrição de unicidade adicional além do `id`.
-  - Ex.: `"fields": ["cnpj"]` → não há dois agregados com o mesmo `cnpj`.
-  - Ex.: `"fields": ["razaosocial", "segmento"]` → o par (`razaosocial`, `segmento`) é único.
+  `command.…​.data.attribute`. Declara **qual combinação de valores identifica o agregado no negócio** —
+  a resposta a *"o que faz dois destes serem o mesmo?"*. `[]` = nenhuma; o agregado é identificado só
+  pelo `id`.
+  - Ex.: `"fields": ["cnpj"]` → dois agregados com o mesmo `cnpj` são o mesmo.
+  - Ex.: `"fields": ["razaosocial", "segmento"]` → o par identifica.
+
+**A combinação é imposta na criação:** um segundo agregado com a mesma combinação de valores é
+**recusado** — não nasce. Modelo com `fields: []` não tem essa restrição.
+
+> **⚠️ Vigência, e ela importa para quem modelou antes.** Até `yc-interpreter:amd64-260909b` esta
+> declaração **não era imposta**: nada no processamento do comando lia `identity`, e **dois agregados
+> com a mesma combinação eram aceitos** — a documentação prometia uma unicidade que não ocorria. **A
+> partir de `amd64-260909c` ela é imposta.**
+>
+> Consequência para quem já tem dados: **os registros criados até ali não foram verificados** e podem
+> conter combinações repetidas. Se algo seu dependia dessa unicidade, vale reconferir.
+
+**O que acontece na colisão.** A criação do segundo é recusada e o agregado não nasce. Quando a
+criação parte de uma **coordenação**, a plataforma reconhece a recusa como *"o alvo já existe"* e
+considera a coordenação **concluída** — não é erro, e não vai para fila de descarte.
+
+#### Como escolher os `fields` — e o erro que a escolha ingênua produz
+
+A pergunta a responder não é *"quais campos são obrigatórios?"*, é **"o que faz dois destes serem o
+mesmo?"**. E há uma armadilha frequente: **recriar depois de encerrar costuma ser legítimo.**
+
+Exemplo. Uma matrícula com `fields: ["aulaid", "alunoid"]`:
+
+| Quando | O que acontece | Com essa chave |
+|---|---|---|
+| março | o aluno se matricula na turma | ok |
+| junho | o aluno sai; a matrícula é encerrada | ok |
+| agosto | o aluno **volta para a mesma turma** | **seria recusado** — mesma combinação |
+
+Voltar em agosto é uma matrícula **nova e legítima**. Se a chave não a distingue da de março, a
+imposição — quando existir — passaria a recusar operação correta, que é pior do que aceitar a repetida.
+
+**A correção é de modelagem, não da plataforma:** a chave precisa conter o que separa uma da outra —
+o período letivo, a data de início, a temporada. Se duas coisas podem coexistir legitimamente com os
+mesmos valores, **os `fields` estão incompletos**.
+
+> A plataforma garante *"esta combinação não se repete"*. **Quais campos formam a combinação é decisão
+> de quem modela** — e é onde o domínio entra.
 
 ### Identificação na projeção (leitura)
 

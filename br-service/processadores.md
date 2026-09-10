@@ -1,8 +1,9 @@
 # br-service · autoria de processadores
 
 > Como um processador é **escrito** e **publicado**, e o que faz uma rota declarada no model existir de
-> fato em execução. O contrato visto pelo chamador está no [guia](README.md) e em
-> [endpoints/br.md](endpoints/br.md).
+> fato em execução. **O que ele recebe e o que precisa devolver depende do contexto de invocação** —
+> isso está em [contextos.md](contextos.md), e é leitura anterior a esta. O contrato visto pelo chamador
+> está no [guia](README.md) e em [endpoints/br.md](endpoints/br.md).
 
 ## Contents
 - Do arquivo à rota
@@ -17,13 +18,18 @@
 
 ## Do arquivo à rota
 
-Um processador é um **arquivo `.js`**, e **o caminho do arquivo é a rota** — sem o sufixo `.js`. Não há
+Um processador é um **arquivo de código**, e **o caminho do arquivo é a rota** — sem a extensão. Não há
 registro, tabela de rotas nem declaração à parte: a árvore de pastas publicada *é* o mapa de rotas.
 
 | Arquivo publicado | Rota resultante |
 |---|---|
-| `<org>/<project>/<bc>/<aggregate>/criar.js` | `<org>/<project>/<bc>/<aggregate>/criar` |
-| `<org>/<project>/<bc>/<aggregate>/coordination/conta_from_pedido.js` | `<org>/<project>/<bc>/<aggregate>/coordination/conta_from_pedido` |
+| `<org>/<project>/<bc>/<aggregate>/criar` | `<org>/<project>/<bc>/<aggregate>/criar` |
+| `<org>/<project>/<bc>/<aggregate>/coordination/conta_from_pedido` | `<org>/<project>/<bc>/<aggregate>/coordination/conta_from_pedido` |
+
+> Os caminhos acima aparecem **sem a extensão**, que é omitida em toda esta documentação. A extensão
+> aceita é a mesma para todos os processadores e é informada no provisionamento — junto com os arquivos
+> de dados de apoio, que a publicação também aceita. Errar a extensão é recusa na publicação, com
+> mensagem: não é um caso que se descubra tarde.
 
 É por isso que a [forma canônica da rota](README.md#forma-canônica-da-rota-obrigatória) é uma regra
 sobre **como organizar as pastas**, e não uma convenção de nomenclatura. O **primeiro segmento é a
@@ -34,65 +40,82 @@ Nomes iniciados por ponto são ignorados na varredura — uma pasta assim nunca 
 
 ## Forma do arquivo
 
-O arquivo precisa exportar uma **função**, de uma das duas formas:
+**O arquivo tem de exportar uma função** — é essa função que a rota executa, e é a única coisa que o
+carregador procura. Há duas formas aceitas, e as duas valem igual:
 
-```javascript
-// Forma 1 — export direto (recomendada)
-module.exports = async (data) => { /* ... */ };
+| Forma | Exigência |
+|---|---|
+| **exportação direta** — o módulo **é** a função | nenhuma; é a recomendada |
+| **exportação nomeada** — o módulo é um objeto com uma função dentro | o nome exportado tem de ser **exatamente o nome do arquivo**, sem a extensão |
 
-// Forma 2 — export nomeado, com o nome do ARQUIVO
-const criar = async (data) => { /* ... */ };
-module.exports = { criar };   // só funciona em um arquivo chamado criar.js
-```
+A função recebe os argumentos que o contexto de invocação determina e pode ser assíncrona; o resultado é
+aguardado. Ver [contextos.md](contextos.md).
 
 > **⚠️ O que não é função é descartado em SILÊNCIO.** Um arquivo que exporta um objeto, que erra o nome
-> no export nomeado, ou que lança durante a importação **não vira rota e não produz erro visível** — ele
-> simplesmente não aparece no mapa, e a chamada correspondente falha depois como "rota inexistente".
-> Processador que "sumiu" é quase sempre isto.
+> na exportação nomeada, ou que falha no instante em que é carregado **não vira rota e não produz erro
+> visível** — ele simplesmente não aparece no mapa, e a chamada correspondente falha depois como "rota
+> inexistente". Processador que "sumiu" é quase sempre isto.
 >
 > A contrapartida: **todo** arquivo publicado que exporte uma função vira rota executável. Um módulo
-> auxiliar compartilhado entre processadores deve exportar um **objeto**, para não virar rota por
-> acidente.
+> auxiliar, compartilhado entre processadores e que não deve ser chamável, precisa exportar **outra
+> coisa que não uma função** — um objeto, por exemplo — para não virar rota por acidente.
 
 Republicar no mesmo caminho substitui a versão anterior: a chamada seguinte já executa o código novo,
 sem versão antiga presa em memória.
 
 ## O que o processador recebe
 
-A quantidade de argumentos depende do que o chamador envia no corpo:
+**Não é o autor quem escolhe a assinatura — é o contexto de invocação.** O serviço monta a chamada a
+partir dos campos que o corpo traz:
 
-| Corpo | Chamada |
+| O corpo traz | A chamada |
 |---|---|
-| `data` + `authToken` + `tenantIds` | `fn(data, authToken, tenantIds)` |
-| `data` + `authToken` | `fn(data, authToken)` |
-| `data` | `fn(data)` |
-| sem `data` | `fn(corpoInteiro)` |
+| `data` + `authToken` + `tenantIds` | `f(data, authToken, tenantIds)` |
+| `data` + `authToken` | `f(data, authToken)` |
+| `data` | `f(data)` |
+| sem `data` | `f(corpoInteiro)` |
 
-O `authToken` é o JWT do usuário e **só chega no hook síncrono** (regra de negócio). Nos hooks
-assíncronos (coordenação, projeção) não há JWT — a regra de acesso de volta a persistence-q/crs nesse
-caso está no [guia](README.md#callback-do-processor--persistence-q--persistence-crs-endpoint-interno-de-cluster).
+Na prática isso quer dizer **três argumentos no contexto síncrono e um só nos dois assíncronos** — e um
+`authToken` nulo, que ocorre em toda operação sem usuário autenticado, também reduz a chamada a um
+argumento. Escreva a função para o contexto em que ela vai rodar, e **nunca leia o segundo parâmetro sem
+checar**: [contextos.md](contextos.md).
+
+Não há JWT em contexto assíncrono — nunca, e não é "pode não haver": a credencial gravada no evento não
+guarda o token. Como ler dados de volta sem ele, e com que consequência de acesso, está em
+[acesso-a-dados.md](acesso-a-dados.md).
 
 ## O que o processador devolve
 
-A função pode ser `async`; o resultado é aguardado. O que ela retorna vai **direto** ao persistence-crs,
-sem envelope — e, na regra de negócio, é mesclado no comando por **whitelist**: chave nova retornada é
-descartada em silêncio. Ver [contrato de resposta](README.md#contrato-de-resposta) e as três categorias
-de retorno em [três categorias de processador](README.md#três-categorias-de-processador).
+A função pode ser assíncrona; o resultado é aguardado. O que ela retorna vai ao persistence-crs **sem
+envelope acrescentado pelo serviço** — mas **o que ela deve retornar não é o mesmo nos três contextos**:
+
+| Contexto | Forma do retorno |
+|---|---|
+| regra de negócio | o objeto do comando, **direto** — mesclado por **whitelist**, e chave nova é descartada em silêncio |
+| coordenação | `{"processedData": {"targetCommand": {…}}}` |
+| projeção | `{"processedData": {"<projeção>": {"aggregateid": …}}}` |
+
+Forma exata, campos obrigatórios e o que acontece quando se erra: [contextos.md](contextos.md). Contrato
+de fio: [contrato de resposta](README.md#contrato-de-resposta).
 
 ## Erros
 
 Lançar é o mecanismo previsto: a exceção vira `400` com `{ status, mensagem, tipo }`.
 
-```javascript
-module.exports = async (data) => {
-  if (!data.cliente) throw new Error("Campo 'cliente' é obrigatório");
-  return { ...data, cliente: data.cliente.trim() };
-};
 ```
+função(data):
+    se !data.cliente: lança erro "Campo 'cliente' é obrigatório"
+    retorna { ...data, cliente: data.cliente.trim() }
+```
+
+A mensagem e o tipo do erro lançado atravessam inteiros para o corpo da resposta:
 
 ```json
 { "status": "error", "mensagem": "Campo 'cliente' é obrigatório", "tipo": "Error" }
 ```
+
+> Escrever a mensagem pensando em quem vai lê-la no `400` compensa: é o único texto do processador que
+> chega ao chamador.
 
 Catálogo completo: [erros.md](erros.md).
 
