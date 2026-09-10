@@ -2,6 +2,51 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.23 — 2026-09-09
+
+- **Uma entity pode declarar que um papel lê apenas as linhas de que o usuário é titular.** Até aqui o
+  controle de acesso só sabia dizer *"este papel lê esta tabela"* ou *"não lê"* — não havia como dizer
+  *"lê só o que é dele"*, e a consequência era que qualquer usuário final autenticado lia a tabela
+  inteira de dados pessoais dos demais. A declaração é `accessControl.scope`, e as duas metades estão
+  documentadas onde cada uma acontece: **como declarar** em [forger — entity](forger/endpoints/entity.md)
+  e **o efeito na consulta** em [persistence-q](persistence-q/README.md#recorte-de-leitura-por-titular).
+
+- **A seção do recorte deixou de ser lista de consequências e virou percurso.** Ela respondia *"o que
+  acontece se…"* sete vezes e nunca *"como eu faço"*. Agora vai do modelo declarado à resposta, com a
+  requisição no meio — e ganhou o que faltava para modelar sem errar: **o que torna uma linha "sua"**, a
+  tabela-verdade de `read` × `scope`, e **como o processador deve ser escrito**.
+
+- **`scope` nunca concede acesso, só estreita o que o `read` já permitiu.** Era a regra que amarrava
+  tudo e não estava escrita em lugar nenhum: papel fora do `read` não lê e portanto nunca chega ao
+  recorte; papel no `read` e fora do `scope` lê a tabela inteira. Sem ela, *"acumular papéis amplia"*
+  soava arbitrário em vez de decorrer da regra.
+
+- **⚠️ Atributo de titular vazio torna a ficha invisível para o próprio dono** — com `200` e lista
+  vazia, indistinguível de *"não existe"*. É a armadilha de modelagem mais provável do recurso, e ela
+  vale especialmente quando a ficha é cadastrada por outra pessoa. Está em
+  [o que torna uma linha "sua"](persistence-q/README.md#o-que-torna-uma-linha-sua).
+
+- **Usar o token do usuário num processador que precisa ver dado de terceiro devolve lista vazia com
+  `200`** — não um erro. Quando a entity é recortada, aquele token restringe a leitura ao próprio
+  usuário. Para ver além, o caminho é o endpoint interno de cluster.
+
+- **Errata em `identity.fields`: a garantia prometida não existia, e agora existe.** O texto afirmava
+  que a combinação declarada era única e que *"não pode haver dois registros com a mesma combinação"* —
+  **nada no processamento do comando lia esse campo**, e dois agregados iguais eram aceitos. A partir de
+  `amd64-260909c` a combinação **é imposta na criação**. Consequência para quem já tem dados: **os
+  registros criados antes não foram verificados** e podem conter repetições. Ver
+  [identidade e unicidade](persistence-crs/spec/model-format.md#identidade-e-unicidade-identity).
+
+- **E como escolher os `fields`, que faltava.** A pergunta não é *"quais campos são obrigatórios"*, é
+  **"o que faz dois destes serem o mesmo?"**. Com a armadilha por extenso: **recriar depois de encerrar
+  costuma ser legítimo** — o aluno que sai da turma e volta no semestre seguinte é matrícula nova, e uma
+  chave que não os distingue passaria a recusar operação correta.
+
+- **Toda afirmação sensível a versão passou a ser datada por versão, e não por expectativa.** Duas vezes
+  no mesmo dia um texto envelheceu em horas: uma ressalva de indisponibilidade que a implantação
+  desmentiu, e uma errata que a implementação desmentiu. Doc ausente faz perguntar; **doc errada faz
+  agir**.
+
 ## 1.22 — 2026-09-09
 
 - **O br-service tem TRÊS contratos, não um — e a doc apresentava um só.** O serviço é acionado de três
