@@ -90,16 +90,36 @@ O BFF lê o **modelo publicado** do tenant no **serviço de cache** — **não**
 forger é quem **grava** ali ao publicar o `.model.json`) — e cruza com os **papéis org-scoped** do token
 → devolve **só** os comandos autorizados. Só para tenant que **consta no token**; senão `404`.
 
-> ⚠️ **A capacidade depende do modelo estar VIVO no cache.** O modelo publicado tem **TTL**: ao expirar,
-> o cache não devolve mais (204) e a capacidade do bounded context **some** — `GET /session/capabilities`
-> deixa de listar os comandos daquele tenant, **mesmo com o sistema provisionado e o dataschema
-> `RUNNING`**. Não é falha do BFF: é o modelo que saiu do cache. Remediação: **republicar** o
-> `.model.json` (`POST forger .../tenant/<id>/model`, sobrescrita idempotente). Vale para **qualquer**
-> consumidor — casca ou cliente sem UI.
+> ⚠️ **A capacidade depende do modelo estar VIVO no cache**, e quando ele some a causa é **remoção,
+> nunca expiração.** Sem a chave, o cache responde `204`, a capacidade do bounded context **some** —
+> `GET /session/capabilities` deixa de listar os comandos daquele tenant — e isso acontece **mesmo com o
+> sistema provisionado e o dataschema `RUNNING`**. Não é falha do BFF: é o modelo que saiu do cache.
+> Vale para **qualquer** consumidor — casca ou cliente sem UI.
 >
-> Quem define esse TTL é **o forger, no momento da publicação** (é ele que grava a chave com prazo); o
-> cache apenas honra o que recebeu. O prazo é **configuração de deploy** do forger — em ambiente de
-> desenvolvimento, um sistema que fica dias sem republicar perde a capacidade sozinho.
+> **O modelo publicado NÃO tem prazo de validade.** O forger grava a chave **sem expiração**, e isso é
+> deliberado: a constante que carrega o valor existe *"para que nenhuma configuração externa possa
+> reintroduzir TTL no modelo publicado"* — não é propriedade de deploy, é constante de código. *(medido
+> pelo `composer` em `forger@421a8b8`, `EntitiesModelCacheService`; confirmado pelo dono em 2026-09-10.
+> O mesmo consta em [persistence-q — pré-requisitos do chamador](../persistence-q/README.md): a entrada
+> "não expira sozinha".)*
+>
+> **O que de fato apaga a chave é a transição `RUNNING → MODELING` do dataschema.** Ela chama o
+> `unpublish` do forger, que remove o modelo; o caminho de volta, `MODELING → RUNNING`, o grava outra
+> vez. É salvaguarda, não efeito colateral — pôr o dataschema em `MODELING` bloqueia o motor de
+> propósito, e sem a chave ele responde `510: Modelo do tenant não encontrado na cache. Republique o
+> modelo.`
+>
+> **A pergunta certa, portanto, não é "há quanto tempo não se republica?" — é "quem levou este
+> dataschema para `MODELING`?".** Republicar o `.model.json`
+> (`POST forger .../tenant/<id>/model`, sobrescrita idempotente) resolve nos dois casos, e é por isso
+> que o diagnóstico errado sobrevivia: a remediação funciona mesmo quando a explicação está trocada.
+> Diagnóstico que culpa o tempo faz **esperar**; diagnóstico que culpa a remoção faz **investigar**.
+>
+> > **Errata, 2026-09-10.** Até esta data o parágrafo afirmava que o modelo tinha TTL e que o prazo era
+> > configuração de deploy do forger. As duas coisas eram falsas. A afirmação nasceu de uma medição
+> > nossa de 2026-08-26 que leu `ModelCacheService` — classe diferente da que grava o modelo publicado —
+> > e sobreviveu porque a remediação sugerida funcionava. Apontada pelo `composer` em
+> > `yc.app/issues/docs.bug.bff-afirma-que-o-modelo-publicado-tem-ttl.20260910.md`.
 
 ## Miolo
 
