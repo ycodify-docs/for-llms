@@ -99,9 +99,11 @@ forger é quem **grava** ali ao publicar o `.model.json`) — e cruza com os **p
 > **O modelo publicado NÃO tem prazo de validade.** O forger grava a chave **sem expiração**, e isso é
 > deliberado: a constante que carrega o valor existe *"para que nenhuma configuração externa possa
 > reintroduzir TTL no modelo publicado"* — não é propriedade de deploy, é constante de código. *(medido
-> pelo `composer` em `forger@421a8b8`, `EntitiesModelCacheService`; confirmado pelo dono em 2026-09-10.
-> O mesmo consta em [persistence-q — pré-requisitos do chamador](../persistence-q/README.md): a entrada
-> "não expira sozinha".)*
+> pelo `composer` em `forger@421a8b8`, `ModelCacheService` — a classe que grava a chave do write model,
+> que é a que o BFF lê; a do read model, `EntitiesModelCacheService`, faz igual. Confirmado pelo dono em
+> 2026-09-10. O mesmo consta em
+> [persistence-q — pré-requisitos do chamador](../persistence-q/README.md): a entrada "não expira
+> sozinha".)*
 >
 > **São DUAS chaves no cache, e a capacidade depende de uma só.** O BFF lê
 > `ENGINE:persistence:cqrs:SETUP-TO:<tenantId>:wm` — o **write model**, gravado ao publicar o
@@ -127,18 +129,29 @@ forger é quem **grava** ali ao publicar o `.model.json`) — e cruza com os **p
 > Diagnóstico que culpa o tempo faz **esperar**; diagnóstico que culpa a remoção faz **investigar** — e
 > investigar a chave errada custa quase o mesmo que esperar.
 >
-> > **Errata, 2026-09-10.** Até esta data o parágrafo afirmava que o modelo tinha TTL e que o prazo era
-> > configuração de deploy do forger. As duas coisas eram falsas. A afirmação nasceu de uma medição
-> > nossa de 2026-08-26 que leu `ModelCacheService` — classe diferente da que grava o modelo publicado —
-> > e sobreviveu porque a remediação sugerida funcionava. Apontada pelo `composer` em
-> > `yc.app/issues/docs.bug.bff-afirma-que-o-modelo-publicado-tem-ttl.20260910.md`.
+> > **Errata, 2026-09-10 — e a parte instrutiva não é o erro, é como ele nasceu.** Até hoje o parágrafo
+> > afirmava que o modelo publicado tinha TTL e que o prazo era configuração de deploy do forger.
+> > **As duas coisas eram VERDADE quando foram escritas:** até `forger@d9e26f0` (2026-08-31) o
+> > `ModelCacheService` declarava `@Value("${app.model.cache.expires:86400}")` — 24 horas por padrão, e
+> > o prazo era mesmo config de deploy. Naquele commit o forger passou a gravar sem prazo e a
+> > propriedade foi removida; **esta fatia não foi atualizada junto, e apodreceu por catorze dias.**
+> >
+> > O risco que isto expõe é estrutural, e não se resolve conferindo melhor: **doc de comportamento
+> > alheio envelhece quando o dono do comportamento muda sem avisar quem documentou.** Quem escreve
+> > sobre serviço de outro não tem como saber que precisa reconferir — foi o `composer` quem mediu a
+> > história do arquivo e trouxe a data. *(medição do `composer`; apontada em
+> > `yc.app/issues/docs.bug.bff-afirma-que-o-modelo-publicado-tem-ttl.20260910.md`)*
 > >
 > > **Segunda rodada, no mesmo dia.** A primeira correção trocou o TTL pelo bracket do dataschema — e
 > > errou de chave, mandando investigar o `MODELING` de um modelo cuja remoção não passa por ali. O
 > > `composer` mediu as duas chaves e desfez a confusão: o `ModelCacheService` grava o write model (o
-> > que o BFF lê) e o `EntitiesModelCacheService` grava o read model (o que o bracket remove). **Duas
-> > explicações erradas antes de uma certa, e as duas soavam plausíveis porque a remediação nunca
-> > falhava.**
+> > que o BFF lê) e o `EntitiesModelCacheService` grava o read model (o que o bracket remove).
+> >
+> > **A história inteira deste parágrafo, que é o que vale guardar:** uma afirmação **correta** que
+> > apodreceu quando o comportamento mudou sem aviso; uma correção que acertou o "não tem TTL" e errou
+> > de chave; e só então a certa. Nenhuma das três falhava na prática, porque a remediação — republicar
+> > — funciona em todas as hipóteses. **Parágrafo cuja receita sempre dá certo não avisa quando a
+> > explicação está errada**, e este já demonstrou isso três vezes.
 
 ## Miolo
 
