@@ -2,6 +2,20 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.25 — 2026-09-10
+
+- **O que separa teste de produção são dois critérios, não um** — e o documento não dizia nenhum dos
+  dois. [Arquitetura](01-arquitetura.md) ganha a seção *Teste e produção — o que separa um do outro*, na
+  Fase 3: a **escrita** se separa pela **superfície** (o prefixo `/t/` entra numa instância de teste do
+  motor, que escreve no event store de teste); a **leitura** se separa pelo **tenant**, e não por nome
+  ou instância de banco — dois tenants podem ter o mesmo modelo de leitura, um de teste e outro de
+  produção, materializados até no mesmo banco.
+
+- **Por que a lacuna importava:** sem esse critério escrito, é natural inferir o ambiente do lugar onde
+  o dado está — "esta linha está no banco X, logo é produção". A inferência é inválida, e leva a tratar
+  como delicado um dado de teste, ou o contrário. A pergunta que classifica é **de que tenant é a
+  linha**; o tenant de teste existe desde o começo, o de produção só quando o sistema vai ao ar.
+
 ## 1.24 — 2026-09-10
 
 - **Pare de invalidar cache à mão: a plataforma já repõe o modelo sozinha.** Até esta versão, a

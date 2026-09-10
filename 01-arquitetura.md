@@ -143,6 +143,29 @@ Três consequências que valem para quem integra:
 - **Uma falha aqui não aparece na resposta do comando**, que já foi entregue. Investigar a resposta do
   comando não revela nada sobre uma projeção que não chegou.
 
+### Teste e produção — o que separa um do outro
+
+São **dois critérios diferentes**, um para cada lado do CQRS, e trocá-los leva a conclusões erradas
+sobre dados que estão corretos.
+
+| Lado | O que separa teste de produção |
+|---|---|
+| **Escrita** | a **superfície** pela qual a requisição entra. O prefixo de teste (`/v3/persistence/t/…`) chega a uma **instância de teste** do motor, cuja escrita vai para o **event store de teste**. É a rota que decide, e a decisão é tomada na porta de entrada. |
+| **Leitura** | o **tenant**. O modelo de leitura **não** se identifica por nome de banco nem por instância de banco de dados. Dois tenants podem ter **exatamente o mesmo modelo de leitura** — um usado para teste, outro para produção — e nada impede que as duas projeções sejam materializadas no mesmo banco. |
+
+Isto é coerente com o que a seção anterior descreve: o destino da projeção sai do `tenant-id` da
+mensagem, e de mais nada. **O mesmo modelo de leitura, sob dois tenants, são dois conjuntos de dados
+distintos e isolados.**
+
+**A consequência prática, para quem integra e para quem investiga:** saber **em que banco** — ou em que
+instância de banco — uma linha está **não diz** se ela é de teste ou de produção. A pergunta que
+classifica é **de que tenant ela é**. Concluir "está no banco X, logo é produção" é um erro de
+raciocínio, não uma medição.
+
+**Ordem de existência:** o tenant de teste existe desde o começo do trabalho; o de produção passa a
+existir **quando o sistema vai para produção**. Antes disso, todo dado sob aquele modelo de leitura é
+de teste, esteja onde estiver.
+
 ---
 
 ## Fase 4 — Consulta
