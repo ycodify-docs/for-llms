@@ -178,6 +178,14 @@ Três consequências práticas, e a terceira é a que mais morde:
   existe"**. Quando a ficha é criada por outra pessoa, garantir que esse campo seja preenchido é parte da
   modelagem, não detalhe de implementação.
 
+> **Está depurando uma lista vazia que não deveria estar vazia?** Esta e a condição irmã — o atributo
+> conter valor diferente do que identifica o usuário no token — **falham fechado**: `200`, lista vazia,
+> e **nenhum erro para ninguém**, nem para quem consulta nem para quem publicou a entity. Nenhuma das
+> duas é verificada na publicação: o forger confere que o atributo **existe**, não o que ele **contém**.
+> Se um titular relata que "sumiu tudo", **verifique estas duas antes de qualquer outra coisa** —
+> detalhe e diagnóstico em
+> [forger — o que o `rows.by` precisa ser](../forger/endpoints/entity.md#recorte-de-leitura-por-titular-accesscontrolscope).
+
 ### `read` e `scope`, conjugados
 
 A regra que explica todo o resto: **`scope` nunca concede acesso, só estreita o que o `read` já
