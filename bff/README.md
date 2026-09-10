@@ -103,23 +103,42 @@ forger é quem **grava** ali ao publicar o `.model.json`) — e cruza com os **p
 > O mesmo consta em [persistence-q — pré-requisitos do chamador](../persistence-q/README.md): a entrada
 > "não expira sozinha".)*
 >
-> **O que de fato apaga a chave é a transição `RUNNING → MODELING` do dataschema.** Ela chama o
-> `unpublish` do forger, que remove o modelo; o caminho de volta, `MODELING → RUNNING`, o grava outra
-> vez. É salvaguarda, não efeito colateral — pôr o dataschema em `MODELING` bloqueia o motor de
-> propósito, e sem a chave ele responde `510: Modelo do tenant não encontrado na cache. Republique o
-> modelo.`
+> **São DUAS chaves no cache, e a capacidade depende de uma só.** O BFF lê
+> `ENGINE:persistence:cqrs:SETUP-TO:<tenantId>:wm` — o **write model**, gravado ao publicar o
+> `.model.json`. A outra, `ENGINE:persistence:SETUP-TO:<tenantId>`, guarda a **spec de entidades** (read
+> model) e é a que o **motor** usa. Confundi-las manda o diagnóstico para o lado errado, porque **o que
+> apaga uma não apaga a outra**.
 >
-> **A pergunta certa, portanto, não é "há quanto tempo não se republica?" — é "quem levou este
-> dataschema para `MODELING`?".** Republicar o `.model.json`
-> (`POST forger .../tenant/<id>/model`, sobrescrita idempotente) resolve nos dois casos, e é por isso
-> que o diagnóstico errado sobrevivia: a remediação funciona mesmo quando a explicação está trocada.
-> Diagnóstico que culpa o tempo faz **esperar**; diagnóstico que culpa a remoção faz **investigar**.
+> **O que apaga a chave das capabilities é o `DELETE` explícito do modelo** — `ModelController
+> .deleteModel`, que chama `modelCacheService.delete(tenantId)`. Só isso. Fora esse caminho nada a
+> remove, e republicar o `.model.json` (`POST forger .../tenant/<id>/model`) a sobrescreve — o mesmo
+> `update` cobre o caso de ela estar ausente. Então, se a capacidade sumiu, as hipóteses são **duas**:
+> o modelo foi apagado, ou nunca foi publicado para aquele tenant.
+>
+> **O bracket do dataschema NÃO derruba a capacidade** — ele age sobre a outra chave. A transição
+> `RUNNING → MODELING` remove a spec de entidades e com isso bloqueia o **motor**, que passa a responder
+> `510: Modelo do tenant não encontrado na cache. Republique o modelo.`; o caminho de volta,
+> `MODELING → RUNNING`, a grava de novo. É salvaguarda deliberada. Sintoma diferente, chave diferente:
+> `GET /session/capabilities` continua listando os comandos enquanto o comando falha no motor.
+>
+> **A pergunta certa, portanto, não é "há quanto tempo não se republica?"** — é "este modelo foi
+> apagado, ou nunca foi publicado?". Republicar resolve em qualquer hipótese, e é por isso que o
+> diagnóstico errado sobrevivia: a remediação funciona mesmo quando a explicação está trocada.
+> Diagnóstico que culpa o tempo faz **esperar**; diagnóstico que culpa a remoção faz **investigar** — e
+> investigar a chave errada custa quase o mesmo que esperar.
 >
 > > **Errata, 2026-09-10.** Até esta data o parágrafo afirmava que o modelo tinha TTL e que o prazo era
 > > configuração de deploy do forger. As duas coisas eram falsas. A afirmação nasceu de uma medição
 > > nossa de 2026-08-26 que leu `ModelCacheService` — classe diferente da que grava o modelo publicado —
 > > e sobreviveu porque a remediação sugerida funcionava. Apontada pelo `composer` em
 > > `yc.app/issues/docs.bug.bff-afirma-que-o-modelo-publicado-tem-ttl.20260910.md`.
+> >
+> > **Segunda rodada, no mesmo dia.** A primeira correção trocou o TTL pelo bracket do dataschema — e
+> > errou de chave, mandando investigar o `MODELING` de um modelo cuja remoção não passa por ali. O
+> > `composer` mediu as duas chaves e desfez a confusão: o `ModelCacheService` grava o write model (o
+> > que o BFF lê) e o `EntitiesModelCacheService` grava o read model (o que o bracket remove). **Duas
+> > explicações erradas antes de uma certa, e as duas soavam plausíveis porque a remediação nunca
+> > falhava.**
 
 ## Miolo
 
