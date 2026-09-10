@@ -48,6 +48,12 @@ Erros: `400`, `403`, `500`.
 
 ### O que a transição faz com o modelo no cache
 
+> **⚠️ Vigência:** o que esta seção descreve vale **a partir da versão do forger que carregar
+> `f45b22c`** (mergeado em `09dbfcb`) — **ainda não implantado em 2026-09-10**. Na superfície que está
+> no ar, `RUNNING → MODELING` derruba **apenas** a spec de entidades, e a volta a `RUNNING` **não
+> verifica nada**: o passo 3 do roteiro abaixo parece opcional porque hoje ele é. Confirme a versão
+> implantada antes de tratar o passo 3 como dispensável — ele deixa de ser.
+
 A transição de `status` **não é só um rótulo no banco**: ela publica e remove os modelos que o motor
 consome. Isso muda o roteiro de alterar um schema em operação, e é a parte que costuma ser feita à mão
 sem necessidade.
