@@ -38,11 +38,11 @@ Nomes são **normalizados para minúsculas** e seguem formato e **limite de comp
 |---|---|---|---|
 | **database** (`dbsqlname`) | só letras minúsculas | `^[a-z]+$` | — (sem limite definido) |
 | **project** (`name`) | só letras minúsculas | `^[a-z]+$` | **16** |
-| **dataschema** (`name`) | minúsculas, dígitos e `_`; **começa com letra** | `^[a-z][a-z0-9_]*$` | **16** |
+| **dataschema** (`name`) | minúsculas, dígitos e `_`; **começa com letra** | `^[a-z][a-z0-9_]*$` | **12** |
 | **entity** (nome) | só letras minúsculas (sem dígitos/`_`) | `^[a-z]+$` | **24** |
 | **atributo** (nome) | só letras minúsculas (sem dígitos/`_`) | `^[a-z]+$` | **24** |
 | **associação** (nome) | só letras minúsculas (sem dígitos/`_`) | `^[a-z]+$` | **24** |
-| **superentidade** (nome) | só letras minúsculas | `^[a-z]+$` | **24** |
+| **superentidade** (nome) | só letras minúsculas | `^[a-z]+$` | **64** — validada por caminho próprio, mais permissivo que os demais |
 
 Violar o padrão ou o limite → `400` com a indicação do nome rejeitado.
 
