@@ -42,15 +42,31 @@ POST /org/acme/project/vendas/database/20/dataschema
 
 ## 5. Projeção (entity)
 
+`_conf` é **obrigatório** e o `type` de cada atributo vem de uma lista fechada, **com inicial
+maiúscula** — ver [entity.md](endpoints/entity.md). O corpo abaixo é o mesmo nas duas chamadas:
+
 ```
-POST /org/acme/project/vendas/dataschema/vendas/entity/validate   // dry-run
-{ "name": "pedido", "attributes": [ { "name": "total", "type": "decimal" } ] }
+POST /org/acme/project/vendas/dataschema/vendas/entity/validate   // dry-run, não persiste
+{
+  "name": "pedido",
+  "_conf": {
+    "type": "entity",
+    "accessControl": { "read": ["MASTER"], "write": ["MASTER"] }
+  },
+  "attributes": [
+    { "name": "total",  "type": "Double", "nullable": false },
+    { "name": "cliente", "type": "String", "length": 60, "nullable": false }
+  ]
+}
 → 200
 
 POST /org/acme/project/vendas/dataschema/vendas/entity            // aplica CREATE TABLE
-{ "name": "pedido", "attributes": [ { "name": "total", "type": "decimal" } ] }
+(mesmo corpo)
 → 201
 ```
+
+> Erros comuns aqui: `type` em minúsculas ou fora da lista (`"decimal"` não existe — use `"Double"`),
+> e `_conf` ausente. Os dois respondem `400` na compilação, antes de tocar o banco.
 
 ## 6. Modelo de domínio (model)
 

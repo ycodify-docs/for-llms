@@ -47,7 +47,7 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
 {
   "name": "string",
   "attributes": [
-    { "name": "string", "type": "string", "length": 0, "nullable": true,
+    { "name": "string", "type": "String", "length": 60, "nullable": true,
       "unique": false, "comment": "string", "default": "string" }
   ],
   "associations": [
@@ -55,6 +55,7 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
       "unique": false, "comment": "string" }
   ],
   "_conf": {
+    "type": "entity",
     "comment": "string", "concurrencyControl": true,
     "uniqueKey": ["string"], "indexKey": ["string"],
     "accessControl": { "read": ["MASTER"], "write": ["MASTER"], "scope": {} },
@@ -62,6 +63,19 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
   }
 }
 ```
+
+**Os dois campos `type` são de listas fechadas — e não são a mesma lista.**
+
+| Onde | Valores aceitos | Obrigatório |
+|---|---|---|
+| `_conf.type` | `entity` · `abstract` · `component` · `enumeration` (minúsculas) | **sim** |
+| `attributes[].type` | `String` · `Text` · `Integer` · `Long` · `Double` · `Float` · `Boolean` · `Date` · `Timestamp` · `Json` · `Jsonb` (**inicial maiúscula**) | **sim** |
+
+> **⚠️ O tipo do atributo casa exatamente, com a caixa.** `"string"` em minúsculas é recusado, e nomes
+> de tipo SQL não existem aqui: para decimal use **`Double`**, para texto longo **`Text`**. A recusa é
+> `400` na compilação, antes de tocar o banco.
+>
+> **`length` é obrigatório para `String`** — os demais tipos o ignoram.
 
 > **⚠️ `_conf` é OBRIGATÓRIO e semântico aqui.** A definição de **entity** exige `_conf` (configuração:
 > chave única, índices, controle de concorrência, superentidade…). A convenção "chave `_`-prefixada =
