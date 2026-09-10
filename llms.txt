@@ -60,7 +60,9 @@
 - [acionar processamento](es-n/endpoints/processar-eventos.md) · [Erros](es-n/erros.md) · [Exemplos](es-n/exemplos.md)
 
 ## br-service (regras e coordenação)
-- [Guia](br-service/README.md): posição no fluxo, três categorias de processador, forma canônica da rota, contrato de resposta.
+- [Guia](br-service/README.md): porta de entrada por pergunta, posição no fluxo, forma canônica da rota, índice de endpoints.
+- [Os três contextos de invocação](br-service/contextos.md): o que chega, quantos argumentos, o que devolver e o que falha em cada um — e por que o envelope `processedData` é obrigatório no assíncrono e proibido no síncrono.
+- [Acesso a dados de dentro do processador](br-service/acesso-a-dados.md): com que identidade ler, por que o token do usuário pode devolver lista vazia com `200`, os controles de acesso e o que fazer quando a projeção não aparece.
 - [Autoria de processadores](br-service/processadores.md): caminho do arquivo → rota, forma do export, o que o processador recebe e devolve, publicação, diagnóstico.
 - [executar função (/br)](br-service/endpoints/br.md) · [Erros](br-service/erros.md) · [Exemplos](br-service/exemplos.md) · [OpenAPI](br-service/openapi.yaml)
 - [implantar processadores](br-service/endpoints/processors-deploy.md): publicar e desfazer a árvore de uma organização por arquivo compactado; os três cabeçalhos, o teto e como conferir o que entrou.

@@ -2,6 +2,44 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.22 — 2026-09-09
+
+- **O br-service tem TRÊS contratos, não um — e a doc apresentava um só.** O serviço é acionado de três
+  lugares (regra de negócio no caminho do comando, coordenação por fila, projeção cross-contexto por
+  fila) e os três mandam **corpo diferente**, entregam **número diferente de argumentos** ao processador
+  e esperam **forma de resposta diferente**. A fatia ganha um documento que é o eixo disso,
+  [br-service — os três contextos de invocação](br-service/contextos.md), e o guia passa a ser porta de
+  entrada por pergunta.
+
+- **O envelope `processedData` é obrigatório nos dois contextos assíncronos e proibido no síncrono.**
+  Esta é a correção mais cara da versão: o guia documentava só a forma **sem** envelope e os exemplos só
+  a forma **com** envelope — cada um certo sobre um contexto e errado sobre o outro, e nenhum dizia de
+  qual falava. Um processador de coordenação que devolve o objeto direto recebe `200` e o comando-alvo
+  **nunca nasce**, sem erro em lugar nenhum.
+
+- **Não existe fan-out de coordenação.** Uma coordenação emite **um** comando, nunca uma lista — e
+  `targetCommand` ausente faz a saga ser descartada em silêncio, com a mensagem confirmada. Quem
+  esperava encerrar N filhos a partir de um cancelamento não tinha como saber que o mecanismo não
+  existe.
+
+- **Na projeção, `aggregateid` é obrigatório** no objeto devolvido, e a chave tem de ser o nome da
+  **projeção de destino** — é o que decide entre criar e atualizar a linha.
+
+- **`accessControl` visto de dentro do processador ganha documento próprio**
+  ([br-service — acesso a dados](br-service/acesso-a-dados.md)): com que identidade ler, por que usar o
+  token do usuário para validar contra dado de **terceiro** devolve **lista vazia com `200`** — e não um
+  erro —, quais controles de acesso mordem em que momento, e o diagnóstico reproduzível para o sintoma
+  "comando `200`, processador ok, **projeção não aparece**". Vale a partir de `amd64-260909b`; a
+  ressalva de que o controle de escrita está no artefato e **não foi exercitado** está escrita lá.
+
+- **O `400` do br-service não é o que o cliente final vê.** No contexto síncrono, a falha do processador
+  chega ao cliente como **`510`**. Quem tratava `400` nunca encontrava a mensagem do processador.
+
+- **`authToken` e `tenantIds` passam a constar do contrato de fio** ([executar função](br-service/endpoints/br.md)
+  e o OpenAPI da fatia): são eles que decidem **quantos argumentos** o processador recebe, e estavam
+  ausentes do corpo publicado. E o `authToken` **nunca** existe em contexto assíncrono — não é "pode não
+  haver".
+
 ## 1.21 — 2026-09-06
 
 - **Errata na doc da borda: cada verificação assina com um cabeçalho próprio.** A versão 1.20 dizia

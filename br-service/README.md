@@ -1,20 +1,29 @@
 # br-service — guia do serviço
 
-> **Papel:** executa **regras de negócio** e funções de **coordenação** de agregados (comumente em
-> sagas). Recebe dados e devolve dados; processadores devem ser **idempotentes** e, idealmente, puros
-> (alguns de coordenação/projeção fazem **leituras** — ver ressalva abaixo).
+> **Papel:** executa as **funções** que o modelo declara — regra de negócio de um comando, coordenação
+> entre agregados (saga) e transformação para projeção de outro contexto. Recebe dados e devolve dados.
 > **Quem chama:** **somente** o [persistence-crs](../persistence-crs/README.md) — nunca o cliente final
 > diretamente (CP-6). Pré-requisitos: [conceitos](../02-conceitos.md), [arquitetura](../01-arquitetura.md).
+
+## Qual é a sua pergunta
+
+| A pergunta | Onde ela é respondida |
+|---|---|
+| em que contexto o meu processador roda, e **o que chega** nele | [contextos.md](contextos.md) |
+| **o que eu devolvo** para o retorno não ser descartado | [contextos.md](contextos.md) |
+| o comando respondeu `200` e **nada aconteceu** | [contextos.md — quando o retorno some sem erro](contextos.md) |
+| meu processador precisa **ler a ficha de outra pessoa** | [acesso-a-dados.md](acesso-a-dados.md) |
+| a **projeção não aparece** depois de um comando que deu certo | [acesso-a-dados.md](acesso-a-dados.md) |
+| **publiquei e a rota não existe** | [processadores.md](processadores.md) |
+| como se escreve e se publica o arquivo | [processadores.md](processadores.md) |
 
 ## Contents
 - Posição no fluxo
 - Índice de endpoints
-- Roteamento de processadores
+- Forma canônica da rota
 - Contrato de resposta
 - Ciclo de vida de uma requisição
-- Autoria de processadores → [processadores.md](processadores.md)
-- Implantar processadores → [endpoints/processors-deploy.md](endpoints/processors-deploy.md)
-- Consultar o log de execução → [endpoints/logs.md](endpoints/logs.md)
+- Callback do processor
 - Pontos de coordenação
 - Pitfalls
 
@@ -22,13 +31,18 @@
 
 ## Posição no fluxo
 
-Durante a execução de um comando, se o **model** do comando (ou de um evento de coordenação) declara
-uma **rota** de regra/coordenação, o persistence-crs chama o br-service nessa rota, passando os dados.
-O br-service executa a **função** correspondente e devolve o resultado, que o persistence-crs incorpora
-ao processamento (CP-6/CP-7). O br-service **não é chamado diretamente pelo cliente** (só pelo
-persistence-crs). Um processor **pode ler de volta** persistence-q/crs para enriquecimento (via **endpoints
-internos de cluster**, ver abaixo) e — quando o caso de uso exigir — chamar integrações externas nos hooks de
-coordenação (async); no caminho **crítico do comando** (síncrono), evite escrita/efeitos externos.
+Quando o **model** de um comando ou de um evento declara uma **rota** de br, o persistence-crs chama o
+br-service nessa rota, passando os dados; o serviço executa a **função** correspondente e devolve o
+resultado, que o persistence-crs incorpora ao processamento (CP-6/CP-7). O br-service **não é chamado
+diretamente pelo cliente**.
+
+**São três contextos de invocação, e eles não têm o mesmo contrato** — corpo, número de argumentos,
+forma da resposta e tratamento de falha mudam entre eles. É o que
+[contextos.md](contextos.md) descreve, e é a leitura obrigatória antes de escrever qualquer processador.
+
+Um processador **pode ler de volta** persistence-q/crs para enriquecimento — como, e com que identidade,
+está em [acesso-a-dados.md](acesso-a-dados.md). Efeito externo com escrita é aceitável nos hooks
+assíncronos, desde que tolere reentrega; no **caminho crítico do comando**, evite.
 
 ## Índice de endpoints
 
@@ -45,24 +59,16 @@ coordenação (async); no caminho **crítico do comando** (síncrono), evite esc
 > pela borda como rotas administrativas e pedem `X-Forger-Credential` — que **nunca** vai junto com
 > `X-Tenant-Id`. O `POST /br` não é afetado: ele é chamado pelo motor de comandos dentro do cluster.
 
-> **⚠️ `POST /coordination` — pendente (gap de plataforma).** O motor de comandos (persistence-crs)
-> aciona uma coordenação **síncrona no caminho do comando** quando o modelo do comando declara
-> `command.<c>.coordination.route`, postando em **`POST /coordination`** (corpo `{content:{route,data}}`,
-> retorno = lista ordenada de comandos). **O br-service ainda NÃO implementa este endpoint** (só `/br`).
-> Até implementá-lo, a coordenação command-path não funciona — use a **coordenação assíncrona**
-> `event.domainBus.triggerCoordination[]` (posta em `/br`, rota `…/coordination/<n>`; ver "Três categorias").
+> **⚠️ `POST /coordination` — pendente (gap de plataforma).** O motor de comandos aciona uma coordenação
+> **síncrona no caminho do comando** quando o modelo do comando declara `command.<c>.coordination.route`,
+> postando em **`POST /coordination`** (corpo `{content:{route,data}}`). **O br-service NÃO implementa
+> este endpoint** — só `/br`. Declarar `coordination.route` hoje não é um no-op silencioso: a chamada
+> falha e leva o comando junto. Para coordenação, use `event.domainBus.triggerCoordination`
+> ([contextos.md](contextos.md)).
 
 Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md).
-Autoria e carga de processadores: [processadores.md](processadores.md).
 
-## Roteamento de processadores
-
-- Cada **função** é um **processador** identificado por uma **rota** (caminho textual).
-- O persistence-crs envia `{ "route": "<rota>", "data": { ... } }`; o serviço localiza o processador
-  pela rota e o executa com os dados.
-- Rota inexistente → erro (com a lista de rotas disponíveis).
-
-### Forma canônica da rota (obrigatória)
+## Forma canônica da rota (obrigatória)
 
 O br-service serve **múltiplas organizações**, cada uma com uma hierarquia de recursos semelhante. Para
 **evitar colisão** entre funções de organizações diferentes, a rota é **totalmente qualificada**, do
@@ -93,14 +99,20 @@ Aninhando os escopos, o **path completo é globalmente único** → duas organiz
 > (1 project = 1 bounded context), os segmentos `project` e `boundedContext` costumam **coincidir** —
 > ex.: `acme/vendas/vendas/pedido/criar`. Não é erro: são escopos distintos que, por padrão, têm o mesmo nome.
 
-> Como o arquivo vira rota no disco, a forma do export, a assinatura recebida pelo processador e
-> por que um processador mal exportado desaparece **sem erro**: [processadores.md](processadores.md).
+> ⚠️ **O sufixo é convenção de leitura, não é o que decide o comportamento.** Quem determina em que
+> contexto o processador roda é **onde a rota foi declarada no modelo** — ver
+> [contextos.md](contextos.md). Uma rota com sufixo `coordination` declarada em `command.br.route` roda
+> como regra de negócio.
 
 ## Contrato de resposta
 
-- Sucesso (`200`): o serviço devolve **diretamente** o objeto retornado pelo processador (sem envelope).
-  Esse objeto é o que o persistence-crs usa para enriquecer/validar/coordenar o comando.
+- Sucesso (`200`): o serviço devolve **diretamente** o que o processador retornou, sem envelope próprio.
 - Falha (`400`): objeto com `status`, mensagem e tipo do erro.
+
+⚠️ **O que o processador deve retornar depende do contexto**, e não é o mesmo nos três: o contexto
+síncrono espera o objeto do comando **sem envelope**; os dois assíncronos exigem o envelope
+**`processedData`**. A forma exata de cada um está em [contextos.md](contextos.md) — errar isso devolve
+`200` e descarta o resultado em silêncio.
 
 ## Ciclo de vida de uma requisição
 
@@ -108,64 +120,21 @@ Aninhando os escopos, o **path completo é globalmente único** → duas organiz
 
 1. **Validação** — corpo não-nulo, objeto, com `route`. Falha → `400`.
 2. **Roteamento** — localiza o processador pela `route`. Não encontrado → `400` (lista rotas disponíveis).
-3. **Execução** — invoca o processador com `data` (ou o corpo inteiro, se `data` ausente). Pode ser
-   assíncrono; o resultado é aguardado.
+3. **Execução** — invoca o processador com os argumentos que o corpo determina
+   ([contextos.md](contextos.md)). Pode ser assíncrono; o resultado é aguardado.
 4. **Resposta** — `200` com o resultado **direto** do processador; exceção no processador → `400` com
    `{ status, mensagem, tipo }`.
 
-## Três categorias de processador
-
-A **rota** de um processador sinaliza seu papel, por convenção de segmento de path. Os três casos
-correspondem aos três pontos onde o modelo referencia uma rota de br:
-
-> Todas as rotas seguem a [forma canônica](#forma-canônica-da-rota-obrigatória)
-> `<org>/<project>/<bc>/<aggregate>/…`. As colunas abaixo mostram só o **sufixo** que distingue a categoria.
-
-| Categoria | Referenciado em | Sufixo da rota | Entrada | Retorno |
-|---|---|---|---|---|
-| **Regra de negócio** | `command.br.route` | `…/<aggregate>/<comando>` (nome do comando) | dados do comando | os **dados validados/enriquecidos** do comando — mesclados no comando antes de gravar o evento |
-| **Coordenação (saga)** | `event.domainBus.triggerCoordination[].br.route` | `…/<aggregate>/coordination/<alvo_from_origem>` (segmento **`coordination`**) | dados do evento (estado do agregado de origem) | um **`targetCommand`** `{ boundedContext, aggregateType, commandName, data }` — submetido como novo comando no contexto destino (CP-7) |
-| **Projeção cross-contexto** | `event.domainBus.triggerProjection[].br.route` | `…/<aggregate>/projection/<alvo_from_origem>` (segmento **`projection`**) | dados do evento (estado do agregado de origem) | a **linha da projeção destino** `{ "<projeção>": { …campos } }` — aplicada na projeção do outro contexto |
-
-**Convenção de nome** (coordenação/projeção): `<alvo>_from_<origem>` (ex.: `conta_from_pedido`).
-
-> **⚠️ Regra de negócio — o merge de volta é whitelist (chaves novas são descartadas):** os dados
-> retornados pelo processor são mesclados no comando **apenas nas chaves que já existem** no
-> `commandData`; **chaves NOVAS retornadas pelo processor são DESCARTADAS** (não chegam ao evento
-> gravado). Por isso todo campo que o processor pretende **enriquecer/calcular** já precisa existir como
-> **atributo do comando no `.model.json`** — do contrário o valor devolvido se perde silenciosamente.
-
-### Pureza e efeitos colaterais (importante)
-
-- O **núcleo** do br-service é um **dispatcher**: não faz chamadas externas.
-- Um **processador** é uma **função** que **deve** ser **idempotente** e, idealmente, **pura**.
-- **Ressalva honesta:** processadores de **coordenação** e **projeção** **podem** fazer **leituras**
-  (ex.: consultar projeções) para enriquecer o mapeamento. Isso é aceitável desde que seja
-  **somente leitura**, idempotente e tolerante a reentrega. **Evite** efeitos colaterais externos com
-  escrita no caminho crítico do comando.
-- A rota usada é a mesma referenciada no **model** do comando/evento (ver
-  [model-format](../persistence-crs/spec/model-format.md#eventos-e-domainbus)).
-
 ### Callback do processor → persistence-q / persistence-crs (endpoint interno de cluster)
 
-O br-service roda **intra-cluster** (atrás da DMZ). Quando um processor precisa **ler** uma projeção
-(enriquecimento) ou **escrever** de volta, usa os **endpoints internos de cluster** da persistence-q/crs
-— sem controle de acesso por conta de usuário, feitos para **chamadas internas** (**nunca expostos fora
-do cluster**). O **path exato é sensível e injetado pela plataforma no deploy** → o processor o lê de
-**variável de ambiente**; **NUNCA hardcodar** o path. Header obrigatório: **`X-Tenant-Id`** (o tenant vem
-do payload: `targetTenantId`/`sourceTenantId`). **Sem `Authorization`/JWT.**
+Movido, e ampliado, para **[acesso-a-dados.md](acesso-a-dados.md)** — que responde também *com que
+identidade* a leitura acontece, por que o token do usuário pode devolver lista vazia com `200`, e o que
+fazer quando a projeção não aparece.
 
-| Ação | Endpoint interno de cluster | Corpo |
-|---|---|---|
-| **Ler projeção** (persistence-q) | endpoint interno de **leitura** da persistence-q | `{"<projeção>":{<predicado>}}` → `200` array · `204` vazio |
-| **Ler estado do agregado** (persistence-crs) | endpoint interno de **leitura de agregado** (`…/a/<bc>/<aggType>/<uuid>` [+ `/history`]) | — |
-| **Escrever comando** (persistence-crs) | endpoint interno de **comando** (`…/a/<bc>/<aggType>`) | `{"<comando>":{...}}` |
-
-> **JWT — regra síncrono vs assíncrono:** no hook **síncrono** (regra de negócio `/br`, caminho do
-> comando) o corpo carrega `authToken` (JWT do usuário) — o processor **pode** usar endpoints seguros
-> com esse token. Nos hooks **assíncronos** (coordenação/projeção, via fila) **NÃO há JWT** → **usar o
-> endpoint interno de cluster** (path via env, `X-Tenant-Id`, sem `Authorization`). ⛔ **NUNCA hardcodar
-> um JWT nem o path do endpoint interno** no processor — ambos vêm do ambiente injetado no deploy.
+O essencial, para quem só passa por aqui: hook **assíncrono** usa o **endpoint interno de cluster**
+(`X-Tenant-Id`, **sem `Authorization`**); hook **síncrono** pode usar a superfície segura com o
+`authToken` do corpo, **e nesse caso o recorte de leitura por titular se aplica**. ⛔ Nunca hardcodar um
+JWT nem o path do endpoint interno — ambos vêm do ambiente injetado no deploy.
 
 ## Pontos de coordenação
 - **CP-6** — o persistence-crs chama o br-service quando o modelo do comando exige regra/coordenação.
@@ -174,9 +143,14 @@ Ver [coordenação](../coordenacao.md).
 
 ## Pitfalls (checklist do agente)
 
-- [ ] Não chamar o br-service diretamente: ele é acionado **pelo persistence-crs** conforme o **model**.
-- [ ] Garantir que a **rota** referenciada no model exista como processador.
-- [ ] Manter o processador **idempotente**; leituras de enriquecimento são aceitáveis, mas **evite
-      escrita/efeitos externos** no caminho crítico do comando.
-- [ ] A resposta de sucesso é o objeto **direto** do processador (sem envelope) — modelar de acordo.
-- [ ] Callback a persistence-q/crs: **hook async → endpoint interno de cluster + `X-Tenant-Id`, SEM JWT**; hook síncrono pode usar `body.authToken`. ⛔ **NUNCA hardcodar JWT nem o path do endpoint interno** (vêm de env injetada no deploy).
+- [ ] **Saber em que contexto o processador roda** antes de escrevê-lo — é o que define argumentos e
+      retorno ([contextos.md](contextos.md)).
+- [ ] **Envelope `processedData` nos contextos assíncronos**, e **nunca** no síncrono.
+- [ ] Na regra de negócio, **todo campo calculado já precisa existir** como atributo do comando: chave
+      nova é descartada em silêncio.
+- [ ] Na projeção, devolver a chave da **projeção de destino**, com `aggregateid`.
+- [ ] Ler dado de terceiro → **endpoint interno**, nunca o token do usuário
+      ([acesso-a-dados.md](acesso-a-dados.md)).
+- [ ] Processador assíncrono **idempotente** — a entrega é ao-menos-uma-vez.
+- [ ] Não chamar o br-service diretamente: ele é acionado **pelo persistence-crs** conforme o model.
+- [ ] Garantir que a **rota** referenciada no model exista como processador publicado.
