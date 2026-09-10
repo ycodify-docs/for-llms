@@ -253,7 +253,8 @@ recorte da tabela inteira — e essa perda é **aberta**, a resposta continuaria
 - vários papéis casando, o **menos restritivo vence**;
 - **`MASTER` nunca entra** no `scope` — ele é exigido nas duas listas e nunca é recortado;
 - `by` nomeia um **atributo declarado** da entity, que guarda o titular da linha;
-- para **remover** o recorte, envie `scope` vazio (`{}`) — isso não mexe nos papéis.
+- para **remover** o recorte, envie `scope` vazio (`{}`) — isso não mexe nos papéis;
+- o recorte vale **só na leitura**: veja abaixo o que acontece com `scope.write`.
 
 **O que o `rows.by` precisa ser — e isto é decisão de modelagem, não de configuração**
 
@@ -279,7 +280,6 @@ eles registram quem escreveu.
 
 | O que | Por quê |
 |---|---|
-| `scope.write` não vazio | o motor honra o recorte apenas na **leitura**; aceitar publicaria entity que se lê como protegida na escrita sem estar |
 | `MASTER` no `scope` | é o piso de toda entity e nunca é recortado |
 | papel em `scope.read` fora de `accessControl.read` | papel que não lê não tem o que recortar — e um erro de digitação aqui significaria "sem recorte", falhando **aberto** |
 | `rows.by` ausente | o recorte precisa saber por qual atributo cortar |
@@ -287,6 +287,21 @@ eles registram quem escreveu.
 | `rows.by` nomeando `id`, `loguser`, `logrole`, `logversion`, `logdate` | são metadados da plataforma: registram **quem escreveu**, não **de quem é** a linha |
 | `rows.by` que não é atributo declarado | — |
 | a dimensão `attributes` | reservada no formato, ainda não honrada pelo motor |
+
+**`scope.write` é caso à parte, e o comportamento depende do verbo** *(medido em
+`yc-composer:amd64-260909`, 2026-09-09)*
+
+O recorte só é honrado na **leitura**. Um `scope.write` não vazio:
+
+- **na criação** da entity é **recusado com `400`**;
+- **no `PUT`** é **aceito com `200` e o lado `write` é descartado em silêncio** — releia a entity e ele
+  não está lá.
+
+> **O resultado final é seguro; o que falta é o aviso.** A entity nunca fica se dizendo protegida na
+> escrita sem estar — o `write` simplesmente não é gravado. Não há buraco de segurança aqui. O problema
+> é que quem declarou acreditando ter protegido a escrita recebe `200` e **não é informado de nada**.
+> **Confira relendo a entity depois do `PUT`:** se o `scope` voltar só com `read`, o seu `write` foi
+> descartado.
 
 O **efeito na consulta** — como o recorte se combina com filtros, `_connective` e `_count` — é do
 `persistence-q`: veja a doc dele. Quem **declara** a chave é o forger; quem a **honra** é o motor.
