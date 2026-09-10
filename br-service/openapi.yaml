@@ -4,7 +4,10 @@ info:
   version: "1.0"
   description: >
     Executa o processador (função) identificado por uma rota. Chamado pelo persistence-crs (não pelo
-    cliente). Resposta = objeto direto do processador (sem envelope). Detalhe: README.md, endpoints/br.md.
+    cliente). O serviço não acrescenta envelope à resposta — mas o que o processador deve RETORNAR
+    depende do contexto de invocação: objeto direto no contexto síncrono, envelope processedData nos
+    dois contextos assíncronos. Os campos authToken e tenantIds decidem quantos argumentos o processador
+    recebe. Detalhe: README.md, contextos.md, endpoints/br.md.
 servers:
   - url: /
     description: Acesso interno entre serviços (host omitido por política).
@@ -26,9 +29,22 @@ paths:
                 data:
                   type: object
                   description: "Dados passados ao processador (se ausente, o corpo inteiro é usado)."
+                authToken:
+                  type: [string, "null"]
+                  description: >-
+                    Token de acesso do usuario. Enviado apenas no contexto SINCRONO (regra de negocio do
+                    comando), e mesmo la pode ser nulo. Ausente nos contextos assincronos.
+                tenantIds:
+                  type: array
+                  items: { type: string }
+                  description: >-
+                    Lista com UM tenant, vindo do modelo de leitura do agregado. Enviada apenas no
+                    contexto SINCRONO. Nao e o tenant do cabecalho da requisicao.
       responses:
         '200':
-          description: "Objeto retornado diretamente pelo processador (sem envelope)."
+          description: >-
+            Objeto retornado pelo processador, sem envelope acrescentado pelo servico. A forma esperada
+            varia por contexto de invocacao (ver contextos.md).
           content: { application/json: { schema: { type: object } } }
         '400':
           description: >-

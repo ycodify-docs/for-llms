@@ -44,6 +44,8 @@
 | Ler o estado ou o histórico de um agregado | [`persistence-crs/endpoints/agregado-leitura.md`](persistence-crs/endpoints/agregado-leitura.md) |
 | Consultar projeções (query) | [`persistence-q/endpoints/consulta.md`](persistence-q/endpoints/consulta.md) |
 | Escrever uma regra de negócio ou coordenação | [`br-service/README.md`](br-service/README.md) |
+| Saber o que chega no processador e o que ele deve devolver | [`br-service/contextos.md`](br-service/contextos.md) |
+| Ler, de dentro do processador, dado que não é do usuário | [`br-service/acesso-a-dados.md`](br-service/acesso-a-dados.md) |
 | Publicar/depurar o arquivo de um processador (rota, export, carga) | [`br-service/processadores.md`](br-service/processadores.md) |
 | Entender quando/como os serviços se chamam | [`coordenacao.md`](coordenacao.md) |
 | Entender o despacho de eventos (projeção, saga) | [`es-n/README.md`](es-n/README.md) |

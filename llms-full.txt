@@ -574,6 +574,8 @@ Tolere a breve defasagem de propagação (reconsulte se necessário). Ver
 | Ler o estado ou o histórico de um agregado | [`persistence-crs/endpoints/agregado-leitura.md`](persistence-crs/endpoints/agregado-leitura.md) |
 | Consultar projeções (query) | [`persistence-q/endpoints/consulta.md`](persistence-q/endpoints/consulta.md) |
 | Escrever uma regra de negócio ou coordenação | [`br-service/README.md`](br-service/README.md) |
+| Saber o que chega no processador e o que ele deve devolver | [`br-service/contextos.md`](br-service/contextos.md) |
+| Ler, de dentro do processador, dado que não é do usuário | [`br-service/acesso-a-dados.md`](br-service/acesso-a-dados.md) |
 | Publicar/depurar o arquivo de um processador (rota, export, carga) | [`br-service/processadores.md`](br-service/processadores.md) |
 | Entender quando/como os serviços se chamam | [`coordenacao.md`](coordenacao.md) |
 | Entender o despacho de eventos (projeção, saga) | [`es-n/README.md`](es-n/README.md) |
@@ -5636,21 +5638,30 @@ comandos** automaticamente (saga), visíveis como novos eventos no histórico do
 
 # br-service — guia do serviço
 
-> **Papel:** executa **regras de negócio** e funções de **coordenação** de agregados (comumente em
-> sagas). Recebe dados e devolve dados; processadores devem ser **idempotentes** e, idealmente, puros
-> (alguns de coordenação/projeção fazem **leituras** — ver ressalva abaixo).
+> **Papel:** executa as **funções** que o modelo declara — regra de negócio de um comando, coordenação
+> entre agregados (saga) e transformação para projeção de outro contexto. Recebe dados e devolve dados.
 > **Quem chama:** **somente** o [persistence-crs](../persistence-crs/README.md) — nunca o cliente final
 > diretamente (CP-6). Pré-requisitos: [conceitos](../02-conceitos.md), [arquitetura](../01-arquitetura.md).
+
+## Qual é a sua pergunta
+
+| A pergunta | Onde ela é respondida |
+|---|---|
+| em que contexto o meu processador roda, e **o que chega** nele | [contextos.md](contextos.md) |
+| **o que eu devolvo** para o retorno não ser descartado | [contextos.md](contextos.md) |
+| o comando respondeu `200` e **nada aconteceu** | [contextos.md — quando o retorno some sem erro](contextos.md) |
+| meu processador precisa **ler a ficha de outra pessoa** | [acesso-a-dados.md](acesso-a-dados.md) |
+| a **projeção não aparece** depois de um comando que deu certo | [acesso-a-dados.md](acesso-a-dados.md) |
+| **publiquei e a rota não existe** | [processadores.md](processadores.md) |
+| como se escreve e se publica o arquivo | [processadores.md](processadores.md) |
 
 ## Contents
 - Posição no fluxo
 - Índice de endpoints
-- Roteamento de processadores
+- Forma canônica da rota
 - Contrato de resposta
 - Ciclo de vida de uma requisição
-- Autoria de processadores → [processadores.md](processadores.md)
-- Implantar processadores → [endpoints/processors-deploy.md](endpoints/processors-deploy.md)
-- Consultar o log de execução → [endpoints/logs.md](endpoints/logs.md)
+- Callback do processor
 - Pontos de coordenação
 - Pitfalls
 
@@ -5658,13 +5669,18 @@ comandos** automaticamente (saga), visíveis como novos eventos no histórico do
 
 ## Posição no fluxo
 
-Durante a execução de um comando, se o **model** do comando (ou de um evento de coordenação) declara
-uma **rota** de regra/coordenação, o persistence-crs chama o br-service nessa rota, passando os dados.
-O br-service executa a **função** correspondente e devolve o resultado, que o persistence-crs incorpora
-ao processamento (CP-6/CP-7). O br-service **não é chamado diretamente pelo cliente** (só pelo
-persistence-crs). Um processor **pode ler de volta** persistence-q/crs para enriquecimento (via **endpoints
-internos de cluster**, ver abaixo) e — quando o caso de uso exigir — chamar integrações externas nos hooks de
-coordenação (async); no caminho **crítico do comando** (síncrono), evite escrita/efeitos externos.
+Quando o **model** de um comando ou de um evento declara uma **rota** de br, o persistence-crs chama o
+br-service nessa rota, passando os dados; o serviço executa a **função** correspondente e devolve o
+resultado, que o persistence-crs incorpora ao processamento (CP-6/CP-7). O br-service **não é chamado
+diretamente pelo cliente**.
+
+**São três contextos de invocação, e eles não têm o mesmo contrato** — corpo, número de argumentos,
+forma da resposta e tratamento de falha mudam entre eles. É o que
+[contextos.md](contextos.md) descreve, e é a leitura obrigatória antes de escrever qualquer processador.
+
+Um processador **pode ler de volta** persistence-q/crs para enriquecimento — como, e com que identidade,
+está em [acesso-a-dados.md](acesso-a-dados.md). Efeito externo com escrita é aceitável nos hooks
+assíncronos, desde que tolere reentrega; no **caminho crítico do comando**, evite.
 
 ## Índice de endpoints
 
@@ -5681,24 +5697,16 @@ coordenação (async); no caminho **crítico do comando** (síncrono), evite esc
 > pela borda como rotas administrativas e pedem `X-Forger-Credential` — que **nunca** vai junto com
 > `X-Tenant-Id`. O `POST /br` não é afetado: ele é chamado pelo motor de comandos dentro do cluster.
 
-> **⚠️ `POST /coordination` — pendente (gap de plataforma).** O motor de comandos (persistence-crs)
-> aciona uma coordenação **síncrona no caminho do comando** quando o modelo do comando declara
-> `command.<c>.coordination.route`, postando em **`POST /coordination`** (corpo `{content:{route,data}}`,
-> retorno = lista ordenada de comandos). **O br-service ainda NÃO implementa este endpoint** (só `/br`).
-> Até implementá-lo, a coordenação command-path não funciona — use a **coordenação assíncrona**
-> `event.domainBus.triggerCoordination[]` (posta em `/br`, rota `…/coordination/<n>`; ver "Três categorias").
+> **⚠️ `POST /coordination` — pendente (gap de plataforma).** O motor de comandos aciona uma coordenação
+> **síncrona no caminho do comando** quando o modelo do comando declara `command.<c>.coordination.route`,
+> postando em **`POST /coordination`** (corpo `{content:{route,data}}`). **O br-service NÃO implementa
+> este endpoint** — só `/br`. Declarar `coordination.route` hoje não é um no-op silencioso: a chamada
+> falha e leva o comando junto. Para coordenação, use `event.domainBus.triggerCoordination`
+> ([contextos.md](contextos.md)).
 
 Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md).
-Autoria e carga de processadores: [processadores.md](processadores.md).
 
-## Roteamento de processadores
-
-- Cada **função** é um **processador** identificado por uma **rota** (caminho textual).
-- O persistence-crs envia `{ "route": "<rota>", "data": { ... } }`; o serviço localiza o processador
-  pela rota e o executa com os dados.
-- Rota inexistente → erro (com a lista de rotas disponíveis).
-
-### Forma canônica da rota (obrigatória)
+## Forma canônica da rota (obrigatória)
 
 O br-service serve **múltiplas organizações**, cada uma com uma hierarquia de recursos semelhante. Para
 **evitar colisão** entre funções de organizações diferentes, a rota é **totalmente qualificada**, do
@@ -5729,14 +5737,20 @@ Aninhando os escopos, o **path completo é globalmente único** → duas organiz
 > (1 project = 1 bounded context), os segmentos `project` e `boundedContext` costumam **coincidir** —
 > ex.: `acme/vendas/vendas/pedido/criar`. Não é erro: são escopos distintos que, por padrão, têm o mesmo nome.
 
-> Como o arquivo vira rota no disco, a forma do export, a assinatura recebida pelo processador e
-> por que um processador mal exportado desaparece **sem erro**: [processadores.md](processadores.md).
+> ⚠️ **O sufixo é convenção de leitura, não é o que decide o comportamento.** Quem determina em que
+> contexto o processador roda é **onde a rota foi declarada no modelo** — ver
+> [contextos.md](contextos.md). Uma rota com sufixo `coordination` declarada em `command.br.route` roda
+> como regra de negócio.
 
 ## Contrato de resposta
 
-- Sucesso (`200`): o serviço devolve **diretamente** o objeto retornado pelo processador (sem envelope).
-  Esse objeto é o que o persistence-crs usa para enriquecer/validar/coordenar o comando.
+- Sucesso (`200`): o serviço devolve **diretamente** o que o processador retornou, sem envelope próprio.
 - Falha (`400`): objeto com `status`, mensagem e tipo do erro.
+
+⚠️ **O que o processador deve retornar depende do contexto**, e não é o mesmo nos três: o contexto
+síncrono espera o objeto do comando **sem envelope**; os dois assíncronos exigem o envelope
+**`processedData`**. A forma exata de cada um está em [contextos.md](contextos.md) — errar isso devolve
+`200` e descarta o resultado em silêncio.
 
 ## Ciclo de vida de uma requisição
 
@@ -5744,64 +5758,21 @@ Aninhando os escopos, o **path completo é globalmente único** → duas organiz
 
 1. **Validação** — corpo não-nulo, objeto, com `route`. Falha → `400`.
 2. **Roteamento** — localiza o processador pela `route`. Não encontrado → `400` (lista rotas disponíveis).
-3. **Execução** — invoca o processador com `data` (ou o corpo inteiro, se `data` ausente). Pode ser
-   assíncrono; o resultado é aguardado.
+3. **Execução** — invoca o processador com os argumentos que o corpo determina
+   ([contextos.md](contextos.md)). Pode ser assíncrono; o resultado é aguardado.
 4. **Resposta** — `200` com o resultado **direto** do processador; exceção no processador → `400` com
    `{ status, mensagem, tipo }`.
 
-## Três categorias de processador
-
-A **rota** de um processador sinaliza seu papel, por convenção de segmento de path. Os três casos
-correspondem aos três pontos onde o modelo referencia uma rota de br:
-
-> Todas as rotas seguem a [forma canônica](#forma-canônica-da-rota-obrigatória)
-> `<org>/<project>/<bc>/<aggregate>/…`. As colunas abaixo mostram só o **sufixo** que distingue a categoria.
-
-| Categoria | Referenciado em | Sufixo da rota | Entrada | Retorno |
-|---|---|---|---|---|
-| **Regra de negócio** | `command.br.route` | `…/<aggregate>/<comando>` (nome do comando) | dados do comando | os **dados validados/enriquecidos** do comando — mesclados no comando antes de gravar o evento |
-| **Coordenação (saga)** | `event.domainBus.triggerCoordination[].br.route` | `…/<aggregate>/coordination/<alvo_from_origem>` (segmento **`coordination`**) | dados do evento (estado do agregado de origem) | um **`targetCommand`** `{ boundedContext, aggregateType, commandName, data }` — submetido como novo comando no contexto destino (CP-7) |
-| **Projeção cross-contexto** | `event.domainBus.triggerProjection[].br.route` | `…/<aggregate>/projection/<alvo_from_origem>` (segmento **`projection`**) | dados do evento (estado do agregado de origem) | a **linha da projeção destino** `{ "<projeção>": { …campos } }` — aplicada na projeção do outro contexto |
-
-**Convenção de nome** (coordenação/projeção): `<alvo>_from_<origem>` (ex.: `conta_from_pedido`).
-
-> **⚠️ Regra de negócio — o merge de volta é whitelist (chaves novas são descartadas):** os dados
-> retornados pelo processor são mesclados no comando **apenas nas chaves que já existem** no
-> `commandData`; **chaves NOVAS retornadas pelo processor são DESCARTADAS** (não chegam ao evento
-> gravado). Por isso todo campo que o processor pretende **enriquecer/calcular** já precisa existir como
-> **atributo do comando no `.model.json`** — do contrário o valor devolvido se perde silenciosamente.
-
-### Pureza e efeitos colaterais (importante)
-
-- O **núcleo** do br-service é um **dispatcher**: não faz chamadas externas.
-- Um **processador** é uma **função** que **deve** ser **idempotente** e, idealmente, **pura**.
-- **Ressalva honesta:** processadores de **coordenação** e **projeção** **podem** fazer **leituras**
-  (ex.: consultar projeções) para enriquecer o mapeamento. Isso é aceitável desde que seja
-  **somente leitura**, idempotente e tolerante a reentrega. **Evite** efeitos colaterais externos com
-  escrita no caminho crítico do comando.
-- A rota usada é a mesma referenciada no **model** do comando/evento (ver
-  [model-format](../persistence-crs/spec/model-format.md#eventos-e-domainbus)).
-
 ### Callback do processor → persistence-q / persistence-crs (endpoint interno de cluster)
 
-O br-service roda **intra-cluster** (atrás da DMZ). Quando um processor precisa **ler** uma projeção
-(enriquecimento) ou **escrever** de volta, usa os **endpoints internos de cluster** da persistence-q/crs
-— sem controle de acesso por conta de usuário, feitos para **chamadas internas** (**nunca expostos fora
-do cluster**). O **path exato é sensível e injetado pela plataforma no deploy** → o processor o lê de
-**variável de ambiente**; **NUNCA hardcodar** o path. Header obrigatório: **`X-Tenant-Id`** (o tenant vem
-do payload: `targetTenantId`/`sourceTenantId`). **Sem `Authorization`/JWT.**
+Movido, e ampliado, para **[acesso-a-dados.md](acesso-a-dados.md)** — que responde também *com que
+identidade* a leitura acontece, por que o token do usuário pode devolver lista vazia com `200`, e o que
+fazer quando a projeção não aparece.
 
-| Ação | Endpoint interno de cluster | Corpo |
-|---|---|---|
-| **Ler projeção** (persistence-q) | endpoint interno de **leitura** da persistence-q | `{"<projeção>":{<predicado>}}` → `200` array · `204` vazio |
-| **Ler estado do agregado** (persistence-crs) | endpoint interno de **leitura de agregado** (`…/a/<bc>/<aggType>/<uuid>` [+ `/history`]) | — |
-| **Escrever comando** (persistence-crs) | endpoint interno de **comando** (`…/a/<bc>/<aggType>`) | `{"<comando>":{...}}` |
-
-> **JWT — regra síncrono vs assíncrono:** no hook **síncrono** (regra de negócio `/br`, caminho do
-> comando) o corpo carrega `authToken` (JWT do usuário) — o processor **pode** usar endpoints seguros
-> com esse token. Nos hooks **assíncronos** (coordenação/projeção, via fila) **NÃO há JWT** → **usar o
-> endpoint interno de cluster** (path via env, `X-Tenant-Id`, sem `Authorization`). ⛔ **NUNCA hardcodar
-> um JWT nem o path do endpoint interno** no processor — ambos vêm do ambiente injetado no deploy.
+O essencial, para quem só passa por aqui: hook **assíncrono** usa o **endpoint interno de cluster**
+(`X-Tenant-Id`, **sem `Authorization`**); hook **síncrono** pode usar a superfície segura com o
+`authToken` do corpo, **e nesse caso o recorte de leitura por titular se aplica**. ⛔ Nunca hardcodar um
+JWT nem o path do endpoint interno — ambos vêm do ambiente injetado no deploy.
 
 ## Pontos de coordenação
 - **CP-6** — o persistence-crs chama o br-service quando o modelo do comando exige regra/coordenação.
@@ -5810,20 +5781,364 @@ Ver [coordenação](../coordenacao.md).
 
 ## Pitfalls (checklist do agente)
 
-- [ ] Não chamar o br-service diretamente: ele é acionado **pelo persistence-crs** conforme o **model**.
-- [ ] Garantir que a **rota** referenciada no model exista como processador.
-- [ ] Manter o processador **idempotente**; leituras de enriquecimento são aceitáveis, mas **evite
-      escrita/efeitos externos** no caminho crítico do comando.
-- [ ] A resposta de sucesso é o objeto **direto** do processador (sem envelope) — modelar de acordo.
-- [ ] Callback a persistence-q/crs: **hook async → endpoint interno de cluster + `X-Tenant-Id`, SEM JWT**; hook síncrono pode usar `body.authToken`. ⛔ **NUNCA hardcodar JWT nem o path do endpoint interno** (vêm de env injetada no deploy).
+- [ ] **Saber em que contexto o processador roda** antes de escrevê-lo — é o que define argumentos e
+      retorno ([contextos.md](contextos.md)).
+- [ ] **Envelope `processedData` nos contextos assíncronos**, e **nunca** no síncrono.
+- [ ] Na regra de negócio, **todo campo calculado já precisa existir** como atributo do comando: chave
+      nova é descartada em silêncio.
+- [ ] Na projeção, devolver a chave da **projeção de destino**, com `aggregateid`.
+- [ ] Ler dado de terceiro → **endpoint interno**, nunca o token do usuário
+      ([acesso-a-dados.md](acesso-a-dados.md)).
+- [ ] Processador assíncrono **idempotente** — a entrega é ao-menos-uma-vez.
+- [ ] Não chamar o br-service diretamente: ele é acionado **pelo persistence-crs** conforme o model.
+- [ ] Garantir que a **rota** referenciada no model exista como processador publicado.
+
+<!-- ===== br-service/contextos.md ===== -->
+
+# br-service · os três contextos de invocação
+
+> **O fato que decide tudo o mais:** o br-service é chamado de **três** lugares diferentes, e os três
+> mandam um corpo diferente, entregam um número diferente de argumentos ao processador e esperam uma
+> **forma de resposta diferente**. Escolher o contrato errado não dá erro — dá `200` e nada acontece.
+> Guia: [README.md](README.md). Autoria do arquivo: [processadores.md](processadores.md).
+> Leitura de dados de dentro do processador: [acesso-a-dados.md](acesso-a-dados.md).
+
+## Contents
+- Qual é o seu caso
+- 1 · Regra de negócio (síncrono)
+- 2 · Coordenação / saga (assíncrono)
+- 3 · Projeção cross-contexto (assíncrono)
+- Quando o retorno some sem erro
+- Reentrega e idempotência
+
+---
+
+## Qual é o seu caso
+
+**Quem decide o contexto é o modelo, não o nome do arquivo.** O sufixo da rota
+(`…/coordination/<n>`, `…/projection/<n>`) é convenção de leitura; o que realmente determina como o seu
+processador é chamado é **onde a rota foi declarada** no `.model.json`.
+
+| | **1 · Regra de negócio** | **2 · Coordenação (saga)** | **3 · Projeção cross-contexto** |
+|---|---|---|---|
+| Declarado em | `command.<cmd>.br.route` | `event.<ev>.domainBus.triggerCoordination[].br.route` | `event.<ev>.domainBus.triggerProjection[].br.route` |
+| Quando roda | **durante** o comando, antes de o evento ser gravado | **depois** do evento, por fila | **depois** do evento, por fila |
+| Síncrono? | sim | não | não |
+| Argumentos recebidos | **três** | **um** | **um** |
+| Há JWT do usuário? | **sim**, em `authToken` | **não** — nunca | **não** — nunca |
+| Resposta esperada | objeto **direto**, sem envelope | `{"processedData": {"targetCommand": {…}}}` | `{"processedData": {"<projeção>": {…}}}` |
+| Se o processador falhar | **o comando é abortado** | mensagem devolvida à fila | mensagem devolvida à fila |
+| Tempo máximo | **17 s** | **30 s** | **17 s** |
+
+> ⚠️ **O envelope `processedData` é obrigatório nos dois contextos assíncronos e proibido no síncrono.**
+> É o engano mais caro desta fatia: um processador de coordenação que devolve o objeto direto recebe
+> `200`, e o comando-alvo simplesmente não nasce — sem erro, sem registro visível ao autor.
+
+---
+
+## 1 · Regra de negócio (síncrono)
+
+Roda **dentro** do comando, depois da autorização por papel e **antes** de o evento existir. É o único
+contexto em que o processador pode **abortar** a operação.
+
+### O que chega
+
+```json
+{
+  "route": "<rota>",
+  "data": { "<atributos do comando>": "..." },
+  "authToken": "<token de acesso do usuário, ou null>",
+  "tenantIds": ["<tenant do modelo de leitura>"]
+}
+```
+
+> Ilustrativo — `<...>` é placeholder, não JSON literal.
+
+- **`data` é só o payload do comando** — não o estado do agregado. E já vem **filtrado**: atributo que
+  não está declarado no comando é removido antes de chegar aqui.
+- **`authToken` é o cabeçalho de autorização inteiro**, como o cliente o enviou.
+- **`tenantIds` tem exatamente um elemento**, e ele vem do **modelo** (o tenant do modelo de leitura do
+  agregado) — **não** é o tenant do cabeçalho da requisição. Os dois normalmente coincidem, mas são
+  origens diferentes e podem divergir.
+- O processador é chamado com **três argumentos**: `(data, authToken, tenantIds)`.
+  ⚠️ Se `authToken` vier nulo — e vem, em toda operação que não passa por um usuário autenticado — o
+  processador é chamado com **um argumento só**. Quem lê o segundo parâmetro sem checar recebe
+  `undefined`.
+
+### O que devolver
+
+O objeto do próprio comando, **sem envelope**. Ele é mesclado de volta antes de o evento ser gravado.
+
+**A mescla é por whitelist, e ela descarta em silêncio:**
+
+| O que você devolve | O que acontece |
+|---|---|
+| chave **que já existia** no comando, com valor | substitui o valor — é o enriquecimento |
+| chave **que já existia**, com valor nulo | **ignorada**; o valor original sobrevive |
+| chave **nova**, que não existia no comando | **descartada**; não chega ao evento |
+
+Por isso **todo campo que o processador pretende calcular já precisa existir como atributo do comando no
+modelo**. Devolver um campo novo não é erro: é um valor que se perde sem aviso.
+
+### Se falhar
+
+Lançar aborta o comando: nenhum evento é gravado e nada segue para as filas.
+
+⚠️ **O código que o cliente recebe não é o que o br-service respondeu.** O processador que lança faz o
+br-service responder `400`; o motor de comandos, porém, embrulha essa falha e o cliente final recebe
+**`510`**. A mensagem do processador viaja dentro do corpo dessa resposta. Quem trata `400` no cliente
+nunca a encontra. *(A recusa por papel é a exceção: essa chega como `403`.)*
+
+---
+
+## 2 · Coordenação / saga (assíncrono)
+
+Roda depois de o evento existir, a partir da fila de coordenação. Serve para que um evento num agregado
+faça nascer um comando em outro.
+
+### O que chega
+
+```json
+{
+  "route": "<rota>",
+  "data": {
+    "<entidade de origem>": { "aggregateid": "<uuid>", "...": "..." },
+    "aggregateState": { "...": "..." },
+    "targetTenantId": "<uuid>",
+    "sourceTenantId": "<uuid>"
+  }
+}
+```
+
+- **Um argumento só.** Não há `authToken` e não há `tenantIds`.
+- **A entidade de origem é a primeira chave** de `data`, e o objeto dentro dela é o payload do evento,
+  já com `aggregateid` incluído.
+- **`aggregateState` é o estado do agregado de origem, reconstituído.** ⚠️ Ele pode chegar **`{}`, sem
+  nenhum aviso**, quando o agregado de origem não é conhecido no tenant de destino — o que é comum
+  justamente no caso cross-contexto. **Trate `{}` como normal** e caia para o payload do evento.
+- Os dois tenants vêm **no corpo**, não em cabeçalho: nenhum cabeçalho de identificação chega aqui.
+
+### O que devolver
+
+```json
+{ "processedData": { "targetCommand": {
+    "boundedContext": "<bc destino>",
+    "aggregateType":  "<agregado destino>",
+    "commandName":    "<comando>",
+    "data":           { "...": "..." }
+} } }
+```
+
+Os quatro campos são **obrigatórios**; faltar um ou trocar o tipo derruba o consumo da mensagem.
+
+> ⚠️ **Um comando, nunca uma lista.** `targetCommand` é lido como objeto único — devolver um array não
+> dispara N comandos, derruba o consumo. **Não existe fan-out**: uma coordenação emite exatamente um
+> comando. Precisar encerrar N filhos de um cancelamento não tem caminho por aqui hoje.
+
+O comando resultante é submetido **sem credencial** — ele não carrega o usuário que originou a cadeia.
+
+---
+
+## 3 · Projeção cross-contexto (assíncrono)
+
+Roda depois do evento, a partir da fila de projeção cross-contexto. Serve para traduzir o evento de um
+contexto na linha da projeção de outro.
+
+### O que chega
+
+```json
+{
+  "route": "<rota>",
+  "data": {
+    "<entidade de origem>": { "aggregateid": "<uuid>", "...": "..." },
+    "_meta": {
+      "targetTenantId": "<uuid>",
+      "sourceTenantId": "<uuid>",
+      "targetSchema":   "<esquema destino, quando declarado>"
+    }
+  }
+}
+```
+
+- **Um argumento só**, e o contexto viaja em **`_meta`** — repare que aqui os tenants estão aninhados,
+  ao contrário do contexto de coordenação, onde ficam no nível de cima.
+- Não há `authToken`. Nenhum cabeçalho de identificação chega aqui.
+
+### O que devolver
+
+```json
+{ "processedData": { "<nome da projeção destino>": {
+    "aggregateid": "<uuid>",
+    "...": "..."
+} } }
+```
+
+- **A chave é o nome da projeção de destino** — é por ela que a linha é procurada e gravada. Devolver a
+  entidade de origem grava na projeção errada.
+- **`aggregateid` é obrigatório.** É a chave que decide entre **criar** e **atualizar**: existindo linha
+  com aquele `aggregateid`, o retorno é aplicado sobre ela; não existindo, uma linha nova é criada. Sem
+  o campo, o consumo da mensagem falha.
+- **Uma projeção por retorno.** Só a primeira chave é considerada.
+
+---
+
+## Quando o retorno some sem erro
+
+Três formas de o processador rodar, responder `200`, e nada acontecer. Nenhuma delas produz erro para o
+autor, e é por isso que estão juntas aqui.
+
+| Contexto | O que faz sumir | Como se manifesta |
+|---|---|---|
+| regra de negócio | devolver **chave que não existe** no comando | o evento é gravado sem o campo calculado |
+| coordenação | devolver **sem o envelope**, ou sem `targetCommand` | a mensagem é confirmada e a saga é **descartada**; o comando-alvo nunca nasce |
+| projeção | devolver **sem o envelope** | o payload do evento segue **sem transformação** para a projeção, e normalmente falha depois por coluna desconhecida |
+
+**Como confirmar de fora, sem entrar em nenhum contêiner:** o desfecho do consumo — inclusive a recusa
+por papel na materialização — aparece na consulta de log do persistence-crs, autorizada pelo segredo do
+tenant, não pelo token de usuário. Ver
+[persistence-crs — consulta de logs](../persistence-crs/endpoints/logs.md) e, para o caso específico da
+projeção que não aparece, [acesso-a-dados.md](acesso-a-dados.md).
+
+---
+
+## Reentrega e idempotência
+
+- **Entrega ao-menos-uma-vez nos dois contextos assíncronos.** A mesma rota, com os mesmos dados, pode
+  chegar mais de uma vez. Processador de coordenação e de projeção **precisa** ser idempotente — a chave
+  natural é o `aggregateid` do payload do evento.
+- **Falha é retentada um número limitado de vezes** e, esgotadas as tentativas, a mensagem vai para a
+  fila de descarte. Retentar só ajuda em falha transitória: recusa por papel ou modelo incompleto volta
+  a falhar igual em toda tentativa.
+- **O contexto síncrono não é retentado** — falhar ali aborta o comando, e quem repete é o cliente.
+- **Estoure o tempo e a chamada é falha**, com a mesma consequência de uma exceção. Os tetos estão na
+  tabela do topo; leitura de enriquecimento cabe neles com folga, integração externa lenta não.
+
+<!-- ===== br-service/acesso-a-dados.md ===== -->
+
+# br-service · acesso a dados de dentro do processador
+
+> **A pergunta que este documento responde:** *meu processador precisa ler um dado que **não é** do
+> usuário que disparou o comando — o que eu uso?*
+> Guia: [README.md](README.md). Em qual contexto você está: [contextos.md](contextos.md).
+
+## Contents
+- A resposta, primeiro
+- Por que a escolha errada não dá erro
+- Os quatro controles de acesso, e quando cada um morde
+- A projeção que não aparece
+- Por que retentar não conserta
+- A partir de quando isto vale
+
+---
+
+## A resposta, primeiro
+
+Uma projeção pode declarar **recorte de leitura por titular**: quem consulta vê apenas as linhas de que
+é titular. Isso muda o que o seu processador recebe, e a escolha é sua:
+
+| O processador precisa ver… | Use | Efeito |
+|---|---|---|
+| **só o que é do usuário** que disparou o comando | o `authToken` do corpo, na superfície segura | **o recorte se aplica** |
+| **além do usuário** — validar contra dado de terceiro | o **endpoint interno de cluster** | não há usuário, e **não há recorte** |
+
+**No caminho assíncrono não existe escolha:** não há JWT nenhum, e o endpoint interno é o único caminho.
+Não procure por um token no payload — [não há](contextos.md), em nenhum dos dois contextos assíncronos.
+
+O endpoint interno pede **`X-Tenant-Id`** e **nenhum `Authorization`**; o path é injetado pela plataforma
+no ambiente do processador. ⛔ **Nunca fixe o path no código, nem embuta um JWT.**
+
+A forma do corpo da consulta, os controles de paginação e ordenação e os códigos de retorno são os
+mesmos dos dois caminhos, e estão em [persistence-q — consulta](../persistence-q/endpoints/consulta.md).
+O que muda entre eles é **só o envelope de autorização**.
+
+## Por que a escolha errada não dá erro
+
+Usar o token do usuário para uma regra que precisa enxergar dado de outra pessoa devolve **lista vazia
+com `200`** — não uma recusa.
+
+E `204` continua querendo dizer "nenhum resultado". Sob recorte, "nenhum resultado" pode significar
+"nenhuma linha é sua", e **não há como distinguir os dois casos pela resposta**.
+
+Para uma invariante que testa exatamente "essa pessoa existe?", os dois casos são indistinguíveis: a
+regra conclui que o dado não existe e recusa um comando legítimo. É o engano mais fácil de cometer aqui,
+e ele não aparece em log nenhum.
+
+> **Regra prática:** se a sua invariante compara com dado de **terceiro** — outro titular, outro
+> responsável, outra ficha —, o caminho é o **endpoint interno**, mesmo que você tenha um token em mãos.
+
+O efeito do recorte sobre a consulta em si — acúmulo de papéis, associações, `_count` — é fatia do
+persistence-q, na seção *"Quando quem consulta é um processor, e não uma pessoa"* de
+[persistence-q](../persistence-q/README.md). Aqui se descreve só o que muda **na escrita do processador**.
+
+## Os quatro controles de acesso, e quando cada um morde
+
+O processador não é o único ponto onde o acesso é avaliado. Saber **em que instante** cada controle roda
+é o que separa "meu processador está errado" de "o modelo está incompleto".
+
+| Controle | Quando roda | O que o autor do processador vê |
+|---|---|---|
+| **papéis do comando** | **antes** de o processador ser chamado | nada. **Se o seu processador rodou, esta autorização já passou** — não a reimplemente |
+| **recorte de leitura** (`accessControl.read` + `scope.read`) | na consulta que **o processador** faz | é a escolha da seção anterior |
+| **controle de escrita** (`accessControl.write`) | na **materialização da projeção**, já depois de o processador ter retornado | o comando responde `200`, o processador roda inteiro, **e a projeção não aparece** |
+| **leitura da entidade associada** | na criação, quando o dado traz associação | recusa numa entidade que você não estava consultando de propósito |
+
+Os dois primeiros são conhecidos; os dois últimos são os que produzem sintoma sem culpado aparente.
+Quem declara qualquer um deles é o forger, no `_conf` da entidade — ver
+[forger — entity](../forger/endpoints/entity.md).
+
+## A projeção que não aparece
+
+O sintoma é este, e ele **não é falha do seu processador**:
+
+> o comando responde `200` · o processador executa e devolve normalmente · a projeção nunca reflete a
+> mudança · nada no caminho do comando indica erro.
+
+Quando o autor do evento não tem papel no `accessControl.write` da entidade, a materialização é recusada
+**depois** de todo o resto ter dado certo. O caminho do comando já respondeu, então a recusa não tem por
+onde voltar ao cliente.
+
+**Como confirmar, sem entrar em contêiner algum:** o desfecho do consumo aparece na consulta de log do
+persistence-crs, que é endpoint de cliente e é autorizada pelo **segredo do tenant** — não pelo token de
+domínio. Procure pelo termo do erro de consumo no intervalo em que o comando rodou; o registro nomeia o
+autor recusado, a projeção e o evento. Requisição, cabeçalhos e formatos de intervalo em
+[persistence-crs — consulta de logs](../persistence-crs/endpoints/logs.md).
+
+**A correção é no modelo, não no processador:** o papel do autor precisa constar do `accessControl.write`
+da entidade de destino. **Audite essa lista antes** de declarar controle de escrita em qualquer entidade
+que já receba projeção — é mais barato que diagnosticar depois.
+
+## Por que retentar não conserta
+
+Recusa por papel **não é falha transitória**. A mensagem volta para a fila e falha de novo, igual, em
+toda tentativa, até esgotar as tentativas e ir para a fila de descarte. Nenhuma delas passa a ter o papel
+que falta.
+
+A consequência prática: **repetir o comando não resolve, e piora o diagnóstico** — cada repetição produz
+mais um evento que vai falhar do mesmo jeito. Corrija a lista de papéis primeiro.
+
+## A partir de quando isto vale
+
+Tudo o que este documento descreve — o recorte de leitura, o endpoint interno **não** recortar, e o
+controle de escrita na materialização — vale a partir de **`amd64-260909b`**.
+
+⚠️ **A versão importa aqui mais do que em qualquer outra página desta fatia.** Houve **duas** imagens no
+mesmo dia. Na primeira, uma entidade com recorte alcançada pelo endpoint interno era **recusada com
+`403`** — declarar o recorte quebraria todo processador que lesse por ali. Foi na segunda que a recusa
+saiu e o endpoint interno passou a simplesmente não recortar.
+
+> **Ressalva honesta, e ela não é formalidade:** o controle de escrita na materialização está **no
+> artefato** e **ainda não foi exercitado** por um comando autenticado que materialize projeção.
+> "Presente no artefato" e "comprovado em execução" não são a mesma coisa. Trate o sintoma descrito acima
+> como o comportamento esperado, e não como comportamento observado.
 
 <!-- ===== br-service/processadores.md ===== -->
 
 # br-service · autoria de processadores
 
 > Como um processador é **escrito** e **publicado**, e o que faz uma rota declarada no model existir de
-> fato em execução. O contrato visto pelo chamador está no [guia](README.md) e em
-> [endpoints/br.md](endpoints/br.md).
+> fato em execução. **O que ele recebe e o que precisa devolver depende do contexto de invocação** —
+> isso está em [contextos.md](contextos.md), e é leitura anterior a esta. O contrato visto pelo chamador
+> está no [guia](README.md) e em [endpoints/br.md](endpoints/br.md).
 
 ## Contents
 - Do arquivo à rota
@@ -5838,13 +6153,18 @@ Ver [coordenação](../coordenacao.md).
 
 ## Do arquivo à rota
 
-Um processador é um **arquivo `.js`**, e **o caminho do arquivo é a rota** — sem o sufixo `.js`. Não há
+Um processador é um **arquivo de código**, e **o caminho do arquivo é a rota** — sem a extensão. Não há
 registro, tabela de rotas nem declaração à parte: a árvore de pastas publicada *é* o mapa de rotas.
 
 | Arquivo publicado | Rota resultante |
 |---|---|
-| `<org>/<project>/<bc>/<aggregate>/criar.js` | `<org>/<project>/<bc>/<aggregate>/criar` |
-| `<org>/<project>/<bc>/<aggregate>/coordination/conta_from_pedido.js` | `<org>/<project>/<bc>/<aggregate>/coordination/conta_from_pedido` |
+| `<org>/<project>/<bc>/<aggregate>/criar` | `<org>/<project>/<bc>/<aggregate>/criar` |
+| `<org>/<project>/<bc>/<aggregate>/coordination/conta_from_pedido` | `<org>/<project>/<bc>/<aggregate>/coordination/conta_from_pedido` |
+
+> Os caminhos acima aparecem **sem a extensão**, que é omitida em toda esta documentação. A extensão
+> aceita é a mesma para todos os processadores e é informada no provisionamento — junto com os arquivos
+> de dados de apoio, que a publicação também aceita. Errar a extensão é recusa na publicação, com
+> mensagem: não é um caso que se descubra tarde.
 
 É por isso que a [forma canônica da rota](README.md#forma-canônica-da-rota-obrigatória) é uma regra
 sobre **como organizar as pastas**, e não uma convenção de nomenclatura. O **primeiro segmento é a
@@ -5855,65 +6175,82 @@ Nomes iniciados por ponto são ignorados na varredura — uma pasta assim nunca 
 
 ## Forma do arquivo
 
-O arquivo precisa exportar uma **função**, de uma das duas formas:
+**O arquivo tem de exportar uma função** — é essa função que a rota executa, e é a única coisa que o
+carregador procura. Há duas formas aceitas, e as duas valem igual:
 
-```javascript
-// Forma 1 — export direto (recomendada)
-module.exports = async (data) => { /* ... */ };
+| Forma | Exigência |
+|---|---|
+| **exportação direta** — o módulo **é** a função | nenhuma; é a recomendada |
+| **exportação nomeada** — o módulo é um objeto com uma função dentro | o nome exportado tem de ser **exatamente o nome do arquivo**, sem a extensão |
 
-// Forma 2 — export nomeado, com o nome do ARQUIVO
-const criar = async (data) => { /* ... */ };
-module.exports = { criar };   // só funciona em um arquivo chamado criar.js
-```
+A função recebe os argumentos que o contexto de invocação determina e pode ser assíncrona; o resultado é
+aguardado. Ver [contextos.md](contextos.md).
 
 > **⚠️ O que não é função é descartado em SILÊNCIO.** Um arquivo que exporta um objeto, que erra o nome
-> no export nomeado, ou que lança durante a importação **não vira rota e não produz erro visível** — ele
-> simplesmente não aparece no mapa, e a chamada correspondente falha depois como "rota inexistente".
-> Processador que "sumiu" é quase sempre isto.
+> na exportação nomeada, ou que falha no instante em que é carregado **não vira rota e não produz erro
+> visível** — ele simplesmente não aparece no mapa, e a chamada correspondente falha depois como "rota
+> inexistente". Processador que "sumiu" é quase sempre isto.
 >
 > A contrapartida: **todo** arquivo publicado que exporte uma função vira rota executável. Um módulo
-> auxiliar compartilhado entre processadores deve exportar um **objeto**, para não virar rota por
-> acidente.
+> auxiliar, compartilhado entre processadores e que não deve ser chamável, precisa exportar **outra
+> coisa que não uma função** — um objeto, por exemplo — para não virar rota por acidente.
 
 Republicar no mesmo caminho substitui a versão anterior: a chamada seguinte já executa o código novo,
 sem versão antiga presa em memória.
 
 ## O que o processador recebe
 
-A quantidade de argumentos depende do que o chamador envia no corpo:
+**Não é o autor quem escolhe a assinatura — é o contexto de invocação.** O serviço monta a chamada a
+partir dos campos que o corpo traz:
 
-| Corpo | Chamada |
+| O corpo traz | A chamada |
 |---|---|
-| `data` + `authToken` + `tenantIds` | `fn(data, authToken, tenantIds)` |
-| `data` + `authToken` | `fn(data, authToken)` |
-| `data` | `fn(data)` |
-| sem `data` | `fn(corpoInteiro)` |
+| `data` + `authToken` + `tenantIds` | `f(data, authToken, tenantIds)` |
+| `data` + `authToken` | `f(data, authToken)` |
+| `data` | `f(data)` |
+| sem `data` | `f(corpoInteiro)` |
 
-O `authToken` é o JWT do usuário e **só chega no hook síncrono** (regra de negócio). Nos hooks
-assíncronos (coordenação, projeção) não há JWT — a regra de acesso de volta a persistence-q/crs nesse
-caso está no [guia](README.md#callback-do-processor--persistence-q--persistence-crs-endpoint-interno-de-cluster).
+Na prática isso quer dizer **três argumentos no contexto síncrono e um só nos dois assíncronos** — e um
+`authToken` nulo, que ocorre em toda operação sem usuário autenticado, também reduz a chamada a um
+argumento. Escreva a função para o contexto em que ela vai rodar, e **nunca leia o segundo parâmetro sem
+checar**: [contextos.md](contextos.md).
+
+Não há JWT em contexto assíncrono — nunca, e não é "pode não haver": a credencial gravada no evento não
+guarda o token. Como ler dados de volta sem ele, e com que consequência de acesso, está em
+[acesso-a-dados.md](acesso-a-dados.md).
 
 ## O que o processador devolve
 
-A função pode ser `async`; o resultado é aguardado. O que ela retorna vai **direto** ao persistence-crs,
-sem envelope — e, na regra de negócio, é mesclado no comando por **whitelist**: chave nova retornada é
-descartada em silêncio. Ver [contrato de resposta](README.md#contrato-de-resposta) e as três categorias
-de retorno em [três categorias de processador](README.md#três-categorias-de-processador).
+A função pode ser assíncrona; o resultado é aguardado. O que ela retorna vai ao persistence-crs **sem
+envelope acrescentado pelo serviço** — mas **o que ela deve retornar não é o mesmo nos três contextos**:
+
+| Contexto | Forma do retorno |
+|---|---|
+| regra de negócio | o objeto do comando, **direto** — mesclado por **whitelist**, e chave nova é descartada em silêncio |
+| coordenação | `{"processedData": {"targetCommand": {…}}}` |
+| projeção | `{"processedData": {"<projeção>": {"aggregateid": …}}}` |
+
+Forma exata, campos obrigatórios e o que acontece quando se erra: [contextos.md](contextos.md). Contrato
+de fio: [contrato de resposta](README.md#contrato-de-resposta).
 
 ## Erros
 
 Lançar é o mecanismo previsto: a exceção vira `400` com `{ status, mensagem, tipo }`.
 
-```javascript
-module.exports = async (data) => {
-  if (!data.cliente) throw new Error("Campo 'cliente' é obrigatório");
-  return { ...data, cliente: data.cliente.trim() };
-};
 ```
+função(data):
+    se !data.cliente: lança erro "Campo 'cliente' é obrigatório"
+    retorna { ...data, cliente: data.cliente.trim() }
+```
+
+A mensagem e o tipo do erro lançado atravessam inteiros para o corpo da resposta:
 
 ```json
 { "status": "error", "mensagem": "Campo 'cliente' é obrigatório", "tipo": "Error" }
 ```
+
+> Escrever a mensagem pensando em quem vai lê-la no `400` compensa: é o único texto do processador que
+> chega ao chamador.
 
 Catálogo completo: [erros.md](erros.md).
 
@@ -5952,7 +6289,8 @@ que a carga engoliu.
 # br-service · endpoints · executar função (rota)
 
 > Executa o **processador** identificado por uma **rota**. Chamado **pelo persistence-crs**, não pelo
-> cliente. Guia: [../README.md](../README.md).
+> cliente. Guia: [../README.md](../README.md). O que muda de um contexto de invocação para outro:
+> [../contextos.md](../contextos.md).
 
 ## Requisição
 
@@ -5961,19 +6299,51 @@ que a carga engoliu.
 Corpo:
 
 ```json
-{ "route": "<rota do processador>", "data": { "...": "..." } }
+{
+  "route": "<rota do processador>",
+  "data": { "...": "..." },
+  "authToken": "<token de acesso do usuário, ou null>",
+  "tenantIds": ["<tenant>"]
+}
 ```
 
-- `route` (obrigatório) — caminho textual que identifica o processador, na forma canônica, **começando pela organização** (ex.: `acme/vendas/vendas/pedido/validar`).
-- `data` — dados passados ao processador. Se ausente, o corpo inteiro é passado.
+> Ilustrativo — `<...>` é placeholder, não JSON literal.
+
+| Campo | Obrigatório | O que é |
+|---|---|---|
+| `route` | **sim** | caminho textual do processador, na forma canônica, começando pela organização (ex.: `acme/vendas/vendas/pedido/validar`) |
+| `data` | não | dados passados ao processador. **Ausente, o corpo inteiro é passado** no lugar |
+| `authToken` | não | token de acesso do usuário. Só é enviado no **contexto síncrono**, e mesmo lá pode ser nulo |
+| `tenantIds` | não | lista com **um** tenant, vindo do modelo. Só é enviada no contexto síncrono |
+
+⚠️ **Estes quatro campos decidem quantos argumentos o processador recebe** — não é o autor quem escolhe:
+
+| O corpo traz | O processador é chamado como |
+|---|---|
+| `data` + `authToken` + `tenantIds` | `f(data, authToken, tenantIds)` |
+| `data` + `authToken` | `f(data, authToken)` |
+| `data` | `f(data)` |
+| sem `data` | `f(corpoInteiro)` |
+
+Um `authToken` **nulo** conta como ausente. Nos dois contextos assíncronos ele nunca é enviado, então
+lá o processador recebe **sempre um argumento só** — ver [../contextos.md](../contextos.md).
+
+### Cabeçalhos
+
+`X-Tenant-Id` acompanha a chamada **no contexto síncrono**. Nos contextos assíncronos **nenhum cabeçalho
+de identificação é enviado**, e o tenant viaja dentro de `data`.
 
 ## Resposta
 
-- `200` — o objeto retornado **diretamente** pelo processador (sem envelope):
+- `200` — o que o processador retornou, **sem envelope acrescentado pelo serviço**:
 
 ```json
 { "...": "..." }
 ```
+
+⚠️ **O que o processador deve retornar não é o mesmo nos três contextos** — o síncrono espera o objeto
+do comando direto; os assíncronos exigem o envelope `processedData`. Formas exatas em
+[../contextos.md](../contextos.md).
 
 - `400` — rota inexistente ou exceção no processador:
 
@@ -5988,10 +6358,13 @@ Corpo:
 { "erro": "<descrição>" }
 ```
 
+> ⚠️ **Este `400` não é o que o cliente final vê no contexto síncrono.** O motor de comandos embrulha a
+> falha, e o cliente recebe `510`. Ver [../erros.md](../erros.md).
+
 ## Comportamento
 Segue o [ciclo de vida](../README.md#ciclo-de-vida-de-uma-requisição): validação → roteamento →
-execução do processador → resposta direta. O serviço é um **transformador puro** (sem efeitos colaterais
-externos próprios).
+execução do processador → resposta direta. O serviço em si não faz chamadas externas; **o processador
+pode fazer** — ver [../acesso-a-dados.md](../acesso-a-dados.md).
 
 ## Erros
 `400` em todos os casos de falha (validação, rota desconhecida — com lista de rotas disponíveis —,
@@ -6002,7 +6375,8 @@ exceção do processador), mas em **dois formatos de corpo diferentes**: a falha
 
 # br-service · catálogo de erros
 
-> Envelope e códigos. Guia: [README.md](README.md).
+> Envelope e códigos, e **o que cada contexto de invocação faz com a falha** — que não é o mesmo nos
+> três. Guia: [README.md](README.md) · [contextos.md](contextos.md).
 
 ## Envelope de erro
 
@@ -6024,79 +6398,221 @@ exceção do processador), mas em **dois formatos de corpo diferentes**: a falha
 | `400` | Rota desconhecida | rota inválida — a resposta lista as rotas disponíveis. | Usar uma rota existente; conferir o nome no model. |
 | `400` | Exceção do processador | mensagem e tipo do erro lançado pelo processador. | Corrigir os dados ou o processador. |
 
+## ⚠️ O código que o serviço responde não é o que o chamador vê
+
+O br-service responde ao **persistence-crs**, não ao cliente final. O que acontece com essa resposta
+depende do contexto:
+
+| Contexto | O que o chamador faz com o `400` | O que o cliente final vê |
+|---|---|---|
+| **regra de negócio** (síncrono) | aborta o comando: nenhum evento é gravado | **`510`** — não `400`. A mensagem do processador viaja no corpo dessa resposta |
+| **coordenação** (assíncrono) | devolve a mensagem à fila | nada: o comando de origem já respondeu `200` |
+| **projeção** (assíncrono) | devolve a mensagem à fila | nada, pelo mesmo motivo |
+
+**Quem trata `400` no cliente nunca encontra a mensagem do processador.** A recusa por papel do comando
+é a exceção que confirma a regra: essa chega como `403`, com mensagem própria, e não passa pelo
+br-service — é avaliada **antes**.
+
+## A falha que não produz erro nenhum
+
+Nem toda falha de processador é exceção. Devolver a forma errada responde `200` e o resultado é
+descartado sem registro visível ao autor — envelope faltando no contexto assíncrono, chave nova no
+síncrono, projeção sem `aggregateid`. Os três casos, e como reconhecê-los, estão em
+[contextos.md](contextos.md).
+
 ## Nota
-O br-service responde sempre de forma **síncrona** ao persistence-crs. Como é um transformador puro,
-não há estados intermediários a recuperar: em falha, o chamador (persistence-crs) trata o erro no
-contexto do comando/coordenação.
+O br-service responde sempre de forma **síncrona** ao persistence-crs, e não guarda estado entre
+chamadas: em falha, quem trata é o chamador, no contexto em que estava. Isso **não** quer dizer que o
+processador seja puro — processadores de coordenação e de projeção normalmente **leem** dados para
+enriquecer o mapeamento ([acesso-a-dados.md](acesso-a-dados.md)), e nos contextos assíncronos podem ter
+efeito externo, desde que tolerem reentrega.
 
 <!-- ===== br-service/exemplos.md ===== -->
 
 # br-service · exemplos anotados
 
-> O br-service é chamado pelo persistence-crs. Os exemplos mostram o **contrato** e a **forma de um
-> processador**. Dados genéricos. Guia: [README.md](README.md).
+> **Um exemplo por contexto de invocação**, e cada um amarrado a um modelo que já existe em
+> [examples/](../examples/README.md) — para que você possa abrir o modelo, publicar o processador e
+> repetir. Regra de cada contexto: [contextos.md](contextos.md). Guia: [README.md](README.md).
 
-> ⚠️ Blocos abaixo são **ilustrativos**: `<...>` e `•••` são placeholders, não JSON literal pronto para envio.
+> ⚠️ Blocos abaixo são **ilustrativos**: `<...>` e `…` são placeholders, não JSON literal pronto para envio.
 
-## Chamada (como o persistence-crs invoca)
+## Contents
+- 1 · Regra de negócio
+- 2 · Coordenação (saga)
+- 3 · Projeção cross-contexto
+- Rota desconhecida
+- Corpo inválido
 
-```
-POST /br
-{ "route": "acme/vendas/vendas/pedido/validar", "data": { "total": 250.0, "cliente": "C-1" } }
+---
 
-→ 200
-{ "total": 250.0, "cliente": "C-1", "descontoAplicado": 0.0, "valido": true }
-```
+## 1 · Regra de negócio — `acme.financeiro`
 
-A resposta é o objeto **direto** do processador; o persistence-crs a usa para enriquecer/validar o comando.
+**Onde o gancho está declarado** — [`examples/acme.financeiro.model.json`](../examples/README.md),
+agregado `financeiro.conta`, comando `criar`:
 
-As três categorias diferem pela **rota** (segmento de path) e pelo que retornam
-(ver [README — três categorias](README.md#três-categorias-de-processador)).
-
-> **Não há envelope.** A resposta é o objeto que o processador devolveu, tal e qual — como no exemplo
-> acima. Um processador de **regra de negócio** devolve os campos do próprio comando: são as chaves desse
-> objeto que o motor de comandos aproveita, e só as que já existiam no comando original. Devolver os dados
-> aninhados dentro de outra chave faz o motor não encontrar nada para aproveitar.
-
-### 1) Regra de negócio — rota `…/<agregado>/<comando>`
-
-Valida/enriquece os dados do comando; o objeto devolvido volta para o comando antes do evento.
-
-```
-função(data):                                  # data = dados do comando
-    se !data.cliente: lança erro "cliente obrigatório"
-    retorna { ...data, cliente: data.cliente.trim() }    # direto, sem envelope
+```json
+"criar": {
+  "data": { "attribute": { "razaosocial": {…}, "cnpj": {…}, "email": {…}, "status": {…} } },
+  "roles": ["MASTER", "GERENTEFINANCEIRO", "VENDEDOR"],
+  "br": { "route": "acme/financeiro/financeiro/conta/criar" }
+}
 ```
 
-### 2) Coordenação (saga) — rota `…/<agregado>/coordination/<alvo>_from_<origem>`
+**O que chega no processador:**
 
-Recebe o estado do agregado de origem; monta um **`targetCommand`** para o contexto destino.
+```json
+{
+  "route": "acme/financeiro/financeiro/conta/criar",
+  "data": {
+    "razaosocial": "  Acme Indústria Ltda  ",
+    "cnpj": "00.000.000/0001-00",
+    "email": "contato@exemplo.invalid",
+    "status": "criada"
+  },
+  "authToken": "Bearer <token do usuário>",
+  "tenantIds": ["00000000-0000-4000-8000-000000000002"]
+}
+```
+
+Três argumentos: `(data, authToken, tenantIds)`. O `tenantIds` traz **um** elemento, o tenant do modelo
+de leitura declarado no agregado.
+
+**O que o processador devolve** — objeto do comando, **sem envelope**:
 
 ```
-função(data):                                  # data = estado do agregado de origem
+função(data, authToken, tenantIds):
+    se !data.razaosocial: lança erro "razaosocial é obrigatória"
+    retorna { ...data, razaosocial: data.razaosocial.trim() }
+```
+
+```json
+{ "razaosocial": "Acme Indústria Ltda", "cnpj": "00.000.000/0001-00",
+  "email": "contato@exemplo.invalid", "status": "criada" }
+```
+
+> ⚠️ **Devolver uma chave que não está entre os atributos do comando não faz nada.** Se este processador
+> quisesse acrescentar `cnpjvalidado`, o campo precisaria **antes** existir como atributo de `criar` no
+> modelo — devolvido sem isso, é descartado em silêncio e não chega ao evento.
+
+## 2 · Coordenação (saga) — `acme.financeiro` → projeto
+
+**Onde o gancho está declarado** — mesmo modelo, evento `criada` do agregado `financeiro.conta`:
+
+```json
+"criada": {
+  "domainBus": {
+    "triggerCoordination": [
+      { "name": "projeto_from_financeiro_criada",
+        "targetTenantId": "00000000-0000-4000-8000-000000000005",
+        "br": { "route": "acme/financeiro/financeiro/conta/coordination/projeto_from_financeiro_criada" } }
+    ]
+  }
+}
+```
+
+**O que chega no processador** — um argumento só, sem token, sem cabeçalho:
+
+```json
+{
+  "route": "acme/financeiro/financeiro/conta/coordination/projeto_from_financeiro_criada",
+  "data": {
+    "conta": {
+      "aggregateid": "<uuid da conta>",
+      "razaosocial": "Acme Indústria Ltda",
+      "cnpj": "00.000.000/0001-00",
+      "status": "criada",
+      "criadaem": "2026-01-31 14:05:00"
+    },
+    "aggregateState": { "…estado reconstituído da conta…" },
+    "targetTenantId": "00000000-0000-4000-8000-000000000005",
+    "sourceTenantId": "00000000-0000-4000-8000-000000000002"
+  }
+}
+```
+
+A primeira chave de `data` é o **tipo do agregado de origem** (`conta`), e `aggregateid` já vem incluído.
+`aggregateState` **pode vir `{}`** sem aviso — trate como normal.
+
+**O que o processador devolve** — com envelope:
+
+```
+função(data):
+    origem = data.conta
     retorna { processedData: { targetCommand: {
-        boundedContext: "financeiro",
-        aggregateType:  "conta",
+        boundedContext: "engenharia",
+        aggregateType:  "projeto",
         commandName:    "criar",
-        data: { razaosocial: data.razaosocial, cnpj: data.cnpj }
+        data: { nome: origem.razaosocial, contaid: origem.aggregateid, status: "criado" }
     } } }
 ```
 
-O persistence-crs submete esse `targetCommand` como **novo comando** (CP-7).
+O persistence-crs submete esse `targetCommand` como **novo comando** no contexto destino (CP-7).
 
-### 3) Projeção cross-contexto — rota `…/<agregado>/projection/<alvo>_from_<origem>`
+> ⚠️ **Um comando, nunca uma lista** — e devolver **sem** o envelope `processedData` responde `200` e
+> descarta a saga em silêncio. Ver [contextos.md](contextos.md).
 
-Mapeia o evento de origem na **linha da projeção** de outro contexto; pode **ler** a projeção destino
-(somente leitura) para um UPDATE coerente.
+## 3 · Projeção cross-contexto — `acme.engenharia`
+
+**Onde o gancho está declarado** — [`examples/acme.engenharia.model.json`](../examples/README.md),
+evento `recusada` do agregado `engenharia.demanda`:
+
+```json
+"recusada": {
+  "whenAttribute": "recusadaem",
+  "domainBus": {
+    "triggerProjection": [
+      { "name": "demandadecisao",
+        "targetTenantId": "00000000-0000-4000-8000-000000000005",
+        "targetSchema": "engenharia",
+        "br": { "route": "acme/engenharia/engenharia/demanda/projection/demandadecisao_from_demanda" } }
+    ]
+  }
+}
+```
+
+> A rota declarada no modelo e o caminho do arquivo publicado precisam ser **idênticos entre si**; a
+> [forma canônica](README.md#forma-canônica-da-rota-obrigatória) é o que evita colisão entre organizações.
+> O modelo de exemplo no acervo declara essa rota **sem o segmento do agregado** — aqui ela aparece na
+> forma canônica.
+
+**O que chega no processador** — um argumento, e o contexto aninhado em `_meta`:
+
+```json
+{
+  "route": "acme/engenharia/engenharia/demanda/projection/demandadecisao_from_demanda",
+  "data": {
+    "demanda": {
+      "aggregateid": "<uuid da demanda>",
+      "parecer": "Fora do escopo contratado.",
+      "motivorecusa": "escopo",
+      "status": "recusada",
+      "recusadaem": "2026-01-31 14:05:00"
+    },
+    "_meta": {
+      "targetTenantId": "00000000-0000-4000-8000-000000000005",
+      "sourceTenantId": "00000000-0000-4000-8000-000000000005",
+      "targetSchema": "engenharia"
+    }
+  }
+}
+```
+
+**O que o processador devolve** — envelope, e a chave é o nome da **projeção de destino**:
 
 ```
-função(data):                                  # data = estado do agregado de origem
-    retorna { processedData: { "demandadecisao": {
-        aggregateid: data.demandaid,            # chave da linha na projeção destino
-        decisao:     data.decisao,
-        registradaem: data.registradaem
+função(data):
+    origem = data.demanda
+    retorna { processedData: { demandadecisao: {
+        aggregateid:  origem.aggregateid,     # obrigatório — decide criar ou atualizar
+        decisao:      "recusada",
+        motivo:       origem.motivorecusa,
+        registradaem: origem.recusadaem
     } } }
 ```
+
+Existindo linha com aquele `aggregateid`, o retorno é aplicado sobre ela; não existindo, uma linha nova é
+criada. **Sem `aggregateid`, o consumo falha.**
 
 ## Rota desconhecida
 
@@ -6107,20 +6623,20 @@ POST /br
 → 400 { "status": "error", "mensagem": "Invalid route ... Available routes: ...", "tipo": "Error" }
 ```
 
-Quando a organização ainda não publicou nenhum processador, a lista vem vazia e a mensagem diz isso, em vez
-de listar rotas que não são publicáveis.
+Quando a organização ainda não publicou nenhum processador, a lista vem vazia e a mensagem diz isso, em
+vez de listar rotas que não são publicáveis.
 
 ## Corpo inválido (formato de erro diferente)
 
 ```
 POST /br
-{ "data": { "total": 250.0 } }            # sem "route"
+{ "data": { "razaosocial": "Acme" } }      # sem "route"
 
-→ 400 { "erro": "Validacao falhou." }     # um campo só — sem status/mensagem/tipo
+→ 400 { "erro": "Validacao falhou." }      # um campo só — sem status/mensagem/tipo
 ```
 
-> A rota referenciada deve coincidir com a declarada no **model** do comando/evento (ver
-> [examples/](../examples/README.md) e [forger/model](../forger/endpoints/model.md)).
+> No contexto síncrono, esse `400` **não** é o que o cliente final recebe: ele vê `510`. Ver
+> [erros.md](erros.md).
 
 <!-- ===== br-service/endpoints/processors-deploy.md ===== -->
 
@@ -8251,6 +8767,99 @@ responde, chame um endpoint dele.
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.22 — 2026-09-09
+
+- **O br-service tem TRÊS contratos, não um — e a doc apresentava um só.** O serviço é acionado de três
+  lugares (regra de negócio no caminho do comando, coordenação por fila, projeção cross-contexto por
+  fila) e os três mandam **corpo diferente**, entregam **número diferente de argumentos** ao processador
+  e esperam **forma de resposta diferente**. A fatia ganha um documento que é o eixo disso,
+  [br-service — os três contextos de invocação](br-service/contextos.md), e o guia passa a ser porta de
+  entrada por pergunta.
+
+- **O envelope `processedData` é obrigatório nos dois contextos assíncronos e proibido no síncrono.**
+  Esta é a correção mais cara da versão: o guia documentava só a forma **sem** envelope e os exemplos só
+  a forma **com** envelope — cada um certo sobre um contexto e errado sobre o outro, e nenhum dizia de
+  qual falava. Um processador de coordenação que devolve o objeto direto recebe `200` e o comando-alvo
+  **nunca nasce**, sem erro em lugar nenhum.
+
+- **Não existe fan-out de coordenação.** Uma coordenação emite **um** comando, nunca uma lista — e
+  `targetCommand` ausente faz a saga ser descartada em silêncio, com a mensagem confirmada. Quem
+  esperava encerrar N filhos a partir de um cancelamento não tinha como saber que o mecanismo não
+  existe.
+
+- **Na projeção, `aggregateid` é obrigatório** no objeto devolvido, e a chave tem de ser o nome da
+  **projeção de destino** — é o que decide entre criar e atualizar a linha.
+
+- **`accessControl` visto de dentro do processador ganha documento próprio**
+  ([br-service — acesso a dados](br-service/acesso-a-dados.md)): com que identidade ler, por que usar o
+  token do usuário para validar contra dado de **terceiro** devolve **lista vazia com `200`** — e não um
+  erro —, quais controles de acesso mordem em que momento, e o diagnóstico reproduzível para o sintoma
+  "comando `200`, processador ok, **projeção não aparece**". Vale a partir de `amd64-260909b`; a
+  ressalva de que o controle de escrita está no artefato e **não foi exercitado** está escrita lá.
+
+- **O `400` do br-service não é o que o cliente final vê.** No contexto síncrono, a falha do processador
+  chega ao cliente como **`510`**. Quem tratava `400` nunca encontrava a mensagem do processador.
+
+- **`authToken` e `tenantIds` passam a constar do contrato de fio** ([executar função](br-service/endpoints/br.md)
+  e o OpenAPI da fatia): são eles que decidem **quantos argumentos** o processador recebe, e estavam
+  ausentes do corpo publicado. E o `authToken` **nunca** existe em contexto assíncrono — não é "pode não
+  haver".
+
+## 1.21 — 2026-09-06
+
+- **Errata na doc da borda: cada verificação assina com um cabeçalho próprio.** A versão 1.20 dizia
+  que resposta da borda se reconhece por `X-Blocked-By`. **É falso para tamanho e para vazão:** um
+  `413` da borda traz `X-Size-Limit-Exceeded` (com `X-Max-Size-Allowed` e `X-Actual-Size`), e um `429`
+  traz `X-RateLimit-…`. Quem procurasse `X-Blocked-By` num `413` não o acharia e concluiria que a
+  resposta veio do servidor de entrada — errando exatamente no discriminador que a página existe para
+  dar.
+
+- **Insistir depois do `429` muda o código para `403`.** Origem que continua chamando é banida por
+  **7 dias** e passa a receber `403` com `X-RateLimit-…`, não `429`. Cliente que só trata `429` vê o
+  erro mudar de natureza sem explicação.
+
+- **A ordem das verificações não é a intuitiva, e muda o erro que você recebe.** A checagem de rota é
+  das **últimas**, não das primeiras: caminho inexistente **com corpo grande** recebe `413`, não
+  `404` — e como caminho desconhecido cai no teto mais restritivo, o `413` aparece com folga. Quem
+  receber `413` em rota nova deve conferir **se a rota está publicada** antes de olhar o payload.
+
+- **`403` tem quatro origens distintas**, e os cabeçalhos as separam — inclusive uma que **não é da
+  borda**: `403` sem nenhum cabeçalho `X-` vem do servidor de entrada, que recusa caminho sem rota
+  publicada antes de a requisição chegar à borda. Correção diferente, lugar diferente.
+
+- **Nem todo serviço fica atrás da borda.** O de arquivos estáticos responde por domínio próprio.
+  Ausência de cabeçalho da borda ali **não** significa que ela deixou passar — significa que ela
+  nunca viu a requisição.
+
+- **A isenção de cabeçalho para canal persistente vale para caminhos nomeados**, não para "qualquer
+  canal": a 1.20 generalizava, e abrir canal em outra rota é recusado como qualquer requisição.
+
+## 1.20 — 2026-09-06
+
+- **A borda ganha documentação própria, e ela responde a uma pergunta que hoje não tem resposta:
+  quem produziu este erro?** Uma recusa da borda e uma recusa do serviço chegam pelo mesmo canal e,
+  em vários casos, com o **mesmo código HTTP** — e quem investiga procura o defeito no serviço que
+  nunca foi chamado. O novo [catálogo de erros da borda](gateway/erros.md) dá o discriminador: os
+  cabeçalhos `X-Blocked-By` e `X-Blocked-Reason` só existem em resposta gerada pela borda. `404` com
+  eles é rota não reconhecida antes do encaminhamento; `404` sem eles é recurso inexistente dentro do
+  serviço. Vale igual para o `413`, que pode vir da borda ou do proxy à frente dela.
+
+- **A regra de um só cabeçalho de identificação passa a estar escrita.** Toda requisição carrega
+  `X-Tenant-Id` **ou** `X-Forger-Credential` — **nunca os dois, nunca nenhum** —, e qual dos dois
+  depende da rota: execução exige o tenant, administração exige a credencial, autenticação aceita
+  qualquer um. Mandar os dois não é mais permissivo: é `400`. Era o erro mais comum contra a borda e
+  só estava documentado de lado, dentro da página de outro serviço.
+
+- **Errata de comportamento:** desde 2026-09-04 a borda **põe o motivo no corpo** quando a recusa é
+  erro de quem chamou (cabeçalho ausente, cabeçalhos conflitantes, formato inválido). Detecção de
+  ataque continua opaca de propósito. Descrições de que a borda responde sempre com corpo vazio
+  estão desatualizadas.
+
+- **Escopo declarado:** a borda **não tem endpoint próprio exposto ao cliente**, então não há
+  `endpoints/` — os endpoints administrativos dela são restritos por origem e ficam fora da
+  convenção, que cobre apenas endpoints autenticados e expostos ao cliente. Segue o precedente de
+  `cache`, componente sem rota pública que também é documentado por guia.
 
 ## 1.19 — 2026-09-05
 
