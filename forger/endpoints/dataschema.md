@@ -46,40 +46,66 @@ Erros: `400`, `403`, `500`.
 > **Regra para o agente:** para **editar schema** (criar/alterar entity), o dataschema precisa estar em
 > `MODELING`; para **operar** (comandos/consultas via persistence-crs/persistence-q), em `RUNNING`.
 
-### O que a transição faz com o modelo no cache
+### Alterar o schema de um sistema em operação
 
-> **⚠️ Vigência:** o que esta seção descreve vale **a partir da versão do forger que carregar
-> `f45b22c`** (mergeado em `09dbfcb`) — **ainda não implantado em 2026-09-10**. Na superfície que está
-> no ar, `RUNNING → MODELING` derruba **apenas** a spec de entidades, e a volta a `RUNNING` **não
-> verifica nada**: o passo 3 do roteiro abaixo parece opcional porque hoje ele é. Confirme a versão
-> implantada antes de tratar o passo 3 como dispensável — ele deixa de ser.
+A transição de `status` **não é só um rótulo no banco**: ela remove e republica os modelos que o motor
+lê. Por isso alterar um schema em operação não é "editar e voltar" — o passo **4** abaixo é o que
+costuma faltar, e sem ele a volta a `RUNNING` é recusada.
 
-A transição de `status` **não é só um rótulo no banco**: ela publica e remove os modelos que o motor
-consome. Isso muda o roteiro de alterar um schema em operação, e é a parte que costuma ser feita à mão
-sem necessidade.
+**1. Descubra a `logversion` corrente** (o `PUT` a exige, e uma versão errada responde `409`):
 
-| Transição | O que acontece |
-|---|---|
-| **`RUNNING → MODELING`** | **as duas chaves do modelo são removidas** — a spec de entidades (read model) e o modelo de escrita (`.model.json`). O motor passa a recusar **consulta e comando** com `510`, e é assim de propósito: o tenant está declaradamente em remodelagem |
-| **`MODELING → RUNNING`** | a spec de entidades é **republicada pela plataforma**, remontada da definição que vive no banco. O modelo de escrita **não** é reconstruído — veja o pré-requisito abaixo |
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  ".../org/acme/project/vendas/database/7/dataschema/pedidos"
+# → { "id": 12, "name": "pedidos", "status": "RUNNING", "logversion": 4, ... }
+```
 
-> ⚠️ **Pré-requisito para voltar a `RUNNING`: o `.model.json` tem de estar publicado.** Se não estiver, o
-> `PUT` é recusado com `400`, **nada é gravado** e o dataschema **continua em `MODELING`**. Republique-o
-> (`POST .../tenant/{tenantId}/model`, aceito com o dataschema em `MODELING`) e repita a transição.
+**2. Vá para `MODELING`** — o tenant para de operar:
+
+```bash
+curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  ".../org/acme/project/vendas/database/7/dataschema/pedidos" \
+  -d '{"logversion": 4, "status": "MODELING"}'
+```
+
+Aqui **as duas chaves do modelo são removidas**: a spec de entidades e o `.model.json`. A partir deste
+instante o motor recusa **consulta e comando** com `510` — de propósito, porque o tenant está
+declaradamente em remodelagem.
+
+**3. Edite as entities** (só é permitido em `MODELING`) — ver [entity.md](entity.md).
+
+**4. Republique o `.model.json`** — este é o passo que falta em quase todo roteiro escrito à mão:
+
+```bash
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  ".../org/acme/project/vendas/tenant/$TENANT_ID/model" \
+  -F "file=@pedidos.model.json"
+```
+
+**5. Volte para `RUNNING`** (a `logversion` avançou no passo 2 — releia-a):
+
+```bash
+curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  ".../org/acme/project/vendas/database/7/dataschema/pedidos" \
+  -d '{"logversion": 5, "status": "RUNNING"}'
+```
+
+A spec de entidades volta sozinha. O `.model.json` **não** — e é por isso que o passo 4 existe.
+
+> **Se você pular o passo 4**, o `PUT` do passo 5 é recusado:
 >
-> A assimetria tem motivo: a spec de entidades a plataforma sabe remontar, porque ela deriva do que está
-> no banco. O `.model.json` é **artefato seu** — a plataforma não guarda outra cópia dele, e quem o repõe
-> é quem o tem.
+> ```json
+> 400: DataSchema 'pedidos' não pode voltar a RUNNING: o modelo de escrita não está publicado.
+> ```
+>
+> **Nada é gravado** e o dataschema **continua em `MODELING`** — repita o passo 4 e depois o 5.
 
-**Roteiro completo, para alterar o schema de um sistema já em operação:**
+**Por que só um dos dois modelos volta sozinho.** A spec de entidades a plataforma sabe remontar, porque
+ela deriva das entities, que vivem no banco. O `.model.json` é **artefato seu**: a plataforma não guarda
+outra cópia dele, e quem o repõe é quem o tem.
 
-1. `RUNNING → MODELING` (`PUT` no `status`) — as duas chaves caem, o tenant para de operar;
-2. edite as entities;
-3. **republique o `.model.json`**;
-4. `MODELING → RUNNING` — a spec volta sozinha, e o passo 3 é verificado.
-
-**Não invalide cache manualmente em nenhum ponto.** A publicação e a remoção são da plataforma, e nenhum
-dos dois modelos expira por tempo: o que os tira do cache é remoção, nunca prazo.
+**Não invalide cache manualmente em nenhum ponto.** Remover e publicar é da plataforma, e nenhum dos dois
+modelos expira por tempo — o que os tira do cache é remoção, nunca prazo.
 
 ## Remover
 
