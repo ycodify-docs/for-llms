@@ -116,11 +116,33 @@ A cada requisição (com `X-Tenant-Id`), o serviço resolve a spec do tenant (en
 > Como a entrada **não expira** por conta própria, um miss significa que o modelo nunca foi publicado
 > ou que a entrada foi removida — e a saída é **republicar**, não reiniciar nem esperar.
 
-A spec fica **stale na memória local** e **não** refresca sozinha. Após alterar entity/model, o refresh exige
-**invalidar as DUAS chaves de cache do modelo** — a do **read-model** **e** a do **write-model** (valores
-internos, resolvidos pela plataforma/ops) — **além de** republicar o modelo + dataschema `RUNNING`.
-**Reiniciar o serviço sozinho não resolve** (re-puxa a stale do `../cache`); **remover o cache sozinho** também
-não (a instância viva mantém a stale na memória). O mesmo vale para o `persistence-q`.
+### Depois de alterar o modelo — o que você precisa fazer
+
+**São dois modelos, não duas cópias do mesmo**, e cada um tem o seu gatilho:
+
+| O que você alterou | O que repõe | Você precisa |
+|---|---|---|
+| **entities** (projeção, `_conf`) — o **modelo de leitura** | fechar a edição do dataschema (`MODELING` → `RUNNING`) republica | **nada além de fechar a edição** |
+| **`.model.json`** (agregados e comandos) — o **modelo de escrita** | republicar sobrescreve o anterior | **republicar** |
+
+> ⚠️ **Não invalide cache à mão.** Republicar **sobrescreve**; apagar antes não adianta e não é passo do
+> procedimento. O procedimento da edição de entities está em
+> [forger/dataschema](../forger/endpoints/dataschema.md#atualizar).
+>
+> **Isto corrige o que este documento dizia até 2026-09-10**, quando mandava "invalidar as DUAS chaves do
+> modelo" antes de republicar. Era trabalho desnecessário: a plataforma já repõe. Se você seguia aquele
+> texto, pode parar.
+
+**Enquanto o dataschema está em `MODELING`, o modelo de leitura não existe** — ele cai na entrada da edição
+e só volta no fechamento. Consulta nessa janela falha com `510`. **O que morde não é editar: é deixar a
+edição aberta.**
+
+**Sobre cópia em memória do serviço.** Até `2026-09-10` cada instância guardava o modelo em memória por
+até uma hora, e a alteração podia "pegar" numa instância e não noutra. **Na instância de teste
+(`tinterpreter`), essas cópias estão desligadas desde a imagem `amd64-260910`**: o modelo é relido do
+serviço de cache a **cada requisição**, e republicar passa a valer na requisição seguinte. Onde elas
+continuarem ligadas, a defasagem de até uma hora ainda vale e o descarte da cópia é operação de
+plataforma. **Reiniciar o serviço nunca foi remédio** — ele repuxa o que estiver no cache.
 
 ## Pontos de coordenação
 

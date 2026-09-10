@@ -2,6 +2,30 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.24 — 2026-09-10
+
+- **Pare de invalidar cache à mão: a plataforma já repõe o modelo sozinha.** Até esta versão, a
+  documentação do [persistence-crs](persistence-crs/README.md#depois-de-alterar-o-modelo) e do
+  [persistence-q](persistence-q/README.md) mandava, depois de alterar um modelo, **apagar duas chaves de
+  cache** antes de republicar. Era **trabalho desnecessário**: fechar a edição do dataschema
+  (`MODELING` → `RUNNING`) já republica o modelo de leitura, e republicar o `.model.json` já sobrescreve
+  o de escrita. Quem seguia aquele texto fazia uma operação delicada, à mão, sem precisar. **Se é o seu
+  caso, pode parar.**
+
+- **E são dois modelos, não duas cópias do mesmo** — o que a redação anterior escondia. O **de escrita**
+  (agregados e comandos) e o **de leitura** (projeções) têm gatilhos diferentes e não se atualizam
+  juntos. A seção agora diz, numa tabela, o que repõe cada um.
+
+- **O que morde não é editar entities: é deixar a edição aberta.** Enquanto o dataschema está em
+  `MODELING` o modelo de leitura não existe, e a consulta falha com `510`. Ele volta ao fechar. Isso não
+  estava dito em lugar nenhum, e a ausência fazia o `510` parecer defeito.
+
+- **A cópia em memória de cada instância deixou de existir na instância de teste.** Até 2026-09-10 cada
+  instância guardava o modelo por até uma hora, e uma alteração podia "pegar" numa e não noutra. No
+  `tinterpreter`, desde a imagem `amd64-260910`, essas cópias estão **desligadas**: o modelo é relido a
+  cada requisição e **republicar passa a valer na requisição seguinte**. Onde continuarem ligadas, a
+  defasagem de até uma hora ainda vale.
+
 ## 1.23 — 2026-09-09
 
 - **Uma entity pode declarar que um papel lê apenas as linhas de que o usuário é titular.** Até aqui o

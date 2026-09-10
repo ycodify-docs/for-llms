@@ -31,13 +31,17 @@
   alteração precisa valer imediatamente em todo lugar, trate-a como operação de implantação. Ver
   [forger/dataschema — gate de status](../forger/endpoints/dataschema.md#atualizar) e
   [query-controls §Quando o modelo é lido](query-controls.md#quando-o-modelo-é-lido).
-- **Spec carregada por-instância (cache):** o serviço resolve a spec do tenant igual ao
-  write-side — dataschema `RUNNING` via Forger → memória local → **serviço de cache** (`../cache`) →
-  **se falta no cache, a consulta falha** (`510`, "republique o modelo"). **Não há recuperação
-  automática a partir do Forger:** o modelo entra no cache **só** quando é publicado, e a entrada
-  **não expira** sozinha. Alterar o modelo só propaga após **invalidar o cache** (as duas chaves do
-  modelo — read-model + write-model, valores internos) + republicar; **restart sozinho não resolve**.
-  Detalhe: [persistence-crs/README §Carga da spec do tenant](../persistence-crs/README.md).
+- **Como a spec do tenant é resolvida:** igual ao write-side — dataschema `RUNNING` via Forger →
+  **serviço de cache** (`../cache`) → **se falta no cache, a consulta falha** (`510`, "republique o
+  modelo"). **Não há recuperação automática a partir do Forger:** o modelo entra no cache **só**
+  quando é publicado, e a entrada **não expira** sozinha. Um `510` aqui significa que o modelo nunca
+  foi publicado, que a entrada foi removida, ou que **o dataschema está em `MODELING`** — nessa janela
+  o modelo de leitura não existe, e volta ao fechar a edição.
+  **Não invalide cache à mão para propagar alteração:** fechar a edição do dataschema republica o
+  modelo de leitura, e republicar o `.model.json` sobrescreve o de escrita. **Restart nunca foi
+  remédio.** *(Este item dizia, até 2026-09-10, que era preciso "invalidar o cache — as duas chaves do
+  modelo" antes de republicar. Era trabalho desnecessário.)*
+  Detalhe: [persistence-crs/README §Depois de alterar o modelo](../persistence-crs/README.md).
 - **Dois identificadores na projeção:** cada linha tem `id` (**Long**, PK da linha) e `aggregateid`
   (**UUID** de 36 chars, o id do agregado; `projecao.aggregateid == aggregate.id`). Filtra-se por
   `aggregateid` para achar a projeção de **um** agregado específico. Para operar o agregado depois
