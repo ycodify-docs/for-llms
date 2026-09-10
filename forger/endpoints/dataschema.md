@@ -14,7 +14,7 @@ Exigem `Authorization` e papel de administrador/engenheiro em `{org}`.
 
 | Campo | Tipo | Obrigatório | Descrição |
 |---|---|---|---|
-| `name` | string | sim | Nome do esquema. Minúsculas, dígitos e `_`, começando por letra (`^[a-z][a-z0-9_]*$`), **máx. 16 caracteres**. |
+| `name` | string | sim | Nome do esquema. Minúsculas, dígitos e `_`, começando por letra (`^[a-z][a-z0-9_]*$`), **máx. 12 caracteres** — o limite é do esquema físico, e não o mesmo do `project`, que aceita 16. |
 | `alias` | string | não | Apelido. |
 | `description` | string | não | Descrição. |
 | `dbsqlminimumconnidle` | inteiro | não | Mínimo de conexões ociosas no pool de leitura. |
