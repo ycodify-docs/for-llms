@@ -10,11 +10,21 @@ Exigem `Authorization` e papel de administrador/engenheiro em `{org}`.
 
 `POST /org/{org}/project/{project}/tenant/{tenantId}/model`
 
-Envio: o documento de modelo (`.json`) como upload. Efeito: valida a consistência
-`(org, project, tenant)` — o `tenantId` deve referenciar exatamente um dataschema do contexto — e
-**publica** o modelo no cache distribuído. **Semântica de sobrescrita**: republicar substitui o anterior.
-Resposta `201`: `{ "key": "<referência de publicação>" }`.
-Erros: `400` (documento inválido / faltando seção de agregado), `403`/`404` (consistência), `500`.
+Envio **multipart**, com o documento no campo `file` — o arquivo precisa ter extensão `.json`:
+
+```bash
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  ".../org/acme/project/vendas/tenant/$TENANT_ID/model" \
+  -F "file=@pedidos.model.json"
+# → 201 { "key": "ENGINE:persistence:cqrs:SETUP-TO:<tenantId>:wm" }
+```
+
+Efeito: valida a consistência `(org, project, tenant)` — o `tenantId` deve referenciar exatamente um
+dataschema do contexto — e **publica** o modelo no cache distribuído. **Semântica de sobrescrita**:
+republicar substitui o anterior, e também cobre o caso de a chave não existir.
+
+Erros: `400` (arquivo vazio, extensão diferente de `.json`, documento inválido), `403`/`404`
+(consistência), `500`.
 
 ## Ler
 
@@ -24,7 +34,8 @@ não publicado.
 ## Listar (por contexto)
 
 `GET /org/{org}/project/{project}/model` → `200` array de
-`{ tenantId, dataschema, project, status, ... }`.
+`{ tenantId, dataschema, project, status, cacheKey }`. O `status` é o do **dataschema**, não o do
+modelo — serve para ver de relance quais contextos estão em `MODELING` e portanto parados.
 
 ## Remover
 
@@ -49,6 +60,11 @@ publicação no cache (criar/atualizar) → resposta.
 > distribuído. As **filas/topologia de mensageria** são provisionadas pelo deploy de **process (BPMN)**
 > — ver [process.md](process.md). O modelo de domínio descreve agregados/comandos/eventos e seus
 > marcadores de despacho (projeção/coordenação), mas não declara nem cria infraestrutura de filas.
+
+> ⚠️ **A transição do dataschema para `MODELING` REMOVE o modelo publicado**, e voltar a `RUNNING`
+> exige republicá-lo — não é a plataforma que o repõe, porque o `.model.json` é artefato seu e ela não
+> guarda outra cópia. Se você remodela entities, este `POST` é passo obrigatório do roteiro, **dentro**
+> do bracket: ver [dataschema — alterar o schema de um sistema em operação](dataschema.md#alterar-o-schema-de-um-sistema-em-operação).
 
 ## Coordenação
 **CP-1:** o modelo publicado aqui é a **fonte da verdade** lida por **persistence-crs** (quais comandos/
