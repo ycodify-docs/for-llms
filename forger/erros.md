@@ -58,6 +58,13 @@ A recusa acumula **todos** os achados numa resposta só, **nada é gravado** e o
 | **`aggregateid` ou `status` não declarados** na projeção | declarar os atributos na entity (é um caso particular do piso, e também é recusado na criação/atualização da entity) |
 | **modelo publicado ilegível** | republicar o `.model.json` |
 
+> **A recusa diz como SAIR, e vale ler essa parte.** O dataschema fica em `MODELING`, e **fechar de
+> novo dá a mesma recusa** — não há volta pela mesma porta. A saída é **retirar a declaração**
+> (`PUT` com `_conf.projectionOf: []`) e fechar a edição: o dataschema volta a `RUNNING` e o contexto
+> opera. Corrija a divergência e declare de novo depois. Sem isso, o contexto fica inoperante até
+> alguém descobrir — e não se descobre por tentativa, porque a saída é o oposto do que se está
+> tentando fazer.
+
 Na criação/atualização da entity, o `400` sai antes, e por outras causas: `projectionOf` em `_conf.type`
 diferente de `entity`, projeção sem `aggregateid`/`status`, item vazio ou repetido.
 

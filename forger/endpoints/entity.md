@@ -246,6 +246,11 @@ São dois conceitos **ortogonais**, e o serviço aceita os dois na mesma entity:
 | `attribute.unique: true` | unicidade no espaço de valores **daquele atributo** |
 | `_conf.uniqueKey: ["a","b"]` | **chave composta** — exige 2+ atributos (com um só, é recusado) |
 
+> **Passar `unique` de `false` para `true` é aplicável, e quem julga duplicata é o banco.** O `PUT`
+> segue adiante e o banco recusa se houver valor repetido, nomeando o valor e a constraint. Não há
+> recusa antecipada do forger — ela existiu e recusava até com a tabela vazia, que é o caso mais comum
+> de quem está modelando.
+
 O uso conjunto é legítimo quando incidem sobre atributos **diferentes** — ex.: `email` único por si
 **e** `(filial, codigo)` único como par. São duas chaves candidatas distintas.
 

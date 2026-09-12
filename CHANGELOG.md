@@ -2,6 +2,23 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.29 — 2026-09-12
+
+- **Passar `unique` de `false` para `true` deixou de ser recusado pelo forger — quem julga duplicata é
+  o banco.** A recusa anterior dizia "requires all existing values to be unique" e **nunca consultava a
+  tabela**: recusava também com a tabela **vazia**, que é o caso mais comum de quem está modelando. Pior,
+  trancava o sistema contra si mesmo, porque a conferência de chave manda marcar o atributo como
+  `unique` quando o agregado declara `identity.fields` de um campo — a instrução da recusa era proibida
+  pela validação seguinte, e quem a seguisse não tinha saída. Vale para atributo e para associação.
+
+- **A recusa da conferência de projeção passa a dizer COMO SAIR, e não só a causa.** O dataschema fica
+  em `MODELING` de propósito, mas **fechar de novo dá a mesma recusa**: a única saída é retirar a
+  declaração (`_conf.projectionOf: []`) e fechar. É o oposto do que quem está corrigindo tenta fazer,
+  então ninguém descobre por tentativa — e até descobrir, o contexto fica inoperante. Em
+  [forger/erros.md](forger/erros.md#projeção-que-não-confere-com-o-modelo-de-escrita--400-na-volta-a-running).
+
+- **Vigência:** `forger@7e32720` — **ainda não há imagem com ela**.
+
 ## 1.28 — 2026-09-12
 
 - **A conferência de chave passou a olhar os DOIS lugares também quando `identity.fields` está vazio.**
