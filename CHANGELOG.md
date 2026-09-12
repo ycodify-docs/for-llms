@@ -17,7 +17,7 @@
   então ninguém descobre por tentativa — e até descobrir, o contexto fica inoperante. Em
   [forger/erros.md](forger/erros.md#projeção-que-não-confere-com-o-modelo-de-escrita--400-na-volta-a-running).
 
-- **Vigência:** `forger@7e32720` — **ainda não há imagem com ela**.
+- **Vigência:** `forger@7e32720`, em teste desde `yc-composer:amd64-260912e`.
 
 ## 1.28 — 2026-09-12
 
