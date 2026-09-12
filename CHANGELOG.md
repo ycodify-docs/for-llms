@@ -22,8 +22,7 @@
   então **índice único já existente no banco** que tenha saído da definição **não é alcançado** — mudar
   o modelo não derruba índice criado antes.
 
-- **Vigência:** a partir da imagem que carregar `forger@eb82d28` — **ainda não há imagem com
-  ela**.
+- **Vigência:** `forger@eb82d28`, em teste desde `yc-composer:amd64-260912c`.
 
 ## 1.26 — 2026-09-12
 
@@ -62,8 +61,8 @@
   mesmo controller, todos sem o prefixo de status que o tradutor de erro usa para decidir o código. Quem
   integra não conseguia distinguir "não existe" de "o serviço quebrou", e `510` manda procurar suporte
   por uma condição perfeitamente normal. O catálogo já documentava `404`; era o comportamento que estava
-  errado. **Vigência:** a partir da imagem que carregar `forger@5c13391` — **ainda não há imagem com
-  ela**; até lá, essas rotas continuam respondendo `510`.
+  errado. **Vigência:** `forger@5c13391`, em teste desde
+  `yc-composer:amd64-260912b`.
 
 ## 1.25 — 2026-09-10
 
