@@ -23,7 +23,7 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
 - Forma da definição
 - Endpoints (exaustivo)
 - Ciclo de vida (criar/atualizar)
-- Declarar que a entity é projeção: `_conf.projectionOf`
+- Declarar que a entity é projeção: `_conf.projectionOf` (teto e piso)
 - Chave única: `attribute.unique` vs `_conf.uniqueKey`
 - Semântica do `PUT`: ausente vs vazio
 - Recorte de leitura por titular: `accessControl.scope`
@@ -111,10 +111,20 @@ Uma entity **pode ou não** ser a projeção (read model) de um ou mais agregado
 > pelo **`type` cru**. Então `"projectionOf": ["lead"]` casa e `"projectionOf": ["comercial.lead"]` é
 > recusado — a mensagem de recusa lista os dois vocabulários.
 
-### O teto: a projeção nunca tem mais que a união dos agregados
+### O teto e o piso: a projeção tem exatamente o que os agregados escrevem
 
-Uma entity que se declara projeção **não pode declarar atributo que agregado nenhum dos nomeados
-escreve**. O conjunto que um agregado escreve é:
+Uma entity que se declara projeção é conferida nos **dois sentidos**, e um não implica o outro:
+
+| | O que é recusado | Por que importa |
+|---|---|---|
+| **teto** | atributo que agregado nenhum dos nomeados escreve | coluna órfã, que fica sempre vazia |
+| **piso** | atributo que os agregados escrevem e a entity **não** declara | **o grave**: sem a coluna, o motor recusa a gravação **inteira** e a linha nunca materializa |
+
+> ⚠️ **Faltar é muito pior que sobrar, e não tem conserto.** O comando responde `200` porque a escrita
+> funcionou; a projeção falha **depois**, em outro processo. Reemitir o comando falha, porque o agregado
+> já mudou de estado — a linha fica divergente para sempre. Sobrar coluna só deixa espaço vazio.
+
+O conjunto que um agregado escreve é:
 
 - os **atributos de todos os `command`** (`command.<nome>.data.attribute`);
 - o **nome de cada value object** (`data.valueObject.single` e `.multiple`) — o value object viaja
@@ -124,9 +134,12 @@ escreve**. O conjunto que um agregado escreve é:
 - **`aggregateid`** e **`status`**, que a plataforma escreve sempre.
 
 Não contam contra o teto os atributos que a plataforma injeta (`id`, `logversion`, `logrole`,
-`loguser`) nem as **associações** da entity.
+`loguser`) nem as **associações** da entity. No **piso**, porém, uma **associação com o nome certo
+satisfaz** — o motor aceita associação como chave do dado. A assimetria é deliberada: no teto a
+associação é livre porque pode ter outra razão de existir; no piso ela resolve a gravação.
 
-O caminho contrário é livre: a projeção **pode** ser mais estreita que o agregado.
+**A projeção não pode ser mais estreita que o agregado.** Não é escolha de desenho: uma chave que a
+entity não tenha derruba a gravação inteira, não só aquele campo.
 
 ### Colunas obrigatórias de toda projeção — `aggregateid`, `status`, e os carimbos
 
@@ -144,12 +157,16 @@ O caminho contrário é livre: a projeção **pode** ser mais estreita que o agr
 da entity**. Faltando qualquer um, a projeção não materializa: o consumidor recusa a chave desconhecida
 e a linha nunca aparece nas consultas de [persistence-q](../../persistence-q/README.md).
 
+**O fechamento da edição recusa a entity a que falte qualquer uma delas** — é a conferência de piso
+acima. `aggregateid` e `status` são recusados já na criação/atualização da entity; os carimbos só no
+fechamento, porque só ali se sabe quais eventos o agregado tem.
+
 ### Onde a regra é imposta
 
 | Momento | O que é recusado | Por quê ali |
 |---|---|---|
 | **criar/atualizar a entity** | `projectionOf` em `_conf.type` != `entity` · projeção sem `aggregateid` ou sem `status` · item vazio ou repetido | só depende da entity |
-| **fechar a edição** (`PUT .../dataschema/{nome}` de `MODELING` para `RUNNING`) | agregado nomeado que não existe no modelo publicado · dois agregados com o mesmo `type` · **atributo acima do teto** · as duas colunas faltando em entity antiga | é o **único** instante em que a entity e o `.model.json` existem com certeza — os dois se publicam por caminhos diferentes e em qualquer ordem |
+| **fechar a edição** (`PUT .../dataschema/{nome}` de `MODELING` para `RUNNING`) | agregado nomeado que não existe no modelo publicado · dois agregados com o mesmo `type` · **atributo acima do teto** · **qualquer coluna que os agregados escrevam e a entity não declare** — `aggregateid`, `status` e os carimbos incluídos | é o **único** instante em que a entity e o `.model.json` existem com certeza — os dois se publicam por caminhos diferentes e em qualquer ordem |
 
 A recusa do fechamento acumula **todos** os achados numa resposta só, **nada é gravado**, e o dataschema
 **continua em `MODELING`**. Conferir a cada publicação de artefato não é possível: recusaria a sequência
