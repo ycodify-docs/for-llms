@@ -23,7 +23,7 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
 - Forma da definição
 - Endpoints (exaustivo)
 - Ciclo de vida (criar/atualizar)
-- Declarar que a entity é projeção: `_conf.projectionOf` (teto e piso)
+- Declarar que a entity é projeção: `_conf.projectionOf` (teto, piso e chave)
 - Chave única: `attribute.unique` vs `_conf.uniqueKey`
 - Semântica do `PUT`: ausente vs vazio
 - Recorte de leitura por titular: `accessControl.scope`
@@ -160,6 +160,36 @@ e a linha nunca aparece nas consultas de [persistence-q](../../persistence-q/REA
 **O fechamento da edição recusa a entity a que falte qualquer uma delas** — é a conferência de piso
 acima. `aggregateid` e `status` são recusados já na criação/atualização da entity; os carimbos só no
 fechamento, porque só ali se sabe quais eventos o agregado tem.
+
+### A chave: `identity.fields` do agregado contra a da projeção
+
+O `identity.fields` do agregado é o **espaço de chave** do modelo de escrita. Na projeção a mesma coisa
+se declara em **dois lugares**, conforme a cardinalidade — e a conferência segue essa divisão:
+
+| `identity.fields` tem | A projeção declara em | Recusado quando |
+|---|---|---|
+| **um** campo | o **atributo**, com `unique: true` | o atributo não é `unique`; ou a entity declara `_conf.uniqueKey`, que o agregado não tem |
+| **dois ou mais** | **`_conf.uniqueKey`** (chave composta) | o conjunto difere do `identity.fields` |
+| **nenhum** | nada | a entity marca `unique` num atributo de negócio sem lastro no `identity.fields` |
+
+Chave de **um** campo não vai em `_conf.uniqueKey`: ele é o lugar da chave **composta** e exige 2+
+atributos. Chave de dois ou mais não se expressa marcando cada atributo como `unique` — isso é mais
+estrito que o agregado, porque cada coluna passaria a ser única sozinha.
+
+A comparação de `uniqueKey` é por **conjunto**: a ordem declarada não é preservada na constraint
+resultante, então exigir ordem recusaria o que o banco trata como igual.
+
+`id` e `aggregateid` ficam **fora** da conta — a unicidade dos dois é da plataforma, não do modelo de
+negócio.
+
+> ⚠️ **O que esta conferência NÃO alcança:** ela compara **definição com definição**. Um índice único
+> que já exista no banco de leitura e tenha saído da definição **não é visto aqui** — mudar o modelo não
+> derruba índice criado antes. É o caso em que "o segundo registro legítimo nunca materializa" com a
+> definição aparentemente correta, e quem enxerga o banco é a infra.
+
+> ⚠️ **Com dois ou mais agregados em `projectionOf`, a conferência de chave é pulada.** Cada agregado
+> tem o seu `identity.fields`, e uni-los inventaria uma chave que nenhum declarou. As conferências de
+> teto e piso continuam valendo normalmente.
 
 ### Onde a regra é imposta
 

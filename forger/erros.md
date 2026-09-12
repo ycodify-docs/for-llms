@@ -54,6 +54,7 @@ A recusa acumula **todos** os achados numa resposta só, **nada é gravado** e o
 | **coluna faltando (piso)** — os agregados escrevem o que a entity não declara, carimbos de evento incluídos | declarar os atributos na entity, **ou** remover do `.model.json` o que a projeção não deve receber. É o caso grave: sem a coluna a gravação inteira é recusada e a linha nunca materializa |
 | **agregado inexistente** — nome em `projectionOf` sem `type` correspondente | corrigir o nome (é o **`type`**, não a chave composta do mapa `aggregate`), ou republicar o modelo com esse agregado |
 | **`type` ambíguo** — dois agregados publicados com o mesmo `type` | dar `type` distintos e republicar o modelo |
+| **chave divergente** — `identity.fields` de um campo sem `unique` no atributo, ou de 2+ campos sem `_conf.uniqueKey` igual, ou `unique` sem lastro nenhum | declarar a chave no lugar certo (um campo → atributo `unique`; dois ou mais → `_conf.uniqueKey`), **ou** acertar o `identity.fields` e republicar o `.model.json` |
 | **`aggregateid` ou `status` não declarados** na projeção | declarar os atributos na entity (é um caso particular do piso, e também é recusado na criação/atualização da entity) |
 | **modelo publicado ilegível** | republicar o `.model.json` |
 

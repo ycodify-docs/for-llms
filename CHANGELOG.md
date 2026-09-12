@@ -2,6 +2,29 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.27 — 2026-09-12
+
+- **A conferência da projeção passa a cobrir também a CHAVE, e ela mora em dois lugares conforme a
+  cardinalidade.** O `identity.fields` do agregado é o espaço de chave do modelo de escrita; na projeção,
+  chave de **um** campo se declara no atributo (`unique: true`) e chave de **dois ou mais** em
+  `_conf.uniqueKey`, que é o lugar da composta e exige 2+ atributos. A conferência segue essa divisão em
+  vez de olhar sempre para o mesmo campo. Em
+  [forger/endpoints/entity.md](forger/endpoints/entity.md#a-chave-identityfields-do-agregado-contra-a-da-projeção).
+
+- **O caso que motivou:** um agregado deixou de exigir chave natural — `identity.fields` virou vazio —
+  e a coluna continuou única na projeção. O segundo registro legítimo nunca materializava, sem erro
+  visível a quem chamou. Agora `unique` sem lastro no `identity.fields` é recusado no fechamento da
+  edição.
+
+- **Dois limites ditos com todas as letras, porque calar seria pior:** com **dois ou mais** agregados em
+  `projectionOf` a conferência de chave é **pulada** — cada agregado tem o seu `identity.fields`, e
+  uni-los inventaria uma chave que nenhum declarou; e a conferência compara **definição com definição**,
+  então **índice único já existente no banco** que tenha saído da definição **não é alcançado** — mudar
+  o modelo não derruba índice criado antes.
+
+- **Vigência:** a partir da imagem que carregar `forger@eb82d28` — **ainda não há imagem com
+  ela**.
+
 ## 1.26 — 2026-09-12
 
 - **A entity passa a poder declarar de que agregados ela é projeção — `_conf.projectionOf` — e o
