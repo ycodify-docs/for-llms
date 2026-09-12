@@ -49,9 +49,16 @@ Violar o padrão ou o limite → `400` com a indicação do nome rejeitado.
 ### Nomes reservados e atributos gerenciados
 - **Nomes reservados** (não podem nomear entity/atributo/associação): `id`, `logversion`, `logrole`,
   `loguser`. Usá-los → `400`.
-- Toda projeção recebe automaticamente atributos de controle (identidade e versionamento/auditoria,
-  os nomes reservados acima). São **injetados e mantidos pela plataforma** — **não** os declare na
+- Toda entity recebe automaticamente esses atributos de controle (identidade e
+  versionamento/auditoria). São **injetados e mantidos pela plataforma** — **não** os declare na
   definição da entity nem os envie em payloads de escrita; fazê-lo causa rejeição.
+
+> ⚠️ **Injetado não é a mesma coisa que obrigatório, e confundir os dois quebra a projeção.** A
+> plataforma injeta **quatro** atributos (`id`, `logversion`, `logrole`, `loguser`). Uma entity que é
+> **projeção de agregado** precisa declarar **ela mesma** outros: `aggregateid`, `status` e um carimbo
+> por evento do agregado. Esses **não** são reservados e **não** são injetados — faltando qualquer um,
+> a linha nunca materializa. Ver
+> [entity — declarar que a entity é projeção](endpoints/entity.md#declarar-que-a-entity-é-projeção--_confprojectionof-regra).
 
 ### Ciclo do `tenant-id`
 O `tenant-id` é **gerado na criação do dataschema** (não é escolhido pelo chamador). Para usá-lo nos

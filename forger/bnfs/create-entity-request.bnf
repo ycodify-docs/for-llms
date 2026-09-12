@@ -40,6 +40,7 @@
                   | <super-entity-strategy> [ "," <more-conf-optional> ]
                   | <partition> [ "," <more-conf-optional> ]
                   | <enumeration> [ "," <more-conf-optional> ]
+                  | <projection-of> [ "," <more-conf-optional> ]
 
 <more-conf-optional> ::= <comment>
                        | <concurrency-control>
@@ -50,6 +51,7 @@
                        | <super-entity-strategy>
                        | <partition>
                        | <enumeration>
+                       | <projection-of>
                        | <comment> "," <more-conf-optional>
                        | <concurrency-control> "," <more-conf-optional>
                        | <unique-key> "," <more-conf-optional>
@@ -59,6 +61,7 @@
                        | <super-entity-strategy> "," <more-conf-optional>
                        | <partition> "," <more-conf-optional>
                        | <enumeration> "," <more-conf-optional>
+                       | <projection-of> "," <more-conf-optional>
 
 <type> ::= "\"type\"" ":" ( "\"entity\"" | "\"abstract\"" | "\"component\"" | "\"enumeration\"" )
 
@@ -69,6 +72,19 @@
 <unique-key> ::= "\"uniqueKey\"" ":" "[" [ <attribute-name-list> ] "]"
 
 <index-key> ::= "\"indexKey\"" ":" "[" [ <attribute-name-list> ] "]"
+
+/**
+ * projectionOf: the aggregate "type"s this entity is the projection of.
+ * Absent or empty = the entity is NOT a projection and is not checked against the write model.
+ * Each item matches the aggregate's "type", NOT the composite key of the .model.json "aggregate" map.
+ */
+<projection-of> ::= "\"projectionOf\"" ":" "[" [ <aggregate-type-list> ] "]"
+
+<aggregate-type-list> ::= <quoted-aggregate-type> [ "," <aggregate-type-list> ]
+
+<quoted-aggregate-type> ::= "\"" <aggregate-type> "\""
+
+<aggregate-type> ::= <lowercase-letter> { <lowercase-letter> }
 
 <access-control> ::= "\"accessControl\"" ":" "{" <read-roles> "," <write-roles> "}"
 

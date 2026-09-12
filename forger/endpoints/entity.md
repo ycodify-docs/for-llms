@@ -23,6 +23,7 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
 - Forma da definição
 - Endpoints (exaustivo)
 - Ciclo de vida (criar/atualizar)
+- Declarar que a entity é projeção: `_conf.projectionOf`
 - Chave única: `attribute.unique` vs `_conf.uniqueKey`
 - Semântica do `PUT`: ausente vs vazio
 - Recorte de leitura por titular: `accessControl.scope`
@@ -59,6 +60,7 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
     "comment": "string", "concurrencyControl": true,
     "uniqueKey": ["string"], "indexKey": ["string"],
     "accessControl": { "read": ["MASTER"], "write": ["MASTER"], "scope": {} },
+    "projectionOf": ["string"],
     "superEntity": "string", "superEntityStrategy": "string"
   }
 }
@@ -83,28 +85,75 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
 > definição de entity. **Não** remova `_conf` (nem outras chaves) deste payload — é outro contrato, em
 > outro endpoint. Ver [model-format — chaves de metadado](../../persistence-crs/spec/model-format.md#chaves-de-metadado-_-prefixadas).
 
-## Colunas obrigatórias de toda projeção — `aggregateid`, `status` e cada `whenAttribute` de evento (REGRA)
+## Declarar que a entity é projeção — `_conf.projectionOf` (REGRA)
 
-Além das colunas derivadas de `data.attribute` + valueObjects, **toda entity que é projeção de um
-agregado DEVE declarar** as colunas de projeção abaixo — em **todo** agregado, sem exceção:
+Uma entity **pode ou não** ser a projeção (read model) de um ou mais agregados (write model, do
+`.model.json`). Ela declara isso em `_conf.projectionOf`:
+
+```json
+{ "name": "aula",
+  "_conf": { "type": "entity", "projectionOf": ["aula", "matricula"] },
+  "attributes": [
+    { "name": "aggregateid", "type": "String", "length": 36, "nullable": false },
+    { "name": "status", "type": "String", "length": 30, "nullable": false },
+    { "name": "titulo", "type": "String", "length": 60, "nullable": true }
+  ] }
+```
+
+| | |
+|---|---|
+| **ausente ou `[]`** | a entity **não é projeção** de agregado nenhum, e nada é conferido contra o modelo de escrita |
+| **cada item** | é o **`type`** do agregado, **não** a chave do mapa `aggregate` do `.model.json` |
+| **vários itens** | a entity é projeção da **união** dos agregados nomeados |
+
+> ⚠️ **O item é o `type`, e a distinção não é cosmética.** No `.model.json` o agregado aparece sob uma
+> chave composta (`"comercial.lead"`) e tem um campo `"type": "lead"`. O roteamento da projeção é feito
+> pelo **`type` cru**. Então `"projectionOf": ["lead"]` casa e `"projectionOf": ["comercial.lead"]` é
+> recusado — a mensagem de recusa lista os dois vocabulários.
+
+### O teto: a projeção nunca tem mais que a união dos agregados
+
+Uma entity que se declara projeção **não pode declarar atributo que agregado nenhum dos nomeados
+escreve**. O conjunto que um agregado escreve é:
+
+- os **atributos de todos os `command`** (`command.<nome>.data.attribute`);
+- o **nome de cada value object** (`data.valueObject.single` e `.multiple`) — o value object viaja
+  **aninhado sob o próprio nome**, então ele é **uma** coluna, e os campos de dentro dele **não** são
+  colunas da projeção;
+- **um carimbo por evento** — o `whenAttribute` de cada `event`;
+- **`aggregateid`** e **`status`**, que a plataforma escreve sempre.
+
+Não contam contra o teto os atributos que a plataforma injeta (`id`, `logversion`, `logrole`,
+`loguser`) nem as **associações** da entity.
+
+O caminho contrário é livre: a projeção **pode** ser mais estreita que o agregado.
+
+### Colunas obrigatórias de toda projeção — `aggregateid`, `status`, e os carimbos
 
 - **`aggregateid`** — `String`, `length` **36**, `nullable: false`: o **UUID do agregado**; **identifica
   a linha** da projeção (ver [identificação na projeção](../../persistence-crs/spec/model-format.md#identificação-na-projeção-leitura)).
 - **`status`** — `String`, `nullable: false`: o **estado atual** do agregado (campo de filtro típico em
   [persistence-q](../../persistence-q/README.md)).
-- **cada `whenAttribute` de evento** — `Timestamp`, `nullable: true`: o **carimbo de tempo do evento**
-  (ex.: o evento `criada` tem `whenAttribute` `criadaem`). Há **uma coluna por evento** do agregado. O
-  valor é **preenchido automaticamente pela plataforma na escrita** (por isso `whenAttribute` **NÃO** é
-  um `data.attribute` de comando no `.model.json` — não o declare lá), mas a **coluna na projeção
-  precisa existir**: ela **não** deriva de `data.attribute` e **não** é auto-injetada.
+- **cada `whenAttribute` de evento** — `Timestamp`, `nullable: true`: o carimbo do evento (ex.: o evento
+  `criada` tem `whenAttribute` `criadaem`). Há **uma coluna por evento**. O valor é preenchido pela
+  plataforma na escrita — por isso `whenAttribute` **não** é um `data.attribute` de comando no
+  `.model.json`, mas a **coluna na projeção precisa existir**.
 
-**Não** são reservados (§reservados acima) **nem** auto-injetados pela plataforma — o Forger injeta
-automaticamente **apenas** `id`/`logversion`/`logrole`/`loguser`. `aggregateid`, `status` e **cada
-`whenAttribute` de evento** são **declarados pelo autor da entity**, obrigatoriamente. **Faltando
-qualquer um deles, a projeção do agregado não é materializável**: o fluxo de projeção do es-n grava a
-linha por `aggregateid`, registra `status` e escreve o carimbo em cada `whenAttribute` — se a coluna
-correspondente não existir, o consumidor de projeção falha (atributo/componente desconhecido) e a linha
-**nunca** é materializada (consultas em [persistence-q](../../persistence-q/README.md) retornam vazio).
+**Nenhum dos três é reservado nem auto-injetado.** O Forger injeta automaticamente **apenas** `id`,
+`logversion`, `logrole` e `loguser`; `aggregateid`, `status` e os carimbos são **declarados pelo autor
+da entity**. Faltando qualquer um, a projeção não materializa: o consumidor recusa a chave desconhecida
+e a linha nunca aparece nas consultas de [persistence-q](../../persistence-q/README.md).
+
+### Onde a regra é imposta
+
+| Momento | O que é recusado | Por quê ali |
+|---|---|---|
+| **criar/atualizar a entity** | `projectionOf` em `_conf.type` != `entity` · projeção sem `aggregateid` ou sem `status` · item vazio ou repetido | só depende da entity |
+| **fechar a edição** (`PUT .../dataschema/{nome}` de `MODELING` para `RUNNING`) | agregado nomeado que não existe no modelo publicado · dois agregados com o mesmo `type` · **atributo acima do teto** · as duas colunas faltando em entity antiga | é o **único** instante em que a entity e o `.model.json` existem com certeza — os dois se publicam por caminhos diferentes e em qualquer ordem |
+
+A recusa do fechamento acumula **todos** os achados numa resposta só, **nada é gravado**, e o dataschema
+**continua em `MODELING`**. Conferir a cada publicação de artefato não é possível: recusaria a sequência
+legítima em que o segundo artefato ainda não existe.
 
 ## Endpoints (exaustivo)
 
@@ -182,7 +231,13 @@ que esvaziar**:
 
 // remove a chave única composta (vazio explícito)
 { "name": "ocorrencia", "_conf": { "type": "entity", "uniqueKey": [] } }
+
+// a entity deixa de ser projeção de agregado (vazio explícito)
+{ "name": "aula", "_conf": { "type": "entity", "projectionOf": [] } }
 ```
+
+> `projectionOf` segue a mesma regra: **ausente** preserva a declaração atual, `[]` a **remove**, e a
+> entity volta a não ser conferida contra o modelo de escrita no fechamento da edição.
 
 Vale igual para atributos e associações: declarar um atributo só com `nullable` altera **apenas**
 `nullable` — `length`, `unique` e `comment` continuam como estavam.

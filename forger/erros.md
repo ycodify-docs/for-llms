@@ -35,12 +35,29 @@ críticos retorna também o relatório de análise.)
 
 | HTTP | Significado | Causas típicas | Correção |
 |---|---|---|---|
-| `400` | Requisição inválida | Campo obrigatório ausente (`_conf`, `logversion`); `type` de atributo fora da lista fechada ou em minúsculas; valor fora do formato (nome em minúsculas, comprimento, porta > 0); documento de modelo sem seção de agregado; **volta a `RUNNING` sem o `.model.json` publicado**. | Corrigir o corpo conforme o contrato do endpoint. No caso da transição, republicar o modelo — ver [dataschema](endpoints/dataschema.md#alterar-o-schema-de-um-sistema-em-operação). |
+| `400` | Requisição inválida | Campo obrigatório ausente (`_conf`, `logversion`); `type` de atributo fora da lista fechada ou em minúsculas; valor fora do formato (nome em minúsculas, comprimento, porta > 0); documento de modelo sem seção de agregado; **volta a `RUNNING` sem o `.model.json` publicado**; **projeção que não confere com o modelo de escrita** (ver abaixo). | Corrigir o corpo conforme o contrato do endpoint. No caso da transição, republicar o modelo — ver [dataschema](endpoints/dataschema.md#alterar-o-schema-de-um-sistema-em-operação). |
 | `403` | Acesso negado | Sem papel de administrador/engenheiro na organização; inconsistência de propriedade (`org`/`project`/`tenant`). | Usar credencial autorizada; conferir que o tenant pertence ao contexto. |
 | `404` | Não encontrado | Recurso inexistente; `tenant` não referencia dataschema do contexto. | Verificar a ordem de deploy e os identificadores. |
 | `409` | Conflito de versão | `logversion` divergente do atual (alguém atualizou antes); ou remoção bloqueada por dependentes. | Reler o recurso, reenviar com o `logversion` atual; remover dependentes antes. |
 | `422` | Não processável | Publicação de **process** com problemas **críticos** na análise. | Corrigir o processo conforme o relatório retornado. |
 | `500` | Erro interno | Falha na compilação/aplicação de DDL; falha ao materializar efeito físico (rollback aplicado). | Revisar a definição; retentar; se persistir, escalar. |
+
+## Projeção que não confere com o modelo de escrita — `400` na volta a `RUNNING`
+
+Vale para entity que declara [`_conf.projectionOf`](endpoints/entity.md#declarar-que-a-entity-é-projeção--_confprojectionof-regra).
+A recusa acumula **todos** os achados numa resposta só, **nada é gravado** e o dataschema **continua em
+`MODELING`**.
+
+| O que motiva | O que dizer ao corrigir |
+|---|---|
+| **atributo acima do teto** — a entity declara o que agregado nenhum escreve | remover o atributo da entity, **ou** acrescentá-lo a um `command` do agregado e republicar o `.model.json` |
+| **agregado inexistente** — nome em `projectionOf` sem `type` correspondente | corrigir o nome (é o **`type`**, não a chave composta do mapa `aggregate`), ou republicar o modelo com esse agregado |
+| **`type` ambíguo** — dois agregados publicados com o mesmo `type` | dar `type` distintos e republicar o modelo |
+| **`aggregateid` ou `status` não declarados** na projeção | declarar os atributos na entity |
+| **modelo publicado ilegível** | republicar o `.model.json` |
+
+Na criação/atualização da entity, o `400` sai antes, e por outras causas: `projectionOf` em `_conf.type`
+diferente de `entity`, projeção sem `aggregateid`/`status`, item vazio ou repetido.
 
 ## Notas de comportamento
 - **Rollback:** ao criar `database`/`dataschema`/`entity`, se o efeito físico falhar, os metadados são

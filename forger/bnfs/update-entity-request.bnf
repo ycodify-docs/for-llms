@@ -26,7 +26,8 @@
  * "name" is always required and must match the entity in the path.
  *
  * ALLOWED UPDATES:
- * - Entity _conf properties: comment, concurrencyControl, uniqueKey, indexKey, accessControl
+ * - Entity _conf properties: comment, concurrencyControl, uniqueKey, indexKey, accessControl,
+ *   projectionOf
  * - Attribute properties: length, nullable, unique, comment, default
  * - Association properties: nullable, unique, comment
  *
@@ -49,17 +50,20 @@
                    | <unique-key> [ "," <more-conf-updatable> ]
                    | <index-key> [ "," <more-conf-updatable> ]
                    | <access-control> [ "," <more-conf-updatable> ]
+                   | <projection-of> [ "," <more-conf-updatable> ]
 
 <more-conf-updatable> ::= <comment>
                         | <concurrency-control>
                         | <unique-key>
                         | <index-key>
                         | <access-control>
+                        | <projection-of>
                         | <comment> "," <more-conf-updatable>
                         | <concurrency-control> "," <more-conf-updatable>
                         | <unique-key> "," <more-conf-updatable>
                         | <index-key> "," <more-conf-updatable>
                         | <access-control> "," <more-conf-updatable>
+                        | <projection-of> "," <more-conf-updatable>
 
 <comment> ::= "\"comment\"" ":" <quoted-string>
 
@@ -68,6 +72,19 @@
 <unique-key> ::= "\"uniqueKey\"" ":" "[" [ <attribute-name-list> ] "]"
 
 <index-key> ::= "\"indexKey\"" ":" "[" [ <attribute-name-list> ] "]"
+
+/**
+ * projectionOf: the aggregate "type"s this entity is the projection of.
+ * Absent = kept as is. Empty ([]) = cleared, and the entity stops being a projection.
+ * Each item matches the aggregate's "type", NOT the composite key of the .model.json "aggregate" map.
+ */
+<projection-of> ::= "\"projectionOf\"" ":" "[" [ <aggregate-type-list> ] "]"
+
+<aggregate-type-list> ::= <quoted-aggregate-type> [ "," <aggregate-type-list> ]
+
+<quoted-aggregate-type> ::= "\"" <aggregate-type> "\""
+
+<aggregate-type> ::= <lowercase-letter> { <lowercase-letter> }
 
 <access-control> ::= "\"accessControl\"" ":" "{" <read-roles> "," <write-roles> "}"
 
