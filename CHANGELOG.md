@@ -2,6 +2,17 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.28 — 2026-09-12
+
+- **A conferência de chave passou a olhar os DOIS lugares também quando `identity.fields` está vazio.**
+  A versão anterior recusava `unique` num atributo sem lastro, mas deixava passar `_conf.uniqueKey` — é a
+  mesma unicidade sem respaldo no modelo de escrita, só declarada no outro lugar, e é justamente a forma
+  que uma chave composta usa. Bastaria um agregado esvaziar o `identity.fields` para a projeção seguir
+  impondo a chave composta em silêncio, que é a classe de defeito que esta conferência existe para pegar.
+  Quadro atualizado em
+  [forger/endpoints/entity.md](forger/endpoints/entity.md#a-chave-identityfields-do-agregado-contra-a-da-projeção).
+  **Vigência:** `forger@e95f65c`, em teste desde `yc-composer:amd64-260912d`.
+
 ## 1.27 — 2026-09-12
 
 - **A conferência da projeção passa a cobrir também a CHAVE, e ela mora em dois lugares conforme a

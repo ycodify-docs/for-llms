@@ -170,7 +170,7 @@ se declara em **dois lugares**, conforme a cardinalidade — e a conferência se
 |---|---|---|
 | **um** campo | o **atributo**, com `unique: true` | o atributo não é `unique`; ou a entity declara `_conf.uniqueKey`, que o agregado não tem |
 | **dois ou mais** | **`_conf.uniqueKey`** (chave composta) | o conjunto difere do `identity.fields` |
-| **nenhum** | nada | a entity marca `unique` num atributo de negócio sem lastro no `identity.fields` |
+| **nenhum** | nada | a entity impõe unicidade de negócio sem lastro — **em qualquer dos dois lugares**: `unique` num atributo, ou `_conf.uniqueKey` |
 
 Chave de **um** campo não vai em `_conf.uniqueKey`: ele é o lugar da chave **composta** e exige 2+
 atributos. Chave de dois ou mais não se expressa marcando cada atributo como `unique` — isso é mais
