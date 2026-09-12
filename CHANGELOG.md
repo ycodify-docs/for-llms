@@ -2,6 +2,46 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.26 — 2026-09-12
+
+- **A entity passa a poder declarar de que agregados ela é projeção — `_conf.projectionOf` — e o
+  fechamento da edição confere as duas coisas contra o modelo de escrita.** Até aqui a tabela de leitura
+  e a definição de escrita descreviam a mesma coisa, eram publicadas por caminhos diferentes, e **nada
+  as confrontava**: a divergência só aparecia quando um evento tentava gravar, e aí não havia conserto —
+  o comando já respondera `200`, a projeção falhava depois, e reemitir o comando falha com o agregado em
+  outro estado. Em [forger/endpoints/entity.md](forger/endpoints/entity.md#declarar-que-a-entity-é-projeção--_confprojectionof-regra),
+  com as recusas em [forger/erros.md](forger/erros.md#projeção-que-não-confere-com-o-modelo-de-escrita--400-na-volta-a-running).
+
+- **São dois sentidos, e faltar é muito pior que sobrar.** *Teto*: a projeção não pode declarar atributo
+  que agregado nenhum dos nomeados escreve — o efeito é coluna órfã, sempre vazia. *Piso*: a projeção
+  tem de declarar **tudo** o que eles escrevem, carimbo de evento incluído — sem a coluna, o motor
+  recusa a gravação **inteira** e a linha nunca materializa. Por isso **a projeção não pode ser mais
+  estreita que o agregado**: não é escolha de desenho, é que uma chave ausente derruba a gravação toda,
+  não só aquele campo.
+
+- **A conferência roda no fechamento da edição, e não na publicação de cada artefato.** A entity e o
+  `.model.json` são publicados por caminhos diferentes e em **qualquer ordem**; conferir um contra o
+  outro no ato de publicar recusaria sequência legítima, porque o segundo artefato ainda não existe. Na
+  transição `MODELING → RUNNING` os dois estão na mesa. A recusa é `400`, **nada é gravado**, e o
+  dataschema **continua em `MODELING`**.
+
+- **O item de `projectionOf` é o `type` do agregado, não a chave do mapa `aggregate`.** No `.model.json`
+  o agregado aparece sob chave composta (`"ensino.aula"`) e tem um campo `"type": "aula"`; o roteamento
+  da projeção usa o `type` cru. A recusa lista os **dois** vocabulários, porque o erro provável é copiar
+  o que se vê no arquivo.
+
+- **É opt-in, e isso é o que protege quem já existe:** entity sem `projectionOf` não é conferida, e
+  nenhum dataschema publicado hoje passa a ser recusado. **Vigência:** a partir da imagem que carregar
+  `forger@04ee971` — em teste desde `yc-composer:amd64-260912`.
+
+- **Corrigido: recurso inexistente respondia `510 "Falha inesperada, solicite suporte."` em vez de
+  `404`.** Valia para entity, dataschema, atributo e associação não encontrados — oito lançamentos do
+  mesmo controller, todos sem o prefixo de status que o tradutor de erro usa para decidir o código. Quem
+  integra não conseguia distinguir "não existe" de "o serviço quebrou", e `510` manda procurar suporte
+  por uma condição perfeitamente normal. O catálogo já documentava `404`; era o comportamento que estava
+  errado. **Vigência:** a partir da imagem que carregar `forger@5c13391` — **ainda não há imagem com
+  ela**; até lá, essas rotas continuam respondendo `510`.
+
 ## 1.25 — 2026-09-10
 
 - **O que separa teste de produção são dois critérios, não um** — e o documento não dizia nenhum dos
