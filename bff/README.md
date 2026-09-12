@@ -204,6 +204,7 @@ Escrita e leitura **não** são governadas do mesmo jeito, e a diferença é del
 | `POST /session/command` | BFF **e** persistence-crs | papéis do token × `command.roles` do modelo; recusa `403` |
 | `POST /session/query` | **persistence-q**, sozinho | `_conf.accessControl.read` da entity |
 | `POST /session/aggregate` · `/session/history` | BFF | mesma derivação de capacidade do comando |
+| **quais COLUNAS**, nas três de leitura | **BFF** | `readProjection` do agregado — ver [abaixo](#limitar-os-campos-que-um-papel-lê--readprojection) |
 
 `POST /session/query` **não aplica portão de papel**. O BFF confere que o `tenantId` pertence ao
 portador e encaminha; quem autoriza é o persistence-q, pela política de leitura declarada na entity.
@@ -218,6 +219,61 @@ não deveria ter, falsificando o modelo e afrouxando a escrita.
 `/session/aggregate` e `/session/history` **mantêm** o portão de capacidade porque batem no
 persistence-crs, que valida **tenant**, não leitura por papel — sem o portão, estado e histórico de
 qualquer agregado ficariam ao alcance de qualquer portador de sessão daquele tenant.
+
+### Limitar os campos que um papel lê — `readProjection`
+
+O `accessControl` da plataforma recorta **linha**: `read` libera a entity inteira e `scope` limita às
+linhas de que o papel é titular. **Nada limita coluna.** Para um papel que deve ver parte de uma
+ficha — a recepção que precisa de nome e telefone e nunca de CPF — sobravam dois extremos: ler tudo
+ou não ler nada.
+
+O BFF preenche essa lacuna com `readProjection`, **declarativo e por papel**, válido para qualquer
+entity.
+
+**Onde se declara:** no `.model.json` do tenant, **ao lado dos comandos do agregado**.
+
+```jsonc
+"pessoal.aluno": {
+  "command": { … },
+  "readProjection": { "RECEPCIONISTA": ["nome", "email", "telefone", "genero"] }
+}
+```
+
+**A regra, e ela é a mesma do `scope` de linha — declaração nunca concede, só estreita:**
+
+| Situação do papel | Lê |
+|---|---|
+| **não** aparece em `readProjection` | a linha inteira |
+| aparece | **só** as colunas listadas |
+| **vários papéis**, um deles fora | a linha inteira — o menos restritivo vence |
+
+**Três colunas nunca se recortam:** `id`, `aggregateid` e `status`. Sem elas a tela não seleciona
+registro nem sabe que transições cabem, e cortá-las não protegeria dado pessoal nenhum — são
+identificador e estado.
+
+**Vale nas três rotas de leitura**, não só na consulta: `POST /session/query`,
+`POST /session/aggregate` e `POST /session/history`. É o mesmo dado por três portas — no histórico o
+recorte cai sobre o `eventData` do evento, e os metadados (quem, quando, qual comando) ficam.
+
+> ⚠️ **A plataforma não valida a declaração, e o BFF valida.** O forger aceita com `201` papel
+> inexistente, coluna com nome errado e lista vazia: ele confere `aggregate`, `org/project/tenant` e
+> os placeholders, e carrega o resto sem olhar. Então **declaração inválida faz a leitura ser recusada
+> com `500`**, nomeando o que está errado — não recortada pela metade. Entregar tela que parece
+> funcionar sobre uma regra de acesso que não se sustenta é pior que recusar.
+>
+> **Nunca prefixe a chave com `_`.** A publicação do `.model.json` remove chaves `_`-prefixadas em
+> qualquer profundidade, **em silêncio** — a declaração sumiria sem aviso nenhum.
+
+> ### 🔴 O que `readProjection` NÃO faz
+>
+> **Só alcança quem passa pelo BFF.** O motor não conhece esta declaração: ela é metadado que só o
+> BFF lê. Quem chamar o `persistence-q` **direto**, com o próprio token, recebe a linha inteira — e
+> isso não é hipótese, é prática medida em 2026-09-08 e reconfirmada em 09-09 num sistema que usa
+> esta plataforma.
+>
+> Em uma frase: **`readProjection` tira o campo da tela, não do banco.** Enquanto o recorte de coluna
+> não existir no `persistence-q`, quem precisa da garantia no dado tem de negar a leitura da entity
+> inteira no `accessControl.read`, ou separar o dado sensível em outra entity.
 
 ### `predicates` é a forma do persistence-q — não há dialeto do BFF
 
