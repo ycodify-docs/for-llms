@@ -16,6 +16,26 @@
   como delicado um dado de teste, ou o contrário. A pergunta que classifica é **de que tenant é a
   linha**; o tenant de teste existe desde o começo, o de produção só quando o sistema vai ao ar.
 
+## 1.25 — 2026-09-12
+
+- **"O comando respondeu `200` e a linha não apareceu" ganhou seção própria, com a receita para achar a
+  causa.** É o sintoma mais caro da plataforma, e o mal-entendido está no `200`: ele responde pela
+  **escrita**. A projeção é aplicada depois, a partir de uma fila, e quando falha não há para quem
+  responder — quem chamou já foi embora. A seção diz o que fazer nessa ordem: conferir a projeção depois
+  de qualquer transição nova, procurar o rastro no log de serviço, e ler o que voltou. Em
+  [persistence-crs/erros.md](persistence-crs/erros.md#o-comando-respondeu-200-e-a-linha-não-apareceu),
+  com ponteiro do [persistence-q](persistence-q/README.md).
+
+- **A busca virou uma palavra só: `NAO-MATERIALIZOU`.** A mesma classe de falha saía sob três termos
+  diferentes, conforme o caminho — projeção do tenant, projeção entre contextos, saga —, e o endpoint de
+  logs recebe o termo **na própria rota**. Quem errava a palavra recebia `204`, que é indistinguível de
+  "não houve falha": foi assim que um cliente concluiu que a falha era silenciosa quando ela estava
+  registrada sob outro nome. **Vigência:** a partir da imagem que carregar `persistence-crs@9bc1b28`;
+  antes dela, os três termos antigos continuam sendo o caminho.
+
+- **Registrado também que `204` na busca de log significa "não achei esse termo"** — nunca "não houve
+  falha". A distinção não era óbvia e custou uma investigação inteira.
+
 ## 1.24 — 2026-09-10
 
 - **Pare de invalidar cache à mão: a plataforma já repõe o modelo sozinha.** Até esta versão, a

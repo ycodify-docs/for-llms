@@ -43,6 +43,10 @@
   remédio.** *(Este item dizia, até 2026-09-10, que era preciso "invalidar o cache — as duas chaves do
   modelo" antes de republicar. Era trabalho desnecessário.)*
   Detalhe: [persistence-crs/README §Depois de alterar o modelo](../persistence-crs/README.md).
+- **Linha que não aparece não é, necessariamente, consulta errada.** Se o comando respondeu `200` e a
+  linha não está aqui, a projeção pode ter falhado ao ser aplicada — o `200` responde pela escrita, não
+  pela leitura. A falha fica registrada, e a receita para achá-la está em
+  [persistence-crs/erros.md § O comando respondeu 200 e a linha não apareceu](../persistence-crs/erros.md#o-comando-respondeu-200-e-a-linha-não-apareceu).
 - **Dois identificadores na projeção:** cada linha tem `id` (**Long**, PK da linha) e `aggregateid`
   (**UUID** de 36 chars, o id do agregado; `projecao.aggregateid == aggregate.id`). Filtra-se por
   `aggregateid` para achar a projeção de **um** agregado específico. Para operar o agregado depois

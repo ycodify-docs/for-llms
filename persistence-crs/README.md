@@ -142,6 +142,11 @@ serviço de cache a **cada requisição**, e republicar passa a valer na requisi
 continuarem ligadas, a defasagem de até uma hora ainda vale e o descarte da cópia é operação de
 plataforma. **Reiniciar o serviço nunca foi remédio** — ele repuxa o que estiver no cache.
 
+> ⚠️ **O `200` do comando não prova que a projeção acompanhou.** Ele responde pela escrita; a projeção
+> é aplicada depois, a partir de uma fila. Se a linha não aparecer, a falha **está registrada** — a
+> receita para achá-la está em
+> [erros.md § O comando respondeu 200 e a linha não apareceu](erros.md#o-comando-respondeu-200-e-a-linha-não-apareceu).
+
 ## Pontos de coordenação
 
 - **CP-3** — gravar o evento **notifica o es-n** (mesma transação).
