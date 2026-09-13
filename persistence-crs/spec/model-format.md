@@ -222,7 +222,7 @@ da regra.
 **Onde NÃO acontece — e a data segue exatamente como você mandou:**
 - dentro de valueObject de **tipo direto** (`{"type": "Json"}`): o modelo não diz que há data lá dentro;
 - em campo `String`, mesmo que o texto seja uma data ou uma hora (`"06:00"`);
-- em dado gravado **antes** de `yc-interpreter:amd64-260913b` — a imagem em que isto passou a valer em teste;
+- em dado gravado **antes** de `yc-interpreter:amd64-260913c` — a imagem em que isto passou a valer em teste;
   **produção ainda não tem**, e lá nenhuma data é normalizada.
 
 **Recusas:** forma irreconhecível — `"13/09/2026"`, `"ontem"`, epoch num `Date` — é **`400`** que nomeia o

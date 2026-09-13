@@ -152,7 +152,7 @@ As duas formas dão o mesmo resultado; a com fuso não depende de quem monta a c
 
 Coluna `Date` não tem hora e, portanto, não tem fuso: compare com `"2026-09-13"`.
 
-**Vigência:** em teste (`/v3/persistence/t/`) desde `yc-interpreter:amd64-260913b` — filtro, normalização na
+**Vigência:** em teste (`/v3/persistence/t/`) desde `yc-interpreter:amd64-260913c` — filtro, normalização na
 entrada e grafia com `T` no endpoint de agregado. **Produção ainda não tem.** Onde a imagem for anterior,
 o **único** formato aceito no filtro é `"2026-09-13 00:00:00.000"` — com espaço, **com a fração**, já em
 UTC —, e o agregado devolve a data como o cliente a mandou. Use `.000` como fração: aquelas imagens tratam a

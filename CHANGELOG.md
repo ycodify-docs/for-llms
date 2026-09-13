@@ -26,7 +26,14 @@
   [persistence-q/endpoints/consulta.md](persistence-q/endpoints/consulta.md#resposta) — com o erro de
   esquecer o `Z`, que desloca 3 horas em silêncio.
 
-- **Vigência:** em teste desde `yc-interpreter:amd64-260913b` (`yc.cqrs-c@0a5c450`). Produção ainda não.
+- **Vigência:** em teste desde `yc-interpreter:amd64-260913c` (`yc.cqrs-c@0a5c450`, `yc.dbr-driver@0334d08`).
+  Produção ainda não.
+
+- ⚠️ **A imagem anterior, `amd64-260913b`, trazia a normalização com um defeito:** a data com `T` era recusada
+  pelo driver do banco na **criação** de registro — o comando respondia `200` e a projeção nunca
+  aparecia. Transições funcionavam. Consertado em `amd64-260913c` e validado com dado real. Se você criou
+  registro com data nesse intervalo e a linha não apareceu, **não recrie**: a mensagem está guardada e é
+  reprocessável.
 
 ## 1.31 — 2026-09-13
 
@@ -45,7 +52,8 @@
   00:00:00"` é meia-noite **UTC** — 21:00 do dia anterior em Brasília. A seção traz o filtro de um dia
   inteiro em Brasília com o fuso junto.
 
-- **Vigência:** em teste desde `yc-interpreter:amd64-260913b` (`ufrn.loco3@66652cf`). Produção ainda não.
+- **Vigência:** em teste desde `yc-interpreter:amd64-260913b` (`ufrn.loco3@66652cf`) — o filtro funcionava nessa
+  imagem; a criação com data, só a partir de `amd64-260913c`. Produção ainda não.
   Onde a imagem for anterior, só `"2026-09-13 00:00:00.000"`, com a fração e já em UTC.
 
 ## 1.30 — 2026-09-12

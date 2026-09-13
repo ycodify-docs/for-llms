@@ -26,7 +26,7 @@ Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`.
 no horário de Brasília, a conversão é do front (exemplo em
 [persistence-q § Resposta](../../persistence-q/endpoints/consulta.md#resposta)).
 
-> Antes de `yc-interpreter:amd64-260913b` — em teste desde essa imagem, **produção ainda não** —, este
+> Antes de `yc-interpreter:amd64-260913c` — em teste desde essa imagem, **produção ainda não** —, este
 > endpoint devolvia a data **como o cliente a
 > mandou** — com fuso, fração ou espaço — e o carimbo automático com espaço (`2026-09-13 20:19:09`).
 
