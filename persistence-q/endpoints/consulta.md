@@ -38,6 +38,9 @@ Os controles ficam ao lado do rótulo, dentro do **mesmo item** do array — cad
   projeção de nome `<rótulo>` inexistente). O rótulo também nomeia a chave correspondente na resposta.
 - Cada predicado é `{ "<atributo>": "<valor>" }` (igualdade) ou `{ "<atributo>": { "<op>": "<valor>" } }`
   (operadores: `eq/neq/gt/gte/lt/lte/like/ilike/in`).
+- ⚠️ **Carimbos de tempo são gravados e devolvidos em UTC, sem fuso** — a conversão para `-03:00` é do
+  front. Formatos aceitos num predicado de `Timestamp` e o erro mais comum (mandar hora local sem fuso)
+  em [query-controls § Filtrar por data e hora](../query-controls.md#filtrar-por-data-e-hora-date-timestamp).
 - Múltiplos predicados combinam por **`_connective`** (padrão **AND**, ou **OR**).
 - Os **controles** — `_paging`, `_sorting`, `_count`, `_connective`, `_cache` — são **irmãos do
   rótulo**, no mesmo nível dele, e **não** vão dentro do objeto de predicados. Controle posto dentro do

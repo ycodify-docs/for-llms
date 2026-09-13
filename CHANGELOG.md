@@ -2,6 +2,26 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.31 — 2026-09-13
+
+- **Carimbos de tempo são gravados e devolvidos em UTC, sem fuso — agora escrito.** A conversão para o fuso
+  de quem lê (`-03:00`, no Brasil) é do front. Não é convenção escolhida: é o que está gravado, medido nos
+  serviços e nos bancos. Um `2026-09-12T20:19:09` devolvido significa 20:19 UTC, 17:19 em Brasília. Em
+  [persistence-q/query-controls.md](persistence-q/query-controls.md#filtrar-por-data-e-hora-date-timestamp).
+
+- **Filtrar por coluna `Timestamp` passa a funcionar.** Respondia `510` para praticamente qualquer valor:
+  só um formato era aceito — com espaço **e fração obrigatória** —, e nem o valor que a própria consulta
+  devolve podia ser mandado de volta. Passam a valer sem fuso (lido como UTC), só data, com `Z` ou
+  `-03:00` (convertido para UTC) e epoch em milissegundos. Formato irreconhecível vira `400` com a lista
+  do que vale.
+
+- ⚠️ **O erro mais fácil de cometer está em destaque:** mandar hora local sem fuso. `"2026-09-13
+  00:00:00"` é meia-noite **UTC** — 21:00 do dia anterior em Brasília. A seção traz o filtro de um dia
+  inteiro em Brasília com o fuso junto.
+
+- **Vigência:** a partir da imagem que carregar `ufrn.loco3@66652cf` — **ainda não implantada**. Antes
+  dela, só `"2026-09-13 00:00:00.000"`, com a fração e já em UTC.
+
 ## 1.30 — 2026-09-12
 
 - **Dá para filtrar pelos campos de dentro de um atributo `Json`, e agora isso está escrito.** A

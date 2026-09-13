@@ -8,6 +8,7 @@
 - Onde os controles ficam (leia primeiro)
 - O rótulo é o nome da projeção
 - Predicados e operadores
+- Filtrar por data e hora (`Date`, `Timestamp`)
 - Filtrar por campo dentro de um atributo `Json`
 - Conectivo (AND/OR)
 - Paginação · ordenação · contagem
@@ -103,6 +104,54 @@ Dois operadores no mesmo atributo formam uma **faixa**, e só nesta combinação
   chave **`CONNECTIVE`** — em maiúsculas, sem o `_` — com valor `"OR"`. É a única chave de controle da
   DSL que não usa o prefixo `_`.
 - Três ou mais operadores no mesmo atributo não são suportados.
+
+## Filtrar por data e hora (`Date`, `Timestamp`)
+
+> ⚠️ **Todo carimbo de tempo é gravado e devolvido em UTC, sem fuso.** A conversão para o fuso de quem lê
+> — `-03:00`, no Brasil — **é do front**. Um `2026-09-12T20:19:09` devolvido pela consulta significa
+> **20:19 UTC**, que são **17:19 em Brasília**.
+
+Isso vale para os carimbos que a plataforma grava sozinha (o `whenAttribute` de cada evento) e para as
+colunas `Timestamp` em geral. **Não é convenção arbitrária, é o que está gravado:** os serviços e os
+bancos rodam em UTC, e as colunas não guardam fuso.
+
+### Formatos aceitos num predicado de `Timestamp`
+
+| Você envia | Como é lido |
+|---|---|
+| `"2026-09-13 14:30:00"` · `"2026-09-13T14:30:00"` · com ou sem fração · com ou sem segundos | **hora UTC**, sem conversão |
+| `"2026-09-13"` | início do dia, **em UTC** |
+| `"2026-09-13T00:00:00Z"` · `"…+00:00"` | UTC |
+| `"2026-09-13T00:00:00-03:00"` | **convertido para UTC** — vira `2026-09-13 03:00:00` |
+| `1789300000000` — **número** | epoch em milissegundos |
+
+**Qualquer outra forma é `400`**, com a lista do que vale. `"13/09/2026"` é recusado **de propósito**:
+dia e mês trocam de lugar conforme o país, e adivinhar seria errar em silêncio.
+
+**O valor que a consulta devolve pode ser mandado de volta tal como veio** — `"2026-09-12T20:19:09"` é
+aceito e compara com a mesma hora gravada.
+
+### O erro mais fácil de cometer
+
+**Mandar a hora local sem o fuso.** `{"lt": "2026-09-13 00:00:00"}` pede "antes da meia-noite **UTC**" —
+que em Brasília é **21:00 do dia anterior**. Para "antes da meia-noite de Brasília", mande o fuso junto
+ou converta antes:
+
+```jsonc
+{ "reserva": { "datahorainicio": { "gte": "2026-09-13T00:00:00-03:00",
+                                    "lt":  "2026-09-14T00:00:00-03:00" } } }   // o dia 13 inteiro, em Brasília
+```
+
+As duas formas dão o mesmo resultado; a com fuso não depende de quem monta a consulta lembrar da conta.
+
+### `Date`
+
+Coluna `Date` não tem hora e, portanto, não tem fuso: compare com `"2026-09-13"`.
+
+**Vigência:** os formatos acima valem a partir da imagem que carregar `ufrn.loco3@66652cf` — **ainda não
+implantada** em 2026-09-13. Antes dela, o **único** formato aceito é `"2026-09-13 00:00:00.000"` — com
+espaço, **com a fração**, já em UTC — e qualquer outro responde `510`. Use `.000` como fração: a imagem
+anterior trata a fração como nanossegundos.
 
 ## Filtrar por campo dentro de um atributo `Json`
 
