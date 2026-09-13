@@ -298,6 +298,14 @@ identificador e estado.
 `POST /session/aggregate` e `POST /session/history`. É o mesmo dado por três portas — no histórico o
 recorte cai sobre o `eventData` do evento, e os metadados (quem, quando, qual comando) ficam.
 
+> **Nas duas últimas, o recorte é a SEGUNDA barreira, não a primeira.** `aggregate` e `history`
+> mantêm o **portão de capacidade**: papel sem comando no agregado recebe `403` e não chega ao
+> recorte. Então, para um papel estreito — que tipicamente não dispara comando ali —, quem fecha a
+> porta é o portão, e o recorte só entra em cena quando o papel **tem** comando no agregado **e** está
+> declarado. Medido com conta real em 2026-09-13: o `RECEPCIONISTA` recebe `403` nas duas, e por isso
+> o recorte **não foi exercitado** por esse caminho. Não confunda porta fechada com campo recortado —
+> a primeira é o portão fazendo o trabalho, e ela some assim que o papel ganhar um comando.
+
 > ⚠️ **A plataforma não valida a declaração, e o BFF valida.** O forger aceita com `201` papel
 > inexistente, coluna com nome errado e lista vazia: ele confere `aggregate`, `org/project/tenant` e
 > os placeholders, e carrega o resto sem olhar. Então **declaração inválida faz a leitura ser recusada
@@ -306,6 +314,18 @@ recorte cai sobre o `eventData` do evento, e os metadados (quem, quando, qual co
 >
 > **Nunca prefixe a chave com `_`.** A publicação do `.model.json` remove chaves `_`-prefixadas em
 > qualquer profundidade, **em silêncio** — a declaração sumiria sem aviso nenhum.
+
+> ### ⚠️ Esta chave viaja por uma propriedade MEDIDA, não por contrato
+>
+> O `.model.json` é gravado no cache **como recebido**, menos as `_`-prefixadas — é isso que faz uma
+> chave desconhecida como `readProjection` chegar ao BFF. Mas **ninguém no forger prometeu preservá-la,
+> e nenhum teste a protege**: é comportamento observado, não garantia. Se a publicação de modelo um dia
+> ganhar validação de esquema, ou um gerador de vocabulário fechado como o que já existe do lado da
+> entity, a declaração **desaparece em silêncio** e o recorte deixa de valer sem nada acusar.
+>
+> Dito pelo `composer`, dono do forger, em 2026-09-13, corrigindo uma formulação anterior desta doc que
+> tratava a sobrevivência como se fosse promessa. **Quem for mexer naquele caminho precisa saber que
+> ele carrega política de acesso a dado pessoal.**
 
 > ### 🔴 O que `readProjection` NÃO faz
 >
