@@ -259,13 +259,36 @@ entity.
 }
 ```
 
-**A regra, e ela é a mesma do `scope` de linha — declaração nunca concede, só estreita:**
+**A declaração é EXAUSTIVA por agregado.** Lista-se todo papel que pode ler, e `"*"` é como se
+declara "este papel vê a ficha inteira":
 
-| Situação do papel | Lê |
+```jsonc
+"readProjection": {
+  "RECEPCIONISTA": ["nome", "email", "telefone", "genero"],
+  "ADMINISTRADOR": "*"
+}
+```
+
+| Situação | Lê |
 |---|---|
-| **não** aparece em `readProjection` | a linha inteira |
-| aparece | **só** as colunas listadas |
-| **vários papéis**, um deles fora | a linha inteira — o menos restritivo vence |
+| o agregado **não** declara `readProjection` | a linha inteira |
+| declara, e **nenhum** papel do usuário está na lista | a linha inteira |
+| declara, e **algum** papel do usuário está na lista | **só** a união das colunas dos papéis declarados |
+| papel listado com `"*"` | a linha inteira |
+
+⚠️ **Papel do usuário que não está na declaração é IGNORADO — ele não alarga o recorte.** Se um papel
+deve ver a ficha inteira, **declare-o com `"*"`**; não basta omiti-lo.
+
+> **Errata, 2026-09-13, e ela vale como aviso de modelagem.** Até esta data a regra era a do `scope`
+> de linha — *"vários papéis, um deles fora → lê tudo"*. Aquilo é correto quando o outro papel **de
+> fato lê** a entity, e o BFF **não tem como saber isso**: quem concede leitura é o
+> `accessControl.read` do `_conf`, que ele não enxerga. Medido com conta real: um usuário
+> `[VISITANTE, RECEPCIONISTA]` recebia a ficha inteira **com CPF**, porque `VISITANTE` não estava na
+> declaração — **embora `VISITANTE` não tivesse leitura nenhuma naquela entity**. Como quase todo
+> usuário acumula papéis, o recorte quase nunca disparava e o controle era praticamente inerte.
+>
+> A regra nova **falha fechando**: esquecer o `"*"` de um papel faz ele perder colunas, o que aparece
+> no primeiro uso — em vez de vazar dado pessoal em silêncio.
 
 **Três colunas nunca se recortam:** `id`, `aggregateid` e `status`. Sem elas a tela não seleciona
 registro nem sabe que transições cabem, e cortá-las não protegeria dado pessoal nenhum — são
