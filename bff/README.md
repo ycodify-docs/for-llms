@@ -13,6 +13,24 @@
 > Pré: [06-autenticacao](../06-autenticacao.md). Para o uso com casca+miolo:
 > [shell/README](../shell/README.md), [shell/seguranca](../shell/seguranca.md).
 
+## O que está aqui
+
+- [Como alcançar o BFF](#como-alcançar-o-bff)
+- [Sessão](#sessão)
+- [Capacidade](#capacidade)
+- [Miolo](#miolo)
+- [Proxy de domínio](#proxy-de-domínio)
+- [Quem autoriza a leitura](#quem-autoriza-a-leitura)
+- [Limitar os campos que um papel lê — `readProjection`](#limitar-os-campos-que-um-papel-lê-readprojection)
+- [`predicates` é a forma do persistence-q — não há dialeto do BFF](#predicates-é-a-forma-do-persistence-q-não-há-dialeto-do-bff)
+- [Autocadastro (`/ua/*`)](#autocadastro-ua)
+- [Preferências da organização (org-scoped)](#preferências-da-organização-org-scoped)
+- [Cabeçalhos que o BFF injeta (contrato de saída)](#cabeçalhos-que-o-bff-injeta-contrato-de-saída)
+- [Operação](#operação)
+- [Erros](#erros)
+- [Checklist do agente](#checklist-do-agente)
+- [Histórico de correções](#histórico-de-correções)
+
 ## Como alcançar o BFF
 
 **O BFF não segue a regra de endereçamento dos oito serviços.** Aqueles ficam atrás do API Gateway e
@@ -102,13 +120,7 @@ com "adicionar" — e é por isso que ela viaja em vez dos campos achatados. `fi
 modelo declarou o value object como atributo tipado direto: não há campos a oferecer, e quem preenche
 precisa conhecer o modelo.
 
-> **Errata, 2026-09-13.** Até esta data `valueObjects` **não existia na capacidade**, embora o comando
-> aceitasse o campo no envio. Quem montava tela a partir da capacidade concluía que o campo não existia,
-> sem nenhum aviso — e o **miolo genérico não conseguia disparar comando com value object obrigatório**,
-> por montar o formulário só de `attributes`. Era omissão por custo, registrada em comentário no código
-> desde setembro: expor exigia mudar o contrato pareado nos três lugares de uma vez. Medido de fora pelo
-> `clubflow` (`yc.app/issues/bff.bug.capacidade-nao-expoe-valueobject-do-comando.20260913.md`), que
-> comparou o modelo publicado com a capacidade devolvida.
+> *Esta seção mudou em 2026-09-13 — ver [histórico de correções](#histórico-de-correções).*
 
 > ⚠️ **A capacidade depende do modelo estar VIVO no cache**, e quando ele some a causa é **remoção,
 > nunca expiração.** Sem a chave, o cache responde `204`, a capacidade do bounded context **some** —
@@ -149,29 +161,7 @@ precisa conhecer o modelo.
 > Diagnóstico que culpa o tempo faz **esperar**; diagnóstico que culpa a remoção faz **investigar** — e
 > investigar a chave errada custa quase o mesmo que esperar.
 >
-> > **Errata, 2026-09-10 — e a parte instrutiva não é o erro, é como ele nasceu.** Até hoje o parágrafo
-> > afirmava que o modelo publicado tinha TTL e que o prazo era configuração de deploy do forger.
-> > **As duas coisas eram VERDADE quando foram escritas:** até `forger@d9e26f0` (2026-08-31) o
-> > `ModelCacheService` declarava `@Value("${app.model.cache.expires:86400}")` — 24 horas por padrão, e
-> > o prazo era mesmo config de deploy. Naquele commit o forger passou a gravar sem prazo e a
-> > propriedade foi removida; **esta fatia não foi atualizada junto, e apodreceu por catorze dias.**
-> >
-> > O risco que isto expõe é estrutural, e não se resolve conferindo melhor: **doc de comportamento
-> > alheio envelhece quando o dono do comportamento muda sem avisar quem documentou.** Quem escreve
-> > sobre serviço de outro não tem como saber que precisa reconferir — foi o `composer` quem mediu a
-> > história do arquivo e trouxe a data. *(medição do `composer`; apontada em
-> > `yc.app/issues/docs.bug.bff-afirma-que-o-modelo-publicado-tem-ttl.20260910.md`)*
-> >
-> > **Segunda rodada, no mesmo dia.** A primeira correção trocou o TTL pelo bracket do dataschema — e
-> > errou de chave, mandando investigar o `MODELING` de um modelo cuja remoção não passa por ali. O
-> > `composer` mediu as duas chaves e desfez a confusão: o `ModelCacheService` grava o write model (o
-> > que o BFF lê) e o `EntitiesModelCacheService` grava o read model (o que o bracket remove).
-> >
-> > **A história inteira deste parágrafo, que é o que vale guardar:** uma afirmação **correta** que
-> > apodreceu quando o comportamento mudou sem aviso; uma correção que acertou o "não tem TTL" e errou
-> > de chave; e só então a certa. Nenhuma das três falhava na prática, porque a remediação — republicar
-> > — funciona em todas as hipóteses. **Parágrafo cuja receita sempre dá certo não avisa quando a
-> > explicação está errada**, e este já demonstrou isso três vezes.
+> > *Este parágrafo foi corrigido três vezes em 2026-09-10 — ver [histórico de correções](#histórico-de-correções).*
 
 ## Miolo
 
@@ -215,7 +205,7 @@ O consumidor **não** compõe esses cabeçalhos nem conhece o token.
 - `/session/aggregate` existe porque a **projeção é assíncrona**: para carregar o estado autoritativo de
   um agregado (ex.: preencher um form de transição) não se deve ler o read model.
 
-### Quem autoriza a leitura
+## Quem autoriza a leitura
 
 Escrita e leitura **não** são governadas do mesmo jeito, e a diferença é deliberada:
 
@@ -232,7 +222,7 @@ A razão é de domínio: **ler não é executar**. Amarrar leitura aos papéis d
 impossível um papel **somente-leitor** — para ver um catálogo, alguém teria de ganhar um comando que
 não deveria ter, falsificando o modelo e afrouxando a escrita.
 
-> ⚠️ **O default é restritivo.** Entity **sem** `_conf.accessControl.read` declarado, ou com a lista
+> **O default é restritivo.** Entity **sem** `_conf.accessControl.read` declarado, ou com a lista
 > vazia, **não é legível** — o persistence-q recusa. Autorizar leitura é ato explícito: declarar o
 > papel na política da entity, o que vale de imediato, sem republicar modelo nem reiniciar serviço.
 
@@ -240,7 +230,7 @@ não deveria ter, falsificando o modelo e afrouxando a escrita.
 persistence-crs, que valida **tenant**, não leitura por papel — sem o portão, estado e histórico de
 qualquer agregado ficariam ao alcance de qualquer portador de sessão daquele tenant.
 
-### Limitar os campos que um papel lê — `readProjection`
+## Limitar os campos que um papel lê — `readProjection`
 
 O `accessControl` da plataforma recorta **linha**: `read` libera a entity inteira e `scope` limita às
 linhas de que o papel é titular. **Nada limita coluna.** Para um papel que deve ver parte de uma
@@ -279,20 +269,17 @@ declara "este papel vê a ficha inteira":
 ⚠️ **Papel do usuário que não está na declaração é IGNORADO — ele não alarga o recorte.** Se um papel
 deve ver a ficha inteira, **declare-o com `"*"`**; não basta omiti-lo.
 
-> **Errata, 2026-09-13, e ela vale como aviso de modelagem.** Até esta data a regra era a do `scope`
-> de linha — *"vários papéis, um deles fora → lê tudo"*. Aquilo é correto quando o outro papel **de
-> fato lê** a entity, e o BFF **não tem como saber isso**: quem concede leitura é o
-> `accessControl.read` do `_conf`, que ele não enxerga. Medido com conta real: um usuário
-> `[VISITANTE, RECEPCIONISTA]` recebia a ficha inteira **com CPF**, porque `VISITANTE` não estava na
-> declaração — **embora `VISITANTE` não tivesse leitura nenhuma naquela entity**. Como quase todo
-> usuário acumula papéis, o recorte quase nunca disparava e o controle era praticamente inerte.
->
-> A regra nova **falha fechando**: esquecer o `"*"` de um papel faz ele perder colunas, o que aparece
-> no primeiro uso — em vez de vazar dado pessoal em silêncio.
+> *A regra mudou em 2026-09-13, e o motivo é instrutivo — ver [histórico de correções](#histórico-de-correções).*
 
 **Três colunas nunca se recortam:** `id`, `aggregateid` e `status`. Sem elas a tela não seleciona
 registro nem sabe que transições cabem, e cortá-las não protegeria dado pessoal nenhum — são
 identificador e estado.
+
+> **"Nunca se recortam" não é "sempre aparecem".** O recorte **preserva** essas três quando elas estão
+> na resposta; ele não as injeta onde não estavam. As rotas carregam formas diferentes e é esperado:
+> `query` devolve a projeção, com `id` **e** `aggregateid`; `aggregate` devolve o estado do write model,
+> onde a chave é `id`; e no `history` o `eventData` traz só o que aquele comando carregava — um comando
+> de criação não tem `id` nenhum. Medido nas três portas em 2026-09-13.
 
 **Vale nas três rotas de leitura**, não só na consulta: `POST /session/query`,
 `POST /session/aggregate` e `POST /session/history`. É o mesmo dado por três portas — no histórico o
@@ -306,7 +293,7 @@ recorte cai sobre o `eventData` do evento, e os metadados (quem, quando, qual co
 > o recorte **não foi exercitado** por esse caminho. Não confunda porta fechada com campo recortado —
 > a primeira é o portão fazendo o trabalho, e ela some assim que o papel ganhar um comando.
 
-> ⚠️ **A plataforma não valida a declaração, e o BFF valida.** O forger aceita com `201` papel
+> **A plataforma não valida a declaração, e o BFF valida.** O forger aceita com `201` papel
 > inexistente, coluna com nome errado e lista vazia: ele confere `aggregate`, `org/project/tenant` e
 > os placeholders, e carrega o resto sem olhar. Então **declaração inválida faz a leitura ser recusada
 > com `500`**, nomeando o que está errado — não recortada pela metade. Entregar tela que parece
@@ -338,7 +325,7 @@ recorte cai sobre o `eventData` do evento, e os metadados (quem, quando, qual co
 > não existir no `persistence-q`, quem precisa da garantia no dado tem de negar a leitura da entity
 > inteira no `accessControl.read`, ou separar o dado sensível em outra entity.
 
-### `predicates` é a forma do persistence-q — não há dialeto do BFF
+## `predicates` é a forma do persistence-q — não há dialeto do BFF
 
 `predicates` é o **objeto de predicados** do
 [persistence-q](../persistence-q/endpoints/consulta.md), repassado como está. O BFF só acrescenta o
@@ -356,7 +343,7 @@ recorte cai sobre o `eventData` do evento, e os metadados (quem, quando, qual co
 - Cada predicado é `{ "<atributo>": "<valor>" }` (igualdade) ou `{ "<atributo>": { "<op>": "<valor>" } }`,
   com `<op>` em `eq/neq/gt/gte/lt/lte/like/ilike/in` — **minúsculas**. O vocabulário de atributos é o do
   modelo provisionado; nome desconhecido é rejeitado pelo persistence-q (`510`).
-- ⚠️ **`predicates` é objeto. Array é recusado com `400`** e mensagem dizendo a forma esperada. Uma
+- **`predicates` é objeto. Array é recusado com `400`** e mensagem dizendo a forma esperada. Uma
   lista de descritores (`[{attribute, operator, value}]`) **não** é aceita: espalhá-la geraria a chave
   `"0"`, que o persistence-q leria como atributo do modelo — rejeição indecifrável no melhor caso,
   filtro silenciosamente diferente do pedido no pior.
@@ -393,7 +380,7 @@ Contrato de origem: [orgid/publico](../orgid/endpoints/publico.md) e [orgid/ua-p
 | Pedir hash (e-mail) | `GET /ua/hash?action={R\|PR}&username={u}` | — | repassa o orgid |
 | Ativar / recuperar | `PUT /ua/activate` | `{ username, action: R\|PR, hash, password? }` | repassa o orgid |
 
-> ⚠️ **Duas travas ficam no BFF, porque o orgid não as faz.**
+> **Duas travas ficam no BFF, porque o orgid não as faz.**
 > 1. **O papel é validado contra o cardápio público** (`GET /ua/roles`, que lista só `ispublic=true`).
 >    O orgid **ignora** `role.ispublic` no corpo e associa **qualquer papel existente** — sem esta
 >    checagem, um registro público pediria um papel privilegiado e o receberia. Fora do cardápio → `403`.
@@ -475,6 +462,11 @@ O corpo do `401` de sessão traz `reason`, para que o consumidor distinga o que 
 | `evicted` | a sessão **desapareceu do servidor antes de expirar** | pedir login **e preservar o destino**: o portador não fez nada errado |
 | `unknown` | não foi possível determinar | tratar como `expired` |
 
+**O corpo traz também `expiresAt`** (epoch em segundos) **quando o BFF sabe o instante em que a sessão
+venceria** — ele vem de um cookie irmão, assinado, que guarda só essa data. Serve para o consumidor
+distinguir *"venceu agora"* de *"venceu há muito"*, e é o que dá substância ao `evicted`: sessão que
+sumiu **antes** desse instante não expirou, foi despejada. Ausente quando não há como saber.
+
 `evicted` é o caso que não pode ficar mudo: o portador estava trabalhando e perdeu a sessão sem causa
 atribuível a ele. Uma interface que trate os quatro como o mesmo `401` seco devolve o usuário ao início
 sem explicação — e ninguém consegue medir a frequência do problema.
@@ -487,3 +479,64 @@ sem explicação — e ninguém consegue medir a frequência do problema.
       (ver [seguranca](../shell/seguranca.md)).
 - [ ] No autocadastro, ofereça só o que `GET /ua/roles` devolve — o servidor recusa o resto.
 - [ ] Endereços de serviço = **config de deploy**, nunca hardcode nem em doc pública.
+
+---
+
+## Histórico de correções
+
+**Por que existe:** cada uma destas afirmações esteve nesta doc, foi lida, e alguém agiu sobre ela. Uma
+correção silenciosa deixa quem leu a versão antiga com a crença errada e nenhum motivo para revisá-la —
+e, nas três abaixo, a crença errada tinha custo: dado pessoal exposto, tela montada sem um campo, ou
+tempo gasto esperando uma expiração que não existia.
+
+**Por que no fim, e não no meio do texto:** quem chega para *usar* precisa de como declarar, não da
+história do documento. Quem volta porque algo não bate com o que lembrava precisa exatamente disto.
+
+### 2026-09-13 · `valueObjects` não existia na capacidade
+
+Até esta data `valueObjects` **não existia na capacidade**, embora o comando
+aceitasse o campo no envio. Quem montava tela a partir da capacidade concluía que o campo não existia,
+sem nenhum aviso — e o **miolo genérico não conseguia disparar comando com value object obrigatório**,
+por montar o formulário só de `attributes`. Era omissão por custo, registrada em comentário no código
+desde setembro: expor exigia mudar o contrato pareado nos três lugares de uma vez. Medido de fora pelo
+`clubflow` (`yc.app/issues/bff.bug.capacidade-nao-expoe-valueobject-do-comando.20260913.md`), que
+comparou o modelo publicado com a capacidade devolvida.
+
+### 2026-09-10 · o modelo publicado nunca teve TTL
+
+> Até hoje o parágrafo
+> afirmava que o modelo publicado tinha TTL e que o prazo era configuração de deploy do forger.
+> **As duas coisas eram VERDADE quando foram escritas:** até `forger@d9e26f0` (2026-08-31) o
+> `ModelCacheService` declarava `@Value("${app.model.cache.expires:86400}")` — 24 horas por padrão, e
+> o prazo era mesmo config de deploy. Naquele commit o forger passou a gravar sem prazo e a
+> propriedade foi removida; **esta fatia não foi atualizada junto, e apodreceu por catorze dias.**
+>
+> O risco que isto expõe é estrutural, e não se resolve conferindo melhor: **doc de comportamento
+> alheio envelhece quando o dono do comportamento muda sem avisar quem documentou.** Quem escreve
+> sobre serviço de outro não tem como saber que precisa reconferir — foi o `composer` quem mediu a
+> história do arquivo e trouxe a data. *(medição do `composer`; apontada em
+> `yc.app/issues/docs.bug.bff-afirma-que-o-modelo-publicado-tem-ttl.20260910.md`)*
+>
+> **Segunda rodada, no mesmo dia.** A primeira correção trocou o TTL pelo bracket do dataschema — e
+> errou de chave, mandando investigar o `MODELING` de um modelo cuja remoção não passa por ali. O
+> `composer` mediu as duas chaves e desfez a confusão: o `ModelCacheService` grava o write model (o
+> que o BFF lê) e o `EntitiesModelCacheService` grava o read model (o que o bracket remove).
+>
+> **A história inteira deste parágrafo, que é o que vale guardar:** uma afirmação **correta** que
+> apodreceu quando o comportamento mudou sem aviso; uma correção que acertou o "não tem TTL" e errou
+> de chave; e só então a certa. Nenhuma das três falhava na prática, porque a remediação — republicar
+> — funciona em todas as hipóteses. **Parágrafo cuja receita sempre dá certo não avisa quando a
+> explicação está errada**, e este já demonstrou isso três vezes.
+
+### 2026-09-13 · a regra do recorte era a do `scope`, e furava
+
+Até esta data a regra era a do `scope`
+de linha — *"vários papéis, um deles fora → lê tudo"*. Aquilo é correto quando o outro papel **de
+fato lê** a entity, e o BFF **não tem como saber isso**: quem concede leitura é o
+`accessControl.read` do `_conf`, que ele não enxerga. Medido com conta real: um usuário
+`[VISITANTE, RECEPCIONISTA]` recebia a ficha inteira **com CPF**, porque `VISITANTE` não estava na
+declaração — **embora `VISITANTE` não tivesse leitura nenhuma naquela entity**. Como quase todo
+usuário acumula papéis, o recorte quase nunca disparava e o controle era praticamente inerte.
+
+A regra nova **falha fechando**: esquecer o `"*"` de um papel faz ele perder colunas, o que aparece
+no primeiro uso — em vez de vazar dado pessoal em silêncio.
