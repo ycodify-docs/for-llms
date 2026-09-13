@@ -186,9 +186,24 @@ Atributos aparecem em `command.<cmd>.data.attribute.<campo>`:
 | `Integer` | inteiro | — |
 | `Long` | inteiro grande (também usado p/ valores monetários em menor unidade, ex.: centavos) | — |
 | `Boolean` | verdadeiro/falso | — |
-| `Date` | data | — |
-| `Timestamp` | data e hora | — |
+| `Date` | data de calendário, **sem fuso** — gravada e devolvida como `2026-09-13` | — |
+| `Timestamp` | data e hora, **em UTC, sem fuso** — gravada e devolvida como `2026-09-12T20:19:09` | — |
 | `Json` | conteúdo semiestruturado (objeto/lista) | — |
+
+> **Datas são normalizadas na entrada do comando.** Todo atributo declarado `Timestamp` ou `Date` — solto ou
+> como campo de um valueObject em grupo — sai do comando na forma acima, **inclusive o que a regra de
+> negócio devolve**. Aceita-se, ao enviar: sem fuso (lido como **UTC**), só data, com `Z` ou `-03:00`
+> (convertido para UTC) e, em `Timestamp`, epoch em milissegundos. `Date` vale **o dia como escrito**, sem
+> conversão — um aniversário às 23h de Brasília continua sendo aquele dia. Forma irreconhecível é **`400`**
+> que nomeia o campo. Valor vazio ou nulo passa como veio.
+>
+> **Por isso o endpoint de agregado e o de projeção devolvem a mesma string.** Antes, o agregado devolvia a
+> data como o cliente a mandou e a projeção devolvia a forma do banco. A conversão para o fuso de quem lê é
+> do front. Detalhe dos formatos em
+> [persistence-q § Filtrar por data e hora](../../persistence-q/query-controls.md#filtrar-por-data-e-hora-date-timestamp).
+>
+> **Não é normalizado:** o conteúdo de valueObject de **tipo direto** — o modelo não o tipa, e a plataforma
+> não tem como saber que um campo lá dentro é data. Data guardada em `String` também não.
 
 > **Não há tipo decimal/float.** Para valores fracionários (ex.: dinheiro), use `Long` (menor unidade)
 > ou `String`. `Json` cobre estruturas aninhadas livres.
@@ -319,7 +334,7 @@ Atributos aparecem em `command.<cmd>.data.attribute.<campo>`:
 ```
 
 - **`whenAttribute`** — nome de um atributo de timestamp **valorizado automaticamente** pela plataforma na
-  gravação do evento. Convenção: particípio passado do verbo do comando + sufixo `em` (comando `criar` →
+  gravação do evento, **em UTC**, na mesma forma dos demais `Timestamp` (`2026-09-12T20:19:09`). Convenção: particípio passado do verbo do comando + sufixo `em` (comando `criar` →
   evento `criada` → `whenAttribute: "criadaem"`). **Não** envie esse campo no comando **e NÃO o declare**
   como `command.<cmd>.data.attribute` — é auto-valorizado, nunca um atributo de dados do comando.
   - **Coluna obrigatória na projeção (REGRA):** ainda assim, **cada** `whenAttribute` **DEVE existir como

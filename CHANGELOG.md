@@ -2,6 +2,24 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.32 — 2026-09-13
+
+- **Datas são normalizadas na entrada do comando, e os dois endpoints passam a devolver a mesma string.**
+  Antes, a data do cliente atravessava a plataforma crua: o endpoint de agregado a devolvia como veio — com
+  fuso, com fração, com espaço — e o de projeção devolvia a forma do banco. O mesmo instante em duas
+  grafias. Agora todo `Timestamp` sai como `2026-09-12T20:19:09` (UTC) e todo `Date` como `2026-09-13`, em
+  [persistence-crs/spec/model-format.md](persistence-crs/spec/model-format.md).
+
+- **Inclusive a data que a regra de negócio devolve.** A resposta do processador é mesclada depois de o
+  comando ser lido, e passa pela mesma normalização.
+
+- **`Date` não tem conversão de fuso:** vale o dia como escrito.
+
+- ⚠️ **Mudança visível:** o carimbo automático (`whenAttribute`) no endpoint de agregado passa de
+  `2026-09-12 20:19:09` para `2026-09-12T20:19:09` — igual ao que a projeção já devolvia.
+
+- **Vigência:** a partir da imagem que carregar `yc.cqrs-c@0a5c450` — **ainda não implantada**.
+
 ## 1.31 — 2026-09-13
 
 - **Carimbos de tempo são gravados e devolvidos em UTC, sem fuso — agora escrito.** A conversão para o fuso

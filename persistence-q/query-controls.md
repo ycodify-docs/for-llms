@@ -131,6 +131,10 @@ dia e mês trocam de lugar conforme o país, e adivinhar seria errar em silênci
 **O valor que a consulta devolve pode ser mandado de volta tal como veio** — `"2026-09-12T20:19:09"` é
 aceito e compara com a mesma hora gravada.
 
+**E é a mesma string que o endpoint de agregado devolve.** Os comandos normalizam toda data na entrada
+([persistence-crs § tipos](../persistence-crs/spec/model-format.md)), então agregado e projeção carregam
+a mesma grafia — com `T`, em UTC, ao segundo.
+
 ### O erro mais fácil de cometer
 
 **Mandar a hora local sem o fuso.** `{"lt": "2026-09-13 00:00:00"}` pede "antes da meia-noite **UTC**" —
@@ -148,10 +152,12 @@ As duas formas dão o mesmo resultado; a com fuso não depende de quem monta a c
 
 Coluna `Date` não tem hora e, portanto, não tem fuso: compare com `"2026-09-13"`.
 
-**Vigência:** os formatos acima valem a partir da imagem que carregar `ufrn.loco3@66652cf` — **ainda não
-implantada** em 2026-09-13. Antes dela, o **único** formato aceito é `"2026-09-13 00:00:00.000"` — com
-espaço, **com a fração**, já em UTC — e qualquer outro responde `510`. Use `.000` como fração: a imagem
-anterior trata a fração como nanossegundos.
+**Vigência:** os formatos do filtro valem a partir da imagem que carregar `ufrn.loco3@66652cf`; a
+normalização na entrada e a grafia com `T` no endpoint de agregado, a partir da que carregar
+`yc.cqrs-c@0a5c450` — **nenhuma das duas implantada** em 2026-09-13. Na imagem anterior, o **único**
+formato aceito no filtro é `"2026-09-13 00:00:00.000"` — com espaço, **com a fração**, já em UTC —, e o
+agregado devolve a data como o cliente a mandou. Use `.000` como fração: aquela imagem trata a fração como
+nanossegundos.
 
 ## Filtrar por campo dentro de um atributo `Json`
 
