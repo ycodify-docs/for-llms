@@ -21,7 +21,11 @@
   "10"}` compara como texto, e aí `"9"` é maior que `"10"`. É a única informação de tipo disponível — o
   modelo declara a coluna como `Json` e não descreve o que existe dentro. **As aspas mudam o resultado.**
 
-- **Vigência:** a partir da imagem que carregar `ufrn.loco3@ea87c43` — **ainda não implantada**.
+- **Coluna vazia não casa com nada, nem com `neq`** — e isso teve de ser consertado antes de sair.
+  Ausência de valor respondia **duas coisas diferentes** conforme estivesse gravada como lista vazia ou
+  como nula: a nula aparecia num filtro "diferente de". Agora as duas ficam de fora, igual.
+
+- **Vigência:** a partir da imagem que carregar `ufrn.loco3@6152345` — **ainda não implantada**.
 
 ## 1.29 — 2026-09-12
 

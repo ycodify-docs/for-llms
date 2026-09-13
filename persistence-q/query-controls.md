@@ -148,6 +148,9 @@ consulta.
 - **`neq` inclui item que não tem o campo.** `{"dia": {"neq": "terca"}}` casa também com itens sem a
   chave `dia` — "não é terça" cobre "não tem dia". Se você quer só os que têm o campo e ele é diferente,
   filtre também por presença.
+- **Coluna vazia não casa com nada — nem com `neq`.** Se o atributo `Json` nunca foi preenchido, a linha
+  fica **fora** de qualquer filtro por campo interno, inclusive de "diferente de". Vale igual para
+  coluna nula e para lista vazia: **ausência de valor responde uma coisa só.**
 - **`like`/`ilike` aqui NÃO exigem o `%`.** No resto da consulta, `like` sem `%` é `400`
   ([regras acima](#regras-que-valem-para-todos-os-predicados)); dentro do `Json`, não. É divergência
   conhecida e está registrada — sem `%`, `like` se comporta como igualdade.
@@ -161,7 +164,7 @@ consulta.
 | **`distinct` não vale** | é `400` |
 
 **Vigência:** o suporte a **objeto** (`single`) e aos operadores além de `eq`/`like`/`ilike` vale a
-partir da imagem que carregar `ufrn.loco3@ea87c43` — **ainda não implantada** em 2026-09-12. Antes dela,
+partir da imagem que carregar `ufrn.loco3@6152345` — **ainda não implantada** em 2026-09-12. Antes dela,
 só `eq`, `like` e `ilike`, e **apenas** quando o valueObject está gravado como lista.
 
 ## Conectivo (AND/OR)
