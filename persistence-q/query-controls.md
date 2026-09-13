@@ -8,6 +8,7 @@
 - Onde os controles ficam (leia primeiro)
 - O rótulo é o nome da projeção
 - Predicados e operadores
+- Filtrar por campo dentro de um atributo `Json`
 - Conectivo (AND/OR)
 - Paginação · ordenação · contagem
 - Cache
@@ -102,6 +103,66 @@ Dois operadores no mesmo atributo formam uma **faixa**, e só nesta combinação
   chave **`CONNECTIVE`** — em maiúsculas, sem o `_` — com valor `"OR"`. É a única chave de controle da
   DSL que não usa o prefixo `_`.
 - Três ou mais operadores no mesmo atributo não são suportados.
+
+## Filtrar por campo dentro de um atributo `Json`
+
+Atributo de tipo `Json` guarda o que o modelo declara como **valueObject**, e pode ser filtrado **pelos
+campos de dentro** — não só comparado inteiro.
+
+**A forma é a mesma dos demais predicados, um nível mais fundo:** o valor do atributo `Json` é um objeto
+cujas chaves são os **campos internos**.
+
+```jsonc
+{ "aula": { "horario": { "dia": "terca" } } }                      // igualdade
+{ "aula": { "horario": { "dia": { "ilike": "%ter%" } } } }         // com operador
+{ "aula": { "horario": { "dia": "terca", "sala": "A1" } } }        // dois campos
+```
+
+**As duas formas do valueObject funcionam**, e você não precisa saber qual está gravada: objeto
+(`single`) e lista de objetos (`multiple`) entram pelo mesmo critério.
+
+> **O que "casar" significa aqui.** Quando o valueObject é uma **lista**, a linha entra no resultado se
+> **algum** item satisfaz o critério — não é preciso que todos satisfaçam. Com dois campos no mesmo
+> critério, os dois têm de valer **no mesmo item**, não em itens diferentes.
+
+### Operadores, e como cada um compara
+
+Valem `eq`, `neq`, `like`, `ilike`, `gt`, `gte`, `lt`, `lte` e `in`. Operador fora dessa lista é
+**`400`** nomeando o operador — nunca vira igualdade em silêncio.
+
+⚠️ **O que decide a comparação é o tipo do valor que VOCÊ envia**, e não o que está gravado:
+
+| Você envia | Comparação | Consequência |
+|---|---|---|
+| `{ "quantidade": { "gt": 10 } }` — **número** | numérica | `9` não passa, `100` passa |
+| `{ "quantidade": { "gt": "10" } }` — **texto** | alfabética | `"9"` **passa**, porque `"9" > "10"` como texto |
+
+**É a única informação de tipo disponível:** o modelo declara que a coluna é `Json`, e não descreve o que
+existe dentro dela. Aspas mudam o resultado — é o erro mais fácil de cometer aqui.
+
+Item cujo campo **não é numérico** simplesmente não casa na comparação numérica; ele não derruba a
+consulta.
+
+### Duas coisas que surpreendem
+
+- **`neq` inclui item que não tem o campo.** `{"dia": {"neq": "terca"}}` casa também com itens sem a
+  chave `dia` — "não é terça" cobre "não tem dia". Se você quer só os que têm o campo e ele é diferente,
+  filtre também por presença.
+- **`like`/`ilike` aqui NÃO exigem o `%`.** No resto da consulta, `like` sem `%` é `400`
+  ([regras acima](#regras-que-valem-para-todos-os-predicados)); dentro do `Json`, não. É divergência
+  conhecida e está registrada — sem `%`, `like` se comporta como igualdade.
+
+### Limites
+
+| | |
+|---|---|
+| **campo de primeiro nível apenas** | `{"endereco": {"rua": "..."}}` funciona; `{"endereco": {"cidade.uf": "RN"}}` não. Objeto aninhado dentro do valueObject não é alcançável pelo critério |
+| **faixa não vale aqui** | dois operadores no mesmo campo interno não formam faixa como nos demais atributos; use um |
+| **`distinct` não vale** | é `400` |
+
+**Vigência:** o suporte a **objeto** (`single`) e aos operadores além de `eq`/`like`/`ilike` vale a
+partir da imagem que carregar `ufrn.loco3@ea87c43` — **ainda não implantada** em 2026-09-12. Antes dela,
+só `eq`, `like` e `ilike`, e **apenas** quando o valueObject está gravado como lista.
 
 ## Conectivo (AND/OR)
 

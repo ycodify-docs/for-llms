@@ -2,6 +2,27 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.30 — 2026-09-12
+
+- **Dá para filtrar pelos campos de dentro de um atributo `Json`, e agora isso está escrito.** A
+  capacidade existia e não constava em lugar nenhum da documentação: o critério aceita um nível a mais,
+  com os campos internos do valueObject. Em
+  [persistence-q/query-controls.md](persistence-q/query-controls.md#filtrar-por-campo-dentro-de-um-atributo-json).
+
+- **As duas formas do valueObject passam a funcionar.** A escrita sempre aceitou objeto (`single`) e
+  lista de objetos (`multiple`), e a leitura devolve as duas — mas o filtro só sabia lidar com lista, e
+  **falhava** quando a coluna guardava um objeto. Quem modelou um valueObject `single` não conseguia
+  consultar por dentro dele.
+
+- **Passam a valer `neq`, `gt`, `gte`, `lt`, `lte` e `in`**, além de `eq`, `like` e `ilike`. Operador
+  fora da lista continua sendo `400` que nomeia o operador — a lista cresceu, o silêncio não voltou.
+
+- ⚠️ **O tipo do valor que você envia decide a comparação.** `{"gt": 10}` compara como número; `{"gt":
+  "10"}` compara como texto, e aí `"9"` é maior que `"10"`. É a única informação de tipo disponível — o
+  modelo declara a coluna como `Json` e não descreve o que existe dentro. **As aspas mudam o resultado.**
+
+- **Vigência:** a partir da imagem que carregar `ufrn.loco3@ea87c43` — **ainda não implantada**.
+
 ## 1.29 — 2026-09-12
 
 - **Passar `unique` de `false` para `true` deixou de ser recusado pelo forger — quem julga duplicata é
