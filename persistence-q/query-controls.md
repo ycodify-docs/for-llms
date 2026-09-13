@@ -152,12 +152,11 @@ As duas formas dão o mesmo resultado; a com fuso não depende de quem monta a c
 
 Coluna `Date` não tem hora e, portanto, não tem fuso: compare com `"2026-09-13"`.
 
-**Vigência:** os formatos do filtro valem a partir da imagem que carregar `ufrn.loco3@66652cf`; a
-normalização na entrada e a grafia com `T` no endpoint de agregado, a partir da que carregar
-`yc.cqrs-c@0a5c450` — **nenhuma das duas implantada** em 2026-09-13. Na imagem anterior, o **único**
-formato aceito no filtro é `"2026-09-13 00:00:00.000"` — com espaço, **com a fração**, já em UTC —, e o
-agregado devolve a data como o cliente a mandou. Use `.000` como fração: aquela imagem trata a fração como
-nanossegundos.
+**Vigência:** em teste (`/v3/persistence/t/`) desde `yc-interpreter:amd64-260913b` — filtro, normalização na
+entrada e grafia com `T` no endpoint de agregado. **Produção ainda não tem.** Onde a imagem for anterior,
+o **único** formato aceito no filtro é `"2026-09-13 00:00:00.000"` — com espaço, **com a fração**, já em
+UTC —, e o agregado devolve a data como o cliente a mandou. Use `.000` como fração: aquelas imagens tratam a
+fração como nanossegundos.
 
 ## Filtrar por campo dentro de um atributo `Json`
 
@@ -219,7 +218,7 @@ consulta.
 | **`distinct` não vale** | é `400` |
 
 **Vigência:** o suporte a **objeto** (`single`) e aos operadores além de `eq`/`like`/`ilike` vale a
-partir da imagem que carregar `ufrn.loco3@6152345` — **ainda não implantada** em 2026-09-12. Antes dela,
+partir de `yc-interpreter:amd64-260913`, em teste (`/v3/persistence/t/`). **Produção ainda não tem.** Antes dela,
 só `eq`, `like` e `ilike`, e **apenas** quando o valueObject está gravado como lista.
 
 ## Conectivo (AND/OR)

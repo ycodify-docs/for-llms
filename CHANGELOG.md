@@ -26,7 +26,7 @@
   [persistence-q/endpoints/consulta.md](persistence-q/endpoints/consulta.md#resposta) — com o erro de
   esquecer o `Z`, que desloca 3 horas em silêncio.
 
-- **Vigência:** a partir da imagem que carregar `yc.cqrs-c@0a5c450` — **ainda não implantada**.
+- **Vigência:** em teste desde `yc-interpreter:amd64-260913b` (`yc.cqrs-c@0a5c450`). Produção ainda não.
 
 ## 1.31 — 2026-09-13
 
@@ -45,8 +45,8 @@
   00:00:00"` é meia-noite **UTC** — 21:00 do dia anterior em Brasília. A seção traz o filtro de um dia
   inteiro em Brasília com o fuso junto.
 
-- **Vigência:** a partir da imagem que carregar `ufrn.loco3@66652cf` — **ainda não implantada**. Antes
-  dela, só `"2026-09-13 00:00:00.000"`, com a fração e já em UTC.
+- **Vigência:** em teste desde `yc-interpreter:amd64-260913b` (`ufrn.loco3@66652cf`). Produção ainda não.
+  Onde a imagem for anterior, só `"2026-09-13 00:00:00.000"`, com a fração e já em UTC.
 
 ## 1.30 — 2026-09-12
 
@@ -71,7 +71,7 @@
   Ausência de valor respondia **duas coisas diferentes** conforme estivesse gravada como lista vazia ou
   como nula: a nula aparecia num filtro "diferente de". Agora as duas ficam de fora, igual.
 
-- **Vigência:** a partir da imagem que carregar `ufrn.loco3@6152345` — **ainda não implantada**.
+- **Vigência:** em teste desde `yc-interpreter:amd64-260913` (`ufrn.loco3@6152345`). Produção ainda não.
 
 ## 1.29 — 2026-09-12
 
@@ -191,8 +191,8 @@
   diferentes, conforme o caminho — projeção do tenant, projeção entre contextos, saga —, e o endpoint de
   logs recebe o termo **na própria rota**. Quem errava a palavra recebia `204`, que é indistinguível de
   "não houve falha": foi assim que um cliente concluiu que a falha era silenciosa quando ela estava
-  registrada sob outro nome. **Vigência:** a partir da imagem que carregar `persistence-crs@9bc1b28`;
-  antes dela, os três termos antigos continuam sendo o caminho.
+  registrada sob outro nome. **Vigência:** em teste desde `yc-interpreter:amd64-260913`
+  (`persistence-crs@9bc1b28`); em produção, os três termos antigos continuam sendo o caminho.
 
 - **Registrado também que `204` na busca de log significa "não achei esse termo"** — nunca "não houve
   falha". A distinção não era óbvia e custou uma investigação inteira.
