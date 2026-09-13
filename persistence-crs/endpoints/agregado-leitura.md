@@ -13,6 +13,22 @@ Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`.
 - `200` — estado atual do agregado (JSON), reconstituído a partir dos seus eventos.
 - `204` — agregado não encontrado.
 
+**Datas no estado:** `Timestamp` vem como `"2026-09-15T09:00:00"` — **UTC, sem fuso** — e `Date` como
+`"1990-04-02"`. Inclusive o carimbo automático de cada evento (o `whenAttribute`, como `criadaem`):
+
+```json
+{ "id": "<uuid>", "status": "cadastrada",
+  "datahorainicio": "2026-09-15T09:00:00",
+  "cadastradaem":   "2026-09-13T20:19:09" }
+```
+
+**É a mesma string que a projeção devolve** para o mesmo campo — pode comparar sem converter. Para mostrar
+no horário de Brasília, a conversão é do front (exemplo em
+[persistence-q § Resposta](../../persistence-q/endpoints/consulta.md#resposta)).
+
+> Antes da imagem que carregar `yc.cqrs-c@0a5c450`, este endpoint devolvia a data **como o cliente a
+> mandou** — com fuso, fração ou espaço — e o carimbo automático com espaço (`2026-09-13 20:19:09`).
+
 ## Histórico de eventos
 
 `GET /a/{boundedContext}/{aggregateType}/{id}/history`

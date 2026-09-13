@@ -91,6 +91,9 @@ A atualização da **projeção** acontece **depois**, de forma assíncrona, pel
       não envia `status`. Divergência com o estado real → `510`.
 - [ ] **Value objects:** dados aninhados seguem a forma declarada no modelo (objeto único ou lista),
       conforme o agregado.
+- [ ] **Datas:** campo `Timestamp` **sem fuso é lido como UTC** — mande `-03:00` junto se a hora é de
+      Brasília. A plataforma grava e devolve sempre `"2026-09-15T09:00:00"` (UTC); `Date` não tem fuso.
+      Ver [endpoints/comando.md § Campos de data](endpoints/comando.md).
 
 ## Garantia de entrega e projeção
 

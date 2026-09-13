@@ -34,6 +34,25 @@ tenant (ver [forger/model](../../forger/endpoints/model.md) e [examples/](../../
 > forma reprova o comando inteiro**. Ver
 > [spec/model-format.md § data.valueObject](../spec/model-format.md).
 
+> **Campos de data — mande no fuso que for mais cômodo; a plataforma grava numa forma só.** Todo campo que
+> o modelo declara como `Timestamp` ou `Date` é **normalizado ao entrar**, e é essa forma que fica no evento
+> e que os endpoints devolvem:
+>
+> ```json
+> { "cadastrar": {
+>     "datahorainicio": "2026-09-15T06:00:00-03:00",   // 06h em Brasília
+>     "datanascimento": "1990-04-02"
+> } }
+> ```
+>
+> fica gravado como `"datahorainicio": "2026-09-15T09:00:00"` (**UTC**, sem fuso) e
+> `"datanascimento": "1990-04-02"` (`Date` não tem fuso e não é convertida). Vale também dentro de
+> valueObject em grupo e **para a data que a regra de negócio devolver**. Formas aceitas, e o que **não** é
+> normalizado: [spec/model-format.md § Tipos](../spec/model-format.md).
+>
+> ⚠️ **Sem fuso, a hora é lida como UTC.** `"2026-09-15 06:00:00"` é **06h UTC** — 03h em Brasília. Se o
+> valor vem de um formulário no horário local, mande o fuso junto ou converta antes.
+
 > **Campo `status` (obrigatório, exceto na criação):** todo comando envia `status` = **estado atual**
 > do agregado (lido do banco de escrita), **nunca** o estado pretendido após o comando (`endState`). O
 > **comando de criação** é a **única exceção** — não envia `status`. Divergência com o estado real →
@@ -64,6 +83,10 @@ A ordem real, que importa para entender o que já rodou quando um erro chega:
 6. **gravação do evento**, que notifica o es-n;
 7. resposta.
 
+> **Onde as datas são normalizadas:** na leitura do corpo, antes do passo 1 — por isso uma data inválida
+> é recusada sem carregar estado nenhum —, e **de novo depois do passo 4**, porque a regra de negócio pode
+> devolver datas que substituem as do corpo.
+
 > A ordem entre 3 e 4 mudou em 2026-09-05. Antes o br-service rodava primeiro e a checagem de papel vinha
 > depois — quem não tinha o papel fazia a regra executar inteira e recebia as mensagens dela de volta.
 > Se você depende de ver a mensagem do processor para diagnosticar permissão, esse caminho não existe
@@ -77,7 +100,7 @@ A ordem real, que importa para entender o que já rodou quando um erro chega:
 
 | Código | Quando |
 |---|---|
-| `400` | `valueObject` na forma errada (a causa mais comum) |
+| `400` | `valueObject` na forma errada (a causa mais comum) · **data em forma irreconhecível** — a mensagem nomeia o campo, inclusive `grupo.campo` |
 | `403` | tenant não autorizado, **ou** usuário sem o papel exigido pelo comando |
 | `510` | falha de transição (`fromState` não casa o `status` enviado) **e o resto**: corpo malformado, agregado ou comando desconhecido, `id` ausente num comando de transição |
 

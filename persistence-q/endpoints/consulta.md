@@ -68,6 +68,25 @@ Os controles ficam ao lado do rótulo, dentro do **mesmo item** do array — cad
 
 No **modo object** o array tem um único item, com o mesmo formato — o rótulo continua presente.
 
+**Datas na resposta:** `Timestamp` vem como `"2026-09-15T09:00:00"` — **UTC, sem fuso** — e `Date` como
+`"1990-04-02"`. É a mesma string que o endpoint de agregado devolve para o mesmo campo.
+
+**A conversão para o horário de quem lê é do front.** Como a string não traz fuso, diga ao parser que ela
+é UTC — senão ele a trata como hora local e o erro é de 3 horas, em silêncio:
+
+```js
+const utc = "2026-09-15T09:00:00";
+new Date(utc + "Z").toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+// "15/09/2026, 06:00:00"      ← certo
+
+new Date(utc).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
+// depende do fuso da máquina  ← errado: sem o "Z", o navegador lê como hora local
+```
+
+`Date` é dia do calendário e **não** se converte: `"1990-04-02"` é 2 de abril em qualquer fuso. Cuidado
+com `new Date("1990-04-02")`, que o JavaScript lê como meia-noite **UTC** e pode mostrar dia 1º no Brasil —
+formate a string diretamente.
+
 Garantias da resposta:
 - **Ordem preservada** — o i-ésimo item da resposta corresponde ao i-ésimo critério da requisição.
 - **Itens vazios aparecem como `[]`** — num `200`, um critério sem resultados ainda ocupa sua posição

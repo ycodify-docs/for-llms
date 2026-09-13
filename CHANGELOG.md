@@ -18,6 +18,14 @@
 - ⚠️ **Mudança visível:** o carimbo automático (`whenAttribute`) no endpoint de agregado passa de
   `2026-09-12 20:19:09` para `2026-09-12T20:19:09` — igual ao que a projeção já devolvia.
 
+- **A documentação de datas foi para onde cada leitor procura, com exemplo:** a regra e a tabela de
+  formas aceitas em [spec/model-format.md](persistence-crs/spec/model-format.md); um corpo de comando com
+  data em [endpoints/comando.md](persistence-crs/endpoints/comando.md); o estado do agregado com datas em
+  [endpoints/agregado-leitura.md](persistence-crs/endpoints/agregado-leitura.md); e **como converter para
+  o horário de Brasília no front** em
+  [persistence-q/endpoints/consulta.md](persistence-q/endpoints/consulta.md#resposta) — com o erro de
+  esquecer o `Z`, que desloca 3 horas em silêncio.
+
 - **Vigência:** a partir da imagem que carregar `yc.cqrs-c@0a5c450` — **ainda não implantada**.
 
 ## 1.31 — 2026-09-13

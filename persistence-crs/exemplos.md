@@ -18,6 +18,23 @@ Headers: Authorization: ..., X-Tenant-Id: <tenant-id>
 O comando `criar`, seus campos e o estado `criada` vêm do **model** publicado (gramática:
 [spec/model-format.md](spec/model-format.md); exemplos: [examples/](../examples/README.md)).
 
+## Comando com data
+
+```
+POST /a/vendas/pedido
+{ "agendar": { "id": "<uuid>", "status": "criada",
+               "entregaem": "2026-09-15T14:00:00-03:00" } }    // 14h em Brasília
+
+→ 200 { "id": "<uuid>", "status": "agendada" }
+
+GET /a/vendas/pedido/<uuid>
+→ 200 { ..., "entregaem": "2026-09-15T17:00:00", "agendadaem": "2026-09-13T20:19:09" }
+```
+
+O `entregaem` voltou em **UTC** (17h), sem fuso — é a forma em que foi gravado, e a mesma que a projeção
+devolve. O `agendadaem` é o carimbo automático do evento, também em UTC. Ver
+[endpoints/comando.md § Campos de data](endpoints/comando.md).
+
 ## Comando que falha por transição
 
 ```
