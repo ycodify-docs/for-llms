@@ -90,6 +90,26 @@ O BFF lê o **modelo publicado** do tenant no **serviço de cache** — **não**
 forger é quem **grava** ali ao publicar o `.model.json`) — e cruza com os **papéis org-scoped** do token
 → devolve **só** os comandos autorizados. Só para tenant que **consta no token**; senão `404`.
 
+**Cada comando descreve o que aceita em duas listas**, e quem monta tela precisa das duas:
+
+| Chave | O que traz |
+|---|---|
+| `attributes` | os atributos escalares, com `type`, `nullable` e o papel de apresentação (`input`, `status`, `serverStamp`, `lookup`) |
+| `valueObjects` | os **value objects** do comando, com `name`, `cardinality` (`single` · `multiple`) e `fields`. **Ausente** quando o comando não declara nenhum |
+
+A `cardinality` é o que decide a tela — `single` desenha **um grupo**, `multiple` desenha **uma lista**
+com "adicionar" — e é por isso que ela viaja em vez dos campos achatados. `fields` vazio significa que o
+modelo declarou o value object como atributo tipado direto: não há campos a oferecer, e quem preenche
+precisa conhecer o modelo.
+
+> **Errata, 2026-09-13.** Até esta data `valueObjects` **não existia na capacidade**, embora o comando
+> aceitasse o campo no envio. Quem montava tela a partir da capacidade concluía que o campo não existia,
+> sem nenhum aviso — e o **miolo genérico não conseguia disparar comando com value object obrigatório**,
+> por montar o formulário só de `attributes`. Era omissão por custo, registrada em comentário no código
+> desde setembro: expor exigia mudar o contrato pareado nos três lugares de uma vez. Medido de fora pelo
+> `clubflow` (`yc.app/issues/bff.bug.capacidade-nao-expoe-valueobject-do-comando.20260913.md`), que
+> comparou o modelo publicado com a capacidade devolvida.
+
 > ⚠️ **A capacidade depende do modelo estar VIVO no cache**, e quando ele some a causa é **remoção,
 > nunca expiração.** Sem a chave, o cache responde `204`, a capacidade do bounded context **some** —
 > `GET /session/capabilities` deixa de listar os comandos daquele tenant — e isso acontece **mesmo com o
@@ -379,6 +399,16 @@ Tudo composto **no servidor**. Nenhum deles é montado — nem visto — pelo br
 > configuração: **sem ela, o login falha com `401` no gateway**, e não por credencial de usuário inválida.
 > É segredo: nunca vai ao browser, nunca em código, nunca em doc.
 
+## Operação
+
+| Operação | Método · Path | Resposta |
+|---|---|---|
+| Saúde do serviço | `GET /health` | `{ ok: true, service: "yc-app-bff" }` |
+
+**Aberta, sem cookie** — é a única rota fora de `/ua/*` que não exige sessão. Serve ao healthcheck do
+container e não diz nada sobre a plataforma atrás: `200` aqui significa que **o BFF** está de pé, não
+que o gateway, o cache ou o persistence respondem.
+
 ## Erros
 
 | HTTP | Quando |
@@ -386,9 +416,9 @@ Tudo composto **no servidor**. Nenhum deles é montado — nem visto — pelo br
 | `400` | falta parâmetro (ex.: `username`/`password`, `tenant`), ou campo obrigatório do comando ausente |
 | `401` | sem sessão / sessão inválida / credencial inválida — ver `reason` abaixo |
 | `403` | comando não autorizado ao papel · papel fora do cardápio público no autocadastro · papel que não é do usuário na org (`active-role`) |
-| `404` | tenant não pertence ao usuário / miolo não registrado / **modelo do tenant ausente ou expirado no cache** |
+| `404` | tenant não pertence ao usuário / miolo não registrado / **modelo do tenant ausente do cache** (removido ou nunca publicado — ele **não expira**) |
 | `409` | autocadastro: papel inexistente — nada foi criado (o `204` do orgid, traduzido) |
-| `500` | configuração ausente no servidor (ex.: o path do endpoint de cache não configurado) |
+| `500` | configuração ausente no servidor (ex.: o path do endpoint de cache não configurado) · **`readProjection` inválido no modelo do tenant** — a leitura é recusada em vez de recortada pela metade |
 | `502` | falha ao falar com um serviço da plataforma |
 
 ### `401` diz **por que** não há sessão

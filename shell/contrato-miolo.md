@@ -93,7 +93,9 @@ não diz **como se vê** (isso é o miolo).
           "roles": ["..."],
           "fromState": ["..."],
           "endState": "...",
-          "attributes": [ { "name": "...", "type": "...", "role": "input|status|serverStamp|lookup" } ]
+          "attributes": [ { "name": "...", "type": "...", "role": "input|status|serverStamp|lookup" } ],
+          "valueObjects": [ { "name": "...", "cardinality": "single|multiple",
+                              "fields": [ { "name": "...", "type": "..." } ], "scalar": false } ]
         }
       ]
     }
@@ -109,6 +111,20 @@ não diz **como se vê** (isso é o miolo).
   - `status` — campo de transição/concorrência (não é entrada do usuário).
   - `serverStamp` — carimbo do servidor (oculto no formulário).
   - `lookup` — referência a outro agregado (widget de seleção).
+- **`valueObjects`** — os value objects que o comando aceita, **ausente** quando não há nenhum. É a
+  segunda metade do que o comando aceita: sem ela, uma tela montada só de `attributes` não oferece o
+  campo, e um comando com value object obrigatório fica **impossível de disparar**.
+  - **`cardinality` decide a tela**: `single` → um **grupo** de campos; `multiple` → uma **lista**, com
+    "adicionar" e "remover". É por isso que ela viaja, em vez dos campos achatados: achatar perderia
+    exatamente essa distinção.
+  - **`fields` vazio** = o modelo declarou o value object como atributo tipado direto. Não há campos a
+    oferecer, e quem preenche precisa conhecer o modelo.
+  - **A forma do valor no envio é uma só**, independente de como o modelo declara: `single` é
+    **objeto**, `multiple` é **array de objetos**. Escalar é recusado com `400` pela plataforma.
+
+  > **Entrou em 2026-09-13.** Antes o value object viajava no **envio** do comando e não aparecia na
+  > capacidade — quem montava tela a partir dela concluía que o campo não existia, sem aviso. Corrigido
+  > nos três lados do contrato ao mesmo tempo, como esta seção exige.
 
 ## Regras
 
