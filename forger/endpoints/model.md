@@ -26,6 +26,40 @@ republicar substitui o anterior, e também cobre o caso de a chave não existir.
 Erros: `400` (arquivo vazio, extensão diferente de `.json`, documento inválido), `403`/`404`
 (consistência), `500`.
 
+> **A publicação passa a validar o documento contra o metamodelo** e a recusar com `400` o que antes era
+> aceito e só falhava — ou silenciava — em runtime. ⚠️ **Ainda não está em produção:** está em
+> `develop` do forger desde 2026-09-16 e vale a partir da imagem que o carregar — ver
+> [CHANGELOG 1.34](../../CHANGELOG.md). O `400` traz **todas** as violações de uma vez, cada uma com o
+> caminho dentro do JSON. As três que mais aparecem:
+>
+> | Recusa | Por quê |
+> |---|---|
+> | chave do agregado ≠ `<boundedContext.name>.<type>` | é o endereço do agregado: o despacho do evento procura **exatamente** essa chave e descarta em silêncio o que não achar, e é a mesma chave que o cliente manda no comando |
+> | `command.<cmd>.endState` sem evento de chave igual | o runtime resolve `event[endState]` por chave, sem fallback: o primeiro write falharia com `510` |
+> | dois envelopes `<org>.<project>` no mesmo arquivo | só o primeiro seria lido, e o outro sumiria sem aviso |
+>
+> Modelo que já estava publicado **não** é revalidado: a checagem acontece na publicação.
+
+### Chaves que um modelo novo não precisa trazer
+
+Estas aparecem em modelos existentes e **nenhum serviço as lê**. Continuam sendo aceitas — não é preciso
+reescrever modelo publicado —, mas **não as gere em modelo novo**:
+
+| Chave | Quem decide de fato |
+|---|---|
+| `schema.forWriteModel.name` | `tenantId.forWriteModel`. O forger **carimba** este campo na publicação e descarta o valor enviado |
+| `schema.forReadModel.name` | o **dataschema do tenant** |
+| `concurrency.*` | não é lido do modelo; o controle de concorrência vive no `_conf` da **entity** |
+| `readProjection` | nada o consome |
+| `queue` | filas são provisionadas pelo deploy de **process (BPMN)**, não pelo modelo |
+
+Por agregado, o necessário é: `org`, `project`, `boundedContext`, `type`, `tenantId`, `command` e
+`event` — mais `identity`, que é opcional e **é** lido.
+
+> ⚠️ **`boundedContext.name` não é rótulo.** Ele compõe o endereço do agregado **e** nomeia o schema
+> onde o log de consumo do evento é gravado. Se divergir do dataschema do tenant, o consumo de evento
+> grava no schema de **outro ambiente** sem um único erro em log. Use o mesmo nome nos dois.
+
 ## Ler
 
 `GET /org/{org}/project/{project}/tenant/{tenantId}/model` → `200` com o conteúdo do modelo; `404` se
