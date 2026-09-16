@@ -2,6 +2,33 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.33 — 2026-09-16
+
+- **Produção passou a rodar a mesma imagem do ambiente de teste: `yc-interpreter:amd64-260913c`.** Tudo
+  o que as entradas 1.30, 1.31 e 1.32 descreviam como *"em teste; produção ainda não"* **vale agora
+  também em produção**, e é por isso que esta entrada existe. São três comportamentos:
+
+  - **datas normalizadas na entrada do comando**, com o agregado e a projeção devolvendo a mesma string,
+    e o filtro de coluna `Timestamp` deixando de falhar (entradas 1.31 e 1.32);
+  - **`NAO-MATERIALIZOU` como termo único** na busca de log de projeção que não materializou (1.31);
+  - **consulta por campo dentro de atributo `Json`** valendo também quando o `valueObject` é *single*,
+    e coluna vazia deixando de casar com `neq` (1.30).
+
+- **Como ler as datas de vigência daqui para trás:** as entradas anteriores dizem *"produção ainda não"*
+  porque era verdade quando foram escritas. **Esta entrada é o corte**: a partir de 2026-09-16, produção
+  e teste rodam a mesma imagem para esses três itens. As páginas de uso descrevem o comportamento
+  corrente e não carregam mais vigência — quem precisa saber *desde quando* vem a este arquivo.
+
+- **Pré-requisito que acompanhou a promoção**, e que só interessa a quem opera banco: o event store de
+  produção ganhou a coluna `client.aggregate.natural_key` e o índice único parcial que a acompanha, sem
+  os quais essa imagem recusa a criação de agregado de modelo que declare `identity.fields`.
+
+- ⚠️ **Mudança de comportamento que vem junto, e é visível para quem usa a API:** com a chave natural
+  valendo, **o segundo agregado criado com a mesma combinação declarada em `identity.fields` é recusado
+  pelo banco** — antes, dois iguais eram aceitos em silêncio. Vale para os agregados criados **a partir
+  de agora**: os anteriores não foram verificados e podem conter repetições, como a entrada 1.28 já
+  advertia.
+
 ## 1.32 — 2026-09-13
 
 - **Datas são normalizadas na entrada do comando, e os dois endpoints passam a devolver a mesma string.**
