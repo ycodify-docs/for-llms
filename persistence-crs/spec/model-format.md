@@ -73,15 +73,20 @@ validação e do JSON publicado) e o grid de interpretação (persistence-crs/es
 }
 ```
 
-- **`schema.forWriteModel.name`** é um **valor fixo definido pela plataforma**, **igual em todo
-  agregado** (o armazém de escrita é universal). Não é escolhido pelo autor do modelo. **Na publicação,
-  o forger NORMALIZA este campo**: se o valor enviado não for o universal, ele é **convertido
-  automaticamente** para o valor canônico (e, se ausente, é definido). Ou seja, **não confie** no valor
-  que você enviar aqui — o serviço o impõe. (Nesta documentação o valor universal é representado como
-  `wdb.client`.)
-- **`schema.forReadModel.name`** é o **nome do dataschema** que hospeda a **projeção** do agregado —
-  por padrão, igual ao nome do **bounded context** (ver
-  [conceitos — do agregado à projeção](../../02-conceitos.md#do-agregado-à-projeção-derivação-e-implantação)).
+- **`schema.forWriteModel.name`** e **`schema.forReadModel.name`** são **carimbados pelo forger na
+  publicação** e **não dirigem o roteamento em runtime** — o grid de interpretação não lê nenhum dos
+  dois. Declare-os (o schema os espera; o valor universal de escrita é representado aqui como
+  `wdb.client`, e o de leitura, por convenção, é o nome do bounded context), mas **não modele contando
+  com eles**: mudá-los não muda para onde nada vai. Quem decide de fato:
+
+  | O que é decidido | Quem decide |
+  |---|---|
+  | banco do armazém de eventos | a **instância** que atende a rota do comando — não o modelo |
+  | schema do armazém de eventos | **fixo**: `client` |
+  | banco e schema da **projeção** | o **dataschema do tenant** (forger: `dataschema → database → dbconn`) |
+  | schema do registro de consumo (`event_consumed`) | o **`boundedContext.name` do modelo** |
+
+  Ver [conceitos — do agregado à projeção](../../02-conceitos.md#do-agregado-à-projeção-derivação-e-implantação).
 - `concurrency.strategy: "optimistic"` → concorrência otimista (ver contrato do `status` no
   [README](../README.md#estados-transições-e-concorrência)).
 
@@ -89,6 +94,29 @@ validação e do JSON publicado) e o grid de interpretação (persistence-crs/es
 > tenant é o header **`X-Tenant-Id`** da requisição. Os campos `tenantId.forWriteModel`/`forReadModel`
 > do JSON são **IGNORADOS** para a resolução de roteamento — `forReadModel` só é **injetado no payload
 > do evento** publicado. Não modele assumindo que este campo do modelo dirige o roteamento por tenant.
+
+### A chave do agregado — `<bc>.<type>`, e ela vale em três lugares
+
+A chave sob `aggregate` **não é rótulo livre**: tem de ser exatamente
+**`<boundedContext.name>.<type>`**, com os dois valores declarados dentro do próprio agregado. A mesma
+string aparece em três lugares, e os três têm de concordar:
+
+| Onde | Forma |
+|---|---|
+| chave do agregado no `.model.json` | `"vendas.pedido": { "type": "pedido", "boundedContext": { "name": "vendas" } }` |
+| chave que o cliente envia no **comando** | `{ "vendas.pedido": { "<comando>": … } }` |
+| schema PG do registro de consumo | `vendas.event_consumed` |
+
+> **⚠️ Divergência aqui não dá erro — dá silêncio.** Se a chave não for exatamente
+> `<boundedContext.name>.<type>`, o evento do agregado **nunca é processado**: não há resposta de erro,
+> não há entrada de log e o comando parece ter sido aceito. O sintoma é **projeção que nunca aparece**,
+> indistinguível de "nada aconteceu". Ao ver isso, **confira a chave antes de investigar qualquer outra
+> coisa**.
+
+> **⚠️ `boundedContext.name` deve ser o nome do dataschema do tenant.** A linha da projeção é gravada no
+> dataschema **do tenant**, enquanto o registro de consumo é gravado no schema que leva o nome do
+> **bounded context**. Quando os dois nomes não coincidem, as duas gravações vão para schemas
+> diferentes — e o segundo pode nem existir no banco do cliente.
 
 ### Identidade e unicidade (`identity`)
 
@@ -110,6 +138,12 @@ validação e do JSON publicado) e o grid de interpretação (persistence-crs/es
 
 **A combinação é imposta na criação:** um segundo agregado com a mesma combinação de valores é
 **recusado** — não nasce. Modelo com `fields: []` não tem essa restrição.
+
+> **⚠️ Campo declarado que não vem no comando desliga a unicidade daquele agregado.** Se **qualquer**
+> atributo listado em `fields` estiver ausente ou nulo no dado do comando de criação, o agregado é
+> criado **sem chave de unicidade** — e uma repetição futura com os mesmos valores passa a ser aceita.
+> Não há recusa e não há aviso na resposta. Portanto: **todo atributo listado em `fields` tem de ser
+> obrigatório no comando de criação**, e é assim que se modela.
 
 > **⚠️ Vigência, e ela importa para quem modelou antes.** Até `yc-interpreter:amd64-260909b` esta
 > declaração **não era imposta**: nada no processamento do comando lia `identity`, e **dois agregados

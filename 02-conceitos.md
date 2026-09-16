@@ -108,6 +108,14 @@ Em palavras:
 > e seus atributos devem **espelhar** os atributos do agregado. Implantação: [forger/entity](forger/endpoints/entity.md).
 > Tipos dos atributos: [model-format — tipos](persistence-crs/spec/model-format.md#atributos-e-tipos).
 
+> **⚠️ A equivalência do item 2 é estrutural, não decorativa.** O nome do bounded context decide **três**
+> coisas ao mesmo tempo: compõe o nome qualificado do agregado (`<org>.<project>.<bc>.<type>`), é a chave
+> pela qual o agregado é encontrado no modelo publicado — e a mesma que o cliente envia no comando — e
+> nomeia o schema onde o registro de consumo dos eventos é gravado. Já o schema da **linha da projeção**
+> é resolvido pelo **tenant**. São duas origens para decisões vizinhas: quando o nome do bounded context
+> não é o nome do dataschema do tenant, as duas divergem em silêncio. Invariante e sintomas:
+> [model-format — a chave do agregado](persistence-crs/spec/model-format.md#a-chave-do-agregado--bctype-e-ela-vale-em-três-lugares).
+
 ## Identidade e isolamento (tenant)
 
 - **tenant-id** — chave que **identifica e isola** o processamento de comandos, eventos e projeções de
@@ -115,13 +123,14 @@ Em palavras:
   leitura quanto de escrita).
 - **Banco de escrita universal** — o armazém de eventos é **comum a todos os clientes e a todos os
   agregados**; o isolamento lógico é garantido pelo `tenant-id`, não por bancos físicos separados.
-- **Modelo de escrita vs modelo de leitura** — no modelo de domínio (`.model.json`):
-  - `schema.forWriteModel.name` (armazém de eventos) é um **valor fixo definido pela plataforma**,
-    **igual em todo agregado** (universal);
-  - `schema.forReadModel.name` (projeção) é o **nome do dataschema** da projeção do agregado — por
-    padrão, igual ao nome do **bounded context**, logo **varia por contexto**.
-  - Ou seja: todos os agregados compartilham o mesmo armazém de eventos, mas cada contexto tem suas
-    próprias projeções.
+- **Modelo de escrita vs modelo de leitura** — todos os agregados compartilham o mesmo armazém de
+  eventos, e cada contexto tem suas próprias projeções. No `.model.json`, os campos
+  `schema.forWriteModel.name` e `schema.forReadModel.name` **registram** essa divisão, mas **não a
+  produzem**: são carimbados pelo forger na publicação e **nenhum dos dois é lido em runtime**. O
+  armazém de eventos é escolhido pela **instância** que atende a rota do comando; o banco e o schema da
+  projeção vêm do **dataschema do tenant**; o schema do registro de consumo vem do
+  **`boundedContext.name` do modelo**. Ver
+  [model-format — nível do agregado](persistence-crs/spec/model-format.md#nível-do-agregado).
 - **Header de tenant** — todas as requisições de comando, leitura e consulta exigem o cabeçalho que
   carrega o `tenant-id`. Sem ele, a requisição é rejeitada.
 
