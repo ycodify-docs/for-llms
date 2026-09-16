@@ -85,7 +85,7 @@ array). A cadeia que liga o agregado à sua projeção e a deixa implantada:
 ```
 agregado  (vive num bounded context)
    │  bounded context = project           (convenção padrão 1:1)
-   │  nome do bounded context = nome do dataschema  (no .model.json: schema.forReadModel.name)
+   │  nome do bounded context = nome do dataschema  (no .model.json: boundedContext.name)
    ▼
 entity (projeção do agregado)             ← colunas derivam de data.attribute do agregado
    │  implantada via forger
@@ -97,8 +97,8 @@ Em palavras:
 
 1. cada **agregado** pertence a um **bounded context**; por padrão, esse bounded context **é** um
    **project** (1:1);
-2. o **nome do bounded context** equivale ao **nome do dataschema** de leitura
-   (`schema.forReadModel.name` no `.model.json`);
+2. o **nome do bounded context** (`boundedContext.name` no `.model.json`) equivale ao **nome do
+   dataschema** de leitura;
 3. a **entity** que é a **projeção** desse agregado é criada **via forger** **sob esse dataschema** —
    e o dataschema está vinculado ao **project** e ao **database** (banco de leitura);
 4. logo, as **colunas** da projeção **derivam dos atributos** do agregado: `data.attribute` (colunas
