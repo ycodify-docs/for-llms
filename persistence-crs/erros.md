@@ -56,11 +56,6 @@ X-Tenant-Id: <tenant>
 > ⚠️ **`204` aqui significa "não achei esse termo", não "não houve falha".** O termo vai na própria
 > rota e a busca é literal — errar a palavra devolve vazio, que é indistinguível de sucesso. Se vier
 > `204`, confira o termo antes de concluir qualquer coisa.
->
-> **Vigência:** o termo único `NAO-MATERIALIZOU` existe em teste (`/v3/persistence/t/`) desde
-> `yc-interpreter:amd64-260913`. **Produção ainda não tem**, e lá a mesma falha sai sob **três** termos,
-> conforme o caminho — `receiveMessage-EXC` (projeção do próprio tenant), `cross-BC` (projeção entre
-> contextos) e `cross-coordination` (saga). Em imagem anterior, procure os três.
 
 **Espere uma linha por tentativa.** A entrega é retentada **3 vezes** antes de a mensagem ser
 estacionada; três registros do mesmo `eventId` são o esperado, não três falhas distintas.
