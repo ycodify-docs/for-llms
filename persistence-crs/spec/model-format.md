@@ -145,14 +145,6 @@ string aparece em três lugares, e os três têm de concordar:
 > Não há recusa e não há aviso na resposta. Portanto: **todo atributo listado em `fields` tem de ser
 > obrigatório no comando de criação**, e é assim que se modela.
 
-> **⚠️ Vigência, e ela importa para quem modelou antes.** Até `yc-interpreter:amd64-260909b` esta
-> declaração **não era imposta**: nada no processamento do comando lia `identity`, e **dois agregados
-> com a mesma combinação eram aceitos** — a documentação prometia uma unicidade que não ocorria. **A
-> partir de `amd64-260909c` ela é imposta.**
->
-> Consequência para quem já tem dados: **os registros criados até ali não foram verificados** e podem
-> conter combinações repetidas. Se algo seu dependia dessa unicidade, vale reconferir.
-
 **O que acontece na colisão.** A criação do segundo é recusada e o agregado não nasce. Quando a
 criação parte de uma **coordenação**, a plataforma reconhece a recusa como *"o alvo já existe"* e
 considera a coordenação **concluída** — não é erro, e não vai para fila de descarte.
