@@ -58,8 +58,8 @@ validação e do JSON publicado) e o grid de interpretação (persistence-crs/es
   "boundedContext": { "name": "<bc>", "comment": "<descrição opcional>" },
 
   "schema": {
-    "forWriteModel.name": "wdb.client",   // valor FIXO definido pela plataforma (igual em todo agregado)
-    "forReadModel.name":  "<dataschema>"  // = nome do dataschema da projeção (por padrão = nome do bc)
+    "forWriteModel.name": "wdb.client",   // carimbo do forger — não é lido em runtime
+    "forReadModel.name":  "<dataschema>"  // carimbo do forger — não é lido em runtime
   },
   "tenantId": {
     "forWriteModel": "<tenant-id>",       // gerado na criação do dataschema (forger)
@@ -420,6 +420,7 @@ Para filtrar por data numa consulta:
   alfabeto português, **sem** `_`, dígito, acento ou separador; para **atributo**, **máx. 24** chars. O
   `whenAttribute` segue a convenção particípio+`em` (e também casa `^[a-z]+$`).
 - O `id` do agregado e os campos de controle são gerenciados pela plataforma — **não** declarar/enviar.
-- `forWriteModel.name` é sempre o mesmo identificador universal; `forReadModel.name` é o esquema do contexto.
+- `schema.forWriteModel.name` e `schema.forReadModel.name` são carimbos do forger e **não dirigem nada**
+  em runtime — ver [nível do agregado](#nível-do-agregado).
 - Publicar o `.model.json` pelo forger ([model](../../forger/endpoints/model.md)) **não cria filas nem
   tabelas**: as projeções (tabelas) vêm das `entity` do forger; as filas, do deploy de processo.
