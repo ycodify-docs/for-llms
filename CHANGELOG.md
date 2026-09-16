@@ -2,6 +2,29 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.34 — 2026-09-16
+
+- **`POST .../model` passa a recusar com `400` modelo que o motor não executaria** — e a página
+  [forger · model](forger/endpoints/model.md) descreve as três recusas mais comuns. ⚠️ **Em `develop` do
+  forger, ainda NÃO em produção:** vale a partir da imagem que carregar essa mudança. Até lá a
+  publicação continua aceitando os três casos, que seguem falhando — ou silenciando — em runtime, que é
+  exatamente a razão da mudança.
+
+  A mais cara das três: **a chave do agregado tem de ser `<boundedContext.name>.<type>`**. Ela é o
+  endereço do agregado no despacho do evento *e* a chave que o cliente manda no comando; divergindo, o
+  evento é descartado **sem log, sem métrica e sem DLQ** — do lado de fora, indistinguível de "nada
+  aconteceu".
+
+- **Chaves que um modelo novo não precisa trazer**, na mesma página: `schema.forWriteModel.name`,
+  `schema.forReadModel.name`, `concurrency.*`, `readProjection` e `queue` **não são lidas por serviço
+  nenhum**. Continuam aceitas — modelo publicado não precisa ser reescrito —, mas quem **gera** modelo
+  novo não deve emiti-las. A página diz, para cada uma, quem decide de fato aquilo que ela aparenta
+  decidir.
+
+- **`boundedContext.name` documentado como o que ele é**: além de compor o endereço do agregado, ele
+  **nomeia o schema** onde o log de consumo do evento é gravado. Divergir do dataschema do tenant faz o
+  consumo gravar no schema de outro ambiente sem um único erro em log.
+
 ## 1.33 — 2026-09-16
 
 - **Produção passou a rodar a mesma imagem do ambiente de teste: `yc-interpreter:amd64-260913c`.** Tudo
