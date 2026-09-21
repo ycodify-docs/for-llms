@@ -27,9 +27,8 @@ Erros: `400` (arquivo vazio, extensão diferente de `.json`, documento inválido
 (consistência), `500`.
 
 > **A publicação passa a validar o documento contra o metamodelo** e a recusar com `400` o que antes era
-> aceito e só falhava — ou silenciava — em runtime. ⚠️ **Ainda não está em produção:** está em
-> `develop` do forger desde 2026-09-16 e vale a partir da imagem que o carregar — ver
-> [CHANGELOG 1.34](../../CHANGELOG.md). O `400` traz **todas** as violações de uma vez, cada uma com o
+> aceito e só falhava — ou silenciava — em runtime. **Em produção desde 2026-09-21** (ver
+> [CHANGELOG 1.37](../../CHANGELOG.md)). O `400` traz **todas** as violações de uma vez, cada uma com o
 > caminho dentro do JSON. As três que mais aparecem:
 >
 > | Recusa | Por quê |

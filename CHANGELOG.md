@@ -2,6 +2,29 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.37 — 2026-09-21
+
+- **Produção passou a rodar `yc-composer:amd64-260921` (`sha256:fecea707b971`), implantado às
+  16:39:59Z.** Tudo o que as entradas 1.34, 1.35 e 1.36 descreviam como *"em `develop`, ainda não em
+  produção"* **vale agora em produção**, e é por isso que esta entrada existe. São três comportamentos,
+  todos na publicação de modelo (`POST .../model`):
+
+  - **o documento é validado contra o metamodelo**, e a publicação responde `400` listando todas as
+    violações de uma vez (1.34);
+  - **a chave do agregado tem de ser `<boundedContext.name>.<type>`** — antes, chave divergente fazia o
+    evento ser descartado sem log, sem métrica e sem DLQ (1.34);
+  - **`roles` no nível do agregado** é aceito, e o recorte de leitura é conferido, com cinco recusas em
+    `400` (1.36).
+
+- **O que continua valendo, e é o que evita susto:** modelo **já publicado não é revalidado** — a
+  checagem é na publicação. Quem publicou ontem e não publica hoje não muda de comportamento por causa
+  desta subida. Agregado sem `roles` publica e lê como antes.
+
+- **Como ler as datas de vigência daqui para trás:** as entradas 1.34, 1.35 e 1.36 dizem *"ainda não em
+  produção"* porque era verdade quando foram escritas. **Esta entrada é o corte.** As páginas de uso
+  descrevem o comportamento corrente e não carregam mais vigência; quem precisa saber *desde quando*
+  vem a este arquivo.
+
 ## 1.36 — 2026-09-21
 
 - **O aggregate passa a aceitar `roles`, que declara o recorte de LEITURA.** Opcional: quem não a usa
