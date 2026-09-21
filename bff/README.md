@@ -20,6 +20,7 @@
 - [Capacidade](#capacidade)
 - [Miolo](#miolo)
 - [Proxy de domínio](#proxy-de-domínio)
+- [Arquivos anexos de agregado (`/session/files/*`)](#arquivos-anexos-de-agregado-sessionfiles)
 - [Quem autoriza a leitura](#quem-autoriza-a-leitura)
 - [Limitar os campos que um papel lê — `readProjection`](#limitar-os-campos-que-um-papel-lê-readprojection)
 - [`predicates` é a forma do persistence-q — não há dialeto do BFF](#predicates-é-a-forma-do-persistence-q-não-há-dialeto-do-bff)
@@ -204,6 +205,49 @@ O consumidor **não** compõe esses cabeçalhos nem conhece o token.
   campos internos: repassa o valor como recebeu, aninhamento incluso.
 - `/session/aggregate` existe porque a **projeção é assíncrona**: para carregar o estado autoritativo de
   um agregado (ex.: preencher um form de transição) não se deve ler o read model.
+
+## Arquivos anexos de agregado (`/session/files/*`)
+
+O BFF faz **proxy do [filer](../filer/README.md)**, o serviço de arquivos da plataforma, pelas mesmas
+regras das outras rotas de sessão: o consumidor manda o **cookie**, e o BFF injeta `Authorization` e
+`X-Tenant-Id`. O arquivo é **anexo de um agregado** e se identifica só pela chave
+`{org}-{project}-{entity}-{entityId}-{attribute}.{ext}`, em que **`entityId` é o `aggregateid`** — o
+mesmo UUID das rotas de domínio, nunca a PK da projeção.
+
+| Operação | Método · Path | Parâmetros | Corpo |
+|---|---|---|---|
+| Enviar | `POST /session/files/upload` | `tenantId`, `filename` (query) | binário, `Content-Type: application/octet-stream` |
+| Baixar | `GET /session/files/download` | `tenantId`, `filename` (query) | — |
+| Listar | `GET /session/files/list` | `tenantId`, `filename` = **prefixo** (query) | — |
+| Remover | `DELETE /session/files/delete` | `tenantId`, `filename` (query) | — |
+
+- **Upload e download exigem a chave completa**, com extensão. **Listar e remover aceitam prefixo
+  parcial, e prefixo significa LOTE** — remover por `…-{entity}-{entityId}-` apaga **todos** os anexos
+  daquele agregado, e por `…-{entity}-` todos os do tipo.
+- Respostas: `list` devolve `{ files: [...] }` (embrulhado, para poder crescer sem quebrar quem
+  consome); `delete` devolve o relatório do filer, `{ deleted, prefix, files }` — **prefixo sem
+  correspondência é `deleted: 0` com `200`**, não erro; `download` devolve o binário com o
+  `Content-Disposition` que o filer escolheu.
+- **Erro do filer passa inteiro** — status e corpo reais, como nas rotas de domínio.
+
+> ⚠️ **É proxy PURO: quem autoriza é o filer, e o que ele confere é o papel na entity INTEIRA.**
+> O BFF checa a sessão e que o `tenantId` pertence ao portador — **não** checa se o anexo é *daquela
+> pessoa*. O filer aplica `accessControl.read` (baixar/listar) e `write` (enviar/remover) do agregado;
+> ele **não** aplica o [`accessControl.scope`](../persistence-q/README.md#recorte-de-leitura-por-titular),
+> que é o que recorta linha por titular. **Consequência prática: um papel com leitura na entity baixa o
+> anexo de qualquer titular, bastando saber o `aggregateid`** — e `list` por prefixo os enumera.
+> Anexo que for dado sensível **não** se protege pelo papel: ou o modelo põe o arquivo num agregado de
+> acesso mais estreito, ou o titular precisa ser parte da chave de autorização, e isso é decisão de
+> quem modela o tenant — não do BFF.
+
+- **Teto por arquivo: 3 MiB** (`3145728` bytes) — acima disso a recusa vem antes de o conteúdo subir.
+  Valor **medido na configuração do serviço em 2026-09-17** (`max-file-size`, que o Spring lê em
+  unidade binária). ⚠️ **A página do filer ainda anuncia "≈10 MB"** — a divergência está apontada e é
+  da fatia dele; enquanto não for reconciliada, **o número que vale para quem passa pelo BFF é este**.
+- **Extensões aceitas:** a whitelist do [filer](../filer/README.md#limites-e-tipos). Fora da lista,
+  `400`; acima do teto, `413`.
+- **O endereço do filer é configuração de deploy**, e num ambiente onde ele não esteja configurado as
+  quatro rotas respondem **`503`** dizendo isso — em vez de `502` sem causa.
 
 ## Quem autoriza a leitura
 
@@ -449,7 +493,9 @@ que o gateway, o cache ou o persistence respondem.
 | `404` | tenant não pertence ao usuário / miolo não registrado / **modelo do tenant ausente do cache** (removido ou nunca publicado — ele **não expira**) |
 | `409` | autocadastro: papel inexistente — nada foi criado (o `204` do orgid, traduzido) |
 | `500` | configuração ausente no servidor (ex.: o path do endpoint de cache não configurado) · **`readProjection` inválido no modelo do tenant** — a leitura é recusada em vez de recortada pela metade |
+| `413` | arquivo acima do teto do filer (3 MiB) em `POST /session/files/upload` |
 | `502` | falha ao falar com um serviço da plataforma |
+| `503` | serviço de arquivos (filer) não configurado neste ambiente |
 
 ### `401` diz **por que** não há sessão
 
@@ -479,6 +525,8 @@ sem explicação — e ninguém consegue medir a frequência do problema.
       (ver [seguranca](../shell/seguranca.md)).
 - [ ] No autocadastro, ofereça só o que `GET /ua/roles` devolve — o servidor recusa o resto.
 - [ ] Endereços de serviço = **config de deploy**, nunca hardcode nem em doc pública.
+- [ ] Em `/session/files/*`: `entityId` da chave = **`aggregateid`**; prefixo em `delete` é **lote**; e
+      o anexo é protegido **por papel na entity**, nunca por titular — ver o aviso da seção.
 
 ---
 
