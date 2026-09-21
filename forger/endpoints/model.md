@@ -27,9 +27,8 @@ Erros: `400` (arquivo vazio, extensão diferente de `.json`, documento inválido
 (consistência), `500`.
 
 > **A publicação passa a validar o documento contra o metamodelo** e a recusar com `400` o que antes era
-> aceito e só falhava — ou silenciava — em runtime. ⚠️ **Ainda não está em produção:** está em
-> `develop` do forger desde 2026-09-16 e vale a partir da imagem que o carregar — ver
-> [CHANGELOG 1.34](../../CHANGELOG.md). O `400` traz **todas** as violações de uma vez, cada uma com o
+> aceito e só falhava — ou silenciava — em runtime. **Em produção desde 2026-09-21** (ver
+> [CHANGELOG 1.37](../../CHANGELOG.md)). O `400` traz **todas** as violações de uma vez, cada uma com o
 > caminho dentro do JSON. As três que mais aparecem:
 >
 > | Recusa | Por quê |
@@ -38,6 +37,28 @@ Erros: `400` (arquivo vazio, extensão diferente de `.json`, documento inválido
 > | `command.<cmd>.endState` sem evento de chave igual | o runtime resolve `event[endState]` por chave, sem fallback: o primeiro write falharia com `510` |
 > | dois envelopes `<org>.<project>` no mesmo arquivo | só o primeiro seria lido, e o outro sumiria sem aviso |
 > | item **objeto** em `domainBus.triggerProjection` sem `targetTenantId` | o destino é descartado no despacho: a projeção cross-tenant simplesmente não dispara. Item **string** continua válido — é a projeção same-tenant |
+> | `roles` do aggregate com recorte incoerente | ver [recorte de leitura do aggregate](#recorte-de-leitura-do-aggregate-roles) |
+
+### Recorte de leitura do aggregate: `roles`
+
+**Opcional.** Declara quem lê o aggregate e quais linhas cada papel lê; quem aplica o recorte é o
+serviço que atende os endpoints de aggregate. **Aggregate sem a chave publica e lê como antes.**
+
+```json
+"roles": {
+  "read":   ["OPERADOR", "MASTER"],
+  "author": ["OPERADOR"],
+  "scope": { "read": { "OPERADOR": { "rows": { "by": "username" } } } }
+}
+```
+
+Recusas na publicação, todas `400`, iguais às do `accessControl.scope` da entity: papel no `scope.read`
+fora de `roles.read`; `MASTER` no `scope`; `rows` sem `by`; `by` em metadado da plataforma (`id`,
+`loguser`, `logrole`, `logversion`, `logdate`); `by` em atributo não declarado em comando nenhum do
+aggregate.
+
+> ⚠️ **Não confunda com o `roles` do comando**, que é **array**, **obrigatório**, e diz quem pode
+> **executar**. Este é **objeto**, **opcional**, e diz quem pode **ler**. O nível desambigua.
 >
 > Modelo que já estava publicado **não** é revalidado: a checagem acontece na publicação.
 

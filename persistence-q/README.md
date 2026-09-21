@@ -177,8 +177,10 @@ chamando" é o **`username` do token** — então o atributo precisa conter esse
 
 Três consequências práticas, e a terceira é a que mais morde:
 
-- **o atributo é escolha de quem modela.** Pode chamar-se `username`, `login`, `titular`: o que importa
-  é o **valor** ser o do token, não o nome da coluna;
+- **o atributo se chama `username`.** O que a plataforma exige é que o **valor** seja o do token; o nome
+  é convenção — e é a mesma que o recorte do **agregado** usa
+  ([model-format](../persistence-crs/spec/model-format.md#quem-pode-ler-o-agregado-roles)). Dois nomes
+  para a mesma coisa cobram o preço no dia em que os dois recortes precisarem concordar;
 - **metadado da plataforma não serve** — `id`, `loguser`, `logrole`, `logversion` e `logdate` são
   recusados. `loguser` registra **quem escreveu** a linha, não **de quem** ela é: ficha cadastrada por um
   administrador levaria o login dele, e o recorte devolveria zero linhas ao dono da ficha;

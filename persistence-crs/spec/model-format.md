@@ -68,6 +68,8 @@ validação e do JSON publicado) e o grid de interpretação (persistence-crs/es
   "identity":    { "strategy": "uuid", "fields": [] },     // ver "Identidade e unicidade"
   "concurrency": { "version": "version", "strategy": "optimistic" },
 
+  "roles": { ... },   // OPCIONAL — quem pode LER este agregado. Ver "Quem pode ler"
+
   "command": { ... },
   "event":   { ... }
 }
@@ -117,6 +119,64 @@ string aparece em três lugares, e os três têm de concordar:
 > dataschema **do tenant**, enquanto o registro de consumo é gravado no schema que leva o nome do
 > **bounded context**. Quando os dois nomes não coincidem, as duas gravações vão para schemas
 > diferentes — e o segundo pode nem existir no banco do cliente.
+
+### Quem pode ler o agregado (`roles`)
+
+```jsonc
+"roles": {
+  "read":   ["ASSOCIADO", "ADMINISTRADOR"],   // podem ler o agregado
+  "author": ["ADMINISTRADOR"],                // veem QUEM fez cada evento no /history
+  "scope":  {                                  // recorte por proprietário, opcional
+    "read": { "ASSOCIADO": { "rows": { "by": "username" } } }
+  }
+}
+```
+
+**Sem esta chave, qualquer usuário do tenant lê o agregado.** É a declaração que liga o recorte.
+
+| Chave | O que declara |
+|---|---|
+| `read` | os papéis que alcançam o agregado. Quem não tem nenhum deles não o enxerga |
+| `scope.read.<PAPEL>.rows.by` | o atributo cujo valor precisa ser o **`username` do token** de quem pede — o proprietário |
+| `author` | os papéis que veem, no `/history`, quem executou cada evento |
+
+Os códigos de resposta estão em
+[leitura de agregado — quem pode ler](../endpoints/agregado-leitura.md#quem-pode-ler).
+
+> **A mesma palavra vale duas coisas, e o nível diz qual.** `roles` **no agregado** é leitura; `roles`
+> **dentro de um comando** é escrita — quem pode executá-lo — e é um array. Ler pode caber a um papel que
+> nunca escreve.
+
+**`by` nomeia um atributo declarado** em `data.attribute` de algum comando: é de lá que o dado nasce. A
+convenção para o atributo de proprietário é **`username`**.
+
+**Papéis acumulados: o menos restritivo vence.** Basta um papel do solicitante estar em `read` sem recorte
+declarado em `scope` para não haver recorte — quem acumula ADMINISTRADOR e um papel recortado não perde o
+que o papel maior lhe dá.
+
+> **⚠️ `loguser` não serve como `by`, e a publicação recusa.** Ele registra **quem executou o comando**,
+> não **de quem o agregado é**: um cadastro feito pelo administrador leva o login dele, e o recorte
+> devolveria nada ao dono do dado.
+
+> **⚠️ Atributo de titular vazio = agregado invisível para o próprio dono.** Se o modelo recorta por
+> `username` e o agregado tem esse campo em branco, ele não casa com ninguém — e a resposta é a de um id
+> inexistente. Preencher o titular é parte da modelagem, em especial quando quem cadastra é outra pessoa.
+
+### `loguser`: quem executou cada comando
+
+Todo comando executado com credencial carimba **`loguser`** no dado do agregado, com o `username` de quem
+o executou. É campo **da plataforma**: não se declara no modelo e não se envia no comando — declará-lo é
+recusado, como os demais metadados.
+
+Em comando disparado por **coordenação**, o valor é o de quem assinou o **primeiro** comando da cadeia: a
+identidade atravessa a saga.
+
+> `loguser` responde *"quem escreveu"*; `username`, quando o modelo o declara, responde *"de quem é"*. Os
+> dois coincidem quase sempre, e divergem no caso que importa — o cadastro feito por terceiro.
+
+A **linha da projeção** tem um `loguser` próprio, que registra quem a criou
+([persistence-q](../../persistence-q/README.md#recorte-de-leitura-por-titular)); o do agregado não o altera. São dois
+registros, em dois lugares, e cada um responde pela sua escrita.
 
 ### Identidade e unicidade (`identity`)
 
@@ -402,6 +462,39 @@ Para filtrar por data numa consulta:
     { "name": "<alvo>", "targetTenantId": "<tenant-id destino>", "br": { "route": "<rota>" } }
     ```
   - Listas **vazias** = sem despacho extra (só a projeção do próprio contexto).
+
+### O que o processor de coordenação devolve
+
+O processor apontado por `triggerCoordination[].br.route` devolve **`processedData.targetCommand`**, com
+as quatro chaves `boundedContext`, `aggregateType`, `commandName` e `data`:
+
+```jsonc
+{ "processedData": { "targetCommand": {
+    "boundedContext": "estoque", "aggregateType": "itemestoque",
+    "commandName":    "registrarentrada", "data": { "quantidade": 3 } } } }
+```
+
+> **⚠️ Resposta `200` com outra forma não dispara nada.** O comando-alvo não é submetido, não há erro,
+> não há retentativa e não há sinal do lado de fora: o alvo fica intacto, como se a coordenação não
+> existisse. Ao investigar *"a coordenação não faz nada"*, **confira a forma do retorno primeiro**.
+
+**Um alvo por coordenação.** `targetCommand` é um objeto, não uma lista: quem precisa atingir N agregados
+emite os N comandos dentro do próprio processor. O `coordination` declarado **dentro de um comando** é
+outro mecanismo — síncrono, transacional — e esse é uma lista ordenada.
+
+**O autor atravessa a saga.** O comando-alvo é gravado com a identidade de quem assinou o **primeiro**
+comando da cadeia, e o papel dele não é reavaliado no alvo: comando disparado por comando já executado é
+considerado autorizado. É essa identidade que aparece no
+[`loguser`](#loguser-quem-executou-cada-comando) e no `/history` do agregado derivado.
+
+> **⚠️ A projeção do alvo é escrita como esse autor.** O `accessControl.write` da **entity** do agregado
+> alvo precisa contemplar um papel de quem dispara a origem — senão o comando é aceito, o evento é
+> gravado e a **projeção não materializa**. Ao modelar uma coordenação, confira os dois lados: o papel de
+> quem executa o comando de origem e o `accessControl.write` da entity que recebe.
+
+**A autorização herdada morre no comando-alvo.** Se o alvo declarar `coordination` — o encadeamento
+síncrono dentro do comando —, esses comandos encadeados têm o papel **conferido** normalmente, contra a
+identidade que atravessou a saga.
 
 > Declarar `triggerProjection`/`triggerCoordination` **não cria filas** — apenas roteia o despacho pelos
 > canais universais do es-n. Ver [arquitetura — de onde vêm as filas](../../01-arquitetura.md#origem-das-filas).

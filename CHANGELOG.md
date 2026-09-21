@@ -2,6 +2,86 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.38 — 2026-09-21
+
+- **O histórico de um agregado tocado por coordenação volta a responder.** O `GET` de histórico desses
+  agregados devolvia erro permanente; agora responde `200`. **Os eventos gravados a partir desta imagem
+  trazem a autoria; os anteriores vêm sem ela** — a identidade não foi gravada quando eles aconteceram, e
+  não há de onde tirá-la. Histórico antigo aparece legível, com alguns eventos sem autor.
+
+- **Todo comando passa a carimbar quem o fez.** O dado do agregado ganha a chave `loguser` nas
+  respostas. Ela **não** desce para a projeção — o modelo de leitura segue com as colunas que você
+  declarou.
+
+- ⚠️ **A autoria passa a valer na materialização da projeção.** O autor do comando de origem agora
+  acompanha a coordenação até a escrita da projeção, e o `accessControl.write` da entity de destino é
+  conferido de verdade. **Se o papel do autor não estiver no `write` da entity alvo, a projeção não
+  materializa** — vale conferir as coordenações em que quem inicia tem papel diferente do que o destino
+  aceita.
+
+- **Campo declarado `nullable: false` passa a ser exigido pelo motor, e não só pelo BFF.** Comando que
+  não traga o campo, ou que o traga nulo, é **recusado**. Até aqui a declaração era lida pelo BFF do
+  Stager e nada mais: comando que entrasse por outro caminho — coordenação, despacho de comando-alvo,
+  chamada direta ao endpoint — era aceito com o campo ausente. ⚠️ Se o seu modelo declara
+  `nullable: false` num campo que **o processador de regra de negócio calcula**, esse comando passa a ser
+  recusado **antes** de a regra rodar.
+
+- **Falha de projeção por chave divergente deixa de ser silenciosa.** A notificação era descartada sem
+  log, sem métrica e sem fila de erro — indistinguível de "nada aconteceu". Agora sai registro com as
+  chaves que o modelo tem, contador e erro publicado; e identificador de agregado malformado passa a ser
+  descartado com motivo, em vez de derrubar o processamento do lote.
+
+- **Vigência:** em **teste** desde `yc-interpreter:amd64-260921` (campo obrigatório e descarte com
+  registro; `yc.cqrs-c@9e2ea51`, `yc.es@0b981db`) e `:amd64-260921b` (histórico, `loguser` e autoria na
+  coordenação; `yc.cqrs-c@0f600d3`, `persistence-crs@8ba070f`, `ufrn.loco3@b8a944b`), implantadas em
+  2026-09-21. **Produção ainda não** — o interpreter segue em `:amd64-260913c`. A validação do
+  metamodelo, que subiu em produção no mesmo dia, está na 1.37 e não se repete aqui.
+
+## 1.37 — 2026-09-21
+
+- **Produção passou a rodar `yc-composer:amd64-260921` (`sha256:fecea707b971`), implantado às
+  16:39:59Z.** Tudo o que as entradas 1.34, 1.35 e 1.36 descreviam como *"em `develop`, ainda não em
+  produção"* **vale agora em produção**, e é por isso que esta entrada existe. São três comportamentos,
+  todos na publicação de modelo (`POST .../model`):
+
+  - **o documento é validado contra o metamodelo**, e a publicação responde `400` listando todas as
+    violações de uma vez (1.34);
+  - **a chave do agregado tem de ser `<boundedContext.name>.<type>`** — antes, chave divergente fazia o
+    evento ser descartado sem log, sem métrica e sem DLQ (1.34);
+  - **`roles` no nível do agregado** é aceito na publicação, e o recorte **declarado** é conferido, com
+    cinco recusas em `400` (1.36).
+
+  ⚠️ **Conferir a declaração não é aplicar o recorte.** O que subiu em produção é a publicação passar a
+  aceitar e validar a chave. **Quem aplica o corte na leitura é o interpreter, e esse lado ainda não
+  está em produção** (ver 1.38 — segue em `:amd64-260913c`). Até ele subir, declarar `roles` publica e
+  **não recorta nada**: quem precisa do corte valendo espera a imagem do interpreter.
+
+- **O que continua valendo, e é o que evita susto:** modelo **já publicado não é revalidado** — a
+  checagem é na publicação. Quem publicou ontem e não publica hoje não muda de comportamento por causa
+  desta subida. Agregado sem `roles` publica e lê como antes.
+
+- **Como ler as datas de vigência daqui para trás:** as entradas 1.34, 1.35 e 1.36 dizem *"ainda não em
+  produção"* porque era verdade quando foram escritas. **Esta entrada é o corte.** As páginas de uso
+  descrevem o comportamento corrente e não carregam mais vigência; quem precisa saber *desde quando*
+  vem a este arquivo.
+
+## 1.36 — 2026-09-21
+
+- **O aggregate passa a aceitar `roles`, que declara o recorte de LEITURA.** Opcional: quem não a usa
+  publica e lê como antes. A forma é
+  `{ read: [...], author: [...], scope: { read: { <PAPEL>: { rows: { by: <atributo> } } } } }`, e a
+  publicação recusa com `400` o recorte incoerente — papel no `scope.read` fora de `roles.read`,
+  `MASTER` no `scope`, `rows` sem `by`, `by` em metadado da plataforma, `by` em atributo não declarado
+  em comando nenhum do aggregate. São as mesmas cinco recusas que o `accessControl.scope` da entity já
+  fazia: o recorte é o mesmo dos dois lados, e divergir publicaria aggregate que passa e entity que não.
+
+- **⚠️ `roles` agora existe em dois níveis, com formas diferentes.** No **comando** é **array** e
+  **obrigatório**, e diz quem pode **executar**. No **aggregate** é **objeto** e **opcional**, e diz
+  quem pode **ler**. O nível desambigua, e não há conversão entre os dois. Em
+  [forger · model](forger/endpoints/model.md#recorte-de-leitura-do-aggregate-roles).
+
+- Vigência: em `develop` do forger, **ainda não em produção**, como a 1.34 e a 1.35.
+
 ## 1.35 — 2026-09-21
 
 - **Os exemplos de modelo deixaram de ensinar chave morta.** O introdutório
