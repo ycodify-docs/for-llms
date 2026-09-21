@@ -46,8 +46,13 @@
     violações de uma vez (1.34);
   - **a chave do agregado tem de ser `<boundedContext.name>.<type>`** — antes, chave divergente fazia o
     evento ser descartado sem log, sem métrica e sem DLQ (1.34);
-  - **`roles` no nível do agregado** é aceito, e o recorte de leitura é conferido, com cinco recusas em
-    `400` (1.36).
+  - **`roles` no nível do agregado** é aceito na publicação, e o recorte **declarado** é conferido, com
+    cinco recusas em `400` (1.36).
+
+  ⚠️ **Conferir a declaração não é aplicar o recorte.** O que subiu em produção é a publicação passar a
+  aceitar e validar a chave. **Quem aplica o corte na leitura é o interpreter, e esse lado ainda não
+  está em produção** (ver 1.38 — segue em `:amd64-260913c`). Até ele subir, declarar `roles` publica e
+  **não recorta nada**: quem precisa do corte valendo espera a imagem do interpreter.
 
 - **O que continua valendo, e é o que evita susto:** modelo **já publicado não é revalidado** — a
   checagem é na publicação. Quem publicou ontem e não publica hoje não muda de comportamento por causa
