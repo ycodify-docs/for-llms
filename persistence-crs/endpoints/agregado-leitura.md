@@ -37,6 +37,9 @@ no horário de Brasília, a conversão é do front (exemplo em
 - `200` — lista (array) dos eventos do agregado, em ordem.
 - `204` — sem eventos.
 
+Cada evento traz **quem o executou**. Evento sem identidade registrada — o caso de um agregado escrito por
+um caminho que não a carrega — vem **sem** o bloco de autoria, e o restante do histórico não muda.
+
 > **`{id}` = UUID do agregado** (o `aggregateid` da projeção; `projecao.aggregateid == aggregate.id`).
 > **Não** use a PK `id` (Long) da projeção — enviar o Long → `510` "Invalid UUID string".
 

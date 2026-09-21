@@ -174,6 +174,10 @@ identidade atravessa a saga.
 > `loguser` responde *"quem escreveu"*; `username`, quando o modelo o declara, responde *"de quem é"*. Os
 > dois coincidem quase sempre, e divergem no caso que importa — o cadastro feito por terceiro.
 
+A **linha da projeção** tem um `loguser` próprio, que registra quem a criou
+([persistence-q](../../persistence-q/README.md#recorte-de-leitura-por-titular)); o do agregado não o altera. São dois
+registros, em dois lugares, e cada um responde pela sua escrita.
+
 ### Identidade e unicidade (`identity`)
 
 ```jsonc
@@ -482,6 +486,15 @@ outro mecanismo — síncrono, transacional — e esse é uma lista ordenada.
 comando da cadeia, e o papel dele não é reavaliado no alvo: comando disparado por comando já executado é
 considerado autorizado. É essa identidade que aparece no
 [`loguser`](#loguser-quem-executou-cada-comando) e no `/history` do agregado derivado.
+
+> **⚠️ A projeção do alvo é escrita como esse autor.** O `accessControl.write` da **entity** do agregado
+> alvo precisa contemplar um papel de quem dispara a origem — senão o comando é aceito, o evento é
+> gravado e a **projeção não materializa**. Ao modelar uma coordenação, confira os dois lados: o papel de
+> quem executa o comando de origem e o `accessControl.write` da entity que recebe.
+
+**A autorização herdada morre no comando-alvo.** Se o alvo declarar `coordination` — o encadeamento
+síncrono dentro do comando —, esses comandos encadeados têm o papel **conferido** normalmente, contra a
+identidade que atravessou a saga.
 
 > Declarar `triggerProjection`/`triggerCoordination` **não cria filas** — apenas roteia o despacho pelos
 > canais universais do es-n. Ver [arquitetura — de onde vêm as filas](../../01-arquitetura.md#origem-das-filas).
