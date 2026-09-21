@@ -13,10 +13,6 @@
           "name": "vendas",
           "comment": "Gestão de pedidos"
         },
-        "schema": {
-          "forWriteModel.name": "wdb.client",
-          "forReadModel.name": "vendas"
-        },
         "tenantId": {
           "forWriteModel": "00000000-0000-4000-8000-000000000010",
           "forReadModel": "00000000-0000-4000-8000-000000000010"
@@ -24,10 +20,6 @@
         "identity": {
           "strategy": "uuid",
           "fields": []
-        },
-        "concurrency": {
-          "version": "version",
-          "strategy": "optimistic"
         },
         "command": {
           "criar": {
@@ -41,7 +33,6 @@
                 },
                 "total": {
                   "type": "Long",
-                  "length": 0,
                   "nullable": false,
                   "comment": "Valor total em centavos"
                 }

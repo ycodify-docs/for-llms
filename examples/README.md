@@ -24,13 +24,19 @@ internas removidas). Úteis por mostrarem padrões mais ricos:
 
 | Bloco | O que descreve | Quem usa |
 |---|---|---|
-| `type` / `org` / `project` / `boundedContext` | Tipo do agregado, organização, contexto. | forger (deploy), todos (escopo). |
-| `schema` / `tenantId` | Modelo de escrita (universal) e leitura (por contexto); `tenant-id` do isolamento. | persistence-crs, es-n, persistence-q. |
-| `identity` / `concurrency` | Estratégia de id (UUID gerado) e de concorrência (otimista). | persistence-crs. |
+| `type` / `org` / `project` / `boundedContext` | Tipo do agregado, organização, contexto. **A chave do agregado é `<boundedContext.name>.<type>`, e `boundedContext.name` é também o nome do schema.** | forger (deploy), todos (escopo). |
+| `tenantId` | `forWriteModel` escolhe o armazém de escrita; `forReadModel` é o tenant da projeção. | persistence-crs, es-n, persistence-q. |
+| `identity` | Estratégia de id (UUID gerado). | persistence-crs. |
 | `command` | Comandos: `data.attribute` (com `type`/`length`/`nullable`), `fromState`/`endState`, `roles`, `coordination`, `br.route` opcional. | persistence-crs (executar), br-service (regra). |
 | `event` | Eventos: `type`, `whenAttribute`, `payloadInherit` e **`domainBus`** (`orderingMode`, `triggerProjection`, `triggerCoordination`). | es-n (despacho), persistence-crs (projeção/coordenação). |
 
 Os estados **não** formam um bloco próprio: são as strings de `fromState`/`endState` dos comandos.
+
+> ⚠️ **Os cinco modelos "reais (sanitizados)" ainda trazem `schema` e `concurrency`, e o seu não deve.**
+> Nenhuma das duas é lida por serviço nenhum — elas ficaram nesses arquivos porque eles espelham modelos
+> publicados antes de isso ser medido. O **introdutório** (`acme.vendas.model.json`) já está sem elas, e é
+> ele o ponto de partida para copiar. A lista completa do que não gerar, com quem decide de fato cada
+> coisa, está em [forger · model](../forger/endpoints/model.md#chaves-que-um-modelo-novo-não-precisa-trazer).
 
 ## Como cada parte mapeia aos endpoints
 
