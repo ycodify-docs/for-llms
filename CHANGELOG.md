@@ -29,10 +29,11 @@
   chaves que o modelo tem, contador e erro publicado; e identificador de agregado malformado passa a ser
   descartado com motivo, em vez de derrubar o processamento do lote.
 
-- **Vigência:** em **teste** desde `yc-interpreter:amd64-260921` (campo obrigatório e descarte com registro) e `:amd64-260921b` (histórico, `loguser` e autoria na coordenação), implantadas em 2026-09-21.
-  `persistence-crs@8ba070f`, `ufrn.loco3@b8a944b`), implantado às 16:35:54Z. **Produção ainda não** —
-  o interpreter segue em `:amd64-260913c`. A validação do metamodelo, que subiu em produção no mesmo
-  dia, está na 1.37 e não se repete aqui.
+- **Vigência:** em **teste** desde `yc-interpreter:amd64-260921` (campo obrigatório e descarte com
+  registro; `yc.cqrs-c@9e2ea51`, `yc.es@0b981db`) e `:amd64-260921b` (histórico, `loguser` e autoria na
+  coordenação; `yc.cqrs-c@0f600d3`, `persistence-crs@8ba070f`, `ufrn.loco3@b8a944b`), implantadas em
+  2026-09-21. **Produção ainda não** — o interpreter segue em `:amd64-260913c`. A validação do
+  metamodelo, que subiu em produção no mesmo dia, está na 1.37 e não se repete aqui.
 
 ## 1.37 — 2026-09-21
 
