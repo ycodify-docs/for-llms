@@ -68,6 +68,8 @@ validação e do JSON publicado) e o grid de interpretação (persistence-crs/es
   "identity":    { "strategy": "uuid", "fields": [] },     // ver "Identidade e unicidade"
   "concurrency": { "version": "version", "strategy": "optimistic" },
 
+  "roles": { ... },   // OPCIONAL — quem pode LER este agregado. Ver "Quem pode ler"
+
   "command": { ... },
   "event":   { ... }
 }
@@ -117,6 +119,62 @@ string aparece em três lugares, e os três têm de concordar:
 > dataschema **do tenant**, enquanto o registro de consumo é gravado no schema que leva o nome do
 > **bounded context**. Quando os dois nomes não coincidem, as duas gravações vão para schemas
 > diferentes — e o segundo pode nem existir no banco do cliente.
+
+### Quem pode ler o agregado (`roles`)
+
+```jsonc
+"roles": {
+  "read":   ["ASSOCIADO", "ADMINISTRADOR"],   // papéis que podem ler este agregado
+  "author": ["ADMINISTRADOR"],                // papéis que veem QUEM fez cada evento no /history
+  "scope":  {                                  // recorte por linha, opcional
+    "read": { "ASSOCIADO": { "rows": { "by": "username" } } }
+  }
+}
+```
+
+> **A mesma palavra vale duas coisas, e o nível diz qual.** `roles` **no agregado** é **leitura**;
+> `roles` **dentro de um comando** é **escrita** — quem pode executar aquele comando — e continua sendo
+> um array. Não são a mesma declaração e não se substituem: ler pode caber a um papel que nunca escreve.
+
+**Sem `roles`, nada muda:** agregado que não declara a chave é lido como sempre foi, por qualquer usuário
+do tenant. Declarar é o que liga o recorte.
+
+| Declaração | O que acontece na leitura de `/a/{bc}/{type}/{id}` e de `/history` |
+|---|---|
+| `read` | papel do solicitante fora da lista → responde como se o agregado **não existisse** (`204`) |
+| `scope.read.<PAPEL>.rows.by` | o valor desse atributo no agregado tem de ser o **`username` do token** de quem pede |
+| `author` | papel fora da lista recebe o histórico **completo, sem o bloco de autoria** de cada evento |
+
+**`by` nomeia um atributo declarado** em `data.attribute` de algum comando — é de lá que o dado nasce. A
+convenção da plataforma para o atributo de proprietário é **`username`**.
+
+> **⚠️ `loguser` não serve como `by`, e a publicação recusa.** `loguser` é carimbado pela plataforma com
+> **quem executou o comando**, não com **de quem o agregado é** — um cadastro feito pelo administrador
+> leva o login dele. Recortar por ele devolveria nada ao dono do dado.
+
+**Papéis acumulados: o menos restritivo vence.** Se qualquer papel do solicitante estiver em `read` e
+**não** tiver recorte declarado em `scope`, não há recorte — quem acumula ADMINISTRADOR e um papel
+recortado não perde o que o papel maior lhe dá.
+
+> **⚠️ Atributo de titular vazio = agregado invisível para o próprio dono.** Se o modelo recorta por
+> `username` e o agregado tem esse campo em branco, ele não casa com ninguém, e a resposta é a de um id
+> inexistente. Preencher o titular é parte da modelagem — em especial quando o cadastro é feito por
+> outra pessoa, que é o caso comum do administrador cadastrando em nome de alguém.
+
+**Por que a resposta é `204` e não `403`:** dizer *"existe, e você não pode"* entrega a existência do
+agregado a quem não pode vê-lo. A resposta é indistinguível da de um id que nunca existiu.
+
+### `loguser`: quem executou cada comando
+
+Todo comando executado com credencial carimba **`loguser`** no dado do agregado, com o `username` de quem
+o executou. Ele aparece na resposta do agregado e em cada evento do `/history`, e é **da plataforma**: não
+se declara no modelo e não se envia no comando.
+
+Em comando disparado por **coordenação**, o `loguser` é o de quem assinou o **primeiro** comando da
+cadeia — a identidade atravessa a saga.
+
+> `loguser` responde *"quem escreveu"*; `username`, quando o modelo o declara, responde *"de quem é"*. Os
+> dois coincidem quase sempre, e divergem exatamente no caso que importa: o cadastro feito por terceiro.
 
 ### Identidade e unicidade (`identity`)
 
@@ -402,6 +460,30 @@ Para filtrar por data numa consulta:
     { "name": "<alvo>", "targetTenantId": "<tenant-id destino>", "br": { "route": "<rota>" } }
     ```
   - Listas **vazias** = sem despacho extra (só a projeção do próprio contexto).
+
+> **O que o processor de `triggerCoordination` precisa devolver, e é exato.** A plataforma espera
+> **`processedData.targetCommand`**, com as quatro chaves `boundedContext`, `aggregateType`,
+> `commandName` e `data`:
+>
+> ```jsonc
+> { "processedData": { "targetCommand": {
+>     "boundedContext": "estoque", "aggregateType": "itemestoque",
+>     "commandName": "registrarentrada", "data": { … } } } }
+> ```
+>
+> **Resposta `200` com outra forma não dispara nada**: o comando-alvo não é submetido, não há erro, não
+> há retentativa e não há sinal do lado de fora — o sintoma é o alvo intacto, como se a coordenação não
+> existisse. Ao investigar "a coordenação não faz nada", **confira a forma do retorno antes de qualquer
+> outra coisa**.
+>
+> **Um alvo por coordenação, não uma lista.** `targetCommand` é um objeto; não há fan-out. Quem precisa
+> atingir N agregados emite os N comandos no próprio processor. (O `coordination` declarado **dentro de
+> um comando** é outro mecanismo, síncrono e transacional, e esse sim é uma lista ordenada.)
+>
+> **O autor atravessa a saga:** o comando-alvo é gravado com a identidade de quem assinou o **primeiro**
+> comando da cadeia, e o papel dele **não** é reavaliado no alvo — comando disparado por comando já
+> executado é considerado autorizado. É essa identidade que aparece no `loguser` e no `/history` do
+> agregado derivado.
 
 > Declarar `triggerProjection`/`triggerCoordination` **não cria filas** — apenas roteia o despacho pelos
 > canais universais do es-n. Ver [arquitetura — de onde vêm as filas](../../01-arquitetura.md#origem-das-filas).

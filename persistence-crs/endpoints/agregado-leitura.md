@@ -40,6 +40,29 @@ no horário de Brasília, a conversão é do front (exemplo em
 > **`{id}` = UUID do agregado** (o `aggregateid` da projeção; `projecao.aggregateid == aggregate.id`).
 > **Não** use a PK `id` (Long) da projeção — enviar o Long → `510` "Invalid UUID string".
 
+## Quem pode ler
+
+Por padrão, **qualquer usuário autenticado do tenant** lê qualquer agregado dele: os dois endpoints
+conferem o tenant, e nada mais.
+
+Quando o modelo do agregado declara **`roles`**
+([model-format](../spec/model-format.md#quem-pode-ler-o-agregado-roles)), os dois passam a recortar:
+
+| Situação | Resposta |
+|---|---|
+| papel do solicitante fora de `roles.read` | **`204`** — a mesma resposta de um `{id}` que não existe |
+| recorte por proprietário, e o agregado é de outra pessoa | **`204`** |
+| passa no recorte | `200` normal — e o `/history` vem **inteiro** |
+| passa, mas o papel não está em `roles.author` | `200`, com os eventos **sem o bloco de autoria** |
+
+> **`204` aqui não distingue "não existe" de "não é seu", e é de propósito:** um `403` entregaria a
+> existência do agregado a quem não pode vê-lo. Ao depurar um `204` inesperado, verifique o recorte do
+> modelo antes de procurar o dado.
+
+**`loguser` aparece nas duas respostas** — no estado e em cada evento — com o `username` de quem executou
+aquele comando. É carimbado pela plataforma: não se declara no modelo nem se envia no comando. Em comando
+disparado por coordenação, é o autor do **primeiro** comando da cadeia.
+
 ## Quando usar
 
 - **Estado atual:** inspeção pontual de um agregado conhecido pelo seu `id` (UUID do agregado).
