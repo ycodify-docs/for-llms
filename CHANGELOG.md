@@ -5,7 +5,9 @@
 ## 1.38 — 2026-09-21
 
 - **O histórico de um agregado tocado por coordenação volta a responder.** O `GET` de histórico desses
-  agregados devolvia erro permanente; agora responde `200`, com a autoria de cada evento.
+  agregados devolvia erro permanente; agora responde `200`. **Os eventos gravados a partir desta imagem
+  trazem a autoria; os anteriores vêm sem ela** — a identidade não foi gravada quando eles aconteceram, e
+  não há de onde tirá-la. Histórico antigo aparece legível, com alguns eventos sem autor.
 
 - **Todo comando passa a carimbar quem o fez.** O dado do agregado ganha a chave `loguser` nas
   respostas. Ela **não** desce para a projeção — o modelo de leitura segue com as colunas que você
