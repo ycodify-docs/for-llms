@@ -58,6 +58,27 @@ Quando o modelo do agregado declara **`roles`**
 | passa no recorte | `200` normal — e o `/history` vem **inteiro** |
 | passa, mas o papel não está em `roles.author` | `200`, com os eventos **sem o bloco de autoria** |
 
+A ordem em que a leitura é decidida:
+
+```
+GET /a/{bc}/{type}/{id}   ou   GET .../{id}/history
+  │
+  ├─ pertence ao tenant?                    não ──▶ 403
+  │
+  ├─ o modelo declara `roles`?              não ──▶ 200   (sem recorte: qualquer usuário do tenant lê)
+  │
+  ├─ tem papel em `roles.read`?             não ──▶ 204   (a resposta de um id inexistente)
+  │
+  ├─ algum papel casado sem `scope`?        sim ──▶ 200   (o menos restritivo vence)
+  │
+  ├─ o atributo de proprietário do
+  │  agregado é o `username` do token?      não ──▶ 204
+  │                                         sim ──▶ 200
+  │
+  └─ no /history, tem papel
+     em `roles.author`?                     não ──▶ 200, e cada evento vem sem o autor
+```
+
 > **`204` aqui não distingue "não existe" de "não é seu", e é de propósito:** um `403` entregaria a
 > existência do agregado a quem não pode vê-lo. Ao depurar um `204` inesperado, verifique o recorte do
 > modelo antes de procurar o dado.

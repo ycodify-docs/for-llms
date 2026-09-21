@@ -463,6 +463,27 @@ Para filtrar por data numa consulta:
     ```
   - Listas **vazias** = sem despacho extra (só a projeção do próprio contexto).
 
+### Por onde a identidade passa na coordenação
+
+```
+comando de origem                 evento do agregado          processor de coordenação
+assinado por ADMINISTRADOR  ──▶   autor: ADMINISTRADOR  ──▶   recebe o evento e devolve
+                                                              processedData.targetCommand
+                                                                       │
+                                                                       ▼
+                                                              comando no agregado ALVO
+                                                              autor: ADMINISTRADOR
+                                                              papel NÃO é reavaliado
+                                                                       │
+                                            ┌──────────────────────────┴───────────────┐
+                                            ▼                                          ▼
+                                   evento do alvo                          projeção do alvo
+                                   loguser: ADMINISTRADOR                  escrita como ADMINISTRADOR
+                                                                           ⚠️ o accessControl.write da
+                                                                              entity precisa conter
+                                                                              esse papel
+```
+
 ### O que o processor de coordenação devolve
 
 O processor apontado por `triggerCoordination[].br.route` devolve **`processedData.targetCommand`**, com
