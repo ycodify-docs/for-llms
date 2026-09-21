@@ -2,30 +2,37 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
-## 1.36 — 2026-09-21
-
-- **Publicar modelo passa a ser validado contra o metamodelo.** `POST .../model` recusa com `400` o
-  modelo que não obedeça ao formato, e duas regras ganham nome: a chave de cada agregado tem de ser
-  `<boundedContext.name>.<type>` — a mesma chave que você envia no comando —, e `roles` de leitura passa
-  a ser opcional. **Modelo já publicado não é revalidado**: a checagem vale na próxima publicação.
+## 1.38 — 2026-09-21
 
 - **O histórico de um agregado tocado por coordenação volta a responder.** O `GET` de histórico desses
-  agregados respondia erro permanente; agora devolve `200`, com a autoria de cada evento.
+  agregados devolvia erro permanente; agora responde `200`, com a autoria de cada evento.
 
 - **Todo comando passa a carimbar quem o fez.** O dado do agregado ganha a chave `loguser` nas
-  respostas. Ela **não** desce para a projeção — o modelo de leitura continua com as colunas que você
+  respostas. Ela **não** desce para a projeção — o modelo de leitura segue com as colunas que você
   declarou.
 
 - ⚠️ **A autoria passa a valer na materialização da projeção.** O autor do comando de origem agora
   acompanha a coordenação até a escrita da projeção, e o `accessControl.write` da entity de destino é
   conferido de verdade. **Se o papel do autor não estiver no `write` da entity alvo, a projeção não
-  materializa** — vale conferir as coordenações em que quem inicia tem papel diferente de quem o destino
+  materializa** — vale conferir as coordenações em que quem inicia tem papel diferente do que o destino
   aceita.
 
-- **Vigência:** publicação validada, em **produção** desde `yc-composer:amd64-260921`
-  (`forger@65f4cb9`). Histórico, `loguser` e autoria na coordenação, **em teste** desde
-  `yc-interpreter:amd64-260921b` (`yc.cqrs-c@0f600d3`, `persistence-crs@8ba070f`, `ufrn.loco3@b8a944b`);
-  produção do interpreter ainda em `:amd64-260913c`.
+- **Campo declarado `nullable: false` passa a ser exigido pelo motor, e não só pelo BFF.** Comando que
+  não traga o campo, ou que o traga nulo, é **recusado**. Até aqui a declaração era lida pelo BFF do
+  Stager e nada mais: comando que entrasse por outro caminho — coordenação, despacho de comando-alvo,
+  chamada direta ao endpoint — era aceito com o campo ausente. ⚠️ Se o seu modelo declara
+  `nullable: false` num campo que **o processador de regra de negócio calcula**, esse comando passa a ser
+  recusado **antes** de a regra rodar.
+
+- **Falha de projeção por chave divergente deixa de ser silenciosa.** A notificação era descartada sem
+  log, sem métrica e sem fila de erro — indistinguível de "nada aconteceu". Agora sai registro com as
+  chaves que o modelo tem, contador e erro publicado; e identificador de agregado malformado passa a ser
+  descartado com motivo, em vez de derrubar o processamento do lote.
+
+- **Vigência:** em **teste** desde `yc-interpreter:amd64-260921` (campo obrigatório e descarte com registro) e `:amd64-260921b` (histórico, `loguser` e autoria na coordenação), implantadas em 2026-09-21.
+  `persistence-crs@8ba070f`, `ufrn.loco3@b8a944b`), implantado às 16:35:54Z. **Produção ainda não** —
+  o interpreter segue em `:amd64-260913c`. A validação do metamodelo, que subiu em produção no mesmo
+  dia, está na 1.37 e não se repete aqui.
 
 ## 1.37 — 2026-09-21
 
@@ -111,27 +118,6 @@
 - **`boundedContext.name` documentado como o que ele é**: além de compor o endereço do agregado, ele
   **nomeia o schema** onde o log de consumo do evento é gravado. Divergir do dataschema do tenant faz o
   consumo gravar no schema de outro ambiente sem um único erro em log.
-
-## 1.34 — 2026-09-21
-
-- **Campo declarado `nullable: false` passa a ser exigido pelo motor, e não só pelo BFF.** Comando que
-  não traga o campo, ou que o traga nulo, é **recusado**. Até aqui a declaração era lida pelo BFF do
-  Stager e nada mais: comando que entrasse por outro caminho — coordenação, despacho de comando-alvo,
-  chamada direta ao endpoint — era aceito com o campo ausente.
-
-- ⚠️ **O que isso muda para quem já integra:** se o seu modelo declara `nullable: false` num campo que
-  **o processador de regra de negócio calcula** (em vez de o chamador enviar), esse comando passa a ser
-  recusado **antes** de a regra rodar. Vale conferir os modelos em uso antes de pedir a promoção para
-  produção.
-
-- **Falha de projeção por chave divergente deixa de ser silenciosa.** Quando a chave do agregado não
-  casa com o modelo publicado, a notificação era descartada sem log, sem métrica e sem fila de erro —
-  do lado de fora, indistinguível de "nada aconteceu". Agora sai registro com as chaves que o modelo
-  tem, contador e erro publicado. E um identificador de agregado malformado, com menos de quatro
-  segmentos, passa a ser descartado com motivo em vez de derrubar o processamento do lote.
-
-- **Vigência:** em teste desde `yc-interpreter:amd64-260921` (`yc.cqrs-c@9e2ea51`, `yc.es@0b981db`).
-  **Produção ainda não** — segue em `:amd64-260913c`.
 
 ## 1.33 — 2026-09-16
 
