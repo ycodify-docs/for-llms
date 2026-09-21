@@ -37,6 +37,7 @@ Erros: `400` (arquivo vazio, extensão diferente de `.json`, documento inválido
 > | chave do agregado ≠ `<boundedContext.name>.<type>` | é o endereço do agregado: o despacho do evento procura **exatamente** essa chave e descarta em silêncio o que não achar, e é a mesma chave que o cliente manda no comando |
 > | `command.<cmd>.endState` sem evento de chave igual | o runtime resolve `event[endState]` por chave, sem fallback: o primeiro write falharia com `510` |
 > | dois envelopes `<org>.<project>` no mesmo arquivo | só o primeiro seria lido, e o outro sumiria sem aviso |
+> | item **objeto** em `domainBus.triggerProjection` sem `targetTenantId` | o destino é descartado no despacho: a projeção cross-tenant simplesmente não dispara. Item **string** continua válido — é a projeção same-tenant |
 >
 > Modelo que já estava publicado **não** é revalidado: a checagem acontece na publicação.
 

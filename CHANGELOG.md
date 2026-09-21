@@ -2,6 +2,28 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.35 — 2026-09-21
+
+- **Os exemplos de modelo deixaram de ensinar chave morta.** O introdutório
+  [`acme.vendas.model.json`](examples/acme.vendas.model.json) perdeu `schema` e `concurrency` — nenhuma
+  das duas é lida por serviço nenhum — e perdeu um `"length": 0` num atributo `Long`, onde `length` não
+  significa nada. É o arquivo que a doc indica como ponto de partida, então era ele que estava
+  ensinando o que não precisa existir. Os cinco "reais (sanitizados)" **continuam** com as duas chaves,
+  porque espelham modelos publicados antes disso ser medido; o
+  [README dos exemplos](examples/README.md) agora diz isso na cara, em vez de deixar quem copia
+  descobrir sozinho.
+
+- **`domainBus.triggerProjection` tem DUAS formas, e a doc só conhecia uma.** Item **string** é a
+  projeção same-tenant; item **objeto** é a cross-tenant/cross-BC, e nela `targetTenantId` é
+  **obrigatório** — sem ele o destino é descartado no despacho e a projeção não dispara. A publicação
+  passa a recusar o objeto sem `targetTenantId`, e a recusa está na tabela de
+  [forger · model](forger/endpoints/model.md).
+
+- **Correção de rota:** a 1.34 tratava `triggerProjection` como lista de strings apenas. Estava errado
+  desde que foi escrito, e quem denunciou foi o próprio metamodelo, ao reprovar um exemplo deste acervo
+  que o motor aceita. A validação de publicação continua **em `develop` do forger, ainda não em
+  produção** — vale a partir da imagem que a carregar.
+
 ## 1.34 — 2026-09-16
 
 - **`POST .../model` passa a recusar com `400` modelo que o motor não executaria** — e a página
