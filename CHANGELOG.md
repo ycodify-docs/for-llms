@@ -47,6 +47,27 @@
   **nomeia o schema** onde o log de consumo do evento é gravado. Divergir do dataschema do tenant faz o
   consumo gravar no schema de outro ambiente sem um único erro em log.
 
+## 1.34 — 2026-09-21
+
+- **Campo declarado `nullable: false` passa a ser exigido pelo motor, e não só pelo BFF.** Comando que
+  não traga o campo, ou que o traga nulo, é **recusado**. Até aqui a declaração era lida pelo BFF do
+  Stager e nada mais: comando que entrasse por outro caminho — coordenação, despacho de comando-alvo,
+  chamada direta ao endpoint — era aceito com o campo ausente.
+
+- ⚠️ **O que isso muda para quem já integra:** se o seu modelo declara `nullable: false` num campo que
+  **o processador de regra de negócio calcula** (em vez de o chamador enviar), esse comando passa a ser
+  recusado **antes** de a regra rodar. Vale conferir os modelos em uso antes de pedir a promoção para
+  produção.
+
+- **Falha de projeção por chave divergente deixa de ser silenciosa.** Quando a chave do agregado não
+  casa com o modelo publicado, a notificação era descartada sem log, sem métrica e sem fila de erro —
+  do lado de fora, indistinguível de "nada aconteceu". Agora sai registro com as chaves que o modelo
+  tem, contador e erro publicado. E um identificador de agregado malformado, com menos de quatro
+  segmentos, passa a ser descartado com motivo em vez de derrubar o processamento do lote.
+
+- **Vigência:** em teste desde `yc-interpreter:amd64-260921` (`yc.cqrs-c@9e2ea51`, `yc.es@0b981db`).
+  **Produção ainda não** — segue em `:amd64-260913c`.
+
 ## 1.33 — 2026-09-16
 
 - **Produção passou a rodar a mesma imagem do ambiente de teste: `yc-interpreter:amd64-260913c`.** Tudo
