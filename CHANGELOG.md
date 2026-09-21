@@ -2,6 +2,31 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.36 — 2026-09-21
+
+- **Publicar modelo passa a ser validado contra o metamodelo.** `POST .../model` recusa com `400` o
+  modelo que não obedeça ao formato, e duas regras ganham nome: a chave de cada agregado tem de ser
+  `<boundedContext.name>.<type>` — a mesma chave que você envia no comando —, e `roles` de leitura passa
+  a ser opcional. **Modelo já publicado não é revalidado**: a checagem vale na próxima publicação.
+
+- **O histórico de um agregado tocado por coordenação volta a responder.** O `GET` de histórico desses
+  agregados respondia erro permanente; agora devolve `200`, com a autoria de cada evento.
+
+- **Todo comando passa a carimbar quem o fez.** O dado do agregado ganha a chave `loguser` nas
+  respostas. Ela **não** desce para a projeção — o modelo de leitura continua com as colunas que você
+  declarou.
+
+- ⚠️ **A autoria passa a valer na materialização da projeção.** O autor do comando de origem agora
+  acompanha a coordenação até a escrita da projeção, e o `accessControl.write` da entity de destino é
+  conferido de verdade. **Se o papel do autor não estiver no `write` da entity alvo, a projeção não
+  materializa** — vale conferir as coordenações em que quem inicia tem papel diferente de quem o destino
+  aceita.
+
+- **Vigência:** publicação validada, em **produção** desde `yc-composer:amd64-260921`
+  (`forger@65f4cb9`). Histórico, `loguser` e autoria na coordenação, **em teste** desde
+  `yc-interpreter:amd64-260921b` (`yc.cqrs-c@0f600d3`, `persistence-crs@8ba070f`, `ufrn.loco3@b8a944b`);
+  produção do interpreter ainda em `:amd64-260913c`.
+
 ## 1.37 — 2026-09-21
 
 - **Produção passou a rodar `yc-composer:amd64-260921` (`sha256:fecea707b971`), implantado às
