@@ -46,7 +46,7 @@ Por padrão, **qualquer usuário autenticado do tenant** lê qualquer agregado d
 conferem o tenant, e nada mais.
 
 Quando o modelo do agregado declara **`roles`**
-([model-format](../spec/model-format.md#quem-pode-ler-o-agregado-roles)), os dois passam a recortar:
+([model-format](../spec/model-format.md#quem-pode-ler-o-agregado-roles)), os dois recortam:
 
 | Situação | Resposta |
 |---|---|
@@ -60,8 +60,7 @@ Quando o modelo do agregado declara **`roles`**
 > modelo antes de procurar o dado.
 
 **`loguser` aparece nas duas respostas** — no estado e em cada evento — com o `username` de quem executou
-aquele comando. É carimbado pela plataforma: não se declara no modelo nem se envia no comando. Em comando
-disparado por coordenação, é o autor do **primeiro** comando da cadeia.
+aquele comando: [model-format — `loguser`](../spec/model-format.md#loguser-quem-executou-cada-comando).
 
 ## Quando usar
 

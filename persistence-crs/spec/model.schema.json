@@ -70,6 +70,48 @@
             "strategy": { "type": "string", "enum": ["optimistic"] }
           }
         },
+        "roles": {
+          "type": "object",
+          "description": "Quem pode LER este agregado. Opcional: sem esta chave, qualquer usuario do tenant le. Nao confundir com command.<cmd>.roles, que e array e governa a ESCRITA.",
+          "properties": {
+            "read": {
+              "type": "array",
+              "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+              "description": "Papeis que podem ler o agregado."
+            },
+            "author": {
+              "type": "array",
+              "items": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*$" },
+              "description": "Papeis que veem quem executou cada evento no /history."
+            },
+            "scope": {
+              "type": "object",
+              "description": "Recorte por linha. O papel citado aqui tem de estar em roles.read.",
+              "properties": {
+                "read": {
+                  "type": "object",
+                  "minProperties": 1,
+                  "additionalProperties": {
+                    "type": "object",
+                    "required": ["rows"],
+                    "properties": {
+                      "rows": {
+                        "type": "object",
+                        "required": ["by"],
+                        "properties": {
+                          "by": {
+                            "type": "string",
+                            "description": "Atributo do agregado cujo valor e o proprietario. Convencao: username. Metadado da plataforma (id, loguser, logrole, logversion, logdate) e recusado na publicacao."
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
         "command": {
           "type": "object",
           "minProperties": 1,
