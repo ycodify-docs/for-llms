@@ -2,6 +2,23 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.36 — 2026-09-21
+
+- **O aggregate passa a aceitar `roles`, que declara o recorte de LEITURA.** Opcional: quem não a usa
+  publica e lê como antes. A forma é
+  `{ read: [...], author: [...], scope: { read: { <PAPEL>: { rows: { by: <atributo> } } } } }`, e a
+  publicação recusa com `400` o recorte incoerente — papel no `scope.read` fora de `roles.read`,
+  `MASTER` no `scope`, `rows` sem `by`, `by` em metadado da plataforma, `by` em atributo não declarado
+  em comando nenhum do aggregate. São as mesmas cinco recusas que o `accessControl.scope` da entity já
+  fazia: o recorte é o mesmo dos dois lados, e divergir publicaria aggregate que passa e entity que não.
+
+- **⚠️ `roles` agora existe em dois níveis, com formas diferentes.** No **comando** é **array** e
+  **obrigatório**, e diz quem pode **executar**. No **aggregate** é **objeto** e **opcional**, e diz
+  quem pode **ler**. O nível desambigua, e não há conversão entre os dois. Em
+  [forger · model](forger/endpoints/model.md#recorte-de-leitura-do-aggregate-roles).
+
+- Vigência: em `develop` do forger, **ainda não em produção**, como a 1.34 e a 1.35.
+
 ## 1.35 — 2026-09-21
 
 - **Os exemplos de modelo deixaram de ensinar chave morta.** O introdutório
