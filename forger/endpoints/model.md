@@ -46,16 +46,26 @@ serviço que atende os endpoints de aggregate. **Aggregate sem a chave publica e
 
 ```json
 "roles": {
-  "read":   ["OPERADOR", "MASTER"],
+  "read":   ["OPERADOR", "CATRACA", "MASTER"],
   "author": ["OPERADOR"],
-  "scope": { "read": { "OPERADOR": { "rows": { "by": "username" } } } }
+  "scope": {
+    "read": {
+      "OPERADOR": { "rows": { "by": "username" } },
+      "CATRACA":  { "attributes": ["nome", "cpf"] }
+    }
+  }
 }
 ```
 
-Recusas na publicação, todas `400`, iguais às do `accessControl.scope` da entity: papel no `scope.read`
-fora de `roles.read`; `MASTER` no `scope`; `rows` sem `by`; `by` em metadado da plataforma (`id`,
-`loguser`, `logrole`, `logversion`, `logdate`); `by` em atributo não declarado em comando nenhum do
-aggregate.
+**Duas dimensões independentes**, como no `accessControl.scope` da entity: `rows.by` responde quais
+**linhas** são suas, `attributes` responde quais **colunas** o papel vê — no estado do aggregate e no
+`eventData` de cada evento do `/history`. Declare uma, a outra, ou as duas.
+
+Recusas na publicação, todas `400`: papel no `scope.read` fora de `roles.read`; `MASTER` no `scope`;
+papel **sem nenhuma** das duas dimensões; `rows` presente sem `by`; `by` em metadado da plataforma
+(`id`, `loguser`, `logrole`, `logversion`, `logdate`); `by` em atributo não declarado em comando nenhum
+do aggregate. Os **nomes** em `attributes` não são conferidos — nome desconhecido é ignorado pelo motor
+com aviso.
 
 > ⚠️ **Não confunda com o `roles` do comando**, que é **array**, **obrigatório**, e diz quem pode
 > **executar**. Este é **objeto**, **opcional**, e diz quem pode **ler**. O nível desambigua.
