@@ -78,9 +78,10 @@ Lista os papéis de um dono.
 > ⚠️ **É o único público do orgid que NÃO começa por `/open/`** — os segmentos estão invertidos
 > (`/ua/open/…` em vez de `/open/ua/…`). Isso não é cosmético: as regras de autorização da plataforma são
 > escritas sobre o prefixo `/open/**`, e **este path escapa delas** e cai na regra de autenticado. No
-> `OrgIdSecurityConfig` do orgid standalone continua assim — liberados só `/open/**`, `/z/**`,
-> `/*/unsecured/**`, swagger e actuator —, então **o orgid sozinho responde `401` aqui, apesar do
-> "público" acima**. O que está implantado é o `composer`, que desde 2026-09-05 libera os **dois**
+> config de segurança do orgid standalone continua assim — liberados só `/open/**`, `/z/**`, um terceiro
+> padrão interno (⚠️ **MASCARADO** como `/*/<rota-livre-interna>/**`: o literal não é este; o que importa é
+> que **existe** um terceiro, além dos dois acima), swagger e actuator —, então **o orgid sozinho responde
+> `401` aqui, apesar do "público" acima**. O que está implantado é o `composer`, que desde 2026-09-05 libera os **dois**
 > prefixos e faz o endpoint honrar o contrato documentado.
 >
 > Ao escrever gateway, proxy ou nova cadeia de segurança: **público no orgid = dois prefixos**,

@@ -16,7 +16,9 @@ Envio **multipart**, com o documento no campo `file` — o arquivo precisa ter e
 curl -X POST -H "Authorization: Bearer $TOKEN" \
   ".../org/acme/project/vendas/tenant/$TENANT_ID/model" \
   -F "file=@pedidos.model.json"
-# → 201 { "key": "ENGINE:persistence:cqrs:SETUP-TO:<tenantId>:wm" }
+# → 201 { "key": "<prefixo-interno>:cqrs:<tenantId>:wm" }
+#   ⚠️ chave MASCARADA: o prefixo interno está substituído e o formato literal não é este.
+#      A resposta real traz a chave completa — leia-a de lá, não daqui.
 ```
 
 Efeito: valida a consistência `(org, project, tenant)` — o `tenantId` deve referenciar exatamente um

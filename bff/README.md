@@ -30,7 +30,6 @@
 - [Operação](#operação)
 - [Erros](#erros)
 - [Checklist do agente](#checklist-do-agente)
-- [Histórico de correções](#histórico-de-correções)
 
 ## Como alcançar o BFF
 
@@ -120,16 +119,13 @@ forger é quem **grava** ali ao publicar o `.model.json`) — e cruza com os **p
 porque a plataforma o valoriza sozinha (canon
 [model-format](../persistence-crs/spec/model-format.md#eventos-e-domainbus)). Qualquer outro `Timestamp`
 declarado em `data.attribute` é `input` e **viaja normalmente** — inclusive o que tem nome terminado em
-`em`. ⚠️ Até 2026-09-22 a classificação era pelo sufixo do nome, e ela **comia em silêncio** instantes
-calculados pela regra de negócio; se você tem tela ou cliente que contornava isso, o contorno virou
-desnecessário.
+`em`. ⚠️ **O sufixo do nome não classifica nada**: instante calculado pela regra de negócio é dado do
+comando e chega ao motor como qualquer outro.
 
 A `cardinality` é o que decide a tela — `single` desenha **um grupo**, `multiple` desenha **uma lista**
 com "adicionar" — e é por isso que ela viaja em vez dos campos achatados. `fields` vazio significa que o
 modelo declarou o value object como atributo tipado direto: não há campos a oferecer, e quem preenche
 precisa conhecer o modelo.
-
-> *Esta seção mudou em 2026-09-13 — ver [histórico de correções](#histórico-de-correções).*
 
 > ⚠️ **A capacidade depende do modelo estar VIVO no cache**, e quando ele some a causa é **remoção,
 > nunca expiração.** Sem a chave, o cache responde `204`, a capacidade do bounded context **some** —
@@ -146,14 +142,16 @@ precisa conhecer o modelo.
 > [persistence-q — pré-requisitos do chamador](../persistence-q/README.md): a entrada "não expira
 > sozinha".)*
 >
-> **São DUAS chaves no cache, e a capacidade depende de uma só.** O BFF lê
-> `ENGINE:persistence:cqrs:SETUP-TO:<tenantId>:wm` — o **write model**, gravado ao publicar o
-> `.model.json`. A outra, `ENGINE:persistence:SETUP-TO:<tenantId>`, guarda a **spec de entidades** (read
-> model) e é a que o **motor** usa. Confundi-las manda o diagnóstico para o lado errado, porque **o que
-> apaga uma não apaga a outra**.
+> **São DUAS chaves no cache, e a capacidade depende de uma só.** ⚠️ **As duas aparecem MASCARADAS
+> abaixo:** o prefixo interno da plataforma está substituído por `<prefixo-interno>`, e o formato literal
+> **não é este** — o que a página afirma é a **distinção** entre elas, não o valor. O BFF lê
+> `<prefixo-interno>:cqrs:<tenantId>:wm` — o **write model**, gravado ao publicar o `.model.json`. A
+> outra, `<prefixo-interno>:<tenantId>`, guarda a **spec de entidades** (read model) e é a que o **motor**
+> usa. Confundi-las manda o diagnóstico para o lado errado, porque **o que apaga uma não apaga a outra**.
 >
-> **O que apaga a chave das capabilities é o `DELETE` explícito do modelo** — `ModelController
-> .deleteModel`, que chama `modelCacheService.delete(tenantId)`. Só isso. Fora esse caminho nada a
+> **O que apaga a chave das capabilities é o `DELETE` explícito do modelo** — o controlador de modelo do
+> forger manda o serviço de cache remover a entrada daquele tenant (nomes de classe e método **omitidos**:
+> são implementação, não contrato). Só isso. Fora esse caminho nada a
 > remove, e republicar o `.model.json` (`POST forger .../tenant/<id>/model`) a sobrescreve — o mesmo
 > `update` cobre o caso de ela estar ausente. Então, se a capacidade sumiu, as hipóteses são **duas**:
 > o modelo foi apagado, ou nunca foi publicado para aquele tenant.
@@ -249,9 +247,7 @@ mesmo UUID das rotas de domínio, nunca a PK da projeção.
 > quem modela o tenant — não do BFF.
 
 - **Teto por arquivo: 3 MiB** (`3145728` bytes) — acima disso a recusa vem antes de o conteúdo subir.
-  Valor **medido na configuração do serviço em 2026-09-17** (`max-file-size`, que o Spring lê em
-  unidade binária). ⚠️ **A página do filer ainda anuncia "≈10 MB"** — a divergência está apontada e é
-  da fatia dele; enquanto não for reconciliada, **o número que vale para quem passa pelo BFF é este**.
+  É o `max-file-size` do próprio serviço de arquivos, lido em unidade binária.
 - **Extensões aceitas:** a whitelist do [filer](../filer/README.md#limites-e-tipos). Fora da lista,
   `400`; acima do teto, `413`.
 - **O endereço do filer é configuração de deploy**, e num ambiente onde ele não esteja configurado as
@@ -320,8 +316,6 @@ declara "este papel vê a ficha inteira":
 
 ⚠️ **Papel do usuário que não está na declaração é IGNORADO — ele não alarga o recorte.** Se um papel
 deve ver a ficha inteira, **declare-o com `"*"`**; não basta omiti-lo.
-
-> *A regra mudou em 2026-09-13, e o motivo é instrutivo — ver [histórico de correções](#histórico-de-correções).*
 
 **Três colunas nunca se recortam:** `id`, `aggregateid` e `status`. Sem elas a tela não seleciona
 registro nem sabe que transições cabem, e cortá-las não protegeria dado pessoal nenhum — são
@@ -507,7 +501,8 @@ que o gateway, o cache ou o persistence respondem.
 
 ### `401` diz **por que** não há sessão
 
-O corpo do `401` de sessão traz `reason`, para que o consumidor distinga o que antes era indistinguível:
+O corpo do `401` de sessão traz `reason`, para o consumidor distinguir quatro situações que, sem ele,
+chegariam iguais:
 
 | `reason` | Significado | O que o consumidor deve fazer |
 |---|---|---|
@@ -537,62 +532,3 @@ sem explicação — e ninguém consegue medir a frequência do problema.
       o anexo é protegido **por papel na entity**, nunca por titular — ver o aviso da seção.
 
 ---
-
-## Histórico de correções
-
-**Por que existe:** cada uma destas afirmações esteve nesta doc, foi lida, e alguém agiu sobre ela. Uma
-correção silenciosa deixa quem leu a versão antiga com a crença errada e nenhum motivo para revisá-la —
-e, nas três abaixo, a crença errada tinha custo: dado pessoal exposto, tela montada sem um campo, ou
-tempo gasto esperando uma expiração que não existia.
-
-**Por que no fim, e não no meio do texto:** quem chega para *usar* precisa de como declarar, não da
-história do documento. Quem volta porque algo não bate com o que lembrava precisa exatamente disto.
-
-### 2026-09-13 · `valueObjects` não existia na capacidade
-
-Até esta data `valueObjects` **não existia na capacidade**, embora o comando
-aceitasse o campo no envio. Quem montava tela a partir da capacidade concluía que o campo não existia,
-sem nenhum aviso — e o **miolo genérico não conseguia disparar comando com value object obrigatório**,
-por montar o formulário só de `attributes`. Era omissão por custo, registrada em comentário no código
-desde setembro: expor exigia mudar o contrato pareado nos três lugares de uma vez. Medido de fora pelo
-`clubflow` (`yc.app/issues/bff.bug.capacidade-nao-expoe-valueobject-do-comando.20260913.md`), que
-comparou o modelo publicado com a capacidade devolvida.
-
-### 2026-09-10 · o modelo publicado nunca teve TTL
-
-> Até hoje o parágrafo
-> afirmava que o modelo publicado tinha TTL e que o prazo era configuração de deploy do forger.
-> **As duas coisas eram VERDADE quando foram escritas:** até `forger@d9e26f0` (2026-08-31) o
-> `ModelCacheService` declarava `@Value("${app.model.cache.expires:86400}")` — 24 horas por padrão, e
-> o prazo era mesmo config de deploy. Naquele commit o forger passou a gravar sem prazo e a
-> propriedade foi removida; **esta fatia não foi atualizada junto, e apodreceu por catorze dias.**
->
-> O risco que isto expõe é estrutural, e não se resolve conferindo melhor: **doc de comportamento
-> alheio envelhece quando o dono do comportamento muda sem avisar quem documentou.** Quem escreve
-> sobre serviço de outro não tem como saber que precisa reconferir — foi o `composer` quem mediu a
-> história do arquivo e trouxe a data. *(medição do `composer`; apontada em
-> `yc.app/issues/docs.bug.bff-afirma-que-o-modelo-publicado-tem-ttl.20260910.md`)*
->
-> **Segunda rodada, no mesmo dia.** A primeira correção trocou o TTL pelo bracket do dataschema — e
-> errou de chave, mandando investigar o `MODELING` de um modelo cuja remoção não passa por ali. O
-> `composer` mediu as duas chaves e desfez a confusão: o `ModelCacheService` grava o write model (o
-> que o BFF lê) e o `EntitiesModelCacheService` grava o read model (o que o bracket remove).
->
-> **A história inteira deste parágrafo, que é o que vale guardar:** uma afirmação **correta** que
-> apodreceu quando o comportamento mudou sem aviso; uma correção que acertou o "não tem TTL" e errou
-> de chave; e só então a certa. Nenhuma das três falhava na prática, porque a remediação — republicar
-> — funciona em todas as hipóteses. **Parágrafo cuja receita sempre dá certo não avisa quando a
-> explicação está errada**, e este já demonstrou isso três vezes.
-
-### 2026-09-13 · a regra do recorte era a do `scope`, e furava
-
-Até esta data a regra era a do `scope`
-de linha — *"vários papéis, um deles fora → lê tudo"*. Aquilo é correto quando o outro papel **de
-fato lê** a entity, e o BFF **não tem como saber isso**: quem concede leitura é o
-`accessControl.read` do `_conf`, que ele não enxerga. Medido com conta real: um usuário
-`[VISITANTE, RECEPCIONISTA]` recebia a ficha inteira **com CPF**, porque `VISITANTE` não estava na
-declaração — **embora `VISITANTE` não tivesse leitura nenhuma naquela entity**. Como quase todo
-usuário acumula papéis, o recorte quase nunca disparava e o controle era praticamente inerte.
-
-A regra nova **falha fechando**: esquecer o `"*"` de um papel faz ele perder colunas, o que aparece
-no primeiro uso — em vez de vazar dado pessoal em silêncio.

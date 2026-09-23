@@ -2,6 +2,77 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.42 — 2026-09-23
+
+- **As chaves de cache internas saem da doc MASCARADAS** — por ordem do dono, hoje. Onde a página
+  precisava falar delas, o prefixo interno virou `<prefixo-interno>` e **o aviso de que o formato está
+  mascarado vem colado à apresentação da chave**, não em rodapé: quem lê não pode sair daqui achando que
+  copiou um literal. O **sentido** fica inteiro, porque o que a doc afirma nunca foi o valor — é a
+  **distinção** entre as duas chaves (uma termina em `:wm`, o write model que a capacidade lê; a outra
+  guarda a spec de entidades, que o motor usa) e o fato de que **o que apaga uma não apaga a outra**.
+  Atingidos: `bff/README.md` §Capacidade e `forger/endpoints/model.md`, no corpo do `201` — ali a nota diz
+  com todas as letras que **a resposta real traz a chave completa, e é de lá que se lê**, não da doc.
+
+- **Nome de classe e de método também saíram**, pela mesma razão e no mesmo lugar: `bff/README.md` passa
+  a dizer *"o controlador de modelo do forger manda o serviço de cache remover a entrada daquele tenant"*.
+  Implementação não é contrato; quem integra não precisa do nome, e quem mantém o serviço não lê esta doc
+  para descobri-lo.
+
+- **`orgid/endpoints/ua-papel.md`: o terceiro padrão de rota liberada também está mascarado.** A passagem
+  continua explicando o que precisava explicar — por que o orgid **sozinho** responde `401` num endpoint
+  documentado como público —, dizendo que além de `/open/**` e `/z/**` **existe** um terceiro padrão
+  interno, sem publicar qual. A config de segurança deixou de ser nomeada por classe.
+
+> **O que NÃO mudou:** nenhum comportamento, nenhum contrato, nenhum endpoint. É a mesma doc dizendo as
+> mesmas coisas com menos valor interno exposto. Quem já integrou não precisa mexer em nada.
+
+## 1.41 — 2026-09-23
+
+> As três correções abaixo viviam numa seção *"Histórico de correções"* dentro da página do BFF. A
+> página passa a dizer só **como é**; o que ela corrigiu, e quando, mora aqui. As datas são as das
+> correções, não a desta revisão.
+
+- **2026-09-13 · `valueObjects` passou a existir na capacidade.** Antes disso o comando aceitava o
+  campo no envio e a capacidade não o descrevia: quem montava tela a partir dela concluía que o campo
+  não existia, sem aviso, e o miolo genérico **não conseguia disparar comando com value object
+  obrigatório**, por montar o formulário só de `attributes`. Medido de fora, comparando o modelo
+  publicado com a capacidade devolvida.
+
+- **2026-09-10 · o modelo publicado nunca teve TTL** — e a doc afirmou o contrário por catorze dias.
+  A afirmação **era verdadeira quando foi escrita**: até 2026-08-31 o forger gravava com prazo de 24h
+  configurável. Naquele dia ele passou a gravar sem prazo e a propriedade sumiu; esta fatia não foi
+  atualizada junto. **O risco é estrutural e não se resolve conferindo melhor: doc de comportamento
+  alheio envelhece quando o dono do comportamento muda sem avisar quem documentou.** A primeira
+  correção ainda errou de chave, mandando investigar o bracket de um modelo cuja remoção não passa por
+  ali — `ModelCacheService` grava o write model (o que o BFF lê) e `EntitiesModelCacheService` grava o
+  read model (o que o bracket remove). **Parágrafo cuja receita sempre dá certo — aqui, republicar —
+  não avisa quando a explicação está errada.**
+
+- **2026-09-13 · a regra do `readProjection` deixou de copiar a do `scope` de linha.** A regra antiga
+  era *"vários papéis, um deles fora da declaração → lê tudo"*, correta **quando o outro papel de fato
+  lê a entity** — e o BFF não tem como saber isso, porque quem concede leitura é o `accessControl.read`
+  do `_conf`, que ele não enxerga. Medido com conta real: um usuário `[VISITANTE, RECEPCIONISTA]`
+  recebia a ficha inteira **com CPF**, porque `VISITANTE` não estava na declaração, embora não tivesse
+  leitura nenhuma naquela entity. Como quase todo usuário acumula papéis, o controle era praticamente
+  inerte. A regra atual **falha fechando**.
+
+## 1.40 — 2026-09-23
+
+- **BFF — `serverStamp` é o `whenAttribute` do evento, e não mais o sufixo do nome.** Até esta revisão
+  a doc descrevia `serverStamp` só como "carimbo do servidor", e a implementação classificava por
+  `Timestamp` com nome terminado em `em` — o que retirava do comando atributos que o modelo declarava
+  como dados, inclusive `nullable:false`. Quem tinha contorno para isso (renomear o atributo, ou
+  declará-lo como `whenAttribute` de um evento só para o valor ser aceito) não precisa mais dele.
+  Páginas: [bff](bff/README.md), [contrato do miolo](shell/contrato-miolo.md).
+
+- **BFF — as quatro rotas de arquivo anexo de agregado passam a existir**: `/session/files/upload`,
+  `/download`, `/list` e `/delete`, proxy do [filer](filer/README.md) pelo cookie de sessão. Página:
+  [bff](bff/README.md#arquivos-anexos-de-agregado-sessionfiles).
+
+- **Teto de arquivo: a página do BFF diz 3 MiB; a do filer ainda anuncia "≈10 MB".** O valor que vale
+  para quem passa pelo BFF é 3 MiB — é o `max-file-size` do próprio serviço. A página do filer será
+  reconciliada por quem responde por ela.
+
 ## 1.39 — 2026-09-23
 
 - **O recorte de leitura passa a ter DUAS dimensões, e elas são independentes.** `rows.by` responde
