@@ -23,9 +23,15 @@
   de modelagem em entity indisponível. O contraste com `rows.by` é deliberado — lá o nome **é**
   conferido, porque um `by` errado não devolve menos, devolve **errado**.
 
-- **Vigência:** em `develop` do forger; **ainda não em produção** — a imagem no ar é
-  `yc-composer:amd64-260921`, anterior a esta mudança. O lado do motor que honra a dimensão de coluna é
-  do interpreter (`ufrn.loco3@22fcb89`, `persistence-crs@dc889db`) e sobe com ele.
+- **Vigência: EM PRODUÇÃO desde 2026-09-23T02:38Z**, em `yc-composer:amd64-9884832-74f6`
+  (`composer@9884832`, `forger@8b906dd`, `auth@537991a`, `orgid@697f402`). A outra metade — o motor que
+  **aplica** o corte — subiu às 02:28:11Z em `tinterpreter:amd64-538ea49-2eca`
+  (`ufrn.loco3@22fcb89`, `persistence-crs@40493a0`).
+
+  **As duas metades no ar é o que torna o recurso real:** a publicação aceitar `attributes` sem o motor
+  cortar seria proteção declarada e não aplicada. Medido dentro do contêiner em execução, e não no jar
+  da máquina de build: o `schema/aggregate-schema.json` que está rodando contém `write-model-v2` e
+  `attributes`.
 
 ## 1.38 — 2026-09-21
 
