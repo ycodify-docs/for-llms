@@ -57,6 +57,8 @@ Quando o modelo do agregado declara **`roles`**
 | recorte por proprietário, e o agregado é de outra pessoa | **`204`** |
 | passa no recorte | `200` normal — e o `/history` vem **inteiro** |
 | passa, mas o papel não está em `roles.author` | `200`, com os eventos **sem o bloco de autoria** |
+| há recorte por coluna | `200`, com o estado e cada evento **só com os atributos da lista** |
+| o recorte por coluna não deixa nenhum atributo de negócio | **`204`** |
 
 A ordem em que a leitura é decidida:
 
