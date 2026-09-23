@@ -2,6 +2,37 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.39 — 2026-09-23
+
+- **O recorte de leitura passa a ter DUAS dimensões, e elas são independentes.** `rows.by` responde
+  quais **linhas** são suas; `attributes`, quais **colunas** você vê. Vale nos dois lugares: no
+  `_conf.accessControl.scope.read` da **entity** ([entity](forger/endpoints/entity.md)) e no
+  `roles.scope.read` do **aggregate** ([model](forger/endpoints/model.md)). Declare uma, a outra, ou as
+  duas.
+
+- **`rows` deixou de ser obrigatório**, e é isso que destrava o caso real: uma **conta de integração**
+  não é titular de linha nenhuma — não existe `rows.by` possível para ela —, então, enquanto
+  `attributes` só valesse dentro de um bloco que exigia `rows`, o caso ficava de fora por construção.
+  O que essa conta precisa é ver **duas colunas de todas as linhas**, em vez das vinte e quatro.
+
+- **Papel sem nenhuma das duas dimensões passa a ser recusado com `400`.** Recorte que não corta nada
+  se lê como proteção e não é. É a única recusa nova.
+
+- **Os nomes em `attributes` NÃO são conferidos na publicação**, de propósito: nome desconhecido o motor
+  ignora com aviso, e lista inteira errada devolve resposta vazia. Recusar por typo transformaria erro
+  de modelagem em entity indisponível. O contraste com `rows.by` é deliberado — lá o nome **é**
+  conferido, porque um `by` errado não devolve menos, devolve **errado**.
+
+- **Vigência: EM PRODUÇÃO desde 2026-09-23T02:38Z**, em `yc-composer:amd64-9884832-74f6`
+  (`composer@9884832`, `forger@8b906dd`, `auth@537991a`, `orgid@697f402`). A outra metade — o motor que
+  **aplica** o corte — subiu às 02:28:11Z em `tinterpreter:amd64-538ea49-2eca`
+  (`ufrn.loco3@22fcb89`, `persistence-crs@40493a0`).
+
+  **As duas metades no ar é o que torna o recurso real:** a publicação aceitar `attributes` sem o motor
+  cortar seria proteção declarada e não aplicada. Medido dentro do contêiner em execução, e não no jar
+  da máquina de build: o `schema/aggregate-schema.json` que está rodando contém `write-model-v2` e
+  `attributes`.
+
 ## 1.38 — 2026-09-21
 
 - **O histórico de um agregado tocado por coordenação volta a responder.** O `GET` de histórico desses

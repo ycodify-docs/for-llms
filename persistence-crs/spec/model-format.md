@@ -138,7 +138,16 @@ string aparece em três lugares, e os três têm de concordar:
 |---|---|
 | `read` | os papéis que alcançam o agregado. Quem não tem nenhum deles não o enxerga |
 | `scope.read.<PAPEL>.rows.by` | o atributo cujo valor precisa ser o **`username` do token** de quem pede — o proprietário |
+| `scope.read.<PAPEL>.attributes` | os atributos que esse papel vê. O que ficar de fora não aparece no estado nem no `eventData` do `/history` |
 | `author` | os papéis que veem, no `/history`, quem executou cada evento |
+
+As duas dimensões de `scope` são independentes: `rows` responde *quais agregados são seus*,
+`attributes` responde *quais campos você vê*. Um papel pode declarar uma, outra ou as duas. Chave da
+plataforma — `id`, `aggregateid`, `status`, `version` e os metadados de auditoria — atravessa o recorte
+de coluna: não é dado de negócio, e escondê-la quebra quem lê sem proteger nada.
+
+> **Agregado sem nenhum atributo de negócio visível responde como um `{id}` que não existe.** Devolver a
+> casca com as chaves técnicas entregaria a existência do agregado a quem não pode vê-lo.
 
 Os códigos de resposta estão em
 [leitura de agregado — quem pode ler](../endpoints/agregado-leitura.md#quem-pode-ler).

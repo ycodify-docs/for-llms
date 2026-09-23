@@ -12,6 +12,7 @@
 - Depois de um comando, espere antes de consultar
 - Linguagem de consulta (resumo)
 - Recorte de leitura por titular (como se faz · o que torna uma linha sua · `read` × `scope` · processors)
+- Recorte de leitura por coluna (o que a lista governa · `id` · valueObject · o mesmo corte no agregado)
 - Pontos de coordenação
 - Pitfalls
 
@@ -253,6 +254,53 @@ O endpoint interno **não recortar** vale a partir de `amd64-260909b` — antes 
 
 Quem **declara** a chave é o forger, no `_conf` da entity — ver
 [forger — entity](../forger/endpoints/entity.md). Aqui só se descreve o efeito na **consulta**.
+
+## Recorte de leitura por coluna
+
+A outra dimensão do mesmo `scope`: o papel vê a linha inteira, mas só **algumas colunas** dela.
+
+```jsonc
+"scope": {
+  "read": {
+    "INTEGRACAO": { "attributes": ["nome", "cpf"] }   // só estas duas colunas
+  }
+}
+```
+
+**As duas dimensões são independentes.** `rows` responde *"quais linhas são suas"*; `attributes`,
+*"quais colunas você vê"*. Um papel pode declarar uma, outra, ou as duas — é o caso de uma conta de
+integração, que não é titular de linha nenhuma e precisa de poucas colunas de muitas linhas.
+
+### O que muda na consulta
+
+- **A lista governa o resultado E o critério.** Coluna fora dela não volta na resposta **e não pode ser
+  usada no filtro, na ordenação ou em `distinct`**. Esconder só o resultado não esconderia nada: quem
+  pudesse filtrar por `cpf` descobriria o valor por tentativa.
+- **Coluna escondida responde igual a coluna que não existe** — mesma recusa, mesma mensagem. A
+  diferença entre as duas respostas seria ela própria a informação: quem recebe *"existe, mas não é
+  sua"* já sabe que existe. Por isso a mensagem **não nomeia** a coluna, e a lista de atributos
+  declarados que ela traz não inclui o que o papel não vê.
+- **`id` é exceção e continua visível.** É chave técnica, não dado de negócio, e o serviço a usa para
+  ordenar e para casar linha com associação.
+- **`valueObject` obedece à mesma lista.** Fora dela, o objeto inteiro some e não aceita filtro pelos
+  campos internos.
+- **Vários papéis: o menos restritivo vence**, igual à dimensão de linha. Papel sem `attributes` não
+  recorta coluna — e um papel com a dimensão mais um sem ela resultam em **sem corte**.
+- **Nenhuma coluna visível = resposta vazia.** Acontece com lista vazia ou com nomes que não existem no
+  modelo. A consulta responde `[]` e `_count` responde zero: o serviço não devolve a coluna técnica de
+  todas as linhas, que entregaria a contagem do tenant.
+- **Nome inexistente na lista não impede a publicação** e não derruba a consulta: ele apenas não entra
+  no vocabulário visível, e fica registrado no log do serviço. É o oposto de `rows.by`, onde o nome
+  **é** conferido — ali um nome errado não devolve menos, devolve errado.
+
+### O mesmo corte vale no agregado
+
+O endereço do agregado lê do armazém de eventos e não consulta o `_conf` da entity; sem declaração
+própria, o dado sairia inteiro por lá. A dimensão existe também no `.model.json`, em
+`roles.scope.read.<PAPEL>.attributes` — ver
+[model-format](../persistence-crs/spec/model-format.md#quem-pode-ler-o-agregado-roles). O estado e o
+`eventData` de cada evento do `/history` saem recortados pela mesma lista, e agregado sem nenhum atributo
+de negócio visível responde como um id inexistente.
 
 ## Pontos de coordenação
 - **CP-2** — consulta as projeções (tabelas) criadas pelo forger.

@@ -330,10 +330,25 @@ O `200` informa o que foi aplicado — uma alteração que remove uma constraint
 
 Requisição sem efeito responde `200` com `totalChanges: 0` e `applied: []`.
 
-## Recorte de leitura por titular: `accessControl.scope`
+## Recorte de leitura: `accessControl.scope`
 
-Declara que um **papel** lê apenas as linhas de que o usuário é titular. Sem ele, `accessControl` só
-sabe dizer "este papel lê esta tabela" ou "não lê" — não existia forma de dizer "lê só o que é dele".
+Declara que um **papel** lê menos do que a tabela inteira. Sem ele, `accessControl` só sabe dizer "este
+papel lê esta tabela" ou "não lê" — não havia como dizer "lê só o que é dele", nem "lê só estas colunas".
+
+**São duas dimensões, e elas são independentes:**
+
+| Dimensão | Responde | Chave |
+|---|---|---|
+| **linha** | quais **linhas** são suas | `rows.by` |
+| **coluna** | quais **colunas** você vê | `attributes` |
+
+Declare **uma, a outra, ou as duas**. Declarar **nenhuma** para um papel listado em `scope.read` é
+recusado com `400`: recorte que não corta nada se lê como proteção e não é.
+
+> **Por que a dimensão de coluna existe sozinha.** Uma conta de integração não é titular de linha
+> nenhuma — ela lê o cadastro inteiro por dever de ofício. Não existe `rows.by` possível para ela, e
+> enquanto `attributes` só valesse dentro de um bloco que exigia `rows`, esse caso ficava de fora **por
+> construção**. O que ela precisa é ver **duas colunas de todas as linhas**, em vez de todas elas.
 
 > **Disponibilidade:** no ar desde **2026-09-09**, em `yc-composer:amd64-260909` (`forger@421a8b8`), com
 > a outra metade — o motor que honra o recorte — em **`yc-interpreter:amd64-260909b`**. **É opt-in:**
@@ -351,7 +366,11 @@ sabe dizer "este papel lê esta tabela" ou "não lê" — não existia forma de 
     "read": ["MASTER", "ADMIN", "OPERADOR"],
     "write": ["MASTER", "ADMIN"],
     "scope": {
-      "read": { "OPERADOR": { "rows": { "by": "username" } } }
+      "read": {
+        "OPERADOR":  { "rows": { "by": "username" } },
+        "CATRACA":   { "attributes": ["nome", "cpf"] },
+        "SUPERVISOR": { "rows": { "by": "username" }, "attributes": ["nome", "cpf", "plano"] }
+      }
     }
   }
 }
@@ -375,6 +394,18 @@ recorte da tabela inteira — e essa perda é **aberta**, a resposta continuaria
 - `by` nomeia um **atributo declarado** da entity, que guarda o titular da linha;
 - para **remover** o recorte, envie `scope` vazio (`{}`) — isso não mexe nos papéis;
 - o recorte vale **só na leitura**: veja abaixo o que acontece com `scope.write`.
+
+**A dimensão de coluna (`attributes`), o que é e o que não é**
+
+- é o **vocabulário** que o papel enxerga: coluna fora da lista responde como coluna **inexistente**,
+  inclusive em filtro e em ordenação — não existe "invisível mas filtrável";
+- **`id` fica sempre visível**, senão a linha deixa de ser referenciável;
+- **lista vazia devolve resposta vazia.** É consequência, não defeito: vocabulário vazio não vê coluna
+  nenhuma;
+- **os nomes NÃO são conferidos na publicação**, e isto é deliberado: nome desconhecido o motor ignora
+  com aviso, e recusar a publicação por um typo transformaria erro de modelagem em **entity
+  indisponível**. O contraste com `rows.by` é proposital — lá o nome **é** conferido, porque um `by`
+  errado não devolve menos: devolve **errado**.
 
 **O que o `rows.by` precisa ser — e isto é decisão de modelagem, não de configuração**
 
@@ -402,11 +433,16 @@ eles registram quem escreveu.
 |---|---|
 | `MASTER` no `scope` | é o piso de toda entity e nunca é recortado |
 | papel em `scope.read` fora de `accessControl.read` | papel que não lê não tem o que recortar — e um erro de digitação aqui significaria "sem recorte", falhando **aberto** |
-| `rows.by` ausente | o recorte precisa saber por qual atributo cortar |
+| papel **sem nenhuma** das duas dimensões | recorte que não corta nada se lê como proteção e não é |
+| `rows` presente e sem `by` | o recorte de linha precisa saber por qual atributo cortar. **`rows` inteiro é opcional** desde 2026-09-23 — quem recorta só por coluna não o declara |
 | `rows.by` com **caminho** (`assoc.atributo`) | reservado no formato, ainda não honrado pelo motor |
 | `rows.by` nomeando `id`, `loguser`, `logrole`, `logversion`, `logdate` | são metadados da plataforma: registram **quem escreveu**, não **de quem é** a linha |
 | `rows.by` que não é atributo declarado | — |
-| a dimensão `attributes` | reservada no formato, ainda não honrada pelo motor |
+
+> **A dimensão `attributes` NÃO está nesta tabela, e a mudança é de 2026-09-23.** Até essa data ela era
+> recusada aqui como "reservada no formato"; hoje é aceita, e os **nomes não são conferidos** de
+> propósito — nome desconhecido o motor ignora com aviso, e recusar a publicação por um typo
+> transformaria erro de modelagem em entity indisponível.
 
 **`scope.write` é caso à parte, e o comportamento depende do verbo** *(medido em
 `yc-composer:amd64-260909`, 2026-09-09)*
