@@ -93,8 +93,12 @@
                   "minProperties": 1,
                   "additionalProperties": {
                     "type": "object",
-                    "required": ["rows"],
                     "properties": {
+                      "attributes": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Atributos que este papel ve. O que ficar de fora nao aparece no estado nem no eventData do /history. Independente de rows: um papel pode declarar so esta dimensao."
+                      },
                       "rows": {
                         "type": "object",
                         "required": ["by"],
