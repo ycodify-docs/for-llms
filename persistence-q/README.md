@@ -282,6 +282,11 @@ integração, que não é titular de linha nenhuma e precisa de poucas colunas d
   declarados que ela traz não inclui o que o papel não vê.
 - **`id` é exceção e continua visível.** É chave técnica, não dado de negócio, e o serviço a usa para
   ordenar e para casar linha com associação.
+- ⚠️ **`id` é a ÚNICA exceção. `aggregateid` e `status` seguem a lista** — se você não os declarar, eles
+  não voltam. Quem vem do `readProjection` do BFF tropeça aqui, porque lá os três nunca se recortam.
+  O caso que morde: uma integração que recorta para `["nome", "cpf"]` perde o `aggregateid`, e sem ele
+  não há como enviar comando para aquele agregado — a consulta responde, e o comando seguinte não tem
+  como ser montado.
 - **`valueObject` obedece à mesma lista.** Fora dela, o objeto inteiro some e não aceita filtro pelos
   campos internos.
 - **Vários papéis: o menos restritivo vence**, igual à dimensão de linha. Papel sem `attributes` não
