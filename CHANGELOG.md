@@ -2,6 +2,30 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.42 — 2026-09-23
+
+- **As chaves de cache internas saem da doc MASCARADAS** — por ordem do dono, hoje. Onde a página
+  precisava falar delas, o prefixo interno virou `<prefixo-interno>` e **o aviso de que o formato está
+  mascarado vem colado à apresentação da chave**, não em rodapé: quem lê não pode sair daqui achando que
+  copiou um literal. O **sentido** fica inteiro, porque o que a doc afirma nunca foi o valor — é a
+  **distinção** entre as duas chaves (uma termina em `:wm`, o write model que a capacidade lê; a outra
+  guarda a spec de entidades, que o motor usa) e o fato de que **o que apaga uma não apaga a outra**.
+  Atingidos: `bff/README.md` §Capacidade e `forger/endpoints/model.md`, no corpo do `201` — ali a nota diz
+  com todas as letras que **a resposta real traz a chave completa, e é de lá que se lê**, não da doc.
+
+- **Nome de classe e de método também saíram**, pela mesma razão e no mesmo lugar: `bff/README.md` passa
+  a dizer *"o controlador de modelo do forger manda o serviço de cache remover a entrada daquele tenant"*.
+  Implementação não é contrato; quem integra não precisa do nome, e quem mantém o serviço não lê esta doc
+  para descobri-lo.
+
+- **`orgid/endpoints/ua-papel.md`: o terceiro padrão de rota liberada também está mascarado.** A passagem
+  continua explicando o que precisava explicar — por que o orgid **sozinho** responde `401` num endpoint
+  documentado como público —, dizendo que além de `/open/**` e `/z/**` **existe** um terceiro padrão
+  interno, sem publicar qual. A config de segurança deixou de ser nomeada por classe.
+
+> **O que NÃO mudou:** nenhum comportamento, nenhum contrato, nenhum endpoint. É a mesma doc dizendo as
+> mesmas coisas com menos valor interno exposto. Quem já integrou não precisa mexer em nada.
+
 ## 1.41 — 2026-09-23
 
 > As três correções abaixo viviam numa seção *"Histórico de correções"* dentro da página do BFF. A

@@ -142,14 +142,16 @@ precisa conhecer o modelo.
 > [persistence-q — pré-requisitos do chamador](../persistence-q/README.md): a entrada "não expira
 > sozinha".)*
 >
-> **São DUAS chaves no cache, e a capacidade depende de uma só.** O BFF lê
-> `ENGINE:persistence:cqrs:SETUP-TO:<tenantId>:wm` — o **write model**, gravado ao publicar o
-> `.model.json`. A outra, `ENGINE:persistence:SETUP-TO:<tenantId>`, guarda a **spec de entidades** (read
-> model) e é a que o **motor** usa. Confundi-las manda o diagnóstico para o lado errado, porque **o que
-> apaga uma não apaga a outra**.
+> **São DUAS chaves no cache, e a capacidade depende de uma só.** ⚠️ **As duas aparecem MASCARADAS
+> abaixo:** o prefixo interno da plataforma está substituído por `<prefixo-interno>`, e o formato literal
+> **não é este** — o que a página afirma é a **distinção** entre elas, não o valor. O BFF lê
+> `<prefixo-interno>:cqrs:<tenantId>:wm` — o **write model**, gravado ao publicar o `.model.json`. A
+> outra, `<prefixo-interno>:<tenantId>`, guarda a **spec de entidades** (read model) e é a que o **motor**
+> usa. Confundi-las manda o diagnóstico para o lado errado, porque **o que apaga uma não apaga a outra**.
 >
-> **O que apaga a chave das capabilities é o `DELETE` explícito do modelo** — `ModelController
-> .deleteModel`, que chama `modelCacheService.delete(tenantId)`. Só isso. Fora esse caminho nada a
+> **O que apaga a chave das capabilities é o `DELETE` explícito do modelo** — o controlador de modelo do
+> forger manda o serviço de cache remover a entrada daquele tenant (nomes de classe e método **omitidos**:
+> são implementação, não contrato). Só isso. Fora esse caminho nada a
 > remove, e republicar o `.model.json` (`POST forger .../tenant/<id>/model`) a sobrescreve — o mesmo
 > `update` cobre o caso de ela estar ausente. Então, se a capacidade sumiu, as hipóteses são **duas**:
 > o modelo foi apagado, ou nunca foi publicado para aquele tenant.
