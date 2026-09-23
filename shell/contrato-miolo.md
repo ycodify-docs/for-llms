@@ -111,10 +111,8 @@ não diz **como se vê** (isso é o miolo).
   - `status` — campo de transição/concorrência (não é entrada do usuário).
   - `serverStamp` — carimbo do servidor: **oculto no formulário e retirado do comando no envio**.
     ⚠️ **É o atributo que o agregado declara como `whenAttribute` de um evento — nunca "Timestamp com
-    nome terminado em `em`".** Até 2026-09-22 o BFF classificava pelo sufixo, e com isso **descartava
-    em silêncio** data que o modelo declarava como dado do comando, ainda que `nullable:false`. Atributo
-    de data que o negócio calcula (ou que o usuário informa) é `input`, viaja normalmente, e só o
-    carimbo declarado fica de fora.
+    nome terminado em `em`".** Atributo de data que o negócio calcula, ou que o usuário informa, é
+    `input`: viaja normalmente no comando. Só o carimbo declarado fica de fora.
   - `lookup` — referência a outro agregado (widget de seleção).
 - **`valueObjects`** — os value objects que o comando aceita, **ausente** quando não há nenhum. É a
   segunda metade do que o comando aceita: sem ela, uma tela montada só de `attributes` não oferece o

@@ -2,6 +2,23 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.40 — 2026-09-23
+
+- **BFF — `serverStamp` é o `whenAttribute` do evento, e não mais o sufixo do nome.** Até esta revisão
+  a doc descrevia `serverStamp` só como "carimbo do servidor", e a implementação classificava por
+  `Timestamp` com nome terminado em `em` — o que retirava do comando atributos que o modelo declarava
+  como dados, inclusive `nullable:false`. Quem tinha contorno para isso (renomear o atributo, ou
+  declará-lo como `whenAttribute` de um evento só para o valor ser aceito) não precisa mais dele.
+  Páginas: [bff](bff/README.md), [contrato do miolo](shell/contrato-miolo.md).
+
+- **BFF — as quatro rotas de arquivo anexo de agregado passam a existir**: `/session/files/upload`,
+  `/download`, `/list` e `/delete`, proxy do [filer](filer/README.md) pelo cookie de sessão. Página:
+  [bff](bff/README.md#arquivos-anexos-de-agregado-sessionfiles).
+
+- **Teto de arquivo: a página do BFF diz 3 MiB; a do filer ainda anuncia "≈10 MB".** O valor que vale
+  para quem passa pelo BFF é 3 MiB — é o `max-file-size` do próprio serviço. A página do filer será
+  reconciliada por quem responde por ela.
+
 ## 1.39 — 2026-09-23
 
 - **O recorte de leitura passa a ter DUAS dimensões, e elas são independentes.** `rows.by` responde

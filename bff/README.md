@@ -120,9 +120,8 @@ forger é quem **grava** ali ao publicar o `.model.json`) — e cruza com os **p
 porque a plataforma o valoriza sozinha (canon
 [model-format](../persistence-crs/spec/model-format.md#eventos-e-domainbus)). Qualquer outro `Timestamp`
 declarado em `data.attribute` é `input` e **viaja normalmente** — inclusive o que tem nome terminado em
-`em`. ⚠️ Até 2026-09-22 a classificação era pelo sufixo do nome, e ela **comia em silêncio** instantes
-calculados pela regra de negócio; se você tem tela ou cliente que contornava isso, o contorno virou
-desnecessário.
+`em`. ⚠️ **O sufixo do nome não classifica nada**: instante calculado pela regra de negócio é dado do
+comando e chega ao motor como qualquer outro.
 
 A `cardinality` é o que decide a tela — `single` desenha **um grupo**, `multiple` desenha **uma lista**
 com "adicionar" — e é por isso que ela viaja em vez dos campos achatados. `fields` vazio significa que o
@@ -249,9 +248,7 @@ mesmo UUID das rotas de domínio, nunca a PK da projeção.
 > quem modela o tenant — não do BFF.
 
 - **Teto por arquivo: 3 MiB** (`3145728` bytes) — acima disso a recusa vem antes de o conteúdo subir.
-  Valor **medido na configuração do serviço em 2026-09-17** (`max-file-size`, que o Spring lê em
-  unidade binária). ⚠️ **A página do filer ainda anuncia "≈10 MB"** — a divergência está apontada e é
-  da fatia dele; enquanto não for reconciliada, **o número que vale para quem passa pelo BFF é este**.
+  É o `max-file-size` do próprio serviço de arquivos, lido em unidade binária.
 - **Extensões aceitas:** a whitelist do [filer](../filer/README.md#limites-e-tipos). Fora da lista,
   `400`; acima do teto, `413`.
 - **O endereço do filer é configuração de deploy**, e num ambiente onde ele não esteja configurado as
