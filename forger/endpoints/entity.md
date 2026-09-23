@@ -433,11 +433,16 @@ eles registram quem escreveu.
 |---|---|
 | `MASTER` no `scope` | é o piso de toda entity e nunca é recortado |
 | papel em `scope.read` fora de `accessControl.read` | papel que não lê não tem o que recortar — e um erro de digitação aqui significaria "sem recorte", falhando **aberto** |
-| `rows.by` ausente | o recorte precisa saber por qual atributo cortar |
+| papel **sem nenhuma** das duas dimensões | recorte que não corta nada se lê como proteção e não é |
+| `rows` presente e sem `by` | o recorte de linha precisa saber por qual atributo cortar. **`rows` inteiro é opcional** desde 2026-09-23 — quem recorta só por coluna não o declara |
 | `rows.by` com **caminho** (`assoc.atributo`) | reservado no formato, ainda não honrado pelo motor |
 | `rows.by` nomeando `id`, `loguser`, `logrole`, `logversion`, `logdate` | são metadados da plataforma: registram **quem escreveu**, não **de quem é** a linha |
 | `rows.by` que não é atributo declarado | — |
-| a dimensão `attributes` | reservada no formato, ainda não honrada pelo motor |
+
+> **A dimensão `attributes` NÃO está nesta tabela, e a mudança é de 2026-09-23.** Até essa data ela era
+> recusada aqui como "reservada no formato"; hoje é aceita, e os **nomes não são conferidos** de
+> propósito — nome desconhecido o motor ignora com aviso, e recusar a publicação por um typo
+> transformaria erro de modelagem em entity indisponível.
 
 **`scope.write` é caso à parte, e o comportamento depende do verbo** *(medido em
 `yc-composer:amd64-260909`, 2026-09-09)*
