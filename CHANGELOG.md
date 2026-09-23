@@ -44,8 +44,8 @@
   atualizada junto. **O risco é estrutural e não se resolve conferindo melhor: doc de comportamento
   alheio envelhece quando o dono do comportamento muda sem avisar quem documentou.** A primeira
   correção ainda errou de chave, mandando investigar o bracket de um modelo cuja remoção não passa por
-  ali — `ModelCacheService` grava o write model (o que o BFF lê) e `EntitiesModelCacheService` grava o
-  read model (o que o bracket remove). **Parágrafo cuja receita sempre dá certo — aqui, republicar —
+  ali — são **dois serviços de cache distintos**: um grava o **write model** (o que o BFF lê), o outro
+  grava o **read model** (o que o bracket remove), e confundi-los é o que levou a investigar o lado errado. **Parágrafo cuja receita sempre dá certo — aqui, republicar —
   não avisa quando a explicação está errada.**
 
 - **2026-09-13 · a regra do `readProjection` deixou de copiar a do `scope` de linha.** A regra antiga
