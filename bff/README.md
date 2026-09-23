@@ -136,8 +136,8 @@ precisa conhecer o modelo.
 > **O modelo publicado NÃO tem prazo de validade.** O forger grava a chave **sem expiração**, e isso é
 > deliberado: a constante que carrega o valor existe *"para que nenhuma configuração externa possa
 > reintroduzir TTL no modelo publicado"* — não é propriedade de deploy, é constante de código. *(medido
-> pelo `composer` em `forger@421a8b8`, `ModelCacheService` — a classe que grava a chave do write model,
-> que é a que o BFF lê; a do read model, `EntitiesModelCacheService`, faz igual. Confirmado pelo dono em
+> em `forger@421a8b8`, no serviço que grava a chave do **write model** — a que o BFF lê; o serviço do
+> **read model** faz igual. Confirmado pelo dono em
 > 2026-09-10. O mesmo consta em
 > [persistence-q — pré-requisitos do chamador](../persistence-q/README.md): a entrada "não expira
 > sozinha".)*
