@@ -303,38 +303,25 @@ A forma é **indexada por posição**, com as chaves em string:
 
 ## Cache
 
+O cache de resultado de consulta **não está em uso**. O controle continua sendo aceito, e a consulta é
+**sempre executada** — a resposta é a mesma que você teria sem mandá-lo.
+
 ```jsonc
 {
   "pedido": { "status": "criada" },
-  "_cache": { "_behavior": "use", "_ttl": <tempo> }
+  "_cache": { "_behavior": "ignore" }
 }
 ```
 
-- **`_behavior`**: `use` (usa/popula o cache), `evict` (invalida), `ignore` (não usa).
-- **`_ttl`**: tempo de vida da entrada em cache. **Obrigatório com `_behavior: "use"`** — sem ele a
-  chamada falha com erro de aplicação, não com `400`.
-- **`_cache` sem `_behavior` é ignorado** por inteiro, sem erro. `_behavior` com valor desconhecido é
+- **`_behavior`**: `use` e `ignore` têm hoje o mesmo efeito — a consulta roda e responde. `evict` apaga
+  a entrada correspondente, e continua fazendo isso.
+- **`_ttl`** não é lido: ele governava o tempo de vida da entrada gravada, e nada é gravado.
+- **`_cache` sem `_behavior`** é ignorado por inteiro, sem erro. `_behavior` com valor desconhecido é
   **`400`**.
 
-⚠️ **A chave da entrada inclui os controles que você mandou explicitamente.** Ela é formada a partir do
-corpo da consulta **antes** de `_paging`, `_sorting`, `_connective` e `_count` serem retirados. Efeito
-prático: a mesma consulta gravada **com** `_paging` explícito e relida **sem** ele produz chaves
-diferentes — o resultado não é reaproveitado, e um `evict` mandado com controles diferentes dos da
-gravação não alcança a entrada. **Para o cache funcionar, mande sempre o mesmo conjunto de controles.**
-
-> ⚠️ **`_behavior: "use"` não devolve resultado correto em nenhum dos dois casos — não use este controle
-> por ora.**
->
-> - Na **falta** (a entrada não existe) a resposta vem **sem os registros e a consulta sequer é
->   executada**: o serviço não distingue "não achei" de "achei", e trata a ausência como acerto.
-> - No **acerto** (a entrada existe) o cliente recebe o **invólucro** da entrada em vez do resultado —
->   formato diferente do da mesma consulta sem cache.
-> - No **modo objeto**, além disso, a consulta ainda roda depois: a resposta volta com **dois** itens.
->
-> O alcance é limitado porque o controle é **opt-in**: só afeta quem o declara. **Enquanto não houver
-> correção, omita `_cache` ou use `_behavior: "ignore"`** — a consulta sem cache responde corretamente.
-> O `evict` funciona: ele apaga a entrada, e passou a formar a chave do mesmo jeito que o `use` a formou
-> (desde que mandado com os mesmos controles).
+> **O que isso custa a você:** nada de correção — a resposta é a consulta de verdade, sempre. O que não
+> existe é o ganho de latência que o controle prometia. Consulta cara precisa de índice na projeção ou
+> de menos linhas por página, não deste controle.
 
 ## Associações (popular relacionados)
 
