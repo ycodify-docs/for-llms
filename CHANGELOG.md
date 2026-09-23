@@ -2,6 +2,36 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.41 — 2026-09-23
+
+> As três correções abaixo viviam numa seção *"Histórico de correções"* dentro da página do BFF. A
+> página passa a dizer só **como é**; o que ela corrigiu, e quando, mora aqui. As datas são as das
+> correções, não a desta revisão.
+
+- **2026-09-13 · `valueObjects` passou a existir na capacidade.** Antes disso o comando aceitava o
+  campo no envio e a capacidade não o descrevia: quem montava tela a partir dela concluía que o campo
+  não existia, sem aviso, e o miolo genérico **não conseguia disparar comando com value object
+  obrigatório**, por montar o formulário só de `attributes`. Medido de fora, comparando o modelo
+  publicado com a capacidade devolvida.
+
+- **2026-09-10 · o modelo publicado nunca teve TTL** — e a doc afirmou o contrário por catorze dias.
+  A afirmação **era verdadeira quando foi escrita**: até 2026-08-31 o forger gravava com prazo de 24h
+  configurável. Naquele dia ele passou a gravar sem prazo e a propriedade sumiu; esta fatia não foi
+  atualizada junto. **O risco é estrutural e não se resolve conferindo melhor: doc de comportamento
+  alheio envelhece quando o dono do comportamento muda sem avisar quem documentou.** A primeira
+  correção ainda errou de chave, mandando investigar o bracket de um modelo cuja remoção não passa por
+  ali — `ModelCacheService` grava o write model (o que o BFF lê) e `EntitiesModelCacheService` grava o
+  read model (o que o bracket remove). **Parágrafo cuja receita sempre dá certo — aqui, republicar —
+  não avisa quando a explicação está errada.**
+
+- **2026-09-13 · a regra do `readProjection` deixou de copiar a do `scope` de linha.** A regra antiga
+  era *"vários papéis, um deles fora da declaração → lê tudo"*, correta **quando o outro papel de fato
+  lê a entity** — e o BFF não tem como saber isso, porque quem concede leitura é o `accessControl.read`
+  do `_conf`, que ele não enxerga. Medido com conta real: um usuário `[VISITANTE, RECEPCIONISTA]`
+  recebia a ficha inteira **com CPF**, porque `VISITANTE` não estava na declaração, embora não tivesse
+  leitura nenhuma naquela entity. Como quase todo usuário acumula papéis, o controle era praticamente
+  inerte. A regra atual **falha fechando**.
+
 ## 1.40 — 2026-09-23
 
 - **BFF — `serverStamp` é o `whenAttribute` do evento, e não mais o sufixo do nome.** Até esta revisão
