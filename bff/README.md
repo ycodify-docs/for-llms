@@ -116,6 +116,14 @@ forger é quem **grava** ali ao publicar o `.model.json`) — e cruza com os **p
 | `attributes` | os atributos escalares, com `type`, `nullable` e o papel de apresentação (`input`, `status`, `serverStamp`, `lookup`) |
 | `valueObjects` | os **value objects** do comando, com `name`, `cardinality` (`single` · `multiple`) e `fields`. **Ausente** quando o comando não declara nenhum |
 
+**`serverStamp` é o `whenAttribute` do evento, e só ele.** O BFF **não envia** esse atributo no comando,
+porque a plataforma o valoriza sozinha (canon
+[model-format](../persistence-crs/spec/model-format.md#eventos-e-domainbus)). Qualquer outro `Timestamp`
+declarado em `data.attribute` é `input` e **viaja normalmente** — inclusive o que tem nome terminado em
+`em`. ⚠️ Até 2026-09-22 a classificação era pelo sufixo do nome, e ela **comia em silêncio** instantes
+calculados pela regra de negócio; se você tem tela ou cliente que contornava isso, o contorno virou
+desnecessário.
+
 A `cardinality` é o que decide a tela — `single` desenha **um grupo**, `multiple` desenha **uma lista**
 com "adicionar" — e é por isso que ela viaja em vez dos campos achatados. `fields` vazio significa que o
 modelo declarou o value object como atributo tipado direto: não há campos a oferecer, e quem preenche
