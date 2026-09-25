@@ -2,6 +2,15 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.49 — 2026-09-25
+
+- **`POST /session/command` recusa com `400` o valor fora do tipo declarado** (`bff/README.md` §Proxy de
+  domínio e §Erros). Antes o BFF **trocava** o valor em silêncio: em `Boolean`, tudo que não fosse `true`
+  virava `false` (`"sim"`, `"True"`, `"1"`); em `Integer`/`Long`, texto não numérico virava `null`
+  explícito (`"abc"`, `"1,5"`). Agora `Boolean` aceita `true`/`false` e `Integer`/`Long` aceitam número
+  inteiro, como valor ou como texto, e o resto é recusado nomeando o campo. **Quem manda o tipo certo
+  não percebe diferença**; quem mandava outra coisa passa a saber, em vez de gravar o valor errado.
+
 ## 1.48 — 2026-09-25
 
 - **`computed`: a página deixa de descrever o motor anterior como se fosse o atual** (`bff/README.md`
