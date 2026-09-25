@@ -210,6 +210,10 @@ O consumidor **não** compõe esses cabeçalhos nem conhece o token.
   nem dentro de array. Forma incompatível é recusada com `400` que **diz a posição** do item errado,
   **nunca omitida em silêncio** (um item fora da forma reprova o comando inteiro). O BFF não coage os
   campos internos: repassa o valor como recebeu, aninhamento incluso.
+- **Valor fora do tipo declarado é recusado com `400`, nunca trocado.** `Boolean` aceita `true`/`false`
+  (ou os textos `"true"`/`"false"`); `Integer`/`Long` aceitam número inteiro (ou texto só de dígitos).
+  `"sim"`, `"1"`, `"abc"` e `"1,5"` são recusados, com a mensagem nomeando o campo. `""` e `null` seguem
+  contando como ausentes. As datas vão como chegam, e o persistence-crs as normaliza ou recusa.
 - **Atributo `computed` não é entrada de ninguém.** O BFF o envia sempre com um marcador explícito e
   não nulo, e o processor br o sobrescreve; o consumidor não precisa mandá-lo, e o que mandar é ignorado — ver
   [Atributo calculado pelo br](#atributo-calculado-pelo-br--computed).
@@ -632,7 +636,7 @@ que o gateway, o cache ou o persistence respondem.
 
 | HTTP | Quando |
 |---|---|
-| `400` | falta parâmetro (ex.: `username`/`password`, `tenant`), ou campo obrigatório do comando ausente |
+| `400` | falta parâmetro (ex.: `username`/`password`, `tenant`), ou campo obrigatório do comando ausente · **valor fora do tipo declarado** no comando (`Boolean` que não é true/false, `Integer`/`Long` que não é inteiro) |
 | `401` | sem sessão / sessão inválida / credencial inválida — ver `reason` abaixo |
 | `403` | comando não autorizado ao papel · papel fora do cardápio público no autocadastro · papel que não é do usuário na org (`active-role`) |
 | `404` | tenant não pertence ao usuário / miolo não registrado / **modelo do tenant ausente do cache** (removido ou nunca publicado — ele **não expira**) |
