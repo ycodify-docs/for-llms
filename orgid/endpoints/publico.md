@@ -76,11 +76,17 @@ Cria uma conta **externa** e a associa a um **papel**.
 | `account.password` | string | sim | Senha. |
 | `account.email` | string | sim | E-mail. |
 | `account.*` | — | não | Demais campos da conta externa (ver [ua-conta.md](ua-conta.md)). |
-| `role.name` | string | sim | Papel a associar. |
+| `role.name` | string | sim | Papel a associar: tem de **existir** e ser **público** (`ispublic=true`). |
 | `role.owner` | string | sim | Dono (espaço de nomes) do papel. |
-| `role.label` / `role.ispublic` / `role.status` | — | não | Metadados do papel. |
+| `role.label` / `role.ispublic` / `role.status` | — | não | Ignorados: o papel é lido do cadastro por `name` + `owner`. |
 
-**Resposta:** `200` (sem corpo).
+**Resposta:** `200` (sem corpo) · `404` — `"role not found: the account was not created."` · `403` —
+`"role is not public: the account was not created."` · `409` se o `username` já existe.
+
+> ⚠️ **Só papel público**, em `develop` do orgid desde 2026-09-25 e **ainda não em produção**. Antes, a rota
+> aceitava **qualquer** papel existente, inclusive administrativo: quem não tinha credencial nenhuma criava
+> conta nova já com esse papel. Papel que o próprio usuário não pode escolher se associa pelo caminho
+> autenticado, `POST /ua/account-role/using/authority` ([ua-associacao.md](ua-associacao.md)).
 
 ## GET /open/up/hash/for/{action}/by/{username}
 ## GET /open/ua/hash/for/{action}/by/{username}
@@ -112,6 +118,11 @@ Executa a ação do hash.
 
 **Resposta:** `200` (sem corpo) — em `R`, ativa a conta; em `PR`, troca a senha · `404` —
 `"account not found: the hash action was not executed."`
+
+> ⚠️ **Em `/ua`, `R` só ativa conta `PENDING`**, em `develop` do orgid desde 2026-09-25 e **ainda não em
+> produção**. Conta já `ACTIVE` responde `200` sem gravar nada; conta `SUSPENDED` responde `403`
+> (`"account is not pending: registration was not confirmed."`). Antes, `R` punha qualquer conta não
+> cancelada em `ACTIVE`: uma conta suspensa voltava a valer pelo próprio e-mail. **Em `/up` nada mudou.**
 
 > ⚠️ Até 2026-09-05 a conta inexistente respondia **`204`** nos dois endpoints acima. `204` é sucesso sem
 > corpo: em `PR`, o usuário recebia confirmação de uma troca de senha que nunca aconteceu. Ver

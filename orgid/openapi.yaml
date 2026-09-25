@@ -99,7 +99,7 @@ paths:
   /open/up/account:
     post: { tags: [publico], summary: "Registro: conta + organização (público)", requestBody: { required: true, content: { application/json: { schema: { type: object, required: [account, org], properties: { account: { type: object }, org: { type: object, required: [name, client, alias], properties: { name: { type: string }, client: { type: string, maxLength: 12 }, alias: { type: string } } } } } } } }, responses: { '201': { description: Criado }, '400': { $ref: '#/components/responses/BadRequest' } } }
   /open/ua/account-role:
-    post: { tags: [publico], summary: "Registro externo: conta + papel (público)", requestBody: { required: true, content: { application/json: { schema: { type: object } } } }, responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/BadRequest' } } }
+    post: { tags: [publico], summary: "Registro externo: conta + papel (público)", description: "O papel tem de existir e ser público (ispublic=true).", requestBody: { required: true, content: { application/json: { schema: { type: object } } } }, responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/BadRequest' }, '403': { description: "Papel não público: conta não criada" }, '404': { description: "Papel inexistente: conta não criada" }, '409': { description: "username já existe" } } }
   /open/up/account/by/username/{username}/exists:
     get: { tags: [publico], summary: Verifica existência da conta (público), parameters: [{ $ref: '#/components/parameters/username' }], responses: { '200': { description: Existe }, '204': { description: Não existe } } }
   /open/up/hash/for/{action}/by/{username}:
