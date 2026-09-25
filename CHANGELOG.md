@@ -2,6 +2,14 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.50 — 2026-09-25
+
+- **`computed` passa a ser chave declarada do aggregate no `.model.json`** (`forger/endpoints/model.md`
+  §Atributos preenchidos pelo processor). Até aqui a publicação só **tolerava** a chave: o metamodelo não
+  a conhecia e não conferia nada. Agora ela é declarada, e a publicação recusa com `400` o comando ou o
+  atributo sem ponto que não existe no aggregate, a lista vazia e o valor que não é lista. **Em `develop`
+  do forger, ainda não em produção.** Modelo sem a chave não muda.
+
 ## 1.49 — 2026-09-25
 
 - **`POST /session/command` recusa com `400` o valor fora do tipo declarado** (`bff/README.md` §Proxy de
