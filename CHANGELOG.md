@@ -2,6 +2,17 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.44 — 2026-09-25
+
+- **`computed`: o campo que aceita nulo passa a receber `null` explícito, não um valor do tipo**
+  (`bff/README.md` §Atributo calculado pelo br). Até a 1.43, todo campo calculado recebia `"computed"`,
+  `0`, `1970-01-01`… — e, como o motor **ignora o `null`** que o processor devolve, um processor que anula
+  de propósito um bloco opcional gravaria o marcador em toda operação comum. Achado pelo `clubflow` ao
+  avaliar o impacto da 1.43, antes de qualquer declaração em produção. O `null` explícito sobrevive até
+  a mescla e é substituível (lido no motor pelo `interpreter`). O obrigatório segue com o valor do tipo.
+  A página passa também a dizer que **devolver `null` não limpa campo nenhum**, e que value object
+  ausente não é criado pelo marcador.
+
 ## 1.43 — 2026-09-25
 
 - **Atributo calculado pelo br — `computed`** (`bff/README.md`, nova seção; `shell/contrato-miolo.md`).
