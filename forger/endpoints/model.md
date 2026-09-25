@@ -40,6 +40,7 @@ Erros: `400` (arquivo vazio, extensão diferente de `.json`, documento inválido
 > | dois envelopes `<org>.<project>` no mesmo arquivo | só o primeiro seria lido, e o outro sumiria sem aviso |
 > | item **objeto** em `domainBus.triggerProjection` sem `targetTenantId` | o destino é descartado no despacho: a projeção cross-tenant simplesmente não dispara. Item **string** continua válido — é a projeção same-tenant |
 > | `roles` do aggregate com recorte incoerente | ver [recorte de leitura do aggregate](#recorte-de-leitura-do-aggregate-roles) |
+> | `computed` que nomeia comando ou atributo inexistente | ver [atributos preenchidos pelo processor](#atributos-preenchidos-pelo-processor-computed) |
 
 ### Recorte de leitura do aggregate: `roles`
 
@@ -73,6 +74,34 @@ com aviso.
 > **executar**. Este é **objeto**, **opcional**, e diz quem pode **ler**. O nível desambigua.
 >
 > Modelo que já estava publicado **não** é revalidado: a checagem acontece na publicação.
+
+### Atributos preenchidos pelo processor: `computed`
+
+**Opcional.** Declara, por comando, os atributos que o **processor br** preenche e que o chamador **não**
+fornece. **Aggregate sem a chave publica como antes.**
+
+```json
+"cadastro.aluno": {
+  "command": { "criar": { … } },
+  "computed": { "criar": ["username", "matriculas.iscurrent"] }
+}
+```
+
+A chave é um objeto: cada chave é o nome de um comando do aggregate, e cada valor é uma lista **não vazia
+e sem repetição** de nomes de atributo. Nome com ponto (`<valueObject>.<campo>`) aponta para um campo de
+value object.
+
+Recusas na publicação, todas `400`: chave que não é comando do aggregate; atributo **sem ponto** que não
+está em `data.attribute` daquele comando; lista vazia; valor que não é lista. Nome **com ponto** não é
+conferido.
+
+Quem lê a declaração é o BFF, que tira o campo do formulário: ver
+[Atributo calculado pelo br](../../bff/README.md#atributo-calculado-pelo-br--computed). **O motor não lê
+esta chave**: ela não muda o que o comando grava.
+
+> **Em `develop` do forger desde 2026-09-25**, e ainda **não em produção**. Até o deploy, a publicação
+> aceita a chave sem conferir nada, porque o metamodelo não fecha chave desconhecida: a declaração chega
+> ao cache sem ser validada.
 
 ### Chaves que um modelo novo não precisa trazer
 
