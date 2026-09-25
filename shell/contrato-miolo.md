@@ -93,9 +93,9 @@ não diz **como se vê** (isso é o miolo).
           "roles": ["..."],
           "fromState": ["..."],
           "endState": "...",
-          "attributes": [ { "name": "...", "type": "...", "role": "input|status|serverStamp|lookup" } ],
+          "attributes": [ { "name": "...", "type": "...", "role": "input|status|serverStamp|lookup|computed" } ],
           "valueObjects": [ { "name": "...", "cardinality": "single|multiple",
-                              "fields": [ { "name": "...", "type": "..." } ], "scalar": false } ]
+                              "fields": [ { "name": "...", "type": "...", "role": "..." } ], "scalar": false } ]
         }
       ]
     }
@@ -114,6 +114,11 @@ não diz **como se vê** (isso é o miolo).
     nome terminado em `em`".** Atributo de data que o negócio calcula, ou que o usuário informa, é
     `input`: viaja normalmente no comando. Só o carimbo declarado fica de fora.
   - `lookup` — referência a outro agregado (widget de seleção).
+  - `computed` — o **processor de regra de negócio preenche**: **oculto no formulário**, e o BFF o envia
+    com um marcador que o processor sobrescreve. Nasce de declaração no modelo, nunca de nome. Vale
+    também para `valueObjects[].fields` — e um value object em que todo campo é `computed` não se
+    desenha. Declaração, marcadores e a regra do processor:
+    [bff — Atributo calculado pelo br](../bff/README.md#atributo-calculado-pelo-br--computed).
 - **`valueObjects`** — os value objects que o comando aceita, **ausente** quando não há nenhum. É a
   segunda metade do que o comando aceita: sem ela, uma tela montada só de `attributes` não oferece o
   campo, e um comando com value object obrigatório fica **impossível de disparar**.

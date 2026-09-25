@@ -23,6 +23,7 @@
 - [Arquivos anexos de agregado (`/session/files/*`)](#arquivos-anexos-de-agregado-sessionfiles)
 - [Quem autoriza a leitura](#quem-autoriza-a-leitura)
 - [Limitar os campos que um papel lê — `readProjection`](#limitar-os-campos-que-um-papel-lê-readprojection)
+- [Atributo calculado pelo br — `computed`](#atributo-calculado-pelo-br--computed)
 - [`predicates` é a forma do persistence-q — não há dialeto do BFF](#predicates-é-a-forma-do-persistence-q-não-há-dialeto-do-bff)
 - [Autocadastro (`/ua/*`)](#autocadastro-ua)
 - [Preferências da organização (org-scoped)](#preferências-da-organização-org-scoped)
@@ -112,7 +113,7 @@ forger é quem **grava** ali ao publicar o `.model.json`) — e cruza com os **p
 
 | Chave | O que traz |
 |---|---|
-| `attributes` | os atributos escalares, com `type`, `nullable` e o papel de apresentação (`input`, `status`, `serverStamp`, `lookup`) |
+| `attributes` | os atributos escalares, com `type`, `nullable` e o papel de apresentação (`input`, `status`, `serverStamp`, `lookup`, `computed`) |
 | `valueObjects` | os **value objects** do comando, com `name`, `cardinality` (`single` · `multiple`) e `fields`. **Ausente** quando o comando não declara nenhum |
 
 **`serverStamp` é o `whenAttribute` do evento, e só ele.** O BFF **não envia** esse atributo no comando,
@@ -209,6 +210,9 @@ O consumidor **não** compõe esses cabeçalhos nem conhece o token.
   nem dentro de array. Forma incompatível é recusada com `400` que **diz a posição** do item errado,
   **nunca omitida em silêncio** (um item fora da forma reprova o comando inteiro). O BFF não coage os
   campos internos: repassa o valor como recebeu, aninhamento incluso.
+- **Atributo `computed` não é entrada de ninguém.** O BFF o envia sempre com um marcador do tipo, e
+  o processor br o sobrescreve; o consumidor não precisa mandá-lo, e o que mandar é ignorado — ver
+  [Atributo calculado pelo br](#atributo-calculado-pelo-br--computed).
 - `/session/aggregate` existe porque a **projeção é assíncrona**: para carregar o estado autoritativo de
   um agregado (ex.: preencher um form de transição) não se deve ler o read model.
 
@@ -371,6 +375,111 @@ recorte cai sobre o `eventData` do evento, e os metadados (quem, quando, qual co
 > não existir no `persistence-q`, quem precisa da garantia no dado tem de negar a leitura da entity
 > inteira no `accessControl.read`, ou separar o dado sensível em outra entity.
 
+## Atributo calculado pelo br — `computed`
+
+Um comando às vezes tem atributo que **o processor de regra de negócio preenche** — o `username` tirado
+do token, o nome copiado de outro agregado, a marca de "matrícula corrente". O usuário não tem o que
+digitar ali, mas a chave **precisa chegar ao processor presente**: a mescla da resposta dele é por
+whitelist, e ele só substitui chave que já veio no comando — chave nova é descartada em silêncio
+([br-service — regra de negócio](../br-service/contextos.md)). E o BFF não repassa `""` nem `null`.
+
+`computed` resolve isso de ponta a ponta: o modelo **declara** o atributo como calculado, a tela **não o
+desenha**, e o BFF o **envia com um marcador**, que o processor sobrescreve.
+
+**Onde se declara:** no `.model.json`, **ao lado dos comandos do agregado** — o mesmo lugar do
+`readProjection` —, por comando. Nome solto é atributo de `data.attribute`; `"<vo>.<campo>"` é campo de
+um value object declarado como grupo.
+
+```jsonc
+"cadastro.aluno": {
+  "command": {
+    "criar": {
+      "data": {
+        "attribute": {
+          "nome":     { "type": "String", "length": 120, "nullable": false },
+          "username": { "type": "String", "length": 60,  "nullable": false }
+        },
+        "valueObject": { "multiple": { "matriculas": {
+          "planid":    { "type": "String",  "length": 36, "nullable": false },
+          "iscurrent": { "type": "Boolean", "nullable": false },
+          "planname":  { "type": "String",  "length": 80, "nullable": true }
+        } } }
+      },
+      "br": { "route": "<org>/cadastro/cadastro/aluno/criar" }
+    }
+  },
+  "computed": { "criar": ["username", "matriculas.iscurrent", "matriculas.planname"] }
+}
+```
+
+- **O atributo continua declarado no comando.** `computed` não cria atributo: marca um que existe. E
+  precisa existir — atributo que o comando não declara é removido antes de chegar ao processor.
+- **Nunca prefixe a chave com `_`.** A publicação remove chaves `_`-prefixadas em silêncio.
+
+**O que muda em cada ponta:**
+
+| Onde | Efeito |
+|---|---|
+| `GET /session/capabilities` | o atributo vem com `role: "computed"` — em `attributes` e em `valueObjects[].fields` |
+| miolo genérico | não desenha o campo; um value object em que **todo** campo é calculado não aparece |
+| `POST /session/command` | o BFF envia o campo **sempre**, com o marcador do tipo, **ignorando** o valor que o consumidor tenha mandado. Em value object, o marcador vai em **cada item** |
+
+**Os marcadores**, um por tipo. Todos passam pela validação que o persistence-crs faz antes do processor
+— ela cobra `nullable` e o `length` de `String`, e normaliza as datas:
+
+| Tipo | Marcador |
+|---|---|
+| `String` · `Text` | `"computed"` — cortado ao `length` quando o campo é menor que isso |
+| `Integer` · `Long` | `0` |
+| `Boolean` | `false` |
+| `Date` | `"1970-01-01"` |
+| `Timestamp` | `"1970-01-01T00:00:00Z"` |
+| `Json` | `{}` |
+
+O campo **dentro** de value object precisa do marcador tanto quanto o de topo: o persistence-crs cobra o
+`nullable` dos campos internos **antes** do processor, e um item sem o campo obrigatório é recusado sem
+a regra rodar.
+
+**Do lado do processor**, a regra é uma só: **sempre devolver um valor, nunca `null`**, em todo campo
+declarado `computed`. Para campo de value object, a mescla é por chave de topo — devolve-se a lista
+inteira, com o campo calculado em cada item:
+
+```
+função(data, authToken):
+    usuario = decodifica(authToken)
+    plano   = lê o plano de cada data.matriculas[i].planid
+    retorna {
+        ...data,
+        username:   usuario.username,
+        matriculas: data.matriculas.map(m => { ...m,
+                        iscurrent: (m é a matrícula vigente),
+                        planname:  plano(m).nome })
+    }
+```
+
+> ### ⚠️ O marcador é gravado se o processor não o sobrescrever
+>
+> Se o processor **não devolver** a chave, ou devolvê-la `null`, o valor que fica é o **marcador** — o
+> motor ignora o `null` na mescla e não revalida nada depois dela. Nada acusa: o comando responde `200`
+> e o evento guarda `"computed"`, `0` ou `false` como se fosse dado. Quem escreve o processor é quem
+> impede isso, devolvendo o campo em **todo** caminho que não lance erro.
+>
+> É o limite desta convenção, e é por isso que ela ainda não é a forma definitiva: a saída sem marcador
+> é o próprio motor aceitar do processor qualquer atributo declarado no modelo — decisão pendente.
+
+**Declaração inválida recusa o comando com `500`**, nomeando o que está errado — não envia marcador pela
+metade. É inválido: chave que não é objeto `{ "<comando>": ["<atributo>"] }`; comando que o agregado não
+declara; lista vazia; atributo ou campo de value object que o comando não declara; `status`; o
+`whenAttribute` de um evento (o carimbo do servidor); e **comando sem `br.route`** — sem processor,
+ninguém sobrescreveria o marcador, e ele seria gravado.
+
+> ### ⚠️ Esta chave viaja por uma propriedade MEDIDA, não por contrato
+>
+> O forger **tolera** `computed` — o esquema do agregado não recusa chave desconhecida —, mas não a
+> declara, como já declara `readProjection`. Lido pelo `composer`, dono do forger, em 2026-09-25
+> (`forger@8b906dd`). Se o esquema um dia fechar, o efeito é `400` na publicação, e não descarte
+> silencioso.
+
 ## `predicates` é a forma do persistence-q — não há dialeto do BFF
 
 `predicates` é o **objeto de predicados** do
@@ -494,7 +603,7 @@ que o gateway, o cache ou o persistence respondem.
 | `403` | comando não autorizado ao papel · papel fora do cardápio público no autocadastro · papel que não é do usuário na org (`active-role`) |
 | `404` | tenant não pertence ao usuário / miolo não registrado / **modelo do tenant ausente do cache** (removido ou nunca publicado — ele **não expira**) |
 | `409` | autocadastro: papel inexistente — nada foi criado (o `204` do orgid, traduzido) |
-| `500` | configuração ausente no servidor (ex.: o path do endpoint de cache não configurado) · **`readProjection` inválido no modelo do tenant** — a leitura é recusada em vez de recortada pela metade |
+| `500` | configuração ausente no servidor (ex.: o path do endpoint de cache não configurado) · **`readProjection` inválido no modelo do tenant** — a leitura é recusada em vez de recortada pela metade · **`computed` inválido no modelo do tenant** — o comando é recusado em vez de gravar marcador |
 | `413` | arquivo acima do teto do filer (3 MiB) em `POST /session/files/upload` |
 | `502` | falha ao falar com um serviço da plataforma |
 | `503` | serviço de arquivos (filer) não configurado neste ambiente |
@@ -530,5 +639,7 @@ sem explicação — e ninguém consegue medir a frequência do problema.
 - [ ] Endereços de serviço = **config de deploy**, nunca hardcode nem em doc pública.
 - [ ] Em `/session/files/*`: `entityId` da chave = **`aggregateid`**; prefixo em `delete` é **lote**; e
       o anexo é protegido **por papel na entity**, nunca por titular — ver o aviso da seção.
+- [ ] Atributo que o processor preenche: declare-o em `computed` e faça o processor **sempre** devolvê-lo
+      não nulo — senão o marcador é gravado.
 
 ---

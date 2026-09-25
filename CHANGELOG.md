@@ -2,6 +2,22 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.43 — 2026-09-25
+
+- **Atributo calculado pelo br — `computed`** (`bff/README.md`, nova seção; `shell/contrato-miolo.md`).
+  O modelo passa a poder declarar, ao lado dos comandos do agregado, quais atributos o processor de
+  regra de negócio **preenche** — escalares e campos de value object. A capacidade os marca com o papel
+  novo `computed`, o miolo genérico não os desenha, e o BFF os envia **sempre** com um marcador do tipo,
+  que o processor sobrescreve. Antes, a chave calculada não chegava ao processor — a mescla dele só
+  substitui chave presente, e o BFF descarta `""`/`null` —, e a única saída era o cliente digitar um
+  placeholder. Declaração inválida, inclusive em comando sem `br.route`, recusa o comando com `500`.
+  ⚠️ **Não é a forma definitiva:** se o processor não devolver o campo, o marcador é gravado sem aviso.
+  Pedido do `conceptnatal`.
+
+> **Quem já integrou não precisa mexer em nada:** sem a declaração, nenhum atributo é `computed` e tudo
+> se comporta como antes. Consumidor que trate `role` como conjunto fechado de quatro valores precisa
+> aceitar o quinto.
+
 ## 1.42 — 2026-09-23
 
 - **As chaves de cache internas saem da doc MASCARADAS** — por ordem do dono, hoje. Onde a página
