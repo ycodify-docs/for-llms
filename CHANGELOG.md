@@ -2,6 +2,15 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.48 — 2026-09-25
+
+- **`computed`: a página deixa de descrever o motor anterior como se fosse o atual** (`bff/README.md`
+  §Atributo calculado pelo br). A tabela de por que o marcador nunca é `null` passa a ser **do motor
+  anterior**, e a página diz onde o conserto da 1.47 já está: **no ar em `/v3/persistence/t/`; em
+  `/v3/persistence/`, ainda não** (2026-09-25). Os marcadores não mudam: enquanto as duas instâncias não
+  rodarem o mesmo motor, só o valor explícito não nulo grava igual nas duas. A regra do processor também
+  fica: o `null` que ele **devolve** continua ignorado na mescla, no motor consertado inclusive.
+
 ## 1.47 — 2026-09-25
 
 - **`null` explícito e `""` em data: o motor foi consertado, e a página diz as regras novas**

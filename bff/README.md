@@ -438,18 +438,23 @@ cobra `nullable` e o `length` de `String`, e normaliza as datas:
 | `Timestamp` | `"1970-01-01T00:00:00Z"` |
 | `Json` | `{}` |
 
-**Por que nunca `null`:** porque `null` explícito no comando **quebra a leitura**. Medido por um sistema
-consumidor em 2026-09-25, direto no persistence-crs:
+**Por que o marcador nunca é `null`:** porque, no motor anterior, `null` explícito no comando **quebrava
+a leitura**. Medido por um sistema consumidor em 2026-09-25, direto no persistence-crs:
 
-| Forma enviada num campo `nullable` | Criação | Transição |
+| Motor anterior — forma enviada num campo `nullable` | Criação | Transição |
 |---|---|---|
 | chave **ausente** | materializa; write model `null`, projeção `""` | os dois lados mantêm o valor anterior |
 | **`null`** explícito | campo numérico: **a projeção não materializa a linha** — o agregado existe e a consulta não o acha. Campo de texto: materializa com a **palavra `"null"`** na projeção | write model grava `NULL`, **projeção mantém o valor anterior** |
 | `""` ou `"computed"` explícito | materializa, os dois lados iguais | os dois lados gravam o valor |
 
-Só o valor explícito não nulo deixa write model e projeção iguais. **E `Date`/`Timestamp` não têm
-vazio:** `""` numa data responde `200`, mas a gravação da projeção falha e ela fica com o valor que
-tinha — por isso o marcador das datas é o epoch, também no campo opcional. Entre o vazio e `"computed"`, o
+No motor anterior, `""` numa `Date`/`Timestamp` também respondia `200` e a gravação da projeção falhava.
+
+**O motor foi consertado** ([persistence-crs — `null` explícito, chave omitida e o que o processor
+devolve](../persistence-crs/endpoints/comando.md)): `null` explícito grava `NULL` nos dois lados, e `""`
+numa data vira `null` no opcional e `400` no obrigatório. **O conserto está no ar em
+`/v3/persistence/t/`; em `/v3/persistence/`, ainda não** (2026-09-25). Enquanto as duas instâncias não
+rodarem o mesmo motor, só o valor explícito não nulo grava igual nas duas — por isso o marcador não é
+`null`, e o das datas é o epoch, também no campo opcional. Entre o vazio e `"computed"`, o
 opcional fica com o **vazio**: o bloco de campos que o processor deixa de preencher de propósito — os
 dados de um empréstimo numa saída de estoque que não é empréstimo — termina vazio, e não com um nome
 `"computed"` que a tela mostraria como dado. O obrigatório fica com `"computed"`, porque ali o processor
@@ -487,8 +492,10 @@ função(data, authToken):
 > e o evento guarda `"computed"`, `0` ou `false` como se fosse dado. Quem escreve o processor é quem
 > impede isso, devolvendo o campo em **todo** caminho que não lance erro.
 >
-> **Devolver `null` não limpa campo nenhum** — nem aqui, nem fora do `computed`: o `null` da mescla é
-> ignorado, e "apagar" e "não mexer" dão no mesmo ([br-service — o que devolver](../br-service/contextos.md)).
+> **Devolver `null` não limpa campo nenhum** — nem aqui, nem fora do `computed`, e nem no motor
+> consertado: o `null` que o **processor devolve** é ignorado na mescla, e "apagar" e "não mexer" dão no
+> mesmo ([br-service — o que devolver](../br-service/contextos.md)). É outra regra que a do `null` enviado
+> no comando ([persistence-crs](../persistence-crs/endpoints/comando.md)).
 > Para limpar, devolva o vazio do tipo.
 >
 > É o limite desta convenção, e é por isso que ela ainda não é a forma definitiva: a saída sem marcador
