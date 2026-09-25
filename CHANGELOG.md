@@ -2,6 +2,53 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.46 — 2026-09-25
+
+- **`computed`: três fatos medidos entram na página** (`bff/README.md` §Atributo calculado pelo br). O
+  `null` explícito na criação tem **dois** desfechos conforme o tipo — em campo numérico a linha não
+  materializa; em texto ela materializa com a palavra `"null"`, que parece dado. `""` numa `Date` ou
+  `Timestamp` responde `200` e a gravação da projeção falha em silêncio — daí o marcador das datas ser o
+  epoch também no opcional. E o processor **não deve validar o valor que chega** num campo `computed`:
+  uma regra de faixa recusa o marcador `0` e, com ele, o próprio comando. Nenhum marcador mudou.
+
+## 1.45 — 2026-09-25
+
+- **`computed` volta a nunca mandar `null` — e a 1.44 fica desdita.** A 1.44 fazia o campo que aceita nulo
+  receber `null` explícito. Medido depois por um sistema consumidor, direto no persistence-crs, o `null`
+  explícito **quebra a leitura**: na criação a projeção **não materializa a linha** (o agregado existe, a
+  consulta não o acha), e na transição o write model grava `NULL` enquanto a projeção **mantém o valor
+  anterior**. Só valor explícito não nulo deixa os dois lados iguais. O marcador passa a ser sempre não
+  nulo; no texto, `""` se o campo aceita nulo e `"computed"` se é obrigatório (`bff/README.md`
+  §Atributo calculado pelo br, com a tabela medida). **A 1.44 nunca chegou ao ar** — o deploy foi
+  segurado antes. A regra do processor fica uma só: nunca devolver `null`; para limpar, o vazio do tipo.
+
+## 1.44 — 2026-09-25
+
+- **`computed`: o campo que aceita nulo passa a receber `null` explícito, não um valor do tipo**
+  (`bff/README.md` §Atributo calculado pelo br). Até a 1.43, todo campo calculado recebia `"computed"`,
+  `0`, `1970-01-01`… — e, como o motor **ignora o `null`** que o processor devolve, um processor que anula
+  de propósito um bloco opcional gravaria o marcador em toda operação comum. Achado pelo `clubflow` ao
+  avaliar o impacto da 1.43, antes de qualquer declaração em produção. O `null` explícito sobrevive até
+  a mescla e é substituível (lido no motor pelo `interpreter`). O obrigatório segue com o valor do tipo.
+  A página passa também a dizer que **devolver `null` não limpa campo nenhum**, e que value object
+  ausente não é criado pelo marcador.
+
+## 1.43 — 2026-09-25
+
+- **Atributo calculado pelo br — `computed`** (`bff/README.md`, nova seção; `shell/contrato-miolo.md`).
+  O modelo passa a poder declarar, ao lado dos comandos do agregado, quais atributos o processor de
+  regra de negócio **preenche** — escalares e campos de value object. A capacidade os marca com o papel
+  novo `computed`, o miolo genérico não os desenha, e o BFF os envia **sempre** com um marcador do tipo,
+  que o processor sobrescreve. Antes, a chave calculada não chegava ao processor — a mescla dele só
+  substitui chave presente, e o BFF descarta `""`/`null` —, e a única saída era o cliente digitar um
+  placeholder. Declaração inválida, inclusive em comando sem `br.route`, recusa o comando com `500`.
+  ⚠️ **Não é a forma definitiva:** se o processor não devolver o campo, o marcador é gravado sem aviso.
+  Pedido do `conceptnatal`.
+
+> **Quem já integrou não precisa mexer em nada:** sem a declaração, nenhum atributo é `computed` e tudo
+> se comporta como antes. Consumidor que trate `role` como conjunto fechado de quatro valores precisa
+> aceitar o quinto.
+
 ## 1.42 — 2026-09-23
 
 - **As chaves de cache internas saem da doc MASCARADAS** — por ordem do dono, hoje. Onde a página
