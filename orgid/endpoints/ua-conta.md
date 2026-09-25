@@ -34,8 +34,13 @@ Retorna a conta do **portador do token**. Sem parâmetros. **Auth:** token váli
 Atualiza o perfil da própria conta (`username` forçado ao do token). **Auth:** token válido.
 
 **Corpo** (JSON): qualquer subconjunto dos **campos da conta `/ua`** (acima), exceto `username`/`password`.
+O `status` do corpo é **ignorado**: a conta mantém o que tem no cadastro.
 
 **Resposta:** `200` (sem corpo) quando gravou · `404` — `"account not found: nothing was updated."`
+
+> ⚠️ **O titular não troca o próprio status**, em `develop` do orgid desde 2026-09-25 e **ainda não em
+> produção**. Antes, `status` no corpo era gravado, e a **ausência** dele gravava `ACTIVE`: qualquer
+> edição de perfil reativava conta `SUSPENDED` e ativava conta `PENDING` sem confirmação.
 
 ## PUT /ua/account/password
 Troca a senha (`username` forçado ao do token). **Auth:** token válido.

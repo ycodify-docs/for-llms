@@ -2,6 +2,15 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.51 — 2026-09-25
+
+- **orgid `/ua`: três rotas deixam de conceder o que não deviam** (`orgid/endpoints/publico.md`,
+  `orgid/endpoints/ua-conta.md`, `orgid/openapi.yaml`). `POST /open/ua/account-role` só aceita papel
+  **público** (`403` no resto); `PUT /open/ua/account/{u}/R/hash/{h}` só ativa conta `PENDING` (`403` em
+  `SUSPENDED`); `PUT /ua/account` ignora o `status` do corpo. **Em `develop` do orgid, ainda não em
+  produção.** Quem registra conta com papel público e confirma cadastro de conta pendente não percebe
+  diferença.
+
 ## 1.50 — 2026-09-25
 
 - **`computed` passa a ser chave declarada do aggregate no `.model.json`** (`forger/endpoints/model.md`
