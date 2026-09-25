@@ -96,6 +96,38 @@ A ordem real, que importa para entender o que já rodou quando um erro chega:
 > um passo que compararia o estado resultante com o `endState` do modelo; ele não existe no serviço. O
 > que é verificado é a **origem** (`fromState`), no passo 5.
 
+### `null` explícito, chave omitida e o que o processor devolve
+
+Vale para `/v3/persistence/` e `/v3/persistence/t/`: as duas instâncias rodam o **mesmo código**.
+
+São três regras diferentes, e confundi-las é o engano comum:
+
+| O que acontece | Agregado | Projeção |
+|---|---|---|
+| **você manda `"campo": null`** num atributo `nullable` | grava `null` | grava `NULL` — na criação e na transição |
+| **você omite a chave** numa transição | não muda | não muda |
+| **o processor do br devolve `null`** para uma chave do corpo | fica o valor **do corpo** | idem |
+
+- **Numa transição, `null` explícito APAGA; omitir preserva.** Se o comando só deve mexer no campo em
+  certos casos, omita a chave nos outros.
+- A terceira linha é a mescla da resposta do br: `null` devolvido é ignorado, e só substitui chave que já
+  veio no corpo. Detalhe em [br-service](../../br-service/README.md).
+- Dentro de `valueObject` o `null` segue como `null` do JSON, sem mudança.
+
+> ⚠️ **Até o conserto de 2026-09-25** (ufrn.loco3 `66b1313`, persistence-crs `4f61f82`), o `null`
+> explícito divergia: na criação, um `null` em atributo numérico fazia a linha **não materializar** na
+> projeção, e em texto gravava a string `"null"`; na transição, a projeção **preservava** o valor
+> anterior enquanto o agregado gravava `null`. Tudo com `200`. Linha com `"null"` em texto gravada antes
+> disso continua lá: é dado, e não se corrige sozinha.
+
+**`""` em `Date` ou `Timestamp` não é data.** Em atributo opcional ele é tratado como `null`; em atributo
+`nullable: false` é `400`, com o nome do campo. Vale também para campo de `valueObject` em grupo e para o
+que o processor do br devolver. Em `String`, `""` continua sendo `""`.
+
+> ⚠️ **Até o conserto de 2026-09-25** (yc.cqrs-c `c111bf8`), `""` em data respondia `200`, e o agregado
+> gravava `""`. Já a projeção falhava ao gravar: na criação a linha não materializava, e na transição
+> ficava o valor anterior.
+
 ## Erros
 
 | Código | Quando |
