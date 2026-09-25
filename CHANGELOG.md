@@ -2,6 +2,15 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.46 — 2026-09-25
+
+- **`computed`: três fatos medidos entram na página** (`bff/README.md` §Atributo calculado pelo br). O
+  `null` explícito na criação tem **dois** desfechos conforme o tipo — em campo numérico a linha não
+  materializa; em texto ela materializa com a palavra `"null"`, que parece dado. `""` numa `Date` ou
+  `Timestamp` responde `200` e a gravação da projeção falha em silêncio — daí o marcador das datas ser o
+  epoch também no opcional. E o processor **não deve validar o valor que chega** num campo `computed`:
+  uma regra de faixa recusa o marcador `0` e, com ele, o próprio comando. Nenhum marcador mudou.
+
 ## 1.45 — 2026-09-25
 
 - **`computed` volta a nunca mandar `null` — e a 1.44 fica desdita.** A 1.44 fazia o campo que aceita nulo

@@ -444,10 +444,12 @@ consumidor em 2026-09-25, direto no persistence-crs:
 | Forma enviada num campo `nullable` | Criação | Transição |
 |---|---|---|
 | chave **ausente** | materializa; write model `null`, projeção `""` | os dois lados mantêm o valor anterior |
-| **`null`** explícito | **a projeção não materializa a linha** — o agregado existe e a consulta não o acha | write model grava `NULL`, **projeção mantém o valor anterior** |
+| **`null`** explícito | campo numérico: **a projeção não materializa a linha** — o agregado existe e a consulta não o acha. Campo de texto: materializa com a **palavra `"null"`** na projeção | write model grava `NULL`, **projeção mantém o valor anterior** |
 | `""` ou `"computed"` explícito | materializa, os dois lados iguais | os dois lados gravam o valor |
 
-Só o valor explícito não nulo deixa write model e projeção iguais. Entre o vazio e `"computed"`, o
+Só o valor explícito não nulo deixa write model e projeção iguais. **E `Date`/`Timestamp` não têm
+vazio:** `""` numa data responde `200`, mas a gravação da projeção falha e ela fica com o valor que
+tinha — por isso o marcador das datas é o epoch, também no campo opcional. Entre o vazio e `"computed"`, o
 opcional fica com o **vazio**: o bloco de campos que o processor deixa de preencher de propósito — os
 dados de um empréstimo numa saída de estoque que não é empréstimo — termina vazio, e não com um nome
 `"computed"` que a tela mostraria como dado. O obrigatório fica com `"computed"`, porque ali o processor
@@ -459,6 +461,9 @@ a regra rodar.
 
 **Do lado do processor:** em todo campo declarado `computed`, **devolver um valor, nunca `null`** — no
 obrigatório, o valor calculado; no opcional que não se aplica, o vazio do tipo (`""`, `0`, `false`).
+E **não validar o valor que chega** num campo `computed`: ele é sempre o marcador. Uma regra como
+"maior que zero" sobre o valor de entrada recusa o marcador `0` — e com ele o próprio comando que
+deveria calcular o campo.
 Para campo de value object, a mescla é por chave de topo — devolve-se a lista inteira, com o campo
 calculado em cada item:
 
