@@ -2,6 +2,17 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.45 — 2026-09-25
+
+- **`computed` volta a nunca mandar `null` — e a 1.44 fica desdita.** A 1.44 fazia o campo que aceita nulo
+  receber `null` explícito. Medido depois por um sistema consumidor, direto no persistence-crs, o `null`
+  explícito **quebra a leitura**: na criação a projeção **não materializa a linha** (o agregado existe, a
+  consulta não o acha), e na transição o write model grava `NULL` enquanto a projeção **mantém o valor
+  anterior**. Só valor explícito não nulo deixa os dois lados iguais. O marcador passa a ser sempre não
+  nulo; no texto, `""` se o campo aceita nulo e `"computed"` se é obrigatório (`bff/README.md`
+  §Atributo calculado pelo br, com a tabela medida). **A 1.44 nunca chegou ao ar** — o deploy foi
+  segurado antes. A regra do processor fica uma só: nunca devolver `null`; para limpar, o vazio do tipo.
+
 ## 1.44 — 2026-09-25
 
 - **`computed`: o campo que aceita nulo passa a receber `null` explícito, não um valor do tipo**

@@ -210,8 +210,8 @@ O consumidor **não** compõe esses cabeçalhos nem conhece o token.
   nem dentro de array. Forma incompatível é recusada com `400` que **diz a posição** do item errado,
   **nunca omitida em silêncio** (um item fora da forma reprova o comando inteiro). O BFF não coage os
   campos internos: repassa o valor como recebeu, aninhamento incluso.
-- **Atributo `computed` não é entrada de ninguém.** O BFF o envia sempre com um marcador — `null` se o
-  atributo aceita nulo, um valor do tipo se é obrigatório —, e o processor br o sobrescreve; o consumidor não precisa mandá-lo, e o que mandar é ignorado — ver
+- **Atributo `computed` não é entrada de ninguém.** O BFF o envia sempre com um marcador explícito e
+  não nulo, e o processor br o sobrescreve; o consumidor não precisa mandá-lo, e o que mandar é ignorado — ver
   [Atributo calculado pelo br](#atributo-calculado-pelo-br--computed).
 - `/session/aggregate` existe porque a **projeção é assíncrona**: para carregar o estado autoritativo de
   um agregado (ex.: preencher um form de transição) não se deve ler o read model.
@@ -424,33 +424,43 @@ um value object declarado como grupo.
 | miolo genérico | não desenha o campo; um value object em que **todo** campo é calculado não aparece |
 | `POST /session/command` | o BFF envia o campo **sempre**, com um marcador, **ignorando** o valor que o consumidor tenha mandado. Em value object, o marcador vai em **cada item enviado** — value object ausente continua ausente, e lista vazia continua vazia |
 
-**Os marcadores.** O campo que **aceita nulo** recebe `null` explícito; o **obrigatório** recebe um valor
-do tipo. Todos passam pela validação que o persistence-crs faz antes do processor — ela cobra `nullable`
-e o `length` de `String`, e normaliza as datas:
+**Os marcadores** — sempre um valor **explícito e não nulo**, um por tipo. Só o de texto muda conforme o
+campo aceite nulo ou não. Todos passam pela validação que o persistence-crs faz antes do processor — ela
+cobra `nullable` e o `length` de `String`, e normaliza as datas:
 
-| Campo | Marcador |
+| Tipo | Marcador |
 |---|---|
-| **`nullable: true`**, de qualquer tipo | `null` — a chave vai **presente**, com valor nulo |
-| `String` · `Text` | `"computed"` — cortado ao `length` quando o campo é menor que isso |
+| `String` · `Text` **obrigatório** | `"computed"` — cortado ao `length` quando o campo é menor que isso |
+| `String` · `Text` com **`nullable: true`** | `""` |
 | `Integer` · `Long` | `0` |
 | `Boolean` | `false` |
 | `Date` | `"1970-01-01"` |
 | `Timestamp` | `"1970-01-01T00:00:00Z"` |
 | `Json` | `{}` |
 
-**Por que o opcional recebe `null`, e não um valor do tipo:** o motor **ignora o `null`** que o processor
-devolve na mescla, e o que estava no comando sobrevive. Com um valor do tipo no lugar, um processor que
-devolve `null` **de propósito** — o bloco de campos que só vale sob uma condição, como os dados de um
-empréstimo numa saída de estoque que não é empréstimo — gravaria `"computed"` e `1970-01-01` em toda
-operação comum. Com o `null` explícito, o que sobrevive é o `null`.
+**Por que nunca `null`:** porque `null` explícito no comando **quebra a leitura**. Medido por um sistema
+consumidor em 2026-09-25, direto no persistence-crs:
+
+| Forma enviada num campo `nullable` | Criação | Transição |
+|---|---|---|
+| chave **ausente** | materializa; write model `null`, projeção `""` | os dois lados mantêm o valor anterior |
+| **`null`** explícito | **a projeção não materializa a linha** — o agregado existe e a consulta não o acha | write model grava `NULL`, **projeção mantém o valor anterior** |
+| `""` ou `"computed"` explícito | materializa, os dois lados iguais | os dois lados gravam o valor |
+
+Só o valor explícito não nulo deixa write model e projeção iguais. Entre o vazio e `"computed"`, o
+opcional fica com o **vazio**: o bloco de campos que o processor deixa de preencher de propósito — os
+dados de um empréstimo numa saída de estoque que não é empréstimo — termina vazio, e não com um nome
+`"computed"` que a tela mostraria como dado. O obrigatório fica com `"computed"`, porque ali o processor
+**tem** de preencher, e se esquecer o vazamento precisa ser visível.
 
 O campo **dentro** de value object precisa do marcador tanto quanto o de topo: o persistence-crs cobra o
 `nullable` dos campos internos **antes** do processor, e um item sem o campo obrigatório é recusado sem
 a regra rodar.
 
-**Do lado do processor:** em todo campo **obrigatório** declarado `computed`, **sempre devolver um valor,
-nunca `null`**. No opcional, devolver `null` é legítimo e grava `null`. Para campo de value object, a
-mescla é por chave de topo — devolve-se a lista inteira, com o campo calculado em cada item:
+**Do lado do processor:** em todo campo declarado `computed`, **devolver um valor, nunca `null`** — no
+obrigatório, o valor calculado; no opcional que não se aplica, o vazio do tipo (`""`, `0`, `false`).
+Para campo de value object, a mescla é por chave de topo — devolve-se a lista inteira, com o campo
+calculado em cada item:
 
 ```
 função(data, authToken):
@@ -465,18 +475,16 @@ função(data, authToken):
     }
 ```
 
-> ### ⚠️ No campo obrigatório, o marcador é gravado se o processor não o sobrescrever
+> ### ⚠️ O marcador é gravado se o processor não o sobrescrever
 >
-> Se o processor **não devolver** a chave de um campo **obrigatório**, ou devolvê-la `null`, o valor que
-> fica é o **marcador** — o motor ignora o `null` na mescla e não revalida nada depois dela. Nada acusa:
-> o comando responde `200` e o evento guarda `"computed"`, `0` ou `false` como se fosse dado. Quem
-> escreve o processor é quem impede isso, devolvendo o campo em **todo** caminho que não lance erro.
+> Se o processor **não devolver** a chave, ou devolvê-la `null`, o valor que fica é o **marcador** — o
+> motor ignora o `null` na mescla e não revalida nada depois dela. Nada acusa: o comando responde `200`
+> e o evento guarda `"computed"`, `0` ou `false` como se fosse dado. Quem escreve o processor é quem
+> impede isso, devolvendo o campo em **todo** caminho que não lance erro.
 >
 > **Devolver `null` não limpa campo nenhum** — nem aqui, nem fora do `computed`: o `null` da mescla é
 > ignorado, e "apagar" e "não mexer" dão no mesmo ([br-service — o que devolver](../br-service/contextos.md)).
-> O `null` do campo opcional só fica gravado porque **foi ele que o BFF mandou**. E em comando de
-> **transição** esse `null` entra no evento: se a projeção grava `NULL` por cima do valor anterior
-> **não foi medido**.
+> Para limpar, devolva o vazio do tipo.
 >
 > É o limite desta convenção, e é por isso que ela ainda não é a forma definitiva: a saída sem marcador
 > é o próprio motor aceitar do processor qualquer atributo declarado no modelo — decisão pendente.
@@ -653,7 +661,7 @@ sem explicação — e ninguém consegue medir a frequência do problema.
 - [ ] Endereços de serviço = **config de deploy**, nunca hardcode nem em doc pública.
 - [ ] Em `/session/files/*`: `entityId` da chave = **`aggregateid`**; prefixo em `delete` é **lote**; e
       o anexo é protegido **por papel na entity**, nunca por titular — ver o aviso da seção.
-- [ ] Atributo que o processor preenche: declare-o em `computed`; se for **obrigatório**, faça o
-      processor **sempre** devolvê-lo não nulo — senão o marcador é gravado.
+- [ ] Atributo que o processor preenche: declare-o em `computed`, e faça o processor **sempre**
+      devolvê-lo não nulo — senão o marcador é gravado.
 
 ---
