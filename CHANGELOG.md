@@ -2,6 +2,18 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.47 — 2026-09-25
+
+- **`null` explícito e `""` em data: o motor foi consertado, e a página diz as regras novas**
+  (`persistence-crs/endpoints/comando.md` §`null` explícito, chave omitida e o que o processor devolve).
+  O `null` explícito num atributo `nullable` grava `NULL` no agregado e na projeção, na criação e na
+  transição. Antes, em campo numérico a linha não materializava, e em texto gravava a palavra `"null"`.
+  Numa transição, `null` apaga e omitir a chave preserva. O `null` **devolvido pelo processor** continua
+  ignorado na mescla: é outra regra. `""` em `Date`/`Timestamp` vira `null` no opcional e dá `400` no
+  obrigatório; antes respondia `200` e a projeção falhava em silêncio. Vale para `/v3/persistence/` e
+  `/v3/persistence/t/`, que rodam o mesmo código. O que as 1.45 e 1.46 mediram no `computed` descrevia o
+  motor anterior.
+
 ## 1.46 — 2026-09-25
 
 - **`computed`: três fatos medidos entram na página** (`bff/README.md` §Atributo calculado pelo br). O

@@ -98,6 +98,8 @@ A ordem real, que importa para entender o que já rodou quando um erro chega:
 
 ### `null` explícito, chave omitida e o que o processor devolve
 
+Vale para `/v3/persistence/` e `/v3/persistence/t/`: as duas instâncias rodam o **mesmo código**.
+
 São três regras diferentes, e confundi-las é o engano comum:
 
 | O que acontece | Agregado | Projeção |
@@ -112,7 +114,7 @@ São três regras diferentes, e confundi-las é o engano comum:
   veio no corpo. Detalhe em [br-service](../../br-service/README.md).
 - Dentro de `valueObject` o `null` segue como `null` do JSON, sem mudança.
 
-> ⚠️ **Antes da imagem com ufrn.loco3 `66b1313` e persistence-crs `4f61f82`** (2026-09-25), o `null`
+> ⚠️ **Até o conserto de 2026-09-25** (ufrn.loco3 `66b1313`, persistence-crs `4f61f82`), o `null`
 > explícito divergia: na criação, um `null` em atributo numérico fazia a linha **não materializar** na
 > projeção, e em texto gravava a string `"null"`; na transição, a projeção **preservava** o valor
 > anterior enquanto o agregado gravava `null`. Tudo com `200`. Linha com `"null"` em texto gravada antes
@@ -122,7 +124,7 @@ São três regras diferentes, e confundi-las é o engano comum:
 `nullable: false` é `400`, com o nome do campo. Vale também para campo de `valueObject` em grupo e para o
 que o processor do br devolver. Em `String`, `""` continua sendo `""`.
 
-> ⚠️ **Antes da imagem com yc.cqrs-c `c111bf8`** (2026-09-25), `""` em data respondia `200`, e o agregado
+> ⚠️ **Até o conserto de 2026-09-25** (yc.cqrs-c `c111bf8`), `""` em data respondia `200`, e o agregado
 > gravava `""`. Já a projeção falhava ao gravar: na criação a linha não materializava, e na transição
 > ficava o valor anterior.
 
