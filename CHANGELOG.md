@@ -2,6 +2,17 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.55 — 2026-09-26
+
+- **`readProjection` sai da lista de chaves que ninguém lê** (`forger/endpoints/model.md` §Chaves que um
+  modelo novo não precisa trazer). A página mandava não gerá-la em modelo novo, mas o **BFF** a lê para
+  limitar as colunas que cada papel vê (`bff/README.md` §Limitar os campos que um papel lê). Quem seguisse
+  a página perdia essa proteção sem erro. Apontado pelo yc.app.
+- **`llms-full.txt`: os nove blocos da fatia do composer que tinham ficado para trás voltam a ser
+  idênticos aos arquivos** — `forger/README.md`, `forger/endpoints/{dataschema,entity,model}.md`,
+  `forger/erros.md`, `forger/exemplos.md`, `orgid/endpoints/{publico,ua-conta,ua-papel}.md`. O bloco do
+  `model.md` ainda não tinha nem o metamodelo da 1.37. Os outros 79 blocos não foram tocados.
+
 ## 1.54 — 2026-09-26
 
 - **`bff/README.md` alinha três avisos ao que o forger e o orgid passaram a fazer.** `readProjection` e
