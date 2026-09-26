@@ -157,7 +157,7 @@
           "type": "object",
           "properties": { "route": { "type": "string" } }
         },
-        "alias": { "type": "string", "minLength": 1, "description": "Opcional. Nome de exibição do comando, lido só pela tela; o motor não o lê." }
+        "alias": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "Opcional. Nome de exibição do comando, lido só pela tela; o motor não o lê." }
       }
     },
     "valueObjectGroup": {
@@ -184,7 +184,7 @@
       "required": ["type", "domainBus"],
       "properties": {
         "type": { "type": "string" },
-        "alias": { "type": "string", "minLength": 1, "description": "Opcional. Nome de exibição do evento, lido só pela tela; o motor não o lê." },
+        "alias": { "type": "string", "minLength": 1, "pattern": "\\S", "description": "Opcional. Nome de exibição do evento, lido só pela tela; o motor não o lê." },
         "whenAttribute": { "type": "string", "description": "Atributo de timestamp auto-valorizado (convenção: particípio + 'em')" },
         "payloadInherit": { "type": "string" },
         "domainBus": {
