@@ -83,7 +83,7 @@ Cria uma conta **externa** e a associa a um **papel**.
 **Resposta:** `200` (sem corpo) · `404` — `"role not found: the account was not created."` · `403` —
 `"role is not public: the account was not created."` · `409` se o `username` já existe.
 
-> ⚠️ **Só papel público**, em `develop` do orgid desde 2026-09-25 e **ainda não em produção**. Antes, a rota
+> ⚠️ **Só papel público**, em produção desde 2026-09-26 (ver [CHANGELOG 1.58](../../CHANGELOG.md)). Antes, a rota
 > aceitava **qualquer** papel existente, inclusive administrativo: quem não tinha credencial nenhuma criava
 > conta nova já com esse papel. Papel que o próprio usuário não pode escolher se associa pelo caminho
 > autenticado, `POST /ua/account-role/using/authority` ([ua-associacao.md](ua-associacao.md)).
