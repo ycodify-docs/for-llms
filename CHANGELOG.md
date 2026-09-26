@@ -2,6 +2,26 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.55 — 2026-09-26
+
+- **`readProjection` sai da lista de chaves que ninguém lê** (`forger/endpoints/model.md` §Chaves que um
+  modelo novo não precisa trazer). A página mandava não gerá-la em modelo novo, mas o **BFF** a lê para
+  limitar as colunas que cada papel vê (`bff/README.md` §Limitar os campos que um papel lê). Quem seguisse
+  a página perdia essa proteção sem erro. Apontado pelo yc.app.
+- **`llms-full.txt`: os nove blocos da fatia do composer que tinham ficado para trás voltam a ser
+  idênticos aos arquivos** — `forger/README.md`, `forger/endpoints/{dataschema,entity,model}.md`,
+  `forger/erros.md`, `forger/exemplos.md`, `orgid/endpoints/{publico,ua-conta,ua-papel}.md`. O bloco do
+  `model.md` ainda não tinha nem o metamodelo da 1.37. Os outros 79 blocos não foram tocados.
+
+## 1.54 — 2026-09-26
+
+- **`bff/README.md` alinha três avisos ao que o forger e o orgid passaram a fazer.** `readProjection` e
+  `computed` deixam de ser descritas como chaves que viajam só porque o forger as tolera: as duas são
+  **declaradas** no esquema do agregado, e a página diz o que a publicação confere e o que continua
+  sendo conferido pelo BFF. No autocadastro, a trava do papel público passa a existir **nos dois lados**
+  (o orgid também recusa papel não público); a da conta nascer `PENDING` continua **só do BFF**, porque
+  o orgid ainda aceita `status: ACTIVE` e a chave `from`.
+
 ## 1.53 — 2026-09-26
 
 - **Coordenação com N alvos: encadear, não emitir de dentro do processor** (`persistence-crs/spec/model-format.md`
