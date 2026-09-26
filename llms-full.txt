@@ -3146,7 +3146,7 @@ Cria uma conta **externa** e a associa a um **papel**.
 **Resposta:** `200` (sem corpo) · `404` — `"role not found: the account was not created."` · `403` —
 `"role is not public: the account was not created."` · `409` se o `username` já existe.
 
-> ⚠️ **Só papel público**, em `develop` do orgid desde 2026-09-25 e **ainda não em produção**. Antes, a rota
+> ⚠️ **Só papel público**, em produção desde 2026-09-26 (ver [CHANGELOG 1.58](../../CHANGELOG.md)). Antes, a rota
 > aceitava **qualquer** papel existente, inclusive administrativo: quem não tinha credencial nenhuma criava
 > conta nova já com esse papel. Papel que o próprio usuário não pode escolher se associa pelo caminho
 > autenticado, `POST /ua/account-role/using/authority` ([ua-associacao.md](ua-associacao.md)).
@@ -5242,9 +5242,9 @@ Quem lê a declaração é o BFF, que tira o campo do formulário: ver
 [Atributo calculado pelo br](../../bff/README.md#atributo-calculado-pelo-br--computed). **O motor não lê
 esta chave**: ela não muda o que o comando grava.
 
-> **Em `develop` do forger desde 2026-09-25**, e ainda **não em produção**. Até o deploy, a publicação
-> aceita a chave sem conferir nada, porque o metamodelo não fecha chave desconhecida: a declaração chega
-> ao cache sem ser validada.
+> **Em produção desde 2026-09-26** (ver [CHANGELOG 1.58](../../CHANGELOG.md)). Modelo publicado antes
+> disso não é revalidado: uma declaração com comando ou atributo inexistente que já estava no cache
+> continua lá até a próxima publicação.
 
 <a id="nome-de-exibicao"></a>
 ### Nome de exibição de comando e evento: `alias`
@@ -5266,9 +5266,8 @@ A **chave** continua sendo o que o cliente envia no comando e o que o motor usa 
 (`endState`); o `alias` não a substitui, nem ao `type` do evento, e **o motor não o lê**. Quem lê é o
 BFF, que o leva na capacidade do tenant: ver [bff — nome de exibição](../../bff/README.md#nome-de-exibicao).
 
-> **Em `develop` do forger desde 2026-09-26**, e ainda **não em produção**. Até o deploy, a publicação
-> aceita a chave sem conferir nada, porque o metamodelo não fecha chave desconhecida em comando nem em
-> evento: um `alias` vazio chega ao cache sem ser recusado.
+> **Em produção desde 2026-09-26** (ver [CHANGELOG 1.58](../../CHANGELOG.md)). Modelo publicado antes
+> disso não é revalidado: um `alias` vazio que já estava no cache continua lá até a próxima publicação.
 
 ### Chaves que um modelo novo não precisa trazer
 
