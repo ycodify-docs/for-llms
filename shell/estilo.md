@@ -40,11 +40,22 @@
 
 | Grupo | Exemplos | Uso |
 |---|---|---|
-| superfícies | `bg`, `surface`, `surface-2` | fundos de tela/painel/hover |
+| superfícies | `bg`, `surface`, `surface-2`, `sidebar` | fundos de tela/painel/hover; `sidebar` é o menu lateral |
 | bordas | `border`, `border-2` | separadores, contornos |
 | texto | `text`, `text-2`, `text-3` | primário / secundário / terciário |
 | acento (deriva da marca) | `accent`, `accent-fg`, `accent-weak`, `accent-ink` | ação primária, realce, texto legível sobre claro |
-| estados | `ok`, `warn`, `info`, `danger` (+ `-weak`) | status, alertas |
+| tinta | `ink`, `ink-fg` | botão escuro de ação secundária forte (ex.: relatar ao suporte); inverte no escuro |
+| estados | `ok`, `warn`, `info`, `danger` (+ `-weak`; `danger-line` para borda) | status, alertas, campo com erro |
+| pílula de estado | `pill-bg-l`, `pill-fg-l` | só a **luminosidade** por tema; ver abaixo |
+
+## Pílula de estado do agregado
+
+- Cada estado tem **uma matiz**, estável entre telas: a pílula usa
+  `oklch(var(--pill-bg-l) <croma> <matiz>)` no fundo e `oklch(var(--pill-fg-l) <croma> <matiz>)` no texto.
+  O tema troca só a luminosidade; a matiz é a mesma no claro e no escuro.
+- A matiz **não se escreve por cliente no código**: sai do nome do estado por uma função estável — o
+  mesmo nome dá sempre a mesma cor, em qualquer tela e para qualquer tenant.
+- Texto da pílula em monoespaçada.
 
 ## Chrome da casca (o que é fixo)
 
