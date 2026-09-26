@@ -356,17 +356,15 @@ recorte cai sobre o `eventData` do evento, e os metadados (quem, quando, qual co
 > **Nunca prefixe a chave com `_`.** A publicação do `.model.json` remove chaves `_`-prefixadas em
 > qualquer profundidade, **em silêncio** — a declaração sumiria sem aviso nenhum.
 
-> ### ⚠️ Esta chave viaja por uma propriedade MEDIDA, não por contrato
+> ### A chave é declarada no esquema do forger
 >
-> O `.model.json` é gravado no cache **como recebido**, menos as `_`-prefixadas — é isso que faz uma
-> chave desconhecida como `readProjection` chegar ao BFF. Mas **ninguém no forger prometeu preservá-la,
-> e nenhum teste a protege**: é comportamento observado, não garantia. Se a publicação de modelo um dia
-> ganhar validação de esquema, ou um gerador de vocabulário fechado como o que já existe do lado da
-> entity, a declaração **desaparece em silêncio** e o recorte deixa de valer sem nada acusar.
->
-> Dito pelo `composer`, dono do forger, em 2026-09-13, corrigindo uma formulação anterior desta doc que
-> tratava a sobrevivência como se fosse promessa. **Quem for mexer naquele caminho precisa saber que
-> ele carrega política de acesso a dado pessoal.**
+> `readProjection` é propriedade **declarada** do agregado no esquema com que o forger valida a
+> publicação do `.model.json` — lido pelo `composer`, dono do forger, em 2026-09-25: a publicação a
+> reconhece, e não depende mais de o forger tolerar chave desconhecida. **O BFF a lê** — é ela que faz o
+> recorte desta seção. **Quem for mexer naquele caminho
+> precisa saber que ela carrega política de acesso a dado pessoal.** A conferência do conteúdo — papel,
+> coluna, lista vazia — continua sendo do BFF, que recusa a leitura com `500` quando a declaração não se
+> sustenta.
 
 > ### 🔴 O que `readProjection` NÃO faz
 >
@@ -511,12 +509,13 @@ declara; lista vazia; atributo ou campo de value object que o comando não decla
 `whenAttribute` de um evento (o carimbo do servidor); e **comando sem `br.route`** — sem processor,
 ninguém sobrescreveria o marcador, e ele seria gravado.
 
-> ### ⚠️ Esta chave viaja por uma propriedade MEDIDA, não por contrato
+> ### A chave é declarada no esquema do forger
 >
-> O forger **tolera** `computed` — o esquema do agregado não recusa chave desconhecida —, mas não a
-> declara, como já declara `readProjection`. Lido pelo `composer`, dono do forger, em 2026-09-25
-> (`forger@8b906dd`). Se o esquema um dia fechar, o efeito é `400` na publicação, e não descarte
-> silencioso.
+> `computed` é propriedade **declarada** do agregado no esquema do forger, na forma que o BFF lê
+> ([forger — model](../forger/endpoints/model.md)). A publicação já recusa com `400` comando inexistente
+> e atributo sem ponto fora de `data.attribute`. **O resto é conferido pelo BFF**, no comando: o nome
+> com ponto (campo de value object), `status`, o `whenAttribute` e a falta de `br.route` — a recusa aí é
+> o `500` descrito acima.
 
 ## `predicates` é a forma do persistence-q — não há dialeto do BFF
 
@@ -573,13 +572,14 @@ Contrato de origem: [orgid/publico](../orgid/endpoints/publico.md) e [orgid/ua-p
 | Pedir hash (e-mail) | `GET /ua/hash?action={R\|PR}&username={u}` | — | repassa o orgid |
 | Ativar / recuperar | `PUT /ua/activate` | `{ username, action: R\|PR, hash, password? }` | repassa o orgid |
 
-> **Duas travas ficam no BFF, porque o orgid não as faz.**
+> **Duas travas no autocadastro — uma nos dois lados, outra só no BFF.**
 > 1. **O papel é validado contra o cardápio público** (`GET /ua/roles`, que lista só `ispublic=true`).
->    O orgid **ignora** `role.ispublic` no corpo e associa **qualquer papel existente** — sem esta
->    checagem, um registro público pediria um papel privilegiado e o receberia. Fora do cardápio → `403`.
-> 2. **A conta nasce sempre `PENDING`.** O contrato do orgid aceita `account.status: ACTIVE` (e a chave
->    `from` na raiz) para pular a ativação; o BFF força `PENDING` e não repassa `from`, de modo que só o
->    fluxo de hash por e-mail ativa a conta.
+>    O orgid também passou a recusar papel não público com `403`
+>    ([orgid — público](../orgid/endpoints/publico.md)); o BFF confere antes e mantém a checagem como
+>    defesa em profundidade. Fora do cardápio → `403`.
+> 2. **A conta nasce sempre `PENDING` — e esta trava é só do BFF.** O orgid ainda aceita
+>    `account.status: ACTIVE` no corpo, e a chave `from` na raiz ativa a conta com qualquer valor; o BFF
+>    força `PENDING` e não repassa `from`, de modo que só o fluxo de hash por e-mail ativa a conta.
 >
 > O `204` do orgid **não é sucesso** (significa papel inexistente e nada criado, transação revertida) —
 > o BFF o converte em `409` para não ser lido como ok.

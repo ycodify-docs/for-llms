@@ -2,6 +2,15 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.54 — 2026-09-26
+
+- **`bff/README.md` alinha três avisos ao que o forger e o orgid passaram a fazer.** `readProjection` e
+  `computed` deixam de ser descritas como chaves que viajam só porque o forger as tolera: as duas são
+  **declaradas** no esquema do agregado, e a página diz o que a publicação confere e o que continua
+  sendo conferido pelo BFF. No autocadastro, a trava do papel público passa a existir **nos dois lados**
+  (o orgid também recusa papel não público); a da conta nascer `PENDING` continua **só do BFF**, porque
+  o orgid ainda aceita `status: ACTIVE` e a chave `from`.
+
 ## 1.53 — 2026-09-26
 
 - **Coordenação com N alvos: encadear, não emitir de dentro do processor** (`persistence-crs/spec/model-format.md`
