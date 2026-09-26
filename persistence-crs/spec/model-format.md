@@ -508,9 +508,30 @@ as quatro chaves `boundedContext`, `aggregateType`, `commandName` e `data`:
 > não há retentativa e não há sinal do lado de fora: o alvo fica intacto, como se a coordenação não
 > existisse. Ao investigar *"a coordenação não faz nada"*, **confira a forma do retorno primeiro**.
 
-**Um alvo por coordenação.** `targetCommand` é um objeto, não uma lista: quem precisa atingir N agregados
-emite os N comandos dentro do próprio processor. O `coordination` declarado **dentro de um comando** é
-outro mecanismo — síncrono, transacional — e esse é uma lista ordenada.
+**Um alvo por coordenação.** `targetCommand` é um objeto, não uma lista. Se vier uma lista, a coordenação
+falha: três tentativas e depois a fila de descarte, sem nenhum alvo executado. O `coordination`
+declarado **dentro de um comando** é outro mecanismo — síncrono, transacional — e esse é uma lista
+ordenada.
+
+**Para atingir N agregados, encadeie.** Cada comando-alvo grava um evento próprio, e esse evento pode ter
+a sua `triggerCoordination`. Exemplo com N reservas: `aula.cancelada` → cancela a reserva 1 → o evento dela
+dispara a coordenação "próxima reserva da aula" → … O processor consulta o que falta e devolve o próximo
+alvo. Quando não houver mais, ele responde **sem** `targetCommand`: nada é despachado e a cadeia termina.
+O autor de origem atravessa cada elo.
+
+> **⚠️ Não emita os N comandos de dentro do processor.** No caminho assíncrono não há JWT, e um comando
+> submetido sem a identidade da saga é executado **sem conferência de papel** e grava um evento **sem
+> autor**. Além disso, você perde o que a cadeia dá por elo: deduplicação e retentativa por evento.
+
+**Várias coordenações no mesmo evento.** `triggerCoordination` aceita mais de uma entrada, e cada entrada
+vira uma mensagem independente, com o seu processor, as suas três tentativas e o seu descarte. Todas
+rodam com a identidade do autor do evento.
+
+- **Cada entrada precisa de um `name` diferente.** A deduplicação é por (evento, `name`): duas entradas
+  com o mesmo `name` podem ter a segunda descartada como já processada.
+- **Cada entrada precisa de `targetTenantId`.** Sem ele, a entrada é pulada, sem erro e sem log.
+- **Não há ordem garantida entre elas.** São publicadas na ordem da lista, mas podem ser consumidas em paralelo.
+  Coordenação que depende do resultado de outra deve ser encadeada, não listada ao lado.
 
 **O autor atravessa a saga.** O comando-alvo é gravado com a identidade de quem assinou o **primeiro**
 comando da cadeia, e o papel dele não é reavaliado no alvo: comando disparado por comando já executado é
