@@ -22,6 +22,8 @@ O contrato **mínimo obrigatório** é `mount` (e o `dispose` que ele devolve). 
   "tenant":       { "org": "...", "project": "...", "boundedContext": "...", "tenantId": "..." },
   "capability":   { /* modelo de capacidade — abaixo */ },
   "identity":     { "username": "...", "name": "...", "email": "..." },
+  "roles":        ["..."],
+  "activeRole":   null,
   "api":          { "command": "…", "query": "…", "aggregate": "…", "history": "…" },
   "prefs":        { "formMode": "inline" | "modal" },
   "canConfigure": false,
@@ -32,6 +34,14 @@ O contrato **mínimo obrigatório** é `mount` (e o `dispose` que ele devolve). 
 - **`tenant`** — o bounded context selecionado (org/projeto/BC + `tenantId` **opaco**).
 - **`capability`** — o **modelo de capacidade** (abaixo): o que o usuário pode fazer ali.
 - **`identity`** — dados **não-sensíveis** do usuário. **Sem token, sem senha.**
+- **`roles`** — os papéis **ativos** do usuário **na organização deste tenant** (UPPERCASE, sem `ROLE_`).
+  - **`activeRole`** — o papel que o usuário escolheu para esta sessão, ou `null`.
+  - **Os dois são dica de apresentação, nunca autorização.** Servem para o miolo decidir o que mostrar
+    — por exemplo, oferecer "reservar para outra pessoa" só a quem atende no balcão. Quem autoriza é o
+    servidor, a cada chamada: o BFF e o persistence-crs revalidam o comando, e a regra de negócio confere
+    o que o papel pode fazer com os dados. Esconder um campo na tela não impede ninguém de enviá-lo.
+  - Não confundir com `capability.commands[].roles`, que são os papéis que o **modelo** autoriza no
+    comando, e não os do usuário.
 - **`api`** — as quatro operações de domínio, todas contra o **BFF** (nunca a plataforma direto):
 
   | Método | Para quê |

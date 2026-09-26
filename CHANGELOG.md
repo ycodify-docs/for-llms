@@ -2,6 +2,44 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.53 — 2026-09-26
+
+- **Coordenação com N alvos: encadear, não emitir de dentro do processor** (`persistence-crs/spec/model-format.md`
+  §O que o processor de coordenação devolve). A página dizia que quem precisa atingir N agregados "emite
+  os N comandos dentro do próprio processor". No caminho assíncrono não há JWT, e o comando assim
+  submetido roda sem conferência de papel e grava evento sem autor. O caminho é encadear: cada alvo gera
+  um evento, que dispara a coordenação do próximo, e a cadeia acaba quando o processor responde sem
+  `targetCommand`. `targetCommand` em forma de lista faz a coordenação falhar. A página passa também a
+  dizer o que vale com **várias entradas** em `triggerCoordination`: uma mensagem independente por
+  entrada, `name` distinto (a deduplicação é por evento e `name`), `targetTenantId` obrigatório (sem ele a
+  entrada é pulada em silêncio) e nenhuma ordem garantida entre elas. Lido no código do persistence-crs e
+  do es-n.
+
+## 1.52 — 2026-09-25
+
+- **O `hostContext` ganha `roles` e `activeRole`** (`shell/contrato-miolo.md`). O miolo passa a saber os
+  papéis **ativos** do usuário na organização do tenant e o papel escolhido na sessão. Antes só havia a
+  identidade, e um miolo que precisasse mostrar coisas diferentes por papel não tinha de onde tirar isso.
+  É **dica de apresentação**: o servidor segue autorizando cada chamada. Pedido do `conceptnatal` para o
+  miolo de agenda. Miolo que não lê os campos não percebe diferença.
+
+## 1.51 — 2026-09-25
+
+- **orgid `/ua`: três rotas deixam de conceder o que não deviam** (`orgid/endpoints/publico.md`,
+  `orgid/endpoints/ua-conta.md`, `orgid/openapi.yaml`). `POST /open/ua/account-role` só aceita papel
+  **público** (`403` no resto); `PUT /open/ua/account/{u}/R/hash/{h}` só ativa conta `PENDING` (`403` em
+  `SUSPENDED`); `PUT /ua/account` ignora o `status` do corpo. **Em `develop` do orgid, ainda não em
+  produção.** Quem registra conta com papel público e confirma cadastro de conta pendente não percebe
+  diferença.
+
+## 1.50 — 2026-09-25
+
+- **`computed` passa a ser chave declarada do aggregate no `.model.json`** (`forger/endpoints/model.md`
+  §Atributos preenchidos pelo processor). Até aqui a publicação só **tolerava** a chave: o metamodelo não
+  a conhecia e não conferia nada. Agora ela é declarada, e a publicação recusa com `400` o comando ou o
+  atributo sem ponto que não existe no aggregate, a lista vazia e o valor que não é lista. **Em `develop`
+  do forger, ainda não em produção.** Modelo sem a chave não muda.
+
 ## 1.49 — 2026-09-25
 
 - **`POST /session/command` recusa com `400` o valor fora do tipo declarado** (`bff/README.md` §Proxy de

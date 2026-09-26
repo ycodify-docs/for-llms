@@ -67,8 +67,8 @@ validação e do JSON publicado) e o grid de interpretação (persistence-crs/es
   "boundedContext": { "name": "<bc>", "comment": "<descrição opcional>" },
 
   "schema": {
-    "forWriteModel.name": "wdb.client",   // valor FIXO definido pela plataforma (igual em todo agregado)
-    "forReadModel.name":  "<dataschema>"  // = nome do dataschema da projeção (por padrão = nome do bc)
+    "forWriteModel.name": "wdb.client",   // carimbo do forger — não é lido em runtime
+    "forReadModel.name":  "<dataschema>"  // carimbo do forger — não é lido em runtime
   },
   "tenantId": {
     "forWriteModel": "<tenant-id>",       // gerado na criação do dataschema (forger)
@@ -77,20 +77,27 @@ validação e do JSON publicado) e o grid de interpretação (persistence-crs/es
   "identity":    { "strategy": "uuid", "fields": [] },     // ver "Identidade e unicidade"
   "concurrency": { "version": "version", "strategy": "optimistic" },
 
+  "roles": { ... },   // OPCIONAL — quem pode LER este agregado. Ver "Quem pode ler"
+
   "command": { ... },
   "event":   { ... }
 }
 ```
 
-- **`schema.forWriteModel.name`** é um **valor fixo definido pela plataforma**, **igual em todo
-  agregado** (o armazém de escrita é universal). Não é escolhido pelo autor do modelo. **Na publicação,
-  o forger NORMALIZA este campo**: se o valor enviado não for o universal, ele é **convertido
-  automaticamente** para o valor canônico (e, se ausente, é definido). Ou seja, **não confie** no valor
-  que você enviar aqui — o serviço o impõe. (Nesta documentação o valor universal é representado como
-  `wdb.client`.)
-- **`schema.forReadModel.name`** é o **nome do dataschema** que hospeda a **projeção** do agregado —
-  por padrão, igual ao nome do **bounded context** (ver
-  [conceitos — do agregado à projeção](../../02-conceitos.md#do-agregado-à-projeção-derivação-e-implantação)).
+- **`schema.forWriteModel.name`** e **`schema.forReadModel.name`** são **carimbados pelo forger na
+  publicação** e **não dirigem o roteamento em runtime** — o grid de interpretação não lê nenhum dos
+  dois. Declare-os (o schema os espera; o valor universal de escrita é representado aqui como
+  `wdb.client`, e o de leitura, por convenção, é o nome do bounded context), mas **não modele contando
+  com eles**: mudá-los não muda para onde nada vai. Quem decide de fato:
+
+  | O que é decidido | Quem decide |
+  |---|---|
+  | banco do armazém de eventos | a **instância** que atende a rota do comando — não o modelo |
+  | schema do armazém de eventos | **fixo**: `client` |
+  | banco e schema da **projeção** | o **dataschema do tenant** (forger: `dataschema → database → dbconn`) |
+  | schema do registro de consumo (`event_consumed`) | o **`boundedContext.name` do modelo** |
+
+  Ver [conceitos — do agregado à projeção](../../02-conceitos.md#do-agregado-à-projeção-derivação-e-implantação).
 - `concurrency.strategy: "optimistic"` → concorrência otimista (ver contrato do `status` no
   [README](../README.md#estados-transições-e-concorrência)).
 
@@ -98,6 +105,96 @@ validação e do JSON publicado) e o grid de interpretação (persistence-crs/es
 > tenant é o header **`X-Tenant-Id`** da requisição. Os campos `tenantId.forWriteModel`/`forReadModel`
 > do JSON são **IGNORADOS** para a resolução de roteamento — `forReadModel` só é **injetado no payload
 > do evento** publicado. Não modele assumindo que este campo do modelo dirige o roteamento por tenant.
+
+### A chave do agregado — `<bc>.<type>`, e ela vale em três lugares
+
+A chave sob `aggregate` **não é rótulo livre**: tem de ser exatamente
+**`<boundedContext.name>.<type>`**, com os dois valores declarados dentro do próprio agregado. A mesma
+string aparece em três lugares, e os três têm de concordar:
+
+| Onde | Forma |
+|---|---|
+| chave do agregado no `.model.json` | `"vendas.pedido": { "type": "pedido", "boundedContext": { "name": "vendas" } }` |
+| chave que o cliente envia no **comando** | `{ "vendas.pedido": { "<comando>": … } }` |
+| schema PG do registro de consumo | `vendas.event_consumed` |
+
+> **⚠️ Divergência aqui não dá erro — dá silêncio.** Se a chave não for exatamente
+> `<boundedContext.name>.<type>`, o evento do agregado **nunca é processado**: não há resposta de erro,
+> não há entrada de log e o comando parece ter sido aceito. O sintoma é **projeção que nunca aparece**,
+> indistinguível de "nada aconteceu". Ao ver isso, **confira a chave antes de investigar qualquer outra
+> coisa**.
+
+> **⚠️ `boundedContext.name` deve ser o nome do dataschema do tenant.** A linha da projeção é gravada no
+> dataschema **do tenant**, enquanto o registro de consumo é gravado no schema que leva o nome do
+> **bounded context**. Quando os dois nomes não coincidem, as duas gravações vão para schemas
+> diferentes — e o segundo pode nem existir no banco do cliente.
+
+### Quem pode ler o agregado (`roles`)
+
+```jsonc
+"roles": {
+  "read":   ["ASSOCIADO", "ADMINISTRADOR"],   // podem ler o agregado
+  "author": ["ADMINISTRADOR"],                // veem QUEM fez cada evento no /history
+  "scope":  {                                  // recorte por proprietário, opcional
+    "read": { "ASSOCIADO": { "rows": { "by": "username" } } }
+  }
+}
+```
+
+**Sem esta chave, qualquer usuário do tenant lê o agregado.** É a declaração que liga o recorte.
+
+| Chave | O que declara |
+|---|---|
+| `read` | os papéis que alcançam o agregado. Quem não tem nenhum deles não o enxerga |
+| `scope.read.<PAPEL>.rows.by` | o atributo cujo valor precisa ser o **`username` do token** de quem pede — o proprietário |
+| `scope.read.<PAPEL>.attributes` | os atributos que esse papel vê. O que ficar de fora não aparece no estado nem no `eventData` do `/history` |
+| `author` | os papéis que veem, no `/history`, quem executou cada evento |
+
+As duas dimensões de `scope` são independentes: `rows` responde *quais agregados são seus*,
+`attributes` responde *quais campos você vê*. Um papel pode declarar uma, outra ou as duas. Chave da
+plataforma — `id`, `aggregateid`, `status`, `version` e os metadados de auditoria — atravessa o recorte
+de coluna: não é dado de negócio, e escondê-la quebra quem lê sem proteger nada.
+
+> **Agregado sem nenhum atributo de negócio visível responde como um `{id}` que não existe.** Devolver a
+> casca com as chaves técnicas entregaria a existência do agregado a quem não pode vê-lo.
+
+Os códigos de resposta estão em
+[leitura de agregado — quem pode ler](../endpoints/agregado-leitura.md#quem-pode-ler).
+
+> **A mesma palavra vale duas coisas, e o nível diz qual.** `roles` **no agregado** é leitura; `roles`
+> **dentro de um comando** é escrita — quem pode executá-lo — e é um array. Ler pode caber a um papel que
+> nunca escreve.
+
+**`by` nomeia um atributo declarado** em `data.attribute` de algum comando: é de lá que o dado nasce. A
+convenção para o atributo de proprietário é **`username`**.
+
+**Papéis acumulados: o menos restritivo vence.** Basta um papel do solicitante estar em `read` sem recorte
+declarado em `scope` para não haver recorte — quem acumula ADMINISTRADOR e um papel recortado não perde o
+que o papel maior lhe dá.
+
+> **⚠️ `loguser` não serve como `by`, e a publicação recusa.** Ele registra **quem executou o comando**,
+> não **de quem o agregado é**: um cadastro feito pelo administrador leva o login dele, e o recorte
+> devolveria nada ao dono do dado.
+
+> **⚠️ Atributo de titular vazio = agregado invisível para o próprio dono.** Se o modelo recorta por
+> `username` e o agregado tem esse campo em branco, ele não casa com ninguém — e a resposta é a de um id
+> inexistente. Preencher o titular é parte da modelagem, em especial quando quem cadastra é outra pessoa.
+
+### `loguser`: quem executou cada comando
+
+Todo comando executado com credencial carimba **`loguser`** no dado do agregado, com o `username` de quem
+o executou. É campo **da plataforma**: não se declara no modelo e não se envia no comando — declará-lo é
+recusado, como os demais metadados.
+
+Em comando disparado por **coordenação**, o valor é o de quem assinou o **primeiro** comando da cadeia: a
+identidade atravessa a saga.
+
+> `loguser` responde *"quem escreveu"*; `username`, quando o modelo o declara, responde *"de quem é"*. Os
+> dois coincidem quase sempre, e divergem no caso que importa — o cadastro feito por terceiro.
+
+A **linha da projeção** tem um `loguser` próprio, que registra quem a criou
+([persistence-q](../../persistence-q/README.md#recorte-de-leitura-por-titular)); o do agregado não o altera. São dois
+registros, em dois lugares, e cada um responde pela sua escrita.
 
 ### Identidade e unicidade (`identity`)
 
@@ -111,11 +208,47 @@ validação e do JSON publicado) e o grid de interpretação (persistence-crs/es
 - **`strategy`** — define o **tipo do `id`** do agregado. `"uuid"` ⇒ o `id` é um UUID **gerado pela
   plataforma**; **não** o envie no comando de criação.
 - **`fields`** — **vetor de strings**, em que **cada elemento é o nome de um atributo** declarado sob
-  `command.…​.data.attribute`. Declara uma **constraint de unicidade composta**: a **combinação dos
-  valores** desses atributos deve ser **única** entre os registros do agregado (não pode haver dois
-  registros com a mesma combinação). `[]` = sem restrição de unicidade adicional além do `id`.
-  - Ex.: `"fields": ["cnpj"]` → não há dois agregados com o mesmo `cnpj`.
-  - Ex.: `"fields": ["razaosocial", "segmento"]` → o par (`razaosocial`, `segmento`) é único.
+  `command.…​.data.attribute`. Declara **qual combinação de valores identifica o agregado no negócio** —
+  a resposta a *"o que faz dois destes serem o mesmo?"*. `[]` = nenhuma; o agregado é identificado só
+  pelo `id`.
+  - Ex.: `"fields": ["cnpj"]` → dois agregados com o mesmo `cnpj` são o mesmo.
+  - Ex.: `"fields": ["razaosocial", "segmento"]` → o par identifica.
+
+**A combinação é imposta na criação:** um segundo agregado com a mesma combinação de valores é
+**recusado** — não nasce. Modelo com `fields: []` não tem essa restrição.
+
+> **⚠️ Campo declarado que não vem no comando desliga a unicidade daquele agregado.** Se **qualquer**
+> atributo listado em `fields` estiver ausente ou nulo no dado do comando de criação, o agregado é
+> criado **sem chave de unicidade** — e uma repetição futura com os mesmos valores passa a ser aceita.
+> Não há recusa e não há aviso na resposta. Portanto: **todo atributo listado em `fields` tem de ser
+> obrigatório no comando de criação**, e é assim que se modela.
+
+**O que acontece na colisão.** A criação do segundo é recusada e o agregado não nasce. Quando a
+criação parte de uma **coordenação**, a plataforma reconhece a recusa como *"o alvo já existe"* e
+considera a coordenação **concluída** — não é erro, e não vai para fila de descarte.
+
+#### Como escolher os `fields` — e o erro que a escolha ingênua produz
+
+A pergunta a responder não é *"quais campos são obrigatórios?"*, é **"o que faz dois destes serem o
+mesmo?"**. E há uma armadilha frequente: **recriar depois de encerrar costuma ser legítimo.**
+
+Exemplo. Uma matrícula com `fields: ["aulaid", "alunoid"]`:
+
+| Quando | O que acontece | Com essa chave |
+|---|---|---|
+| março | o aluno se matricula na turma | ok |
+| junho | o aluno sai; a matrícula é encerrada | ok |
+| agosto | o aluno **volta para a mesma turma** | **seria recusado** — mesma combinação |
+
+Voltar em agosto é uma matrícula **nova e legítima**. Se a chave não a distingue da de março, a
+imposição — quando existir — passaria a recusar operação correta, que é pior do que aceitar a repetida.
+
+**A correção é de modelagem, não da plataforma:** a chave precisa conter o que separa uma da outra —
+o período letivo, a data de início, a temporada. Se duas coisas podem coexistir legitimamente com os
+mesmos valores, **os `fields` estão incompletos**.
+
+> A plataforma garante *"esta combinação não se repete"*. **Quais campos formam a combinação é decisão
+> de quem modela** — e é onde o domínio entra.
 
 ### Identificação na projeção (leitura)
 
@@ -157,9 +290,51 @@ Atributos aparecem em `command.<cmd>.data.attribute.<campo>`:
 | `Integer` | inteiro | — |
 | `Long` | inteiro grande (também usado p/ valores monetários em menor unidade, ex.: centavos) | — |
 | `Boolean` | verdadeiro/falso | — |
-| `Date` | data | — |
-| `Timestamp` | data e hora | — |
+| `Date` | data de calendário, **sem fuso** — gravada e devolvida como `2026-09-13` | — |
+| `Timestamp` | data e hora, **em UTC, sem fuso** — gravada e devolvida como `2026-09-12T20:19:09` | — |
 | `Json` | conteúdo semiestruturado (objeto/lista) | — |
+
+### Datas: `Timestamp` e `Date`
+
+**Por que isto importa:** a mesma data sai por dois caminhos — o estado do agregado e a projeção. Se cada
+um a devolvesse numa grafia, o front teria de reconciliar as duas. Por isso **toda data é normalizada ao
+entrar no comando**, e as duas leituras devolvem **a mesma string**.
+
+**A convenção:** `Timestamp` é gravado e devolvido **em UTC, sem fuso**; a conversão para o horário de quem
+lê é do front. `Date` é dia do calendário e **não tem fuso**.
+
+| Tipo | Você pode enviar | Fica gravado e volta como |
+|---|---|---|
+| `Timestamp` | `"2026-09-15T06:00:00-03:00"` — com fuso | `"2026-09-15T09:00:00"` — convertido para UTC |
+| | `"2026-09-15T09:00:00Z"` · `"…+00:00"` | `"2026-09-15T09:00:00"` |
+| | `"2026-09-15 09:00:00"` · `"2026-09-15T09:00:00.665"` — **sem fuso** | `"2026-09-15T09:00:00"` — **lido como UTC**, fração descartada |
+| | `"2026-09-15"` — só data | `"2026-09-15T00:00:00"` — início do dia em UTC |
+| | `1789462800000` — número | `"2026-09-15T09:00:00"` — epoch em milissegundos |
+| `Date` | `"1990-04-02"` | `"1990-04-02"` |
+| | `"1990-04-02T23:00:00-03:00"` — com hora | `"1990-04-02"` — **o dia como escrito**, sem conversão |
+
+> ⚠️ **O erro mais comum: hora local sem fuso.** `"2026-09-15 06:00:00"` é **06h UTC** — 03h em Brasília.
+> Se a hora veio de um formulário, mande `-03:00` junto.
+
+> **Por que `Date` não converte:** um aniversário registrado às 23h de Brasília seria dia seguinte em UTC.
+> Quem manda uma data manda um dia do calendário, não um instante — converter mudaria o dia.
+
+**Onde a normalização acontece:** em todo atributo declarado `Timestamp` ou `Date`, **solto ou como campo de
+valueObject em grupo**, e **também na data que a regra de negócio devolver** — ela é aplicada de novo depois
+da regra.
+
+**Onde NÃO acontece — e a data segue exatamente como você mandou:**
+- dentro de valueObject de **tipo direto** (`{"type": "Json"}`): o modelo não diz que há data lá dentro;
+- em campo `String`, mesmo que o texto seja uma data ou uma hora (`"06:00"`);
+- em dado gravado **antes** de `yc-interpreter:amd64-260913c` — a imagem em que isto passou a valer em teste;
+  **produção ainda não tem**, e lá nenhuma data é normalizada.
+
+**Recusas:** forma irreconhecível — `"13/09/2026"`, `"ontem"`, epoch num `Date` — é **`400`** que nomeia o
+campo (`no campo 'notafiscal.datacompra': …`). `"13/09/2026"` é recusado de propósito: dia e mês trocam de
+lugar conforme o país. Valor **vazio ou nulo** passa como veio.
+
+Para filtrar por data numa consulta:
+[persistence-q § Filtrar por data e hora](../../persistence-q/query-controls.md#filtrar-por-data-e-hora-date-timestamp).
 
 > **Não há tipo decimal/float.** Para valores fracionários (ex.: dinheiro), use `Long` (menor unidade)
 > ou `String`. `Json` cobre estruturas aninhadas livres.
@@ -290,7 +465,7 @@ Atributos aparecem em `command.<cmd>.data.attribute.<campo>`:
 ```
 
 - **`whenAttribute`** — nome de um atributo de timestamp **valorizado automaticamente** pela plataforma na
-  gravação do evento. Convenção: particípio passado do verbo do comando + sufixo `em` (comando `criar` →
+  gravação do evento, **em UTC**, na mesma forma dos demais `Timestamp` (`2026-09-12T20:19:09`). Convenção: particípio passado do verbo do comando + sufixo `em` (comando `criar` →
   evento `criada` → `whenAttribute: "criadaem"`). **Não** envie esse campo no comando **e NÃO o declare**
   como `command.<cmd>.data.attribute` — é auto-valorizado, nunca um atributo de dados do comando.
   - **Coluna obrigatória na projeção (REGRA):** ainda assim, **cada** `whenAttribute` **DEVE existir como
@@ -305,6 +480,81 @@ Atributos aparecem em `command.<cmd>.data.attribute.<campo>`:
     { "name": "<alvo>", "targetTenantId": "<tenant-id destino>", "br": { "route": "<rota>" } }
     ```
   - Listas **vazias** = sem despacho extra (só a projeção do próprio contexto).
+
+### Por onde a identidade passa na coordenação
+
+```
+comando de origem                 evento do agregado          processor de coordenação
+assinado por ADMINISTRADOR  ──▶   autor: ADMINISTRADOR  ──▶   recebe o evento e devolve
+                                                              processedData.targetCommand
+                                                                       │
+                                                                       ▼
+                                                              comando no agregado ALVO
+                                                              autor: ADMINISTRADOR
+                                                              papel NÃO é reavaliado
+                                                                       │
+                                            ┌──────────────────────────┴───────────────┐
+                                            ▼                                          ▼
+                                   evento do alvo                          projeção do alvo
+                                   loguser: ADMINISTRADOR                  escrita como ADMINISTRADOR
+                                                                           ⚠️ o accessControl.write da
+                                                                              entity precisa conter
+                                                                              esse papel
+```
+
+### O que o processor de coordenação devolve
+
+O processor apontado por `triggerCoordination[].br.route` devolve **`processedData.targetCommand`**, com
+as quatro chaves `boundedContext`, `aggregateType`, `commandName` e `data`:
+
+```jsonc
+{ "processedData": { "targetCommand": {
+    "boundedContext": "estoque", "aggregateType": "itemestoque",
+    "commandName":    "registrarentrada", "data": { "quantidade": 3 } } } }
+```
+
+> **⚠️ Resposta `200` com outra forma não dispara nada.** O comando-alvo não é submetido, não há erro,
+> não há retentativa e não há sinal do lado de fora: o alvo fica intacto, como se a coordenação não
+> existisse. Ao investigar *"a coordenação não faz nada"*, **confira a forma do retorno primeiro**.
+
+**Um alvo por coordenação.** `targetCommand` é um objeto, não uma lista. Se vier uma lista, a coordenação
+falha: três tentativas e depois a fila de descarte, sem nenhum alvo executado. O `coordination`
+declarado **dentro de um comando** é outro mecanismo — síncrono, transacional — e esse é uma lista
+ordenada.
+
+**Para atingir N agregados, encadeie.** Cada comando-alvo grava um evento próprio, e esse evento pode ter
+a sua `triggerCoordination`. Exemplo com N reservas: `aula.cancelada` → cancela a reserva 1 → o evento dela
+dispara a coordenação "próxima reserva da aula" → … O processor consulta o que falta e devolve o próximo
+alvo. Quando não houver mais, ele responde **sem** `targetCommand`: nada é despachado e a cadeia termina.
+O autor de origem atravessa cada elo.
+
+> **⚠️ Não emita os N comandos de dentro do processor.** No caminho assíncrono não há JWT, e um comando
+> submetido sem a identidade da saga é executado **sem conferência de papel** e grava um evento **sem
+> autor**. Além disso, você perde o que a cadeia dá por elo: deduplicação e retentativa por evento.
+
+**Várias coordenações no mesmo evento.** `triggerCoordination` aceita mais de uma entrada, e cada entrada
+vira uma mensagem independente, com o seu processor, as suas três tentativas e o seu descarte. Todas
+rodam com a identidade do autor do evento.
+
+- **Cada entrada precisa de um `name` diferente.** A deduplicação é por (evento, `name`): duas entradas
+  com o mesmo `name` podem ter a segunda descartada como já processada.
+- **Cada entrada precisa de `targetTenantId`.** Sem ele, a entrada é pulada, sem erro e sem log.
+- **Não há ordem garantida entre elas.** São publicadas na ordem da lista, mas podem ser consumidas em paralelo.
+  Coordenação que depende do resultado de outra deve ser encadeada, não listada ao lado.
+
+**O autor atravessa a saga.** O comando-alvo é gravado com a identidade de quem assinou o **primeiro**
+comando da cadeia, e o papel dele não é reavaliado no alvo: comando disparado por comando já executado é
+considerado autorizado. É essa identidade que aparece no
+[`loguser`](#loguser-quem-executou-cada-comando) e no `/history` do agregado derivado.
+
+> **⚠️ A projeção do alvo é escrita como esse autor.** O `accessControl.write` da **entity** do agregado
+> alvo precisa contemplar um papel de quem dispara a origem — senão o comando é aceito, o evento é
+> gravado e a **projeção não materializa**. Ao modelar uma coordenação, confira os dois lados: o papel de
+> quem executa o comando de origem e o `accessControl.write` da entity que recebe.
+
+**A autorização herdada morre no comando-alvo.** Se o alvo declarar `coordination` — o encadeamento
+síncrono dentro do comando —, esses comandos encadeados têm o papel **conferido** normalmente, contra a
+identidade que atravessou a saga.
 
 > Declarar `triggerProjection`/`triggerCoordination` **não cria filas** — apenas roteia o despacho pelos
 > canais universais do es-n. Ver [arquitetura — de onde vêm as filas](../../01-arquitetura.md#origem-das-filas).
@@ -323,7 +573,8 @@ Atributos aparecem em `command.<cmd>.data.attribute.<campo>`:
   alfabeto português, **sem** `_`, dígito, acento ou separador; para **atributo**, **máx. 24** chars. O
   `whenAttribute` segue a convenção particípio+`em` (e também casa `^[a-z]+$`).
 - O `id` do agregado e os campos de controle são gerenciados pela plataforma — **não** declarar/enviar.
-- `forWriteModel.name` é sempre o mesmo identificador universal; `forReadModel.name` é o esquema do contexto.
+- `schema.forWriteModel.name` e `schema.forReadModel.name` são carimbos do forger e **não dirigem nada**
+  em runtime — ver [nível do agregado](#nível-do-agregado).
 - Publicar o `.model.json` pelo forger ([model](../../forger/endpoints/model.md)) **não cria filas nem
   tabelas**: as projeções (tabelas) vêm das `entity` do forger; as filas, do deploy de processo.
 
