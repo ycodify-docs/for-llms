@@ -128,6 +128,26 @@ com "adicionar" — e é por isso que ela viaja em vez dos campos achatados. `fi
 modelo declarou o value object como atributo tipado direto: não há campos a oferecer, e quem preenche
 precisa conhecer o modelo.
 
+<a id="nome-de-exibicao"></a>
+### Nome de exibição de comando e evento: `alias`
+
+Quando o modelo declara `alias` em `command.<cmd>` ou em `event.<evt>`
+([forger — nome de exibição](../forger/endpoints/model.md#nome-de-exibicao)), a capacidade o leva:
+
+| Chave | Onde | O que traz |
+|---|---|---|
+| `alias` | em cada item de `commands` | o nome que a tela mostra no lugar de `name`. **Ausente** quando o comando não declara |
+| `events` | em cada item de `aggregates` | `{ "<evento>": { "alias": "…" } }`, indexado pela chave de `event`, **só com os eventos que declaram** alias. **Ausente** quando nenhum declara |
+
+- **Quem exibe faz o fallback**: o alias, e sem ele o nome. O BFF entrega o alias como o modelo o
+  declarou; alias vazio ou só de espaços é tratado como ausente.
+- **O alias é só exibição.** O envelope do comando continua `{ "<name>": {…} }`, com a **chave**; o alias
+  no lugar dela é comando inexistente, e o BFF responde `403`.
+- **O histórico não muda:** `/session/history` repassa o persistence-crs como veio. O `eventType` de cada
+  evento é qualificado por pontos e termina no `type` do evento; para exibir o alias, procure o último
+  segmento em `events`. Isso supõe a chave do evento igual ao seu `type` — se forem diferentes, o alias
+  daquele evento não aparece.
+
 > ⚠️ **A capacidade depende do modelo estar VIVO no cache**, e quando ele some a causa é **remoção,
 > nunca expiração.** Sem a chave, o cache responde `204`, a capacidade do bounded context **some** —
 > `GET /session/capabilities` deixa de listar os comandos daquele tenant — e isso acontece **mesmo com o

@@ -2,6 +2,15 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.57 — 2026-09-26
+
+- **A capacidade passa a levar o `alias` de comando e de evento** (`bff/README.md` §Nome de exibição de
+  comando e evento; `shell/contrato-miolo.md` §Modelo de capacidade). `commands[].alias` e
+  `aggregates[].events.<evento>.alias`, os dois ausentes quando o modelo não declara. Quem exibe mostra o
+  alias e, sem ele, o nome; o comando continua sendo enviado pelo nome. O histórico não muda: o alias do
+  evento se acha pelo último segmento do `eventType`. A regra "o modelo não fornece rótulo" ganha essa
+  exceção. Complementa a 1.56. Em `develop` do yc.app, ainda não em produção.
+
 ## 1.56 — 2026-09-26
 
 - **`alias` de comando e de evento no `.model.json`** (`forger/endpoints/model.md` §Nome de exibição de
