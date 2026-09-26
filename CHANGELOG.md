@@ -2,6 +2,27 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.57 — 2026-09-26
+
+- **A capacidade passa a levar o `alias` de comando e de evento** (`bff/README.md` §Nome de exibição de
+  comando e evento; `shell/contrato-miolo.md` §Modelo de capacidade). `commands[].alias` e
+  `aggregates[].events.<evento>.alias`, os dois ausentes quando o modelo não declara. Quem exibe mostra o
+  alias e, sem ele, o nome; o comando continua sendo enviado pelo nome. O histórico não muda: o alias do
+  evento se acha pelo último segmento do `eventType`. A regra "o modelo não fornece rótulo" ganha essa
+  exceção. Complementa a 1.56. Em `develop` do yc.app, ainda não em produção.
+
+## 1.56 — 2026-09-26
+
+- **`alias` de comando e de evento no `.model.json`** (`forger/endpoints/model.md` §Nome de exibição de
+  comando e evento). Chave opcional em `command.<cmd>` e `event.<evt>`: o nome que a tela mostra no lugar
+  da chave. A publicação recusa com `400` o alias vazio, só de espaços ou que não é texto; ausente,
+  publica como antes. O motor não lê a chave. Em `develop` do forger, ainda não em produção.
+- **`alias` na gramática do `.model.json`** (`persistence-crs/spec/model-format.md` §Comandos e §Eventos,
+  `persistence-crs/spec/model.schema.json`). Opcional em `command.<cmd>` e `event.<evt>`, com a forma que o
+  forger valida: texto com ao menos um caractere que não seja espaço. O motor (yc.cqrs-c, yc.es, es-n,
+  persistence-crs) não lê a chave. O bloco do `model-format.md` no `llms-full.txt` volta a ser idêntico ao
+  arquivo.
+
 ## 1.55 — 2026-09-26
 
 - **`readProjection` sai da lista de chaves que ninguém lê** (`forger/endpoints/model.md` §Chaves que um

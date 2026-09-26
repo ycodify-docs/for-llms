@@ -344,6 +344,7 @@ Para filtrar por data numa consulta:
 ```jsonc
 "command": {
   "<nomeDoComando>": {
+    "alias": "<nome de exibição>",                // opcional: só a tela lê
     "data": {
       "attribute": {
         "<campo>": { "type": "...", "length": 0, "nullable": true, "comment": "..." }
@@ -446,6 +447,9 @@ Para filtrar por data numa consulta:
   gravar o evento (CP-6). A rota segue a **forma canônica totalmente qualificada**
   `<org>/<project>/<bc>/<aggregate>/<comando>` (evita colisão entre organizações) — ver
   [br — forma canônica da rota](../../br-service/README.md#forma-canônica-da-rota-obrigatória).
+- **`alias`** (opcional) — nome de exibição do comando, **string com ao menos um caractere que não seja espaço**, para a tela. O motor
+  (yc.cqrs-c, persistence-crs, es-n) **não o lê**: não entra em validação, rota, evento nem mensagem.
+  Quem identifica o comando continua sendo a chave `<nomeDoComando>`.
 
 ## Eventos e `domainBus`
 
@@ -453,6 +457,7 @@ Para filtrar por data numa consulta:
 "event": {
   "<nomeDoEvento>": {
     "type": "<nome-do-evento>",          // identificador do tipo do evento
+    "alias": "<nome de exibição>",       // opcional: só a tela lê
     "whenAttribute": "<campoTimestamp>", // atributo de carimbo de tempo (auto-valorizado)
     "payloadInherit": "command-data",    // herda os dados do comando
     "domainBus": {
@@ -464,6 +469,9 @@ Para filtrar por data numa consulta:
 }
 ```
 
+- **`alias`** (opcional) — nome de exibição do evento, **string com ao menos um caractere que não seja espaço**, para a tela. O motor
+  (yc.cqrs-c, yc.es, es-n) **não o lê**: não entra no `eventType`, na mensagem publicada nem no
+  `eventData`. Quem identifica o evento continua sendo `type`.
 - **`whenAttribute`** — nome de um atributo de timestamp **valorizado automaticamente** pela plataforma na
   gravação do evento, **em UTC**, na mesma forma dos demais `Timestamp` (`2026-09-12T20:19:09`). Convenção: particípio passado do verbo do comando + sufixo `em` (comando `criar` →
   evento `criada` → `whenAttribute: "criadaem"`). **Não** envie esse campo no comando **e NÃO o declare**
@@ -5175,6 +5183,7 @@ Erros: `400` (arquivo vazio, extensão diferente de `.json`, documento inválido
 > | item **objeto** em `domainBus.triggerProjection` sem `targetTenantId` | o destino é descartado no despacho: a projeção cross-tenant simplesmente não dispara. Item **string** continua válido — é a projeção same-tenant |
 > | `roles` do aggregate com recorte incoerente | ver [recorte de leitura do aggregate](#recorte-de-leitura-do-aggregate-roles) |
 > | `computed` que nomeia comando ou atributo inexistente | ver [atributos preenchidos pelo processor](#atributos-preenchidos-pelo-processor-computed) |
+> | `alias` vazio, só de espaços ou que não é texto, em comando ou evento | ver [nome de exibição](#nome-de-exibicao) |
 
 ### Recorte de leitura do aggregate: `roles`
 
@@ -5236,6 +5245,30 @@ esta chave**: ela não muda o que o comando grava.
 > **Em `develop` do forger desde 2026-09-25**, e ainda **não em produção**. Até o deploy, a publicação
 > aceita a chave sem conferir nada, porque o metamodelo não fecha chave desconhecida: a declaração chega
 > ao cache sem ser validada.
+
+<a id="nome-de-exibicao"></a>
+### Nome de exibição de comando e evento: `alias`
+
+**Opcional**, em `command.<cmd>` e em `event.<evt>`. É o nome que a tela mostra ao usuário **no lugar da
+chave**; ausente, a tela mostra a chave. **Comando e evento sem a chave publicam como antes.**
+
+```json
+"command": { "registrar": { "alias": "Registrar pedido", … } },
+"event":   { "registrado": { "alias": "Pedido registrado", "type": "registrado", … } }
+```
+
+> Ilustrativo: `…` é placeholder, não JSON literal.
+
+Texto livre: acento e espaço são aceitos, e a unicidade não é conferida. Recusas na publicação, todas
+`400`: `alias` vazio, só de espaços, ou que não é texto.
+
+A **chave** continua sendo o que o cliente envia no comando e o que o motor usa para achar o evento
+(`endState`); o `alias` não a substitui, nem ao `type` do evento, e **o motor não o lê**. Quem lê é o
+BFF, que o leva na capacidade do tenant: ver [bff — nome de exibição](../../bff/README.md#nome-de-exibicao).
+
+> **Em `develop` do forger desde 2026-09-26**, e ainda **não em produção**. Até o deploy, a publicação
+> aceita a chave sem conferir nada, porque o metamodelo não fecha chave desconhecida em comando nem em
+> evento: um `alias` vazio chega ao cache sem ser recusado.
 
 ### Chaves que um modelo novo não precisa trazer
 
@@ -8512,6 +8545,7 @@ não diz **como se vê** (isso é o miolo).
       "commands": [
         {
           "name": "...",
+          "alias": "...",
           "roles": ["..."],
           "fromState": ["..."],
           "endState": "...",
@@ -8519,13 +8553,18 @@ não diz **como se vê** (isso é o miolo).
           "valueObjects": [ { "name": "...", "cardinality": "single|multiple",
                               "fields": [ { "name": "...", "type": "...", "role": "..." } ], "scalar": false } ]
         }
-      ]
+      ],
+      "events": { "<evento>": { "alias": "..." } }
     }
   ]
 }
 ```
 
 - **`commands`** — **apenas** os autorizados ao papel do usuário (interseção já aplicada pelo BFF).
+- **`alias`** e **`events`** — o nome de exibição que o modelo declara para comando e evento; a tela
+  mostra o alias e, sem ele, o nome. Os dois são **ausentes** quando o modelo não declara, e `events`
+  traz só os eventos que declaram. O comando continua sendo enviado pelo `name`. Detalhe, inclusive como
+  casar o evento do histórico: [bff — Nome de exibição](../bff/README.md#nome-de-exibicao).
 - **`fromState`** — de quais estados o comando aparece; a casca/miolo habilita a transição só quando o
   agregado está num estado válido.
 - **`attributes[].role`** — classificação que guia a apresentação:
@@ -8560,7 +8599,8 @@ não diz **como se vê** (isso é o miolo).
 
 - **Modelo = domínio (autoritativo)**: existência de comando, papéis, tipos, transições — o miolo **não
   sobrescreve**. **Miolo = apresentação**: rótulo, widget, layout, ordem, visibilidade — o modelo **não
-  fornece**, o miolo **preenche**.
+  fornece**, o miolo **preenche**. A exceção é o nome de exibição de comando e evento (`alias`), que o
+  modelo pode declarar e o miolo deve respeitar.
 - **Nada de segredo no miolo**: toda escrita/leitura de domínio passa pelo `api` → **BFF** → plataforma,
   que **revalida** a autorização no servidor.
 - **Ciclo de vida**: `mount` ao selecionar o bounded context; `dispose` ao trocar de BC ou encerrar.
@@ -9004,6 +9044,26 @@ A `cardinality` é o que decide a tela — `single` desenha **um grupo**, `multi
 com "adicionar" — e é por isso que ela viaja em vez dos campos achatados. `fields` vazio significa que o
 modelo declarou o value object como atributo tipado direto: não há campos a oferecer, e quem preenche
 precisa conhecer o modelo.
+
+<a id="nome-de-exibicao"></a>
+### Nome de exibição de comando e evento: `alias`
+
+Quando o modelo declara `alias` em `command.<cmd>` ou em `event.<evt>`
+([forger — nome de exibição](../forger/endpoints/model.md#nome-de-exibicao)), a capacidade o leva:
+
+| Chave | Onde | O que traz |
+|---|---|---|
+| `alias` | em cada item de `commands` | o nome que a tela mostra no lugar de `name`. **Ausente** quando o comando não declara |
+| `events` | em cada item de `aggregates` | `{ "<evento>": { "alias": "…" } }`, indexado pela chave de `event`, **só com os eventos que declaram** alias. **Ausente** quando nenhum declara |
+
+- **Quem exibe faz o fallback**: o alias, e sem ele o nome. O BFF entrega o alias como o modelo o
+  declarou; alias vazio ou só de espaços é tratado como ausente.
+- **O alias é só exibição.** O envelope do comando continua `{ "<name>": {…} }`, com a **chave**; o alias
+  no lugar dela é comando inexistente, e o BFF responde `403`.
+- **O histórico não muda:** `/session/history` repassa o persistence-crs como veio. O `eventType` de cada
+  evento é qualificado por pontos e termina no `type` do evento; para exibir o alias, procure o último
+  segmento em `events`. Isso supõe a chave do evento igual ao seu `type` — se forem diferentes, o alias
+  daquele evento não aparece.
 
 > ⚠️ **A capacidade depende do modelo estar VIVO no cache**, e quando ele some a causa é **remoção,
 > nunca expiração.** Sem a chave, o cache responde `204`, a capacidade do bounded context **some** —
