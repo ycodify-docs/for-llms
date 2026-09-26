@@ -19,7 +19,8 @@
 
 - **Autenticação:** toda requisição exige o cabeçalho `Authorization`.
 - **Autorização:** o usuário precisa ter, na organização (`{org}`) alvo, o papel de **administrador** ou
-  de **engenheiro**. Sem isso → `403`.
+  de **engenheiro**. Sem isso → `403`. **Exceção:** o `GET` do [manifesto de apresentação](endpoints/presentation.md)
+  basta o tenant constar no token.
 - **Ordem:** respeitar a sequência de deploy (um recurso não pode ser criado sem o seu "pai"). Ver
   [fluxo de deploy](../03-fluxo-de-deploy.md).
 
@@ -28,7 +29,7 @@
 forger administra **recursos** (não agregados de domínio). Cada recurso tem ciclo de vida
 **criar → ler → atualizar → remover**, com **versão otimista** na atualização (campo `logversion`) e
 **remoção bloqueada** enquanto houver dependentes. Recursos:
-`dbconn`, `database`, `project`, `dataschema`, `entity`, `model`, `process`, `email`
+`dbconn`, `database`, `project`, `dataschema`, `entity`, `model`, `process`, `email`, `presentation`
 (ver [conceitos](../02-conceitos.md)).
 
 ### Regras de nome dos recursos
@@ -112,6 +113,7 @@ dbconn      (servidor, porta e usuário de conexão)
 | **model** | `POST/GET/DELETE .../tenant/{tenantId}/model` + listar | [endpoints/model.md](endpoints/model.md) |
 | **process** | `POST/GET/DELETE /org/{org}/project/{project}/process` | [endpoints/process.md](endpoints/process.md) |
 | **email** | `POST/GET/PUT/DELETE /org/{org}/project/{project}/email[/{id}]` | [endpoints/email.md](endpoints/email.md) |
+| **presentation** | `POST/GET/DELETE .../tenant/{tenantId}/presentation` | [endpoints/presentation.md](endpoints/presentation.md) |
 
 Catálogo de erros: [erros.md](erros.md). Exemplos anotados: [exemplos.md](exemplos.md).
 

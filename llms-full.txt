@@ -828,6 +828,7 @@ Tolere a breve defasagem de propagação (reconsulte se necessário). Ver
 | Entender o fluxo ponta a ponta entre serviços | [`01-arquitetura.md`](01-arquitetura.md) |
 | Implantar um sistema do zero (ordem dos recursos) | [`03-fluxo-de-deploy.md`](03-fluxo-de-deploy.md) + [`forger/`](forger/README.md) |
 | Escrever um modelo de domínio (`.model.json`) | [`examples/`](examples/README.md) + [`forger/endpoints/model.md`](forger/endpoints/model.md) |
+| Dizer como a tela apresenta os agregados de um tenant (`.presentation.json`) | [`forger/endpoints/presentation.md`](forger/endpoints/presentation.md) |
 | Criar as projeções (tabelas de leitura) | [`forger/endpoints/entity.md`](forger/endpoints/entity.md) |
 | Executar/disparar um comando de domínio | [`persistence-crs/endpoints/comando.md`](persistence-crs/endpoints/comando.md) |
 | Ler o estado ou o histórico de um agregado | [`persistence-crs/endpoints/agregado-leitura.md`](persistence-crs/endpoints/agregado-leitura.md) |
@@ -4234,7 +4235,8 @@ pode levar um curto intervalo até refletir a mudança — a projeção é atual
 
 - **Autenticação:** toda requisição exige o cabeçalho `Authorization`.
 - **Autorização:** o usuário precisa ter, na organização (`{org}`) alvo, o papel de **administrador** ou
-  de **engenheiro**. Sem isso → `403`.
+  de **engenheiro**. Sem isso → `403`. **Exceção:** o `GET` do [manifesto de apresentação](endpoints/presentation.md)
+  basta o tenant constar no token.
 - **Ordem:** respeitar a sequência de deploy (um recurso não pode ser criado sem o seu "pai"). Ver
   [fluxo de deploy](../03-fluxo-de-deploy.md).
 
@@ -4243,7 +4245,7 @@ pode levar um curto intervalo até refletir a mudança — a projeção é atual
 forger administra **recursos** (não agregados de domínio). Cada recurso tem ciclo de vida
 **criar → ler → atualizar → remover**, com **versão otimista** na atualização (campo `logversion`) e
 **remoção bloqueada** enquanto houver dependentes. Recursos:
-`dbconn`, `database`, `project`, `dataschema`, `entity`, `model`, `process`, `email`
+`dbconn`, `database`, `project`, `dataschema`, `entity`, `model`, `process`, `email`, `presentation`
 (ver [conceitos](../02-conceitos.md)).
 
 ### Regras de nome dos recursos
@@ -4327,6 +4329,7 @@ dbconn      (servidor, porta e usuário de conexão)
 | **model** | `POST/GET/DELETE .../tenant/{tenantId}/model` + listar | [endpoints/model.md](endpoints/model.md) |
 | **process** | `POST/GET/DELETE /org/{org}/project/{project}/process` | [endpoints/process.md](endpoints/process.md) |
 | **email** | `POST/GET/PUT/DELETE /org/{org}/project/{project}/email[/{id}]` | [endpoints/email.md](endpoints/email.md) |
+| **presentation** | `POST/GET/DELETE .../tenant/{tenantId}/presentation` | [endpoints/presentation.md](endpoints/presentation.md) |
 
 Catálogo de erros: [erros.md](erros.md). Exemplos anotados: [exemplos.md](exemplos.md).
 
@@ -5433,6 +5436,123 @@ Resposta `201`: `{ "id": <número>, "message": "..." }`. Erros: `400`, `403`, `5
 
 ## Remover
 `DELETE /org/{org}/project/{project}/email/{id}` → `200`/`404`.
+
+<!-- ===== forger/endpoints/presentation.md ===== -->
+
+# forger · endpoints · presentation
+
+> **presentation** = o **manifesto de apresentação** de um tenant: como a tela mostra os agregados —
+> rótulos, formatos, colunas, filtros, opções e cor de cada estado. **Opcional**: sem ele, a tela deriva
+> tudo do nome e do tipo. Guia: [../README.md](../README.md). Forma: [presentation.schema.json](../spec/presentation.schema.json).
+> Consumo pela tela: [bff](../../bff/README.md).
+
+## Contents
+- Publicar · Ler · Remover
+- Forma do arquivo
+- Referências conferidas na publicação
+- Ciclo de vida
+
+Um manifesto por tenant, publicado **depois** do `.model.json` daquele tenant: é contra o modelo
+publicado que as referências são conferidas. O motor de execução **não** lê este arquivo.
+
+## Publicar
+
+`POST /org/{org}/project/{project}/tenant/{tenantId}/presentation`
+
+Envio **multipart**, com o documento no campo `file` e extensão `.json`. Autorização: a mesma do
+[model](model.md) — papel de administrador ou de engenheiro em `{org}`.
+
+Efeito, na ordem: confere que `(org, project, tenant)` referenciam um único dataschema → remove as chaves
+`_`-prefixadas (metadado) → valida a **forma** → exige o **modelo publicado** do tenant → confere as
+**referências** → publica. **Semântica de sobrescrita.** Um manifesto recusado **não** substitui o que
+estava publicado.
+
+| Resposta | Quando |
+|---|---|
+| `201` `{ "stored": true }` | publicado |
+| `400` | arquivo vazio ou sem `.json`; forma inválida; modelo do tenant não publicado; referência inexistente. Traz **todas** as violações de uma vez, cada uma nomeando o que está errado |
+| `403` · `404` | consistência de `(org, project, tenant)`, como no model |
+
+## Ler
+
+`GET /org/{org}/project/{project}/tenant/{tenantId}/presentation`
+
+**Lê quem tem o tenant no token** — não exige papel de administrador nem de engenheiro. É a exceção à
+regra geral do serviço.
+
+| Resposta | Quando |
+|---|---|
+| `200` | o manifesto, como publicado (sem as chaves `_`) |
+| `204` sem corpo | o tenant não tem manifesto — é o caso normal, e a tela deriva do nome e do tipo |
+| `403` | o tenant não está no token |
+| `404` | tenant inexistente ou de outro project |
+
+## Remover
+
+`DELETE /org/{org}/project/{project}/tenant/{tenantId}/presentation` — autorização do publicar.
+`200` `{ "deleted": true }`, ou `false` se não havia manifesto.
+
+## Forma do arquivo
+
+```json
+{
+  "formato": 1,
+  "aggregate": {
+    "loja.pedido": {
+      "singular": "Pedido", "plural": "Pedidos", "titleKey": "numero",
+      "labels": { "numero": "Número", "endereco.cep": "CEP" },
+      "stateLabels": { "criado": "Criado", "pago": "Pago" },
+      "fmt": { "total": "money:2", "criadoem": "datetime" },
+      "cols": ["numero", "total"], "filters": ["numero"],
+      "options": { "canal": ["loja", "site"],
+                   "cliente": { "aggregate": "loja.cliente", "valueKey": "id", "labelKey": "nome" } },
+      "stateHue": { "criado": 210, "pago": 120 }
+    }
+  }
+}
+```
+
+> Ilustrativo: nomes de agregado, atributo e estado são exemplos, não JSON literal a copiar.
+
+`formato` é **obrigatório** e vale `1`. Todo o resto é **opcional**. A chave de `aggregate` é a **mesma**
+do `.model.json` (`<boundedContext>.<type>`). Chave desconhecida é **recusada** — typo não passa em silêncio.
+
+| Chave | O que é |
+|---|---|
+| `singular` · `plural` | nome do agregado na tela; texto não vazio |
+| `titleKey` | atributo cujo valor identifica a linha |
+| `labels` | rótulo por atributo, value object ou `grupo.campo` |
+| `stateLabels` | rótulo por estado |
+| `fmt` | formato por atributo: `date` · `datetime` · `money` · `money:<casas>` · `phone` · `bool` · `mono`. `money:2` é inteiro com 2 casas implícitas (`1050` = `10,50`) |
+| `cols` · `filters` | atributos das colunas padrão, na ordem, e atributos filtráveis; lista não vazia, sem repetição |
+| `options` | por atributo, lista fixa de valores **ou** `{ aggregate, valueKey, labelKey }` apontando outro agregado |
+| `stateHue` | matiz da cor de cada estado, inteiro de `0` a `359` |
+
+O nome de exibição de **comando** e de **evento** não entra aqui: é o `alias`, declarado no próprio modelo
+([model](model.md#nome-de-exibicao)).
+
+## Referências conferidas na publicação
+
+Toda referência tem de existir no **modelo publicado do mesmo tenant**:
+
+- **agregado** — chave de `aggregate` do modelo;
+- **atributo** — declarado em `data.attribute` de algum comando do agregado, ou `whenAttribute` de algum
+  evento dele, ou metadado da plataforma (`id`, `loguser`, `logrole`, `logversion`, `logdate`);
+- **`grupo.campo`** — só em value object que é **grupo de campos**; value object descrito como um
+  atributo não tem campos para apontar;
+- **value object pelo nome** — só em `labels`;
+- **estado** (`stateLabels`, `stateHue`) — chave de evento do agregado;
+- **`options` por referência** — outro agregado do **mesmo** modelo, com `valueKey` e `labelKey` entre os
+  atributos **dele**.
+
+## Ciclo de vida
+
+- O manifesto **não** é removido junto com o modelo — nem pelo `DELETE` do model, nem quando o dataschema
+  entra em `MODELING`. Referência que ficar órfã (atributo renomeado no modelo) a tela ignora, e a
+  próxima publicação do manifesto recusa.
+- Chaves `_`-prefixadas são metadado, removidas na publicação, como no `.model.json`.
+
+> **Em `develop` do forger desde 2026-09-26**, e ainda **não em produção**.
 
 <!-- ===== forger/erros.md ===== -->
 
