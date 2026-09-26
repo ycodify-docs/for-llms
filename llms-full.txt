@@ -5175,6 +5175,7 @@ Erros: `400` (arquivo vazio, extensão diferente de `.json`, documento inválido
 > | item **objeto** em `domainBus.triggerProjection` sem `targetTenantId` | o destino é descartado no despacho: a projeção cross-tenant simplesmente não dispara. Item **string** continua válido — é a projeção same-tenant |
 > | `roles` do aggregate com recorte incoerente | ver [recorte de leitura do aggregate](#recorte-de-leitura-do-aggregate-roles) |
 > | `computed` que nomeia comando ou atributo inexistente | ver [atributos preenchidos pelo processor](#atributos-preenchidos-pelo-processor-computed) |
+> | `alias` vazio, só de espaços ou que não é texto, em comando ou evento | ver [nome de exibição](#nome-de-exibicao) |
 
 ### Recorte de leitura do aggregate: `roles`
 
@@ -5236,6 +5237,30 @@ esta chave**: ela não muda o que o comando grava.
 > **Em `develop` do forger desde 2026-09-25**, e ainda **não em produção**. Até o deploy, a publicação
 > aceita a chave sem conferir nada, porque o metamodelo não fecha chave desconhecida: a declaração chega
 > ao cache sem ser validada.
+
+<a id="nome-de-exibicao"></a>
+### Nome de exibição de comando e evento: `alias`
+
+**Opcional**, em `command.<cmd>` e em `event.<evt>`. É o nome que a tela mostra ao usuário **no lugar da
+chave**; ausente, a tela mostra a chave. **Comando e evento sem a chave publicam como antes.**
+
+```json
+"command": { "registrar": { "alias": "Registrar pedido", … } },
+"event":   { "registrado": { "alias": "Pedido registrado", "type": "registrado", … } }
+```
+
+> Ilustrativo: `…` é placeholder, não JSON literal.
+
+Texto livre: acento e espaço são aceitos, e a unicidade não é conferida. Recusas na publicação, todas
+`400`: `alias` vazio, só de espaços, ou que não é texto.
+
+A **chave** continua sendo o que o cliente envia no comando e o que o motor usa para achar o evento
+(`endState`); o `alias` não a substitui, nem ao `type` do evento, e **o motor não o lê**. Quem lê é o
+BFF: ver [bff](../../bff/README.md).
+
+> **Em `develop` do forger desde 2026-09-26**, e ainda **não em produção**. Até o deploy, a publicação
+> aceita a chave sem conferir nada, porque o metamodelo não fecha chave desconhecida em comando nem em
+> evento: um `alias` vazio chega ao cache sem ser recusado.
 
 ### Chaves que um modelo novo não precisa trazer
 
