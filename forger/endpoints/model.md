@@ -100,9 +100,9 @@ Quem lê a declaração é o BFF, que tira o campo do formulário: ver
 [Atributo calculado pelo br](../../bff/README.md#atributo-calculado-pelo-br--computed). **O motor não lê
 esta chave**: ela não muda o que o comando grava.
 
-> **Em `develop` do forger desde 2026-09-25**, e ainda **não em produção**. Até o deploy, a publicação
-> aceita a chave sem conferir nada, porque o metamodelo não fecha chave desconhecida: a declaração chega
-> ao cache sem ser validada.
+> **Em produção desde 2026-09-26** (ver [CHANGELOG 1.58](../../CHANGELOG.md)). Modelo publicado antes
+> disso não é revalidado: uma declaração com comando ou atributo inexistente que já estava no cache
+> continua lá até a próxima publicação.
 
 <a id="nome-de-exibicao"></a>
 ### Nome de exibição de comando e evento: `alias`
@@ -124,9 +124,8 @@ A **chave** continua sendo o que o cliente envia no comando e o que o motor usa 
 (`endState`); o `alias` não a substitui, nem ao `type` do evento, e **o motor não o lê**. Quem lê é o
 BFF, que o leva na capacidade do tenant: ver [bff — nome de exibição](../../bff/README.md#nome-de-exibicao).
 
-> **Em `develop` do forger desde 2026-09-26**, e ainda **não em produção**. Até o deploy, a publicação
-> aceita a chave sem conferir nada, porque o metamodelo não fecha chave desconhecida em comando nem em
-> evento: um `alias` vazio chega ao cache sem ser recusado.
+> **Em produção desde 2026-09-26** (ver [CHANGELOG 1.58](../../CHANGELOG.md)). Modelo publicado antes
+> disso não é revalidado: um `alias` vazio que já estava no cache continua lá até a próxima publicação.
 
 ### Chaves que um modelo novo não precisa trazer
 

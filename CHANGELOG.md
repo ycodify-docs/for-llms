@@ -2,6 +2,13 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.58 — 2026-09-26
+
+- **`alias`, `computed` e a trava de papel público do autocadastro entram em produção** — três avisos
+  de "ainda não em produção" saem da fatia do composer: `forger/endpoints/model.md` §Atributos
+  preenchidos pelo processor e §Nome de exibição de comando e evento, e `orgid/endpoints/publico.md`
+  (só papel público). Modelo publicado antes não é revalidado: vale a partir da próxima publicação.
+
 ## 1.57 — 2026-09-26
 
 - **A capacidade passa a levar o `alias` de comando e de evento** (`bff/README.md` §Nome de exibição de
