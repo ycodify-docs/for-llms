@@ -2,6 +2,13 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.56 — 2026-09-26
+
+- **`alias` de comando e de evento no `.model.json`** (`forger/endpoints/model.md` §Nome de exibição de
+  comando e evento). Chave opcional em `command.<cmd>` e `event.<evt>`: o nome que a tela mostra no lugar
+  da chave. A publicação recusa com `400` o alias vazio, só de espaços ou que não é texto; ausente,
+  publica como antes. O motor não lê a chave. Em `develop` do forger, ainda não em produção.
+
 ## 1.55 — 2026-09-26
 
 - **`readProjection` sai da lista de chaves que ninguém lê** (`forger/endpoints/model.md` §Chaves que um
