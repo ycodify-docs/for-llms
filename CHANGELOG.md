@@ -2,6 +2,19 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.53 — 2026-09-26
+
+- **Coordenação com N alvos: encadear, não emitir de dentro do processor** (`persistence-crs/spec/model-format.md`
+  §O que o processor de coordenação devolve). A página dizia que quem precisa atingir N agregados "emite
+  os N comandos dentro do próprio processor". No caminho assíncrono não há JWT, e o comando assim
+  submetido roda sem conferência de papel e grava evento sem autor. O caminho é encadear: cada alvo gera
+  um evento, que dispara a coordenação do próximo, e a cadeia acaba quando o processor responde sem
+  `targetCommand`. `targetCommand` em forma de lista faz a coordenação falhar. A página passa também a
+  dizer o que vale com **várias entradas** em `triggerCoordination`: uma mensagem independente por
+  entrada, `name` distinto (a deduplicação é por evento e `name`), `targetTenantId` obrigatório (sem ele a
+  entrada é pulada em silêncio) e nenhuma ordem garantida entre elas. Lido no código do persistence-crs e
+  do es-n.
+
 ## 1.52 — 2026-09-25
 
 - **O `hostContext` ganha `roles` e `activeRole`** (`shell/contrato-miolo.md`). O miolo passa a saber os
