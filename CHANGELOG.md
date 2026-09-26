@@ -2,6 +2,14 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.52 — 2026-09-25
+
+- **O `hostContext` ganha `roles` e `activeRole`** (`shell/contrato-miolo.md`). O miolo passa a saber os
+  papéis **ativos** do usuário na organização do tenant e o papel escolhido na sessão. Antes só havia a
+  identidade, e um miolo que precisasse mostrar coisas diferentes por papel não tinha de onde tirar isso.
+  É **dica de apresentação**: o servidor segue autorizando cada chamada. Pedido do `conceptnatal` para o
+  miolo de agenda. Miolo que não lê os campos não percebe diferença.
+
 ## 1.51 — 2026-09-25
 
 - **orgid `/ua`: três rotas deixam de conceder o que não deviam** (`orgid/endpoints/publico.md`,
