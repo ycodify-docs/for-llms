@@ -49,7 +49,8 @@ regra geral do serviço.
 ## Remover
 
 `DELETE /org/{org}/project/{project}/tenant/{tenantId}/presentation` — autorização do publicar.
-`200` `{ "deleted": true }`, ou `false` se não havia manifesto.
+`200` `{ "deleted": true }` — o corpo diz o **estado**: não resta manifesto, tivesse ou não havido um.
+Repetir o `DELETE` é seguro e responde o mesmo.
 
 ## Forma do arquivo
 
@@ -111,4 +112,6 @@ Toda referência tem de existir no **modelo publicado do mesmo tenant**:
   próxima publicação do manifesto recusa.
 - Chaves `_`-prefixadas são metadado, removidas na publicação, como no `.model.json`.
 
-> **Em `develop` do forger desde 2026-09-26**, e ainda **não em produção**.
+> **Em produção desde 2026-09-26** (ver [CHANGELOG 1.61](../../CHANGELOG.md)). Até o próximo deploy, o `DELETE`
+> em produção ainda responde `{ "deleted": false }` quando não havia manifesto — inclusive numa repetição
+> da mesma chamada, com o manifesto já apagado pela primeira.

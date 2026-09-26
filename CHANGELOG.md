@@ -2,6 +2,12 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.61 — 2026-09-26
+
+- **Manifesto de apresentação em produção** (`forger/endpoints/presentation.md`): o aviso de "ainda não em
+  produção" sai. E o `DELETE` passa a responder `{ "deleted": true }` sempre que não resta manifesto,
+  para que a repetição da mesma chamada responda o mesmo; em produção a partir do próximo deploy.
+
 ## 1.60 — 2026-09-26
 
 - **Manifesto de apresentação por tenant** (`forger/endpoints/presentation.md`, página nova, e
