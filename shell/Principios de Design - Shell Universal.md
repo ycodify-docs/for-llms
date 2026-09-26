@@ -42,10 +42,13 @@ O verde Ycodify é o único primitivo de marca. Todos os tons de acento derivam 
 
 | Token | Hex | Uso |
 |-------|-----|-----|
-| `--yc-brand` | `#00d676` | Verde de marca (sobrescrevível pelo tenant) |
-| `--accent-ink` | `#07935a` | Texto de acento sobre fundo claro |
-| `--accent-weak` | `#dcf7e9` | Fundo suave de acento |
-| `--accent-fg` | `#043019` | Texto sobre o verde cheio |
+| `--yc-brand` | `#00c875` | Verde de marca (sobrescrevível pelo tenant) |
+| `--accent-ink` | `#08653c` | Texto de acento sobre fundo claro |
+| `--accent-weak` | `#dff5ea` | Fundo suave de acento |
+| `--accent-fg` | `#063d24` | Texto sobre o verde cheio |
+
+> Valores do **Stager Console** (2026-09-26), o desenho de referência da casca e do miolo. Até então a
+> marca era `#00d676`, com `#07935a` · `#dcf7e9` · `#043019` nos acentos.
 
 > **Regra:** o verde cheio nunca recebe texto que não seja `--accent-fg`. Para texto de acento sobre fundo claro, use sempre `--accent-ink`, nunca o verde puro (contraste insuficiente).
 
@@ -56,14 +59,15 @@ O verde Ycodify é o único primitivo de marca. Todos os tons de acento derivam 
 | Sucesso | `--ok` | `#1f7a4d` |
 | Atenção | `--warn` | `#9a6412` |
 | Informação | `--info` | `#1f6f9a` |
-| Erro | `--danger` | `#b23b34` |
+| Erro | `--danger` | `oklch(0.52 0.17 25)` — fundo `--danger-weak`, borda `--danger-line` |
 
 ### Tipografia
 
 - **Manrope** (400 · 500 · 600 · 700 · 800) — interface inteira: títulos, corpo, rótulos, botões. Peso 800 para títulos, 700 para ênfase, 500–600 para corpo e controles.
-- **IBM Plex Mono** (400 · 500 · 600) — metadados técnicos: identificadores, códigos de org, atalhos, timestamps, rótulos em caixa-alta. Nunca para corpo de leitura.
+- **JetBrains Mono** (400 · 500 · 600) — metadados técnicos: identificadores, códigos de org, atalhos, timestamps, rótulos em caixa-alta, e na tabela os documentos, telefones, datas e valores. Nunca para corpo de leitura.
 
-> Duas famílias, sem exceção. Uma terceira fonte só entra por decisão registrada neste guia. Corpo mínimo de interface: 13px; texto de leitura longa: 14–15px com entrelinha 1.6.
+> Duas famílias, sem exceção. Uma terceira fonte só entra por decisão registrada neste guia. *Decisão
+> registrada em 2026-09-26: JetBrains Mono substitui a IBM Plex Mono, com o desenho do Stager Console.* Corpo mínimo de interface: 13px; texto de leitura longa: 14–15px com entrelinha 1.6.
 
 ### Espaço, raio e elevação
 

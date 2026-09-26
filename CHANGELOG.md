@@ -2,6 +2,15 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.59 — 2026-09-26
+
+- **A casca adota a paleta e a fonte do Stager Console** (`shell/Principios de Design - Shell Universal.md`
+  §Marca e cor e §Tipografia; `shell/estilo.md` §Grupos de token). Marca `#00d676` → `#00c875`, com
+  os acentos `#08653c` · `#dff5ea` · `#063d24`; erro em `oklch`. **JetBrains Mono** substitui a IBM
+  Plex Mono, como decisão registrada no guia. Tokens novos: `sidebar` (menu lateral), `ink`/`ink-fg`
+  (botão escuro), `danger-line` (borda de erro) e `pill-bg-l`/`pill-fg-l` (luminosidade da pílula de
+  estado, cuja matiz sai do nome do estado). Em `develop` do yc.app (merge `c9f1935`), ainda não em produção.
+
 ## 1.58 — 2026-09-26
 
 - **`alias`, `computed` e a trava de papel público do autocadastro entram em produção** — três avisos
