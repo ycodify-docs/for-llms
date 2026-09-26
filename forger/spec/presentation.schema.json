@@ -1,0 +1,144 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://docs.exemplo/forger/presentation.schema.json",
+  "title": "Manifesto de apresentacao (<tenantId>.presentation.json)",
+  "description": "Manifesto de apresentacao de UM tenant: como a tela mostra os agregados (rotulos, formatos, colunas, filtros, opcoes e cor de cada estado). Tudo e opcional alem de 'formato': o que faltar, a tela deriva do nome e do tipo. O motor de execucao NAO le este arquivo. Chaves '_'-prefixadas sao metadado e sao removidas na publicacao. Este schema confere so a FORMA; que agregado, atributo e estado citados existem no modelo publicado do tenant e conferido na publicacao (ver forger/endpoints/presentation.md). Chave desconhecida e recusada.",
+  "type": "object",
+  "required": [
+    "formato"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "formato": {
+      "const": 1,
+      "description": "Versao da forma deste arquivo. So existe a 1."
+    },
+    "aggregate": {
+      "type": "object",
+      "description": "Mapa de agregados. A CHAVE e a mesma de aggregate.<chave> no .model.json do tenant: '<boundedContext.name>.<type>'.",
+      "propertyNames": {
+        "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$"
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/aggregate"
+      }
+    }
+  },
+  "definitions": {
+    "texto": {
+      "type": "string",
+      "minLength": 1,
+      "pattern": "\\S",
+      "description": "Texto exibido ao usuario: nao vazio e nao so de espacos."
+    },
+    "nome": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Nome de atributo, de value object ou 'grupo.campo'. A existencia e conferida contra o modelo."
+    },
+    "listaDeNomes": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": {
+        "$ref": "#/definitions/nome"
+      }
+    },
+    "aggregate": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "singular": {
+          "$ref": "#/definitions/texto"
+        },
+        "plural": {
+          "$ref": "#/definitions/texto"
+        },
+        "titleKey": {
+          "$ref": "#/definitions/nome",
+          "description": "Atributo cujo valor identifica a linha para o usuario."
+        },
+        "labels": {
+          "type": "object",
+          "description": "Chave = atributo, value object ou 'grupo.campo'; valor = rotulo exibido.",
+          "additionalProperties": {
+            "$ref": "#/definitions/texto"
+          }
+        },
+        "stateLabels": {
+          "type": "object",
+          "description": "Chave = estado (chave do evento, igual ao type); valor = rotulo exibido.",
+          "additionalProperties": {
+            "$ref": "#/definitions/texto"
+          }
+        },
+        "fmt": {
+          "type": "object",
+          "description": "Chave = atributo; valor = formato. 'money:<casas>' e inteiro com casas decimais implicitas ('money:2' guarda 1050 para 10,50).",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^(date|datetime|money|money:[0-9]{1,2}|phone|bool|mono)$"
+          }
+        },
+        "cols": {
+          "$ref": "#/definitions/listaDeNomes",
+          "description": "Atributos das colunas padrao da listagem, na ordem."
+        },
+        "filters": {
+          "$ref": "#/definitions/listaDeNomes",
+          "description": "Atributos filtraveis."
+        },
+        "options": {
+          "type": "object",
+          "description": "Chave = atributo; valor = lista fixa de valores OU referencia a outro agregado do MESMO tenant.",
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "array",
+                "minItems": 1,
+                "uniqueItems": true,
+                "items": {
+                  "type": [
+                    "string",
+                    "number",
+                    "boolean"
+                  ]
+                }
+              },
+              {
+                "type": "object",
+                "required": [
+                  "aggregate",
+                  "valueKey",
+                  "labelKey"
+                ],
+                "additionalProperties": false,
+                "properties": {
+                  "aggregate": {
+                    "type": "string",
+                    "pattern": "^[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$"
+                  },
+                  "valueKey": {
+                    "$ref": "#/definitions/nome"
+                  },
+                  "labelKey": {
+                    "$ref": "#/definitions/nome"
+                  }
+                }
+              }
+            ]
+          }
+        },
+        "stateHue": {
+          "type": "object",
+          "description": "Chave = estado; valor = matiz da cor, em graus.",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 359
+          }
+        }
+      }
+    }
+  }
+}

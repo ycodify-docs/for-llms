@@ -20,6 +20,7 @@ tags:
   - { name: model }
   - { name: process }
   - { name: email }
+  - { name: presentation }
 paths:
   /org/{org}/dbconn:
     parameters: [{ $ref: '#/components/parameters/org' }]
@@ -145,6 +146,15 @@ paths:
     get: { tags: [email], summary: Ler configuração, responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/NotFound' } } }
     put: { tags: [email], summary: Atualizar configuração, requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Versioned' } } } }, responses: { '200': { description: OK }, '409': { $ref: '#/components/responses/Conflict' } } }
     delete: { tags: [email], summary: Remover configuração, responses: { '200': { description: OK }, '404': { $ref: '#/components/responses/NotFound' } } }
+  /org/{org}/project/{project}/tenant/{tenantId}/presentation:
+    parameters: [{ $ref: '#/components/parameters/org' }, { $ref: '#/components/parameters/project' }, { $ref: '#/components/parameters/tenantId' }]
+    post:
+      tags: [presentation]
+      summary: Publicar manifesto de apresentação do tenant (sobrescreve); exige o modelo publicado
+      requestBody: { required: true, content: { multipart/form-data: { schema: { type: object, properties: { file: { type: string, format: binary } } } } } }
+      responses: { '201': { description: Publicado, content: { application/json: { schema: { type: object, properties: { stored: { type: boolean } } } } } }, '400': { $ref: '#/components/responses/BadRequest' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
+    get: { tags: [presentation], summary: Ler manifesto — quem tem o tenant no token, sem papel de administrador/engenheiro, responses: { '200': { description: OK }, '204': { description: Tenant sem manifesto }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } } }
+    delete: { tags: [presentation], summary: Remover manifesto, responses: { '200': { description: OK, content: { application/json: { schema: { type: object, properties: { deleted: { type: boolean } } } } } } } }
 components:
   securitySchemes:
     bearerAuth: { type: http, scheme: bearer }

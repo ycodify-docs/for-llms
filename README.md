@@ -39,6 +39,7 @@
 | Entender o fluxo ponta a ponta entre serviços | [`01-arquitetura.md`](01-arquitetura.md) |
 | Implantar um sistema do zero (ordem dos recursos) | [`03-fluxo-de-deploy.md`](03-fluxo-de-deploy.md) + [`forger/`](forger/README.md) |
 | Escrever um modelo de domínio (`.model.json`) | [`examples/`](examples/README.md) + [`forger/endpoints/model.md`](forger/endpoints/model.md) |
+| Dizer como a tela apresenta os agregados de um tenant (`.presentation.json`) | [`forger/endpoints/presentation.md`](forger/endpoints/presentation.md) |
 | Criar as projeções (tabelas de leitura) | [`forger/endpoints/entity.md`](forger/endpoints/entity.md) |
 | Executar/disparar um comando de domínio | [`persistence-crs/endpoints/comando.md`](persistence-crs/endpoints/comando.md) |
 | Ler o estado ou o histórico de um agregado | [`persistence-crs/endpoints/agregado-leitura.md`](persistence-crs/endpoints/agregado-leitura.md) |

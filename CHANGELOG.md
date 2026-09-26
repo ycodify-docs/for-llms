@@ -2,6 +2,15 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.60 — 2026-09-26
+
+- **Manifesto de apresentação por tenant** (`forger/endpoints/presentation.md`, página nova, e
+  `forger/spec/presentation.schema.json`). `POST`/`GET`/`DELETE .../tenant/{tenantId}/presentation`: publicar
+  e remover com a autorização do model; ler basta o tenant no token (`204` sem manifesto). A publicação
+  confere a forma e cada referência contra o modelo publicado do tenant; o manifesto não é removido com o
+  modelo. Índices: `forger/README.md`, `forger/openapi.yaml`, `llms.txt`, `README.md`. Em `develop` do
+  forger, ainda não em produção.
+
 ## 1.59 — 2026-09-26
 
 - **A casca adota a paleta e a fonte do Stager Console** (`shell/Principios de Design - Shell Universal.md`
