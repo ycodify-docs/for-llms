@@ -5264,7 +5264,7 @@ Texto livre: acento e espaço são aceitos, e a unicidade não é conferida. Rec
 
 A **chave** continua sendo o que o cliente envia no comando e o que o motor usa para achar o evento
 (`endState`); o `alias` não a substitui, nem ao `type` do evento, e **o motor não o lê**. Quem lê é o
-BFF: ver [bff](../../bff/README.md).
+BFF, que o leva na capacidade do tenant: ver [bff — nome de exibição](../../bff/README.md#nome-de-exibicao).
 
 > **Em `develop` do forger desde 2026-09-26**, e ainda **não em produção**. Até o deploy, a publicação
 > aceita a chave sem conferir nada, porque o metamodelo não fecha chave desconhecida em comando nem em
