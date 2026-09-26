@@ -438,7 +438,7 @@ Para filtrar por data numa consulta:
   gravar o evento (CP-6). A rota segue a **forma canônica totalmente qualificada**
   `<org>/<project>/<bc>/<aggregate>/<comando>` (evita colisão entre organizações) — ver
   [br — forma canônica da rota](../../br-service/README.md#forma-canônica-da-rota-obrigatória).
-- **`alias`** (opcional) — nome de exibição do comando, **string não vazia**, para a tela. O motor
+- **`alias`** (opcional) — nome de exibição do comando, **string com ao menos um caractere que não seja espaço**, para a tela. O motor
   (yc.cqrs-c, persistence-crs, es-n) **não o lê**: não entra em validação, rota, evento nem mensagem.
   Quem identifica o comando continua sendo a chave `<nomeDoComando>`.
 
@@ -460,7 +460,7 @@ Para filtrar por data numa consulta:
 }
 ```
 
-- **`alias`** (opcional) — nome de exibição do evento, **string não vazia**, para a tela. O motor
+- **`alias`** (opcional) — nome de exibição do evento, **string com ao menos um caractere que não seja espaço**, para a tela. O motor
   (yc.cqrs-c, yc.es, es-n) **não o lê**: não entra no `eventType`, na mensagem publicada nem no
   `eventData`. Quem identifica o evento continua sendo `type`.
 - **`whenAttribute`** — nome de um atributo de timestamp **valorizado automaticamente** pela plataforma na

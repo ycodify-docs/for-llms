@@ -8,6 +8,11 @@
   comando e evento). Chave opcional em `command.<cmd>` e `event.<evt>`: o nome que a tela mostra no lugar
   da chave. A publicação recusa com `400` o alias vazio, só de espaços ou que não é texto; ausente,
   publica como antes. O motor não lê a chave. Em `develop` do forger, ainda não em produção.
+- **`alias` na gramática do `.model.json`** (`persistence-crs/spec/model-format.md` §Comandos e §Eventos,
+  `persistence-crs/spec/model.schema.json`). Opcional em `command.<cmd>` e `event.<evt>`, com a forma que o
+  forger valida: texto com ao menos um caractere que não seja espaço. O motor (yc.cqrs-c, yc.es, es-n,
+  persistence-crs) não lê a chave. O bloco do `model-format.md` no `llms-full.txt` volta a ser idêntico ao
+  arquivo.
 
 ## 1.55 — 2026-09-26
 
