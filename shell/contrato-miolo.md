@@ -100,6 +100,7 @@ não diz **como se vê** (isso é o miolo).
       "commands": [
         {
           "name": "...",
+          "alias": "...",
           "roles": ["..."],
           "fromState": ["..."],
           "endState": "...",
@@ -107,13 +108,18 @@ não diz **como se vê** (isso é o miolo).
           "valueObjects": [ { "name": "...", "cardinality": "single|multiple",
                               "fields": [ { "name": "...", "type": "...", "role": "..." } ], "scalar": false } ]
         }
-      ]
+      ],
+      "events": { "<evento>": { "alias": "..." } }
     }
   ]
 }
 ```
 
 - **`commands`** — **apenas** os autorizados ao papel do usuário (interseção já aplicada pelo BFF).
+- **`alias`** e **`events`** — o nome de exibição que o modelo declara para comando e evento; a tela
+  mostra o alias e, sem ele, o nome. Os dois são **ausentes** quando o modelo não declara, e `events`
+  traz só os eventos que declaram. O comando continua sendo enviado pelo `name`. Detalhe, inclusive como
+  casar o evento do histórico: [bff — Nome de exibição](../bff/README.md#nome-de-exibicao).
 - **`fromState`** — de quais estados o comando aparece; a casca/miolo habilita a transição só quando o
   agregado está num estado válido.
 - **`attributes[].role`** — classificação que guia a apresentação:
@@ -148,7 +154,8 @@ não diz **como se vê** (isso é o miolo).
 
 - **Modelo = domínio (autoritativo)**: existência de comando, papéis, tipos, transições — o miolo **não
   sobrescreve**. **Miolo = apresentação**: rótulo, widget, layout, ordem, visibilidade — o modelo **não
-  fornece**, o miolo **preenche**.
+  fornece**, o miolo **preenche**. A exceção é o nome de exibição de comando e evento (`alias`), que o
+  modelo pode declarar e o miolo deve respeitar.
 - **Nada de segredo no miolo**: toda escrita/leitura de domínio passa pelo `api` → **BFF** → plataforma,
   que **revalida** a autorização no servidor.
 - **Ciclo de vida**: `mount` ao selecionar o bounded context; `dispose` ao trocar de BC ou encerrar.
