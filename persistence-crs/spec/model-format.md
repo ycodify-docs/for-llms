@@ -335,6 +335,7 @@ Para filtrar por data numa consulta:
 ```jsonc
 "command": {
   "<nomeDoComando>": {
+    "alias": "<nome de exibição>",                // opcional: só a tela lê
     "data": {
       "attribute": {
         "<campo>": { "type": "...", "length": 0, "nullable": true, "comment": "..." }
@@ -437,6 +438,9 @@ Para filtrar por data numa consulta:
   gravar o evento (CP-6). A rota segue a **forma canônica totalmente qualificada**
   `<org>/<project>/<bc>/<aggregate>/<comando>` (evita colisão entre organizações) — ver
   [br — forma canônica da rota](../../br-service/README.md#forma-canônica-da-rota-obrigatória).
+- **`alias`** (opcional) — nome de exibição do comando, **string não vazia**, para a tela. O motor
+  (yc.cqrs-c, persistence-crs, es-n) **não o lê**: não entra em validação, rota, evento nem mensagem.
+  Quem identifica o comando continua sendo a chave `<nomeDoComando>`.
 
 ## Eventos e `domainBus`
 
@@ -444,6 +448,7 @@ Para filtrar por data numa consulta:
 "event": {
   "<nomeDoEvento>": {
     "type": "<nome-do-evento>",          // identificador do tipo do evento
+    "alias": "<nome de exibição>",       // opcional: só a tela lê
     "whenAttribute": "<campoTimestamp>", // atributo de carimbo de tempo (auto-valorizado)
     "payloadInherit": "command-data",    // herda os dados do comando
     "domainBus": {
@@ -455,6 +460,9 @@ Para filtrar por data numa consulta:
 }
 ```
 
+- **`alias`** (opcional) — nome de exibição do evento, **string não vazia**, para a tela. O motor
+  (yc.cqrs-c, yc.es, es-n) **não o lê**: não entra no `eventType`, na mensagem publicada nem no
+  `eventData`. Quem identifica o evento continua sendo `type`.
 - **`whenAttribute`** — nome de um atributo de timestamp **valorizado automaticamente** pela plataforma na
   gravação do evento, **em UTC**, na mesma forma dos demais `Timestamp` (`2026-09-12T20:19:09`). Convenção: particípio passado do verbo do comando + sufixo `em` (comando `criar` →
   evento `criada` → `whenAttribute: "criadaem"`). **Não** envie esse campo no comando **e NÃO o declare**
