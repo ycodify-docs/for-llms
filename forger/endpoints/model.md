@@ -113,11 +113,15 @@ reescrever modelo publicado —, mas **não as gere em modelo novo**:
 | `schema.forWriteModel.name` | `tenantId.forWriteModel`. O forger **carimba** este campo na publicação e descarta o valor enviado |
 | `schema.forReadModel.name` | o **dataschema do tenant** |
 | `concurrency.*` | não é lido do modelo; o controle de concorrência vive no `_conf` da **entity** |
-| `readProjection` | nada o consome |
 | `queue` | filas são provisionadas pelo deploy de **process (BPMN)**, não pelo modelo |
 
 Por agregado, o necessário é: `org`, `project`, `boundedContext`, `type`, `tenantId`, `command` e
 `event` — mais `identity`, que é opcional e **é** lido.
+
+> ⚠️ **`readProjection` não é chave morta.** O motor não a lê, mas o **BFF** lê: é ela que limita, por
+> papel, as colunas que o usuário vê (ex.: esconder o CPF da recepção). Tirá-la do modelo remove essa
+> proteção sem erro nenhum. Ver [Limitar os campos que um papel lê](../../bff/README.md#limitar-os-campos-que-um-papel-lê--readprojection).
+> Até a 1.55 esta página a listava acima como chave que ninguém lê, o que estava errado.
 
 > ⚠️ **`boundedContext.name` não é rótulo.** Ele compõe o endereço do agregado **e** nomeia o schema
 > onde o log de consumo do evento é gravado. Se divergir do dataschema do tenant, o consumo de evento

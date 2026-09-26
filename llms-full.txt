@@ -2793,8 +2793,13 @@ Retorna a conta do **portador do token**. Sem parâmetros. **Auth:** token váli
 Atualiza o perfil da própria conta (`username` forçado ao do token). **Auth:** token válido.
 
 **Corpo** (JSON): qualquer subconjunto dos **campos da conta `/ua`** (acima), exceto `username`/`password`.
+O `status` do corpo é **ignorado**: a conta mantém o que tem no cadastro.
 
 **Resposta:** `200` (sem corpo) quando gravou · `404` — `"account not found: nothing was updated."`
+
+> ⚠️ **O titular não troca o próprio status**, em `develop` do orgid desde 2026-09-25 e **ainda não em
+> produção**. Antes, `status` no corpo era gravado, e a **ausência** dele gravava `ACTIVE`: qualquer
+> edição de perfil reativava conta `SUSPENDED` e ativava conta `PENDING` sem confirmação.
 
 ## PUT /ua/account/password
 Troca a senha (`username` forçado ao do token). **Auth:** token válido.
@@ -2923,9 +2928,10 @@ Lista os papéis de um dono.
 > ⚠️ **É o único público do orgid que NÃO começa por `/open/`** — os segmentos estão invertidos
 > (`/ua/open/…` em vez de `/open/ua/…`). Isso não é cosmético: as regras de autorização da plataforma são
 > escritas sobre o prefixo `/open/**`, e **este path escapa delas** e cai na regra de autenticado. No
-> `OrgIdSecurityConfig` do orgid standalone continua assim — liberados só `/open/**`, `/z/**`,
-> `/*/unsecured/**`, swagger e actuator —, então **o orgid sozinho responde `401` aqui, apesar do
-> "público" acima**. O que está implantado é o `composer`, que desde 2026-09-05 libera os **dois**
+> config de segurança do orgid standalone continua assim — liberados só `/open/**`, `/z/**`, um terceiro
+> padrão interno (⚠️ **MASCARADO** como `/*/<rota-livre-interna>/**`: o literal não é este; o que importa é
+> que **existe** um terceiro, além dos dois acima), swagger e actuator —, então **o orgid sozinho responde
+> `401` aqui, apesar do "público" acima**. O que está implantado é o `composer`, que desde 2026-09-05 libera os **dois**
 > prefixos e faz o endpoint honrar o contrato documentado.
 >
 > Ao escrever gateway, proxy ou nova cadeia de segurança: **público no orgid = dois prefixos**,
@@ -3125,11 +3131,17 @@ Cria uma conta **externa** e a associa a um **papel**.
 | `account.password` | string | sim | Senha. |
 | `account.email` | string | sim | E-mail. |
 | `account.*` | — | não | Demais campos da conta externa (ver [ua-conta.md](ua-conta.md)). |
-| `role.name` | string | sim | Papel a associar. |
+| `role.name` | string | sim | Papel a associar: tem de **existir** e ser **público** (`ispublic=true`). |
 | `role.owner` | string | sim | Dono (espaço de nomes) do papel. |
-| `role.label` / `role.ispublic` / `role.status` | — | não | Metadados do papel. |
+| `role.label` / `role.ispublic` / `role.status` | — | não | Ignorados: o papel é lido do cadastro por `name` + `owner`. |
 
-**Resposta:** `200` (sem corpo).
+**Resposta:** `200` (sem corpo) · `404` — `"role not found: the account was not created."` · `403` —
+`"role is not public: the account was not created."` · `409` se o `username` já existe.
+
+> ⚠️ **Só papel público**, em `develop` do orgid desde 2026-09-25 e **ainda não em produção**. Antes, a rota
+> aceitava **qualquer** papel existente, inclusive administrativo: quem não tinha credencial nenhuma criava
+> conta nova já com esse papel. Papel que o próprio usuário não pode escolher se associa pelo caminho
+> autenticado, `POST /ua/account-role/using/authority` ([ua-associacao.md](ua-associacao.md)).
 
 ## GET /open/up/hash/for/{action}/by/{username}
 ## GET /open/ua/hash/for/{action}/by/{username}
@@ -3161,6 +3173,11 @@ Executa a ação do hash.
 
 **Resposta:** `200` (sem corpo) — em `R`, ativa a conta; em `PR`, troca a senha · `404` —
 `"account not found: the hash action was not executed."`
+
+> ⚠️ **Em `/ua`, `R` só ativa conta `PENDING`**, em `develop` do orgid desde 2026-09-25 e **ainda não em
+> produção**. Conta já `ACTIVE` responde `200` sem gravar nada; conta `SUSPENDED` responde `403`
+> (`"account is not pending: registration was not confirmed."`). Antes, `R` punha qualquer conta não
+> cancelada em `ACTIVE`: uma conta suspensa voltava a valer pelo próprio e-mail. **Em `/up` nada mudou.**
 
 > ⚠️ Até 2026-09-05 a conta inexistente respondia **`204`** nos dois endpoints acima. `204` é sucesso sem
 > corpo: em `PR`, o usuário recebia confirmação de uma troca de senha que nunca aconteceu. Ver
@@ -4228,20 +4245,27 @@ Nomes são **normalizados para minúsculas** e seguem formato e **limite de comp
 |---|---|---|---|
 | **database** (`dbsqlname`) | só letras minúsculas | `^[a-z]+$` | — (sem limite definido) |
 | **project** (`name`) | só letras minúsculas | `^[a-z]+$` | **16** |
-| **dataschema** (`name`) | minúsculas, dígitos e `_`; **começa com letra** | `^[a-z][a-z0-9_]*$` | **16** |
+| **dataschema** (`name`) | minúsculas, dígitos e `_`; **começa com letra** | `^[a-z][a-z0-9_]*$` | **12** |
 | **entity** (nome) | só letras minúsculas (sem dígitos/`_`) | `^[a-z]+$` | **24** |
 | **atributo** (nome) | só letras minúsculas (sem dígitos/`_`) | `^[a-z]+$` | **24** |
 | **associação** (nome) | só letras minúsculas (sem dígitos/`_`) | `^[a-z]+$` | **24** |
-| **superentidade** (nome) | só letras minúsculas | `^[a-z]+$` | **24** |
+| **superentidade** (nome) | só letras minúsculas | `^[a-z]+$` | **64** — validada por caminho próprio, mais permissivo que os demais |
 
 Violar o padrão ou o limite → `400` com a indicação do nome rejeitado.
 
 ### Nomes reservados e atributos gerenciados
 - **Nomes reservados** (não podem nomear entity/atributo/associação): `id`, `logversion`, `logrole`,
   `loguser`. Usá-los → `400`.
-- Toda projeção recebe automaticamente atributos de controle (identidade e versionamento/auditoria,
-  os nomes reservados acima). São **injetados e mantidos pela plataforma** — **não** os declare na
+- Toda entity recebe automaticamente esses atributos de controle (identidade e
+  versionamento/auditoria). São **injetados e mantidos pela plataforma** — **não** os declare na
   definição da entity nem os envie em payloads de escrita; fazê-lo causa rejeição.
+
+> ⚠️ **Injetado não é a mesma coisa que obrigatório, e confundir os dois quebra a projeção.** A
+> plataforma injeta **quatro** atributos (`id`, `logversion`, `logrole`, `loguser`). Uma entity que é
+> **projeção de agregado** precisa declarar **ela mesma** outros: `aggregateid`, `status` e um carimbo
+> por evento do agregado. Esses **não** são reservados e **não** são injetados — faltando qualquer um,
+> a linha nunca materializa. Ver
+> [entity — declarar que a entity é projeção](endpoints/entity.md#declarar-que-a-entity-é-projeção--_confprojectionof-regra).
 
 ### Ciclo do `tenant-id`
 O `tenant-id` é **gerado na criação do dataschema** (não é escolhido pelo chamador). Para usá-lo nos
@@ -4517,7 +4541,7 @@ Exigem `Authorization` e papel de administrador/engenheiro em `{org}`.
 
 | Campo | Tipo | Obrigatório | Descrição |
 |---|---|---|---|
-| `name` | string | sim | Nome do esquema. Minúsculas, dígitos e `_`, começando por letra (`^[a-z][a-z0-9_]*$`), **máx. 16 caracteres**. |
+| `name` | string | sim | Nome do esquema. Minúsculas, dígitos e `_`, começando por letra (`^[a-z][a-z0-9_]*$`), **máx. 12 caracteres** — o limite é do esquema físico, e não o mesmo do `project`, que aceita 16. |
 | `alias` | string | não | Apelido. |
 | `description` | string | não | Descrição. |
 | `dbsqlminimumconnidle` | inteiro | não | Mínimo de conexões ociosas no pool de leitura. |
@@ -4547,9 +4571,68 @@ Erros: `400`, `403`, `500`.
 > | **`RUNNING`** | **congelado** — o **forger rejeita** criar/alterar `entity` neste estado | **ocorre** — persistence-crs/persistence-q interpretam e executam o modelo |
 >
 > **Regra para o agente:** para **editar schema** (criar/alterar entity), o dataschema precisa estar em
-> `MODELING`; para **operar** (comandos/consultas via persistence-crs/persistence-q), em `RUNNING`. Para
-> alterar o schema de um sistema já em operação: transite `RUNNING → MODELING` (via `PUT` no `status`),
-> edite as entities, e volte a `MODELING → RUNNING`.
+> `MODELING`; para **operar** (comandos/consultas via persistence-crs/persistence-q), em `RUNNING`.
+
+### Alterar o schema de um sistema em operação
+
+A transição de `status` **não é só um rótulo no banco**: ela remove e republica os modelos que o motor
+lê. Por isso alterar um schema em operação não é "editar e voltar" — o passo **4** abaixo é o que
+costuma faltar, e sem ele a volta a `RUNNING` é recusada.
+
+**1. Descubra a `logversion` corrente** (o `PUT` a exige, e uma versão errada responde `409`):
+
+```bash
+curl -H "Authorization: Bearer $TOKEN" \
+  ".../org/acme/project/vendas/database/7/dataschema/pedidos"
+# → { "id": 12, "name": "pedidos", "status": "RUNNING", "logversion": 4, ... }
+```
+
+**2. Vá para `MODELING`** — o tenant para de operar:
+
+```bash
+curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  ".../org/acme/project/vendas/database/7/dataschema/pedidos" \
+  -d '{"logversion": 4, "status": "MODELING"}'
+```
+
+Aqui **as duas chaves do modelo são removidas**: a spec de entidades e o `.model.json`. A partir deste
+instante o motor recusa **consulta e comando** com `510` — de propósito, porque o tenant está
+declaradamente em remodelagem.
+
+**3. Edite as entities** (só é permitido em `MODELING`) — ver [entity.md](entity.md).
+
+**4. Republique o `.model.json`** — este é o passo que falta em quase todo roteiro escrito à mão:
+
+```bash
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  ".../org/acme/project/vendas/tenant/$TENANT_ID/model" \
+  -F "file=@pedidos.model.json"
+```
+
+**5. Volte para `RUNNING`** (a `logversion` avançou no passo 2 — releia-a):
+
+```bash
+curl -X PUT -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+  ".../org/acme/project/vendas/database/7/dataschema/pedidos" \
+  -d '{"logversion": 5, "status": "RUNNING"}'
+```
+
+A spec de entidades volta sozinha. O `.model.json` **não** — e é por isso que o passo 4 existe.
+
+> **Se você pular o passo 4**, o `PUT` do passo 5 é recusado:
+>
+> ```json
+> 400: DataSchema 'pedidos' não pode voltar a RUNNING: o modelo de escrita não está publicado.
+> ```
+>
+> **Nada é gravado** e o dataschema **continua em `MODELING`** — repita o passo 4 e depois o 5.
+
+**Por que só um dos dois modelos volta sozinho.** A spec de entidades a plataforma sabe remontar, porque
+ela deriva das entities, que vivem no banco. O `.model.json` é **artefato seu**: a plataforma não guarda
+outra cópia dele, e quem o repõe é quem o tem.
+
+**Não invalide cache manualmente em nenhum ponto.** Remover e publicar é da plataforma, e nenhum dos dois
+modelos expira por tempo — o que os tira do cache é remoção, nunca prazo.
 
 ## Remover
 
@@ -4592,8 +4675,10 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
 - Forma da definição
 - Endpoints (exaustivo)
 - Ciclo de vida (criar/atualizar)
+- Declarar que a entity é projeção: `_conf.projectionOf` (teto, piso e chave)
 - Chave única: `attribute.unique` vs `_conf.uniqueKey`
 - Semântica do `PUT`: ausente vs vazio
+- Recorte de leitura por titular: `accessControl.scope`
 - Regra de escopo único no `PUT`
 - Saída de `analyze` / `validate`
 
@@ -4615,7 +4700,7 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
 {
   "name": "string",
   "attributes": [
-    { "name": "string", "type": "string", "length": 0, "nullable": true,
+    { "name": "string", "type": "String", "length": 60, "nullable": true,
       "unique": false, "comment": "string", "default": "string" }
   ],
   "associations": [
@@ -4623,12 +4708,28 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
       "unique": false, "comment": "string" }
   ],
   "_conf": {
+    "type": "entity",
     "comment": "string", "concurrencyControl": true,
     "uniqueKey": ["string"], "indexKey": ["string"],
-    "accessControl": {}, "superEntity": "string", "superEntityStrategy": "string"
+    "accessControl": { "read": ["MASTER"], "write": ["MASTER"], "scope": {} },
+    "projectionOf": ["string"],
+    "superEntity": "string", "superEntityStrategy": "string"
   }
 }
 ```
+
+**Os dois campos `type` são de listas fechadas — e não são a mesma lista.**
+
+| Onde | Valores aceitos | Obrigatório |
+|---|---|---|
+| `_conf.type` | `entity` · `abstract` · `component` · `enumeration` (minúsculas) | **sim** |
+| `attributes[].type` | `String` · `Text` · `Integer` · `Long` · `Double` · `Float` · `Boolean` · `Date` · `Timestamp` · `Json` · `Jsonb` (**inicial maiúscula**) | **sim** |
+
+> **⚠️ O tipo do atributo casa exatamente, com a caixa.** `"string"` em minúsculas é recusado, e nomes
+> de tipo SQL não existem aqui: para decimal use **`Double`**, para texto longo **`Text`**. A recusa é
+> `400` na compilação, antes de tocar o banco.
+>
+> **`length` é obrigatório para `String`** — os demais tipos o ignoram.
 
 > **⚠️ `_conf` é OBRIGATÓRIO e semântico aqui.** A definição de **entity** exige `_conf` (configuração:
 > chave única, índices, controle de concorrência, superentidade…). A convenção "chave `_`-prefixada =
@@ -4636,28 +4737,122 @@ Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
 > definição de entity. **Não** remova `_conf` (nem outras chaves) deste payload — é outro contrato, em
 > outro endpoint. Ver [model-format — chaves de metadado](../../persistence-crs/spec/model-format.md#chaves-de-metadado-_-prefixadas).
 
-## Colunas obrigatórias de toda projeção — `aggregateid`, `status` e cada `whenAttribute` de evento (REGRA)
+## Declarar que a entity é projeção — `_conf.projectionOf` (REGRA)
 
-Além das colunas derivadas de `data.attribute` + valueObjects, **toda entity que é projeção de um
-agregado DEVE declarar** as colunas de projeção abaixo — em **todo** agregado, sem exceção:
+Uma entity **pode ou não** ser a projeção (read model) de um ou mais agregados (write model, do
+`.model.json`). Ela declara isso em `_conf.projectionOf`:
+
+```json
+{ "name": "aula",
+  "_conf": { "type": "entity", "projectionOf": ["aula", "matricula"] },
+  "attributes": [
+    { "name": "aggregateid", "type": "String", "length": 36, "nullable": false },
+    { "name": "status", "type": "String", "length": 30, "nullable": false },
+    { "name": "titulo", "type": "String", "length": 60, "nullable": true }
+  ] }
+```
+
+| | |
+|---|---|
+| **ausente ou `[]`** | a entity **não é projeção** de agregado nenhum, e nada é conferido contra o modelo de escrita |
+| **cada item** | é o **`type`** do agregado, **não** a chave do mapa `aggregate` do `.model.json` |
+| **vários itens** | a entity é projeção da **união** dos agregados nomeados |
+
+> ⚠️ **O item é o `type`, e a distinção não é cosmética.** No `.model.json` o agregado aparece sob uma
+> chave composta (`"comercial.lead"`) e tem um campo `"type": "lead"`. O roteamento da projeção é feito
+> pelo **`type` cru**. Então `"projectionOf": ["lead"]` casa e `"projectionOf": ["comercial.lead"]` é
+> recusado — a mensagem de recusa lista os dois vocabulários.
+
+### O teto e o piso: a projeção tem exatamente o que os agregados escrevem
+
+Uma entity que se declara projeção é conferida nos **dois sentidos**, e um não implica o outro:
+
+| | O que é recusado | Por que importa |
+|---|---|---|
+| **teto** | atributo que agregado nenhum dos nomeados escreve | coluna órfã, que fica sempre vazia |
+| **piso** | atributo que os agregados escrevem e a entity **não** declara | **o grave**: sem a coluna, o motor recusa a gravação **inteira** e a linha nunca materializa |
+
+> ⚠️ **Faltar é muito pior que sobrar, e não tem conserto.** O comando responde `200` porque a escrita
+> funcionou; a projeção falha **depois**, em outro processo. Reemitir o comando falha, porque o agregado
+> já mudou de estado — a linha fica divergente para sempre. Sobrar coluna só deixa espaço vazio.
+
+O conjunto que um agregado escreve é:
+
+- os **atributos de todos os `command`** (`command.<nome>.data.attribute`);
+- o **nome de cada value object** (`data.valueObject.single` e `.multiple`) — o value object viaja
+  **aninhado sob o próprio nome**, então ele é **uma** coluna, e os campos de dentro dele **não** são
+  colunas da projeção;
+- **um carimbo por evento** — o `whenAttribute` de cada `event`;
+- **`aggregateid`** e **`status`**, que a plataforma escreve sempre.
+
+Não contam contra o teto os atributos que a plataforma injeta (`id`, `logversion`, `logrole`,
+`loguser`) nem as **associações** da entity. No **piso**, porém, uma **associação com o nome certo
+satisfaz** — o motor aceita associação como chave do dado. A assimetria é deliberada: no teto a
+associação é livre porque pode ter outra razão de existir; no piso ela resolve a gravação.
+
+**A projeção não pode ser mais estreita que o agregado.** Não é escolha de desenho: uma chave que a
+entity não tenha derruba a gravação inteira, não só aquele campo.
+
+### Colunas obrigatórias de toda projeção — `aggregateid`, `status`, e os carimbos
 
 - **`aggregateid`** — `String`, `length` **36**, `nullable: false`: o **UUID do agregado**; **identifica
   a linha** da projeção (ver [identificação na projeção](../../persistence-crs/spec/model-format.md#identificação-na-projeção-leitura)).
 - **`status`** — `String`, `nullable: false`: o **estado atual** do agregado (campo de filtro típico em
   [persistence-q](../../persistence-q/README.md)).
-- **cada `whenAttribute` de evento** — `Timestamp`, `nullable: true`: o **carimbo de tempo do evento**
-  (ex.: o evento `criada` tem `whenAttribute` `criadaem`). Há **uma coluna por evento** do agregado. O
-  valor é **preenchido automaticamente pela plataforma na escrita** (por isso `whenAttribute` **NÃO** é
-  um `data.attribute` de comando no `.model.json` — não o declare lá), mas a **coluna na projeção
-  precisa existir**: ela **não** deriva de `data.attribute` e **não** é auto-injetada.
+- **cada `whenAttribute` de evento** — `Timestamp`, `nullable: true`: o carimbo do evento (ex.: o evento
+  `criada` tem `whenAttribute` `criadaem`). Há **uma coluna por evento**. O valor é preenchido pela
+  plataforma na escrita — por isso `whenAttribute` **não** é um `data.attribute` de comando no
+  `.model.json`, mas a **coluna na projeção precisa existir**.
 
-**Não** são reservados (§reservados acima) **nem** auto-injetados pela plataforma — o Forger injeta
-automaticamente **apenas** `id`/`logversion`/`logrole`/`loguser`. `aggregateid`, `status` e **cada
-`whenAttribute` de evento** são **declarados pelo autor da entity**, obrigatoriamente. **Faltando
-qualquer um deles, a projeção do agregado não é materializável**: o fluxo de projeção do es-n grava a
-linha por `aggregateid`, registra `status` e escreve o carimbo em cada `whenAttribute` — se a coluna
-correspondente não existir, o consumidor de projeção falha (atributo/componente desconhecido) e a linha
-**nunca** é materializada (consultas em [persistence-q](../../persistence-q/README.md) retornam vazio).
+**Nenhum dos três é reservado nem auto-injetado.** O Forger injeta automaticamente **apenas** `id`,
+`logversion`, `logrole` e `loguser`; `aggregateid`, `status` e os carimbos são **declarados pelo autor
+da entity**. Faltando qualquer um, a projeção não materializa: o consumidor recusa a chave desconhecida
+e a linha nunca aparece nas consultas de [persistence-q](../../persistence-q/README.md).
+
+**O fechamento da edição recusa a entity a que falte qualquer uma delas** — é a conferência de piso
+acima. `aggregateid` e `status` são recusados já na criação/atualização da entity; os carimbos só no
+fechamento, porque só ali se sabe quais eventos o agregado tem.
+
+### A chave: `identity.fields` do agregado contra a da projeção
+
+O `identity.fields` do agregado é o **espaço de chave** do modelo de escrita. Na projeção a mesma coisa
+se declara em **dois lugares**, conforme a cardinalidade — e a conferência segue essa divisão:
+
+| `identity.fields` tem | A projeção declara em | Recusado quando |
+|---|---|---|
+| **um** campo | o **atributo**, com `unique: true` | o atributo não é `unique`; ou a entity declara `_conf.uniqueKey`, que o agregado não tem |
+| **dois ou mais** | **`_conf.uniqueKey`** (chave composta) | o conjunto difere do `identity.fields` |
+| **nenhum** | nada | a entity impõe unicidade de negócio sem lastro — **em qualquer dos dois lugares**: `unique` num atributo, ou `_conf.uniqueKey` |
+
+Chave de **um** campo não vai em `_conf.uniqueKey`: ele é o lugar da chave **composta** e exige 2+
+atributos. Chave de dois ou mais não se expressa marcando cada atributo como `unique` — isso é mais
+estrito que o agregado, porque cada coluna passaria a ser única sozinha.
+
+A comparação de `uniqueKey` é por **conjunto**: a ordem declarada não é preservada na constraint
+resultante, então exigir ordem recusaria o que o banco trata como igual.
+
+`id` e `aggregateid` ficam **fora** da conta — a unicidade dos dois é da plataforma, não do modelo de
+negócio.
+
+> ⚠️ **O que esta conferência NÃO alcança:** ela compara **definição com definição**. Um índice único
+> que já exista no banco de leitura e tenha saído da definição **não é visto aqui** — mudar o modelo não
+> derruba índice criado antes. É o caso em que "o segundo registro legítimo nunca materializa" com a
+> definição aparentemente correta, e quem enxerga o banco é a infra.
+
+> ⚠️ **Com dois ou mais agregados em `projectionOf`, a conferência de chave é pulada.** Cada agregado
+> tem o seu `identity.fields`, e uni-los inventaria uma chave que nenhum declarou. As conferências de
+> teto e piso continuam valendo normalmente.
+
+### Onde a regra é imposta
+
+| Momento | O que é recusado | Por quê ali |
+|---|---|---|
+| **criar/atualizar a entity** | `projectionOf` em `_conf.type` != `entity` · projeção sem `aggregateid` ou sem `status` · item vazio ou repetido | só depende da entity |
+| **fechar a edição** (`PUT .../dataschema/{nome}` de `MODELING` para `RUNNING`) | agregado nomeado que não existe no modelo publicado · dois agregados com o mesmo `type` · **atributo acima do teto** · **qualquer coluna que os agregados escrevam e a entity não declare** — `aggregateid`, `status` e os carimbos incluídos | é o **único** instante em que a entity e o `.model.json` existem com certeza — os dois se publicam por caminhos diferentes e em qualquer ordem |
+
+A recusa do fechamento acumula **todos** os achados numa resposta só, **nada é gravado**, e o dataschema
+**continua em `MODELING`**. Conferir a cada publicação de artefato não é possível: recusaria a sequência
+legítima em que o segundo artefato ainda não existe.
 
 ## Endpoints (exaustivo)
 
@@ -4703,6 +4898,10 @@ São dois conceitos **ortogonais**, e o serviço aceita os dois na mesma entity:
 | `attribute.unique: true` | unicidade no espaço de valores **daquele atributo** |
 | `_conf.uniqueKey: ["a","b"]` | **chave composta** — exige 2+ atributos (com um só, é recusado) |
 
+> **Passar `unique` de `false` para `true` é aplicável, e quem julga duplicata é o banco.** O `PUT`
+> segue adiante; se houver valor repetido, o banco recusa nomeando o valor e a constraint. Numa tabela
+> sem linhas a mudança sempre passa.
+
 O uso conjunto é legítimo quando incidem sobre atributos **diferentes** — ex.: `email` único por si
 **e** `(filial, codigo)` único como par. São duas chaves candidatas distintas.
 
@@ -4735,7 +4934,13 @@ que esvaziar**:
 
 // remove a chave única composta (vazio explícito)
 { "name": "ocorrencia", "_conf": { "type": "entity", "uniqueKey": [] } }
+
+// a entity deixa de ser projeção de agregado (vazio explícito)
+{ "name": "aula", "_conf": { "type": "entity", "projectionOf": [] } }
 ```
+
+> `projectionOf` segue a mesma regra: **ausente** preserva a declaração atual, `[]` a **remove**, e a
+> entity volta a não ser conferida contra o modelo de escrita no fechamento da edição.
 
 Vale igual para atributos e associações: declarar um atributo só com `nullable` altera **apenas**
 `nullable` — `length`, `unique` e `comment` continuam como estavam.
@@ -4743,8 +4948,12 @@ Vale igual para atributos e associações: declarar um atributo só com `nullabl
 Três detalhes que costumam morder:
 
 - **`null` explícito conta como ausente.** Para limpar, use o vazio do tipo (`[]`, `""`), não `null`.
-- **`accessControl` é substituído por inteiro**, não mesclado chave a chave: enviar só `read` reseta
-  `write` para `["MASTER"]`. Não existe entity sem controle de acesso — `MASTER` é o piso.
+- **`accessControl` é mesclado**, não substituído em bloco: enviar só `read` **preserva** o `write`
+  corrente, e vice-versa. Não existe entity sem controle de acesso — `MASTER` continua sendo o piso, e
+  lista enviada vazia volta a `["MASTER"]`.
+  *(Até **2026-09-09** o bloco era substituído por inteiro, e mandar só `read` zerava o `write` para
+  `["MASTER"]` sem avisar. Se você integrou antes dessa data e manda as duas listas sempre "porque
+  senão apaga", isso não é mais necessário — mas continua correto.)*
 - **`_conf` é opcional no `PUT`.** Uma requisição que só toca atributos não precisa mencioná-lo.
   (Na **criação** ele continua obrigatório.) `name` é sempre obrigatório e deve casar com o caminho.
 
@@ -4772,6 +4981,138 @@ O `200` informa o que foi aplicado — uma alteração que remove uma constraint
 ```
 
 Requisição sem efeito responde `200` com `totalChanges: 0` e `applied: []`.
+
+## Recorte de leitura: `accessControl.scope`
+
+Declara que um **papel** lê menos do que a tabela inteira. Sem ele, `accessControl` só sabe dizer "este
+papel lê esta tabela" ou "não lê" — não havia como dizer "lê só o que é dele", nem "lê só estas colunas".
+
+**São duas dimensões, e elas são independentes:**
+
+| Dimensão | Responde | Chave |
+|---|---|---|
+| **linha** | quais **linhas** são suas | `rows.by` |
+| **coluna** | quais **colunas** você vê | `attributes` |
+
+Declare **uma, a outra, ou as duas**. Declarar **nenhuma** para um papel listado em `scope.read` é
+recusado com `400`: recorte que não corta nada se lê como proteção e não é.
+
+> **Por que a dimensão de coluna existe sozinha.** Uma conta de integração não é titular de linha
+> nenhuma — ela lê o cadastro inteiro por dever de ofício. Não existe `rows.by` possível para ela, e
+> enquanto `attributes` só valesse dentro de um bloco que exigia `rows`, esse caso ficava de fora **por
+> construção**. O que ela precisa é ver **duas colunas de todas as linhas**, em vez de todas elas.
+
+> **Disponibilidade:** no ar desde **2026-09-09**, em `yc-composer:amd64-260909` (`forger@421a8b8`), com
+> a outra metade — o motor que honra o recorte — em **`yc-interpreter:amd64-260909b`**. **É opt-in:**
+> enquanto nenhuma entity declarar `accessControl.scope`, nada muda para ninguém.
+>
+> **⚠️ O sufixo `b` importa, e não é detalhe de nomenclatura.** Houve duas imagens do interpreter no
+> mesmo dia. Na primeira, `amd64-260909`, uma entity com recorte alcançada pela rota interna era
+> **recusada com `403`** — declarar o `scope` ali quebraria os processors. A recusa saiu em
+> `amd64-260909b`, e **só a partir dela o recorte é utilizável**. Se a sua superfície ainda está na
+> imagem sem o `b`, **não declare o `scope`**.
+
+```json
+"_conf": {
+  "accessControl": {
+    "read": ["MASTER", "ADMIN", "OPERADOR"],
+    "write": ["MASTER", "ADMIN"],
+    "scope": {
+      "read": {
+        "OPERADOR":  { "rows": { "by": "username" } },
+        "CATRACA":   { "attributes": ["nome", "cpf"] },
+        "SUPERVISOR": { "rows": { "by": "username" }, "attributes": ["nome", "cpf", "plano"] }
+      }
+    }
+  }
+}
+```
+
+Mora **dentro** do `accessControl` porque é controle de acesso. Isso só é seguro porque o `PUT` do
+`accessControl` mescla: se ele ainda substituísse o bloco, um `PUT` que trocasse papéis apagaria o
+recorte da tabela inteira — e essa perda é **aberta**, a resposta continuaria `200` e com dados.
+
+> **A regra, numa linha: `scope` só ESTREITA o que o `read` já permitiu.** Ele nunca concede acesso —
+> papel que não está em `accessControl.read` não lê nada, e portanto nunca chega ao recorte. Por isso
+> declarar `scope` para um papel fora do `read` é recusado (veja a tabela abaixo): não é o recorte que
+> abre a porta, é o `read`; o recorte só decide **quanto** passa por ela.
+
+**Semântica**
+
+- papel **ausente** de `scope.read` lê sem recorte;
+- `accessControl` **sem** `scope` é o comportamento de sempre;
+- vários papéis casando, o **menos restritivo vence**;
+- **`MASTER` nunca entra** no `scope` — ele é exigido nas duas listas e nunca é recortado;
+- `by` nomeia um **atributo declarado** da entity, que guarda o titular da linha;
+- para **remover** o recorte, envie `scope` vazio (`{}`) — isso não mexe nos papéis;
+- o recorte vale **só na leitura**: veja abaixo o que acontece com `scope.write`.
+
+**A dimensão de coluna (`attributes`), o que é e o que não é**
+
+- é o **vocabulário** que o papel enxerga: coluna fora da lista responde como coluna **inexistente**,
+  inclusive em filtro e em ordenação — não existe "invisível mas filtrável";
+- **`id` fica sempre visível**, senão a linha deixa de ser referenciável;
+- **lista vazia devolve resposta vazia.** É consequência, não defeito: vocabulário vazio não vê coluna
+  nenhuma;
+- **os nomes NÃO são conferidos na publicação**, e isto é deliberado: nome desconhecido o motor ignora
+  com aviso, e recusar a publicação por um typo transformaria erro de modelagem em **entity
+  indisponível**. O contraste com `rows.by` é proposital — lá o nome **é** conferido, porque um `by`
+  errado não devolve menos: devolve **errado**.
+
+**O que o `rows.by` precisa ser — e isto é decisão de modelagem, não de configuração**
+
+O atributo tem de satisfazer as duas condições abaixo. Nenhuma delas é verificada na publicação: o
+forger confere que o atributo **existe**, não o que ele **contém**.
+
+1. **Conter o mesmo valor que identifica o usuário no token.** O recorte compara o conteúdo da coluna
+   com a identidade de quem consulta; se a entity guarda `matricula` e o token identifica por
+   `username`, a comparação nunca casa e o titular não vê as próprias linhas.
+2. **Estar preenchido em toda linha que deva ser vista.** Linha com esse campo vazio não pertence a
+   ninguém: ela **desaparece** para o próprio dono.
+
+> **⚠️ As duas falham FECHADO, e é isso que as torna traiçoeiras:** a resposta é `200` com lista vazia,
+> indistinguível de "não há dado". Ninguém recebe erro, nem quem consulta nem quem publicou a entity.
+> Se um titular relata que "sumiu tudo", verifique estas duas antes de qualquer outra coisa.
+
+Vale também para o caminho de escrita: se as linhas são criadas por outra pessoa que não o titular —
+uma ficha de instrutor criada pelo administrador, por exemplo —, o atributo de titular precisa ser
+**preenchido explicitamente com o titular**. É por isso que os metadados de auditoria não servem aqui:
+eles registram quem escreveu.
+
+**Recusado com `400` nesta versão**
+
+| O que | Por quê |
+|---|---|
+| `MASTER` no `scope` | é o piso de toda entity e nunca é recortado |
+| papel em `scope.read` fora de `accessControl.read` | papel que não lê não tem o que recortar — e um erro de digitação aqui significaria "sem recorte", falhando **aberto** |
+| papel **sem nenhuma** das duas dimensões | recorte que não corta nada se lê como proteção e não é |
+| `rows` presente e sem `by` | o recorte de linha precisa saber por qual atributo cortar. **`rows` inteiro é opcional** desde 2026-09-23 — quem recorta só por coluna não o declara |
+| `rows.by` com **caminho** (`assoc.atributo`) | reservado no formato, ainda não honrado pelo motor |
+| `rows.by` nomeando `id`, `loguser`, `logrole`, `logversion`, `logdate` | são metadados da plataforma: registram **quem escreveu**, não **de quem é** a linha |
+| `rows.by` que não é atributo declarado | — |
+
+> **A dimensão `attributes` NÃO está nesta tabela, e a mudança é de 2026-09-23.** Até essa data ela era
+> recusada aqui como "reservada no formato"; hoje é aceita, e os **nomes não são conferidos** de
+> propósito — nome desconhecido o motor ignora com aviso, e recusar a publicação por um typo
+> transformaria erro de modelagem em entity indisponível.
+
+**`scope.write` é caso à parte, e o comportamento depende do verbo** *(medido em
+`yc-composer:amd64-260909`, 2026-09-09)*
+
+O recorte só é honrado na **leitura**. Um `scope.write` não vazio:
+
+- **na criação** da entity é **recusado com `400`**;
+- **no `PUT`** é **aceito com `200` e o lado `write` é descartado em silêncio** — releia a entity e ele
+  não está lá.
+
+> **O resultado final é seguro; o que falta é o aviso.** A entity nunca fica se dizendo protegida na
+> escrita sem estar — o `write` simplesmente não é gravado. Não há buraco de segurança aqui. O problema
+> é que quem declarou acreditando ter protegido a escrita recebe `200` e **não é informado de nada**.
+> **Confira relendo a entity depois do `PUT`:** se o `scope` voltar só com `read`, o seu `write` foi
+> descartado.
+
+O **efeito na consulta** — como o recorte se combina com filtros, `_connective` e `_count` — é do
+`persistence-q`: veja a doc dele. Quem **declara** a chave é o forger; quem a **honra** é o motor.
 
 ## Regra de escopo único no `PUT`
 Uma atualização (`PUT`) altera **um** escopo por requisição: **ou** `_conf`, **ou** atributos, **ou**
@@ -4803,11 +5144,122 @@ Exigem `Authorization` e papel de administrador/engenheiro em `{org}`.
 
 `POST /org/{org}/project/{project}/tenant/{tenantId}/model`
 
-Envio: o documento de modelo (`.json`) como upload. Efeito: valida a consistência
-`(org, project, tenant)` — o `tenantId` deve referenciar exatamente um dataschema do contexto — e
-**publica** o modelo no cache distribuído. **Semântica de sobrescrita**: republicar substitui o anterior.
-Resposta `201`: `{ "key": "<referência de publicação>" }`.
-Erros: `400` (documento inválido / faltando seção de agregado), `403`/`404` (consistência), `500`.
+Envio **multipart**, com o documento no campo `file` — o arquivo precisa ter extensão `.json`:
+
+```bash
+curl -X POST -H "Authorization: Bearer $TOKEN" \
+  ".../org/acme/project/vendas/tenant/$TENANT_ID/model" \
+  -F "file=@pedidos.model.json"
+# → 201 { "key": "<prefixo-interno>:cqrs:<tenantId>:wm" }
+#   ⚠️ chave MASCARADA: o prefixo interno está substituído e o formato literal não é este.
+#      A resposta real traz a chave completa — leia-a de lá, não daqui.
+```
+
+Efeito: valida a consistência `(org, project, tenant)` — o `tenantId` deve referenciar exatamente um
+dataschema do contexto — e **publica** o modelo no cache distribuído. **Semântica de sobrescrita**:
+republicar substitui o anterior, e também cobre o caso de a chave não existir.
+
+Erros: `400` (arquivo vazio, extensão diferente de `.json`, documento inválido), `403`/`404`
+(consistência), `500`.
+
+> **A publicação passa a validar o documento contra o metamodelo** e a recusar com `400` o que antes era
+> aceito e só falhava — ou silenciava — em runtime. **Em produção desde 2026-09-21** (ver
+> [CHANGELOG 1.37](../../CHANGELOG.md)). O `400` traz **todas** as violações de uma vez, cada uma com o
+> caminho dentro do JSON. As três que mais aparecem:
+>
+> | Recusa | Por quê |
+> |---|---|
+> | chave do agregado ≠ `<boundedContext.name>.<type>` | é o endereço do agregado: o despacho do evento procura **exatamente** essa chave e descarta em silêncio o que não achar, e é a mesma chave que o cliente manda no comando |
+> | `command.<cmd>.endState` sem evento de chave igual | o runtime resolve `event[endState]` por chave, sem fallback: o primeiro write falharia com `510` |
+> | dois envelopes `<org>.<project>` no mesmo arquivo | só o primeiro seria lido, e o outro sumiria sem aviso |
+> | item **objeto** em `domainBus.triggerProjection` sem `targetTenantId` | o destino é descartado no despacho: a projeção cross-tenant simplesmente não dispara. Item **string** continua válido — é a projeção same-tenant |
+> | `roles` do aggregate com recorte incoerente | ver [recorte de leitura do aggregate](#recorte-de-leitura-do-aggregate-roles) |
+> | `computed` que nomeia comando ou atributo inexistente | ver [atributos preenchidos pelo processor](#atributos-preenchidos-pelo-processor-computed) |
+
+### Recorte de leitura do aggregate: `roles`
+
+**Opcional.** Declara quem lê o aggregate e quais linhas cada papel lê; quem aplica o recorte é o
+serviço que atende os endpoints de aggregate. **Aggregate sem a chave publica e lê como antes.**
+
+```json
+"roles": {
+  "read":   ["OPERADOR", "CATRACA", "MASTER"],
+  "author": ["OPERADOR"],
+  "scope": {
+    "read": {
+      "OPERADOR": { "rows": { "by": "username" } },
+      "CATRACA":  { "attributes": ["nome", "cpf"] }
+    }
+  }
+}
+```
+
+**Duas dimensões independentes**, como no `accessControl.scope` da entity: `rows.by` responde quais
+**linhas** são suas, `attributes` responde quais **colunas** o papel vê — no estado do aggregate e no
+`eventData` de cada evento do `/history`. Declare uma, a outra, ou as duas.
+
+Recusas na publicação, todas `400`: papel no `scope.read` fora de `roles.read`; `MASTER` no `scope`;
+papel **sem nenhuma** das duas dimensões; `rows` presente sem `by`; `by` em metadado da plataforma
+(`id`, `loguser`, `logrole`, `logversion`, `logdate`); `by` em atributo não declarado em comando nenhum
+do aggregate. Os **nomes** em `attributes` não são conferidos — nome desconhecido é ignorado pelo motor
+com aviso.
+
+> ⚠️ **Não confunda com o `roles` do comando**, que é **array**, **obrigatório**, e diz quem pode
+> **executar**. Este é **objeto**, **opcional**, e diz quem pode **ler**. O nível desambigua.
+>
+> Modelo que já estava publicado **não** é revalidado: a checagem acontece na publicação.
+
+### Atributos preenchidos pelo processor: `computed`
+
+**Opcional.** Declara, por comando, os atributos que o **processor br** preenche e que o chamador **não**
+fornece. **Aggregate sem a chave publica como antes.**
+
+```json
+"cadastro.aluno": {
+  "command": { "criar": { … } },
+  "computed": { "criar": ["username", "matriculas.iscurrent"] }
+}
+```
+
+A chave é um objeto: cada chave é o nome de um comando do aggregate, e cada valor é uma lista **não vazia
+e sem repetição** de nomes de atributo. Nome com ponto (`<valueObject>.<campo>`) aponta para um campo de
+value object.
+
+Recusas na publicação, todas `400`: chave que não é comando do aggregate; atributo **sem ponto** que não
+está em `data.attribute` daquele comando; lista vazia; valor que não é lista. Nome **com ponto** não é
+conferido.
+
+Quem lê a declaração é o BFF, que tira o campo do formulário: ver
+[Atributo calculado pelo br](../../bff/README.md#atributo-calculado-pelo-br--computed). **O motor não lê
+esta chave**: ela não muda o que o comando grava.
+
+> **Em `develop` do forger desde 2026-09-25**, e ainda **não em produção**. Até o deploy, a publicação
+> aceita a chave sem conferir nada, porque o metamodelo não fecha chave desconhecida: a declaração chega
+> ao cache sem ser validada.
+
+### Chaves que um modelo novo não precisa trazer
+
+Estas aparecem em modelos existentes e **nenhum serviço as lê**. Continuam sendo aceitas — não é preciso
+reescrever modelo publicado —, mas **não as gere em modelo novo**:
+
+| Chave | Quem decide de fato |
+|---|---|
+| `schema.forWriteModel.name` | `tenantId.forWriteModel`. O forger **carimba** este campo na publicação e descarta o valor enviado |
+| `schema.forReadModel.name` | o **dataschema do tenant** |
+| `concurrency.*` | não é lido do modelo; o controle de concorrência vive no `_conf` da **entity** |
+| `queue` | filas são provisionadas pelo deploy de **process (BPMN)**, não pelo modelo |
+
+Por agregado, o necessário é: `org`, `project`, `boundedContext`, `type`, `tenantId`, `command` e
+`event` — mais `identity`, que é opcional e **é** lido.
+
+> ⚠️ **`readProjection` não é chave morta.** O motor não a lê, mas o **BFF** lê: é ela que limita, por
+> papel, as colunas que o usuário vê (ex.: esconder o CPF da recepção). Tirá-la do modelo remove essa
+> proteção sem erro nenhum. Ver [Limitar os campos que um papel lê](../../bff/README.md#limitar-os-campos-que-um-papel-lê--readprojection).
+> Até a 1.55 esta página a listava acima como chave que ninguém lê, o que estava errado.
+
+> ⚠️ **`boundedContext.name` não é rótulo.** Ele compõe o endereço do agregado **e** nomeia o schema
+> onde o log de consumo do evento é gravado. Se divergir do dataschema do tenant, o consumo de evento
+> grava no schema de **outro ambiente** sem um único erro em log. Use o mesmo nome nos dois.
 
 ## Ler
 
@@ -4817,7 +5269,8 @@ não publicado.
 ## Listar (por contexto)
 
 `GET /org/{org}/project/{project}/model` → `200` array de
-`{ tenantId, dataschema, project, status, ... }`.
+`{ tenantId, dataschema, project, status, cacheKey }`. O `status` é o do **dataschema**, não o do
+modelo — serve para ver de relance quais contextos estão em `MODELING` e portanto parados.
 
 ## Remover
 
@@ -4842,6 +5295,11 @@ publicação no cache (criar/atualizar) → resposta.
 > distribuído. As **filas/topologia de mensageria** são provisionadas pelo deploy de **process (BPMN)**
 > — ver [process.md](process.md). O modelo de domínio descreve agregados/comandos/eventos e seus
 > marcadores de despacho (projeção/coordenação), mas não declara nem cria infraestrutura de filas.
+
+> ⚠️ **A transição do dataschema para `MODELING` REMOVE o modelo publicado**, e voltar a `RUNNING`
+> exige republicá-lo — não é a plataforma que o repõe, porque o `.model.json` é artefato seu e ela não
+> guarda outra cópia. Se você remodela entities, este `POST` é passo obrigatório do roteiro, **dentro**
+> do bracket: ver [dataschema — alterar o schema de um sistema em operação](dataschema.md#alterar-o-schema-de-um-sistema-em-operação).
 
 ## Coordenação
 **CP-1:** o modelo publicado aqui é a **fonte da verdade** lida por **persistence-crs** (quais comandos/
@@ -4952,11 +5410,29 @@ Resposta `201`: `{ "id": <número>, "message": "..." }`. Erros: `400`, `403`, `5
 
 ## Envelope
 
-Em erro, a resposta tem o status HTTP correspondente e um corpo JSON:
+Em erro, a resposta tem o status HTTP correspondente e um corpo JSON com esta forma:
 
 ```json
-{ "error": "mensagem" }
+{
+  "timestamp": 1757520000000,
+  "orgName": "acme",
+  "projectName": "vendas",
+  "endpoint": "/org/acme/project/vendas/...",
+  "trace": null,
+  "statusCode": "400",
+  "default-message": "Requisição inválida.",
+  "message": "DataSchema 'pedidos' não pode voltar a RUNNING: ...",
+  "cause": "..."
+}
 ```
+
+> **Leia a `message`, não a `default-message`.** A `default-message` é um texto fixo por classe de erro,
+> em pt-BR; a **`message`** é a explicação específica daquela falha — é ela que diz *qual* campo faltou
+> ou *o que* fazer. O `statusCode` vem como **string** e repete o status HTTP.
+>
+> `cause` só aparece quando a exceção tem causa encadeada, e `trace` só é preenchido quando o rastreio
+> está ligado na instância; nos demais casos vem `null`. `orgName`, `projectName` e `endpoint` são
+> preenchidos nos endpoints que os conhecem.
 
 (Em casos específicos o corpo traz campos adicionais — ex.: publicação de **process** com problemas
 críticos retorna também o relatório de análise.)
@@ -4965,12 +5441,38 @@ críticos retorna também o relatório de análise.)
 
 | HTTP | Significado | Causas típicas | Correção |
 |---|---|---|---|
-| `400` | Requisição inválida | Campo obrigatório ausente; valor fora do formato (nome em minúsculas, comprimento, porta > 0); documento de modelo sem seção de agregado. | Corrigir o corpo conforme o contrato do endpoint. |
+| `400` | Requisição inválida | Campo obrigatório ausente (`_conf`, `logversion`); `type` de atributo fora da lista fechada ou em minúsculas; valor fora do formato (nome em minúsculas, comprimento, porta > 0); documento de modelo sem seção de agregado; **volta a `RUNNING` sem o `.model.json` publicado**; **projeção que não confere com o modelo de escrita** (ver abaixo). | Corrigir o corpo conforme o contrato do endpoint. No caso da transição, republicar o modelo — ver [dataschema](endpoints/dataschema.md#alterar-o-schema-de-um-sistema-em-operação). |
 | `403` | Acesso negado | Sem papel de administrador/engenheiro na organização; inconsistência de propriedade (`org`/`project`/`tenant`). | Usar credencial autorizada; conferir que o tenant pertence ao contexto. |
 | `404` | Não encontrado | Recurso inexistente; `tenant` não referencia dataschema do contexto. | Verificar a ordem de deploy e os identificadores. |
 | `409` | Conflito de versão | `logversion` divergente do atual (alguém atualizou antes); ou remoção bloqueada por dependentes. | Reler o recurso, reenviar com o `logversion` atual; remover dependentes antes. |
 | `422` | Não processável | Publicação de **process** com problemas **críticos** na análise. | Corrigir o processo conforme o relatório retornado. |
 | `500` | Erro interno | Falha na compilação/aplicação de DDL; falha ao materializar efeito físico (rollback aplicado). | Revisar a definição; retentar; se persistir, escalar. |
+
+## Projeção que não confere com o modelo de escrita — `400` na volta a `RUNNING`
+
+Vale para entity que declara [`_conf.projectionOf`](endpoints/entity.md#declarar-que-a-entity-é-projeção--_confprojectionof-regra).
+A recusa acumula **todos** os achados numa resposta só, **nada é gravado** e o dataschema **continua em
+`MODELING`**.
+
+| O que motiva | O que dizer ao corrigir |
+|---|---|
+| **atributo acima do teto** — a entity declara o que agregado nenhum escreve | remover o atributo da entity, **ou** acrescentá-lo a um `command` do agregado e republicar o `.model.json` |
+| **coluna faltando (piso)** — os agregados escrevem o que a entity não declara, carimbos de evento incluídos | declarar os atributos na entity, **ou** remover do `.model.json` o que a projeção não deve receber. É o caso grave: sem a coluna a gravação inteira é recusada e a linha nunca materializa |
+| **agregado inexistente** — nome em `projectionOf` sem `type` correspondente | corrigir o nome (é o **`type`**, não a chave composta do mapa `aggregate`), ou republicar o modelo com esse agregado |
+| **`type` ambíguo** — dois agregados publicados com o mesmo `type` | dar `type` distintos e republicar o modelo |
+| **chave divergente** — `identity.fields` de um campo sem `unique` no atributo, ou de 2+ campos sem `_conf.uniqueKey` igual, ou `unique` sem lastro nenhum | declarar a chave no lugar certo (um campo → atributo `unique`; dois ou mais → `_conf.uniqueKey`), **ou** acertar o `identity.fields` e republicar o `.model.json` |
+| **`aggregateid` ou `status` não declarados** na projeção | declarar os atributos na entity (é um caso particular do piso, e também é recusado na criação/atualização da entity) |
+| **modelo publicado ilegível** | republicar o `.model.json` |
+
+> **A recusa diz como SAIR, e vale ler essa parte.** O dataschema fica em `MODELING`, e **fechar de
+> novo dá a mesma recusa** — não há volta pela mesma porta. A saída é **retirar a declaração**
+> (`PUT` com `_conf.projectionOf: []`) e fechar a edição: o dataschema volta a `RUNNING` e o contexto
+> opera. Corrija a divergência e declare de novo depois. Sem isso, o contexto fica inoperante até
+> alguém descobrir — e não se descobre por tentativa, porque a saída é o oposto do que se está
+> tentando fazer.
+
+Na criação/atualização da entity, o `400` sai antes, e por outras causas: `projectionOf` em `_conf.type`
+diferente de `entity`, projeção sem `aggregateid`/`status`, item vazio ou repetido.
 
 ## Notas de comportamento
 - **Rollback:** ao criar `database`/`dataschema`/`entity`, se o efeito físico falhar, os metadados são
@@ -5024,15 +5526,31 @@ POST /org/acme/project/vendas/database/20/dataschema
 
 ## 5. Projeção (entity)
 
+`_conf` é **obrigatório** e o `type` de cada atributo vem de uma lista fechada, **com inicial
+maiúscula** — ver [entity.md](endpoints/entity.md). O corpo abaixo é o mesmo nas duas chamadas:
+
 ```
-POST /org/acme/project/vendas/dataschema/vendas/entity/validate   // dry-run
-{ "name": "pedido", "attributes": [ { "name": "total", "type": "decimal" } ] }
+POST /org/acme/project/vendas/dataschema/vendas/entity/validate   // dry-run, não persiste
+{
+  "name": "pedido",
+  "_conf": {
+    "type": "entity",
+    "accessControl": { "read": ["MASTER"], "write": ["MASTER"] }
+  },
+  "attributes": [
+    { "name": "total",  "type": "Double", "nullable": false },
+    { "name": "cliente", "type": "String", "length": 60, "nullable": false }
+  ]
+}
 → 200
 
 POST /org/acme/project/vendas/dataschema/vendas/entity            // aplica CREATE TABLE
-{ "name": "pedido", "attributes": [ { "name": "total", "type": "decimal" } ] }
+(mesmo corpo)
 → 201
 ```
+
+> Erros comuns aqui: `type` em minúsculas ou fora da lista (`"decimal"` não existe — use `"Double"`),
+> e `_conf` ausente. Os dois respondem `400` na compilação, antes de tocar o banco.
 
 ## 6. Modelo de domínio (model)
 
