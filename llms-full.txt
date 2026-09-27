@@ -10692,6 +10692,882 @@ O usuário abre um relato novo.
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.80 — 2026-09-27
+
+- **`llms-full.txt`: o bloco do CHANGELOG volta a acompanhar o `CHANGELOG.md`.** Ele estava parado na 1.22,
+  e o agente de contexto pequeno não via as revisões 1.23 a 1.79. Só esse bloco foi regenerado, a partir do
+  `CHANGELOG.md`; nenhum outro documento mudou. Decisão do dono de 2026-09-27.
+
+## 1.79 — 2026-09-27
+
+- **monitor: relatos publicados na borda** (`monitor/README.md`). Sai o aviso de que a rota
+  `/v3/monitor/suporte/**` não estava publicada: a infra mediu, às 04:13Z, a chamada pela borda chegando ao
+  monitor.
+
+## 1.78 — 2026-09-27
+
+- **Relatos de suporte no ar** (`bff/README.md` §Relatos de suporte): as rotas `/session/suporte/*` estão em
+  stager desde 2026-09-27T04:23Z (yc.app `3dbf9d1`); sai o aviso de que dependiam da rota da borda.
+
+## 1.77 — 2026-09-27
+
+- **BFF: relatos de suporte** (`bff/README.md` §Relatos de suporte; `shell/contrato-miolo.md` §hostContext,
+  `openSupport`). Seis rotas de sessão em `/session/suporte/*` — criar, listar os meus, ler com a conversa,
+  responder, marcar lido, contar não lidos — que repassam ao monitor (contrato na 1.76). O BFF tira da sessão
+  quem relata e confere org e tenant; o erro do monitor passa inteiro. O `openSupport` deixa de dizer que o
+  suporte é mockup. Decisões do dono de 2026-09-27; em `develop` do yc.app (`7e8dc7a`), no ar quando a rota da
+  borda for publicada.
+
+## 1.76 — 2026-09-27
+
+- **Fatia nova: monitor — relatos de suporte** (`monitor/README.md`, `monitor/endpoints/relatos.md`,
+  `monitor/erros.md`, `monitor/exemplos.md`). O BFF grava e lê, em nome do usuário, os relatos que a casca
+  monta: credencial de serviço, e o relator vem em cabeçalhos, nunca do corpo. A equipe atende pela tela do
+  monitor, e cada organização vê os seus. A fatia cobre estados, não lido, redação de credenciais no texto
+  livre e retenção contada do fechamento. Pedido do yc.app, a mando do dono. Implantado em 2026-09-27
+  (monitor `76a072f`); a rota na borda foi pedida e ainda não está publicada.
+
+## 1.75 — 2026-09-27
+
+- **O relato de suporte leva o diagnóstico da tela** (`shell/contrato-miolo.md` §hostContext,
+  `shell/seguranca.md` §Diagnóstico do relato de suporte, `bff/README.md` §Id de requisição). O
+  `hostContext` ganha `diagnostico` (`erro` e `trilha`, para o miolo registrar o que só ele sabe) e
+  `openSupport` aceita o erro em foco; a página de segurança diz o que o diagnóstico leva e o que nunca leva;
+  o BFF adota o `x-request-id` de quem chama (ou gera um) e o devolve em toda resposta, ligando o relato à
+  linha do log. Nada sai sem o usuário relatar. Pedido do dono de 2026-09-26; em `develop` do yc.app
+  (`5242624`), deploy em stager pedido.
+
+## 1.74 — 2026-09-27
+
+- **Manifesto: `genero` em produção** (`forger/endpoints/presentation.md`) — sai o aviso de que a publicação
+  ainda recusava a chave.
+
+## 1.73 — 2026-09-27
+
+- **A tela concorda com o gênero do agregado** (`shell/apresentacao.md` §O que cada chave faz na tela e
+  checklist; `shell/contrato-miolo.md` §hostContext): com `genero: "feminino"` no manifesto (chave do forger
+  desde a 1.72), o botão de criação diz "Nova {singular}" e o estado vazio "criar a primeira". Decisão do
+  dono de 2026-09-27, depois de ver "Novo modalidade" no stager. Em `develop` do yc.app (`4538e42`), ainda não em stager.
+
+## 1.72 — 2026-09-27
+
+- **Manifesto: `genero` do agregado** (`forger/endpoints/presentation.md` e `forger/spec/presentation.schema.json`).
+  Chave opcional por agregado, `feminino` ou `masculino` (ausente = masculino), para a tela concordar artigo
+  e adjetivo com o nome ("Nova modalidade", não "Novo modalidade"). Em `develop` do forger; até o próximo
+  deploy, a publicação em produção a recusa como chave desconhecida.
+
+## 1.71 — 2026-09-27
+
+- **A tela usa campo de value object (`grupo.campo`) em todo lugar que o forger aceita**
+  (`shell/apresentacao.md` §Campos de value object; `shell/contrato-miolo.md` §hostContext): coluna,
+  título, formato, filtro e seleção, além do rótulo. Grupo `multiple` mostra os valores dos itens por
+  vírgula, e o filtro casa com qualquer item. Decisão do dono de 2026-09-27, depois que a 1.70 do forger
+  documentou que a publicação já aceitava `grupo.campo` nessas chaves e a tela os ignorava. Em `develop`
+  do yc.app (`3ac23a5`), ainda não em stager.
+
+## 1.70 — 2026-09-27
+
+- **Manifesto: o que cada chave aceita, chave por chave** (`forger/endpoints/presentation.md` §Referências
+  conferidas na publicação). A tabela de chaves dizia "formato por atributo" em `fmt`, e a seção de
+  referências dava `grupo.campo` como válido — duas leituras opostas. Agora uma tabela diz, para `titleKey`,
+  `labels`, `fmt`, `cols`, `filters`, `options` e estados, o que a publicação aceita: `fmt`, `cols`, `filters`,
+  `titleKey` e as chaves de `options` aceitam atributo **ou** `grupo.campo`; só `labels` aceita o nome do value
+  object sozinho. Nenhum comportamento mudou — é o que o forger em produção já confere. Pedido do conceptnatal.
+
+## 1.69 — 2026-09-27
+
+- **`shell/apresentacao.md` perde duas ressalvas vencidas pelo deploy do composer** (forger em produção desde
+  2026-09-27T00:29Z): a conta de plataforma que publica **já confere pelo `GET`** (o composer mediu `204` com
+  token de plataforma às 00:31Z), e `aggregateid` como `valueKey` já é aceito em produção.
+
+## 1.68 — 2026-09-27
+
+- **Manifesto: as três correções da 1.61 estão em produção** (`forger/endpoints/presentation.md`) — o `DELETE`
+  que responde `{ "deleted": true }` sempre que não resta manifesto, as chaves da plataforma do canon
+  (`aggregateid`, `status`, `version`) e o `GET` também para papel de administrador ou de engenheiro. Sai a
+  nota das "três diferenças até o próximo deploy".
+
+## 1.67 — 2026-09-27
+
+- **`shell/README.md` e `shell/injecao.md` descrevem o menu e a injeção como são desde a 1.62**: menu
+  Projeto → Contexto → Agregados, o miolo montado ao escolher o **agregado** (e remontado a cada escolha),
+  e a casca pedindo capacidade, manifesto de apresentação e URL do miolo. O README ganha a página
+  `apresentacao` na tabela de documentos. As duas páginas ainda falavam em "selecionar um bounded context".
+
+## 1.66 — 2026-09-27
+
+- **Dois avisos de "ainda não em produção" saem do orgid** — `orgid/endpoints/publico.md` (em `/ua`, `R` só
+  ativa conta `PENDING`) e `orgid/endpoints/ua-conta.md` (o titular não troca o próprio status). As duas
+  travas estão em produção desde 2026-09-26, no mesmo deploy que levou a trava de papel público (1.58); a
+  1.58 não os tirou porque a frase quebrava de linha e a busca não os achou.
+
+## 1.65 — 2026-09-27
+
+- **Login do auth: as chaves da resposta são `accessToken`, `tokenType` e `mcpSessionId`** — e não `token`,
+  `type` e `sessionId`, como diziam `auth/endpoints/sign-in.md`, `auth/README.md`, `auth/exemplos.md` e o
+  `auth/openapi.yaml`. Quem lia `.token` ficava sem token. E a página passa a dizer que, pela borda, o login
+  leva **um** cabeçalho de identificação (`X-Tenant-Id` ou `X-Forger-Credential`); sem nenhum, `401`.
+  Medido pelo conceptnatal pela borda e conferido no código.
+
+## 1.64 — 2026-09-27
+
+- **`shell/apresentacao.md` acompanha a decisão do dono sobre o `GET` do manifesto**: quem publica
+  (administrador ou engenheiro na org) passa a conferir pelo `GET` do forger, como a página do forger já
+  diz; até o próximo deploy do composer, a produção ainda responde `403` a essa conta, e a página diz
+  isso com a medição. Desfaz o "não confere pelo GET" da 1.63, que valia só para o código em produção.
+
+## 1.63 — 2026-09-27
+
+- **`shell/apresentacao.md` deixa de mandar quem publica conferir o manifesto pelo `GET`.** A conta de
+  plataforma que publica recebe `403` `tenant <id> is not in the token` no `GET` do forger, porque o token
+  dela não carrega os tenants — medido no stager em 2026-09-27T00:09Z com o token de plataforma do
+  conceptnatal, que lia o `/model` do mesmo tenant com `200`. A conferência passa a ser com um usuário do
+  app que tenha o tenant (forger ou BFF), ou pela tela. E `options` por referência diz que o `valueKey`
+  de um campo de referência costuma ser `aggregateid`.
+
+## 1.62 — 2026-09-26
+
+- **O agregado passa a ser escolhido no menu da casca** (`shell/contrato-miolo.md` §hostContext;
+  `shell/estilo.md` §Chrome da casca). O menu vira Projeto → Contexto → Agregados, com contagem de
+  registros; cada escolha remonta o miolo. O `hostContext` ganha `aggregate`, `presentation` (o
+  manifesto de apresentação do tenant, ou `null`), `openSupport(contexto)` e `api.count`; comando
+  recusado rejeita com `status` e `em` além da mensagem. "Encerrar sessão" fica só no menu da conta; a
+  barra ganha agente e suporte (este, por ora, mockup declarado).
+- **Página nova: como preencher e publicar o manifesto de apresentação** (`shell/apresentacao.md`), para a
+  hierarquia de agentes que escreve o `.model.json`: o que cada chave faz na tela do Stager, como
+  escolher o valor, os formatos, um exemplo e o caminho de publicação e conferência.
+- **BFF: manifesto de apresentação e contagem** (`bff/README.md` §Manifesto de apresentação e §Proxy de
+  domínio). `GET /session/presentation?tenant=` lê no forger, com o token da sessão, o manifesto
+  publicado ([forger — presentation](forger/endpoints/presentation.md), 1.60); `null` quando não há.
+  `POST /session/query` aceita `count: true` e devolve `{ entity, total }`. Em `develop` do yc.app (merge
+  `7c9c55f`), ainda não em produção.
+
+## 1.61 — 2026-09-26
+
+- **Manifesto de apresentação em produção** (`forger/endpoints/presentation.md`): o aviso de "ainda não em
+  produção" sai. E o `DELETE` passa a responder `{ "deleted": true }` sempre que não resta manifesto,
+  para que a repetição da mesma chamada responda o mesmo; em produção a partir do próximo deploy.
+- **Manifesto: as chaves da plataforma aceitas como atributo passam a ser as do canon** — `id`,
+  `aggregateid`, `status`, `version` e os metadados de auditoria. A página listava só `id` e a auditoria, e a
+  publicação recusava `status` em coluna e `aggregateid` como `valueKey` de referência. Apontado pelo yc.app;
+  em produção a partir do próximo deploy.
+- **Manifesto: o `GET` aceita também papel de administrador ou de engenheiro na org** — quem publica usa
+  token de plataforma, que não carrega os tenants, e recebia `403` ao conferir o que publicou. Medido pelo
+  conceptnatal; em produção a partir do próximo deploy.
+
+## 1.60 — 2026-09-26
+
+- **Manifesto de apresentação por tenant** (`forger/endpoints/presentation.md`, página nova, e
+  `forger/spec/presentation.schema.json`). `POST`/`GET`/`DELETE .../tenant/{tenantId}/presentation`: publicar
+  e remover com a autorização do model; ler basta o tenant no token (`204` sem manifesto). A publicação
+  confere a forma e cada referência contra o modelo publicado do tenant; o manifesto não é removido com o
+  modelo. Índices: `forger/README.md`, `forger/openapi.yaml`, `llms.txt`, `README.md`. Em `develop` do
+  forger, ainda não em produção.
+
+## 1.59 — 2026-09-26
+
+- **A casca adota a paleta e a fonte do Stager Console** (`shell/Principios de Design - Shell Universal.md`
+  §Marca e cor e §Tipografia; `shell/estilo.md` §Grupos de token). Marca `#00d676` → `#00c875`, com
+  os acentos `#08653c` · `#dff5ea` · `#063d24`; erro em `oklch`. **JetBrains Mono** substitui a IBM
+  Plex Mono, como decisão registrada no guia. Tokens novos: `sidebar` (menu lateral), `ink`/`ink-fg`
+  (botão escuro), `danger-line` (borda de erro) e `pill-bg-l`/`pill-fg-l` (luminosidade da pílula de
+  estado, cuja matiz sai do nome do estado). Em `develop` do yc.app (merge `c9f1935`), ainda não em produção.
+
+## 1.58 — 2026-09-26
+
+- **`alias`, `computed` e a trava de papel público do autocadastro entram em produção** — três avisos
+  de "ainda não em produção" saem da fatia do composer: `forger/endpoints/model.md` §Atributos
+  preenchidos pelo processor e §Nome de exibição de comando e evento, e `orgid/endpoints/publico.md`
+  (só papel público). Modelo publicado antes não é revalidado: vale a partir da próxima publicação.
+
+## 1.57 — 2026-09-26
+
+- **A capacidade passa a levar o `alias` de comando e de evento** (`bff/README.md` §Nome de exibição de
+  comando e evento; `shell/contrato-miolo.md` §Modelo de capacidade). `commands[].alias` e
+  `aggregates[].events.<evento>.alias`, os dois ausentes quando o modelo não declara. Quem exibe mostra o
+  alias e, sem ele, o nome; o comando continua sendo enviado pelo nome. O histórico não muda: o alias do
+  evento se acha pelo último segmento do `eventType`. A regra "o modelo não fornece rótulo" ganha essa
+  exceção. Complementa a 1.56. Em `develop` do yc.app, ainda não em produção.
+
+## 1.56 — 2026-09-26
+
+- **`alias` de comando e de evento no `.model.json`** (`forger/endpoints/model.md` §Nome de exibição de
+  comando e evento). Chave opcional em `command.<cmd>` e `event.<evt>`: o nome que a tela mostra no lugar
+  da chave. A publicação recusa com `400` o alias vazio, só de espaços ou que não é texto; ausente,
+  publica como antes. O motor não lê a chave. Em `develop` do forger, ainda não em produção.
+- **`alias` na gramática do `.model.json`** (`persistence-crs/spec/model-format.md` §Comandos e §Eventos,
+  `persistence-crs/spec/model.schema.json`). Opcional em `command.<cmd>` e `event.<evt>`, com a forma que o
+  forger valida: texto com ao menos um caractere que não seja espaço. O motor (yc.cqrs-c, yc.es, es-n,
+  persistence-crs) não lê a chave. O bloco do `model-format.md` no `llms-full.txt` volta a ser idêntico ao
+  arquivo.
+
+## 1.55 — 2026-09-26
+
+- **`readProjection` sai da lista de chaves que ninguém lê** (`forger/endpoints/model.md` §Chaves que um
+  modelo novo não precisa trazer). A página mandava não gerá-la em modelo novo, mas o **BFF** a lê para
+  limitar as colunas que cada papel vê (`bff/README.md` §Limitar os campos que um papel lê). Quem seguisse
+  a página perdia essa proteção sem erro. Apontado pelo yc.app.
+- **`llms-full.txt`: os nove blocos da fatia do composer que tinham ficado para trás voltam a ser
+  idênticos aos arquivos** — `forger/README.md`, `forger/endpoints/{dataschema,entity,model}.md`,
+  `forger/erros.md`, `forger/exemplos.md`, `orgid/endpoints/{publico,ua-conta,ua-papel}.md`. O bloco do
+  `model.md` ainda não tinha nem o metamodelo da 1.37. Os outros 79 blocos não foram tocados.
+
+## 1.54 — 2026-09-26
+
+- **`bff/README.md` alinha três avisos ao que o forger e o orgid passaram a fazer.** `readProjection` e
+  `computed` deixam de ser descritas como chaves que viajam só porque o forger as tolera: as duas são
+  **declaradas** no esquema do agregado, e a página diz o que a publicação confere e o que continua
+  sendo conferido pelo BFF. No autocadastro, a trava do papel público passa a existir **nos dois lados**
+  (o orgid também recusa papel não público); a da conta nascer `PENDING` continua **só do BFF**, porque
+  o orgid ainda aceita `status: ACTIVE` e a chave `from`.
+
+## 1.53 — 2026-09-26
+
+- **Coordenação com N alvos: encadear, não emitir de dentro do processor** (`persistence-crs/spec/model-format.md`
+  §O que o processor de coordenação devolve). A página dizia que quem precisa atingir N agregados "emite
+  os N comandos dentro do próprio processor". No caminho assíncrono não há JWT, e o comando assim
+  submetido roda sem conferência de papel e grava evento sem autor. O caminho é encadear: cada alvo gera
+  um evento, que dispara a coordenação do próximo, e a cadeia acaba quando o processor responde sem
+  `targetCommand`. `targetCommand` em forma de lista faz a coordenação falhar. A página passa também a
+  dizer o que vale com **várias entradas** em `triggerCoordination`: uma mensagem independente por
+  entrada, `name` distinto (a deduplicação é por evento e `name`), `targetTenantId` obrigatório (sem ele a
+  entrada é pulada em silêncio) e nenhuma ordem garantida entre elas. Lido no código do persistence-crs e
+  do es-n.
+
+## 1.52 — 2026-09-25
+
+- **O `hostContext` ganha `roles` e `activeRole`** (`shell/contrato-miolo.md`). O miolo passa a saber os
+  papéis **ativos** do usuário na organização do tenant e o papel escolhido na sessão. Antes só havia a
+  identidade, e um miolo que precisasse mostrar coisas diferentes por papel não tinha de onde tirar isso.
+  É **dica de apresentação**: o servidor segue autorizando cada chamada. Pedido do `conceptnatal` para o
+  miolo de agenda. Miolo que não lê os campos não percebe diferença.
+
+## 1.51 — 2026-09-25
+
+- **orgid `/ua`: três rotas deixam de conceder o que não deviam** (`orgid/endpoints/publico.md`,
+  `orgid/endpoints/ua-conta.md`, `orgid/openapi.yaml`). `POST /open/ua/account-role` só aceita papel
+  **público** (`403` no resto); `PUT /open/ua/account/{u}/R/hash/{h}` só ativa conta `PENDING` (`403` em
+  `SUSPENDED`); `PUT /ua/account` ignora o `status` do corpo. **Em `develop` do orgid, ainda não em
+  produção.** Quem registra conta com papel público e confirma cadastro de conta pendente não percebe
+  diferença.
+
+## 1.50 — 2026-09-25
+
+- **`computed` passa a ser chave declarada do aggregate no `.model.json`** (`forger/endpoints/model.md`
+  §Atributos preenchidos pelo processor). Até aqui a publicação só **tolerava** a chave: o metamodelo não
+  a conhecia e não conferia nada. Agora ela é declarada, e a publicação recusa com `400` o comando ou o
+  atributo sem ponto que não existe no aggregate, a lista vazia e o valor que não é lista. **Em `develop`
+  do forger, ainda não em produção.** Modelo sem a chave não muda.
+
+## 1.49 — 2026-09-25
+
+- **`POST /session/command` recusa com `400` o valor fora do tipo declarado** (`bff/README.md` §Proxy de
+  domínio e §Erros). Antes o BFF **trocava** o valor em silêncio: em `Boolean`, tudo que não fosse `true`
+  virava `false` (`"sim"`, `"True"`, `"1"`); em `Integer`/`Long`, texto não numérico virava `null`
+  explícito (`"abc"`, `"1,5"`). Agora `Boolean` aceita `true`/`false` e `Integer`/`Long` aceitam número
+  inteiro, como valor ou como texto, e o resto é recusado nomeando o campo. **Quem manda o tipo certo
+  não percebe diferença**; quem mandava outra coisa passa a saber, em vez de gravar o valor errado.
+
+## 1.48 — 2026-09-25
+
+- **`computed`: a página deixa de descrever o motor anterior como se fosse o atual** (`bff/README.md`
+  §Atributo calculado pelo br). A tabela de por que o marcador nunca é `null` passa a ser **do motor
+  anterior**, e a página diz onde o conserto da 1.47 já está: **no ar em `/v3/persistence/t/`; em
+  `/v3/persistence/`, ainda não** (2026-09-25). Os marcadores não mudam: enquanto as duas instâncias não
+  rodarem o mesmo motor, só o valor explícito não nulo grava igual nas duas. A regra do processor também
+  fica: o `null` que ele **devolve** continua ignorado na mescla, no motor consertado inclusive.
+
+## 1.47 — 2026-09-25
+
+- **`null` explícito e `""` em data: o motor foi consertado, e a página diz as regras novas**
+  (`persistence-crs/endpoints/comando.md` §`null` explícito, chave omitida e o que o processor devolve).
+  O `null` explícito num atributo `nullable` grava `NULL` no agregado e na projeção, na criação e na
+  transição. Antes, em campo numérico a linha não materializava, e em texto gravava a palavra `"null"`.
+  Numa transição, `null` apaga e omitir a chave preserva. O `null` **devolvido pelo processor** continua
+  ignorado na mescla: é outra regra. `""` em `Date`/`Timestamp` vira `null` no opcional e dá `400` no
+  obrigatório; antes respondia `200` e a projeção falhava em silêncio. Vale para `/v3/persistence/` e
+  `/v3/persistence/t/`, que rodam o mesmo código. O que as 1.45 e 1.46 mediram no `computed` descrevia o
+  motor anterior.
+
+## 1.46 — 2026-09-25
+
+- **`computed`: três fatos medidos entram na página** (`bff/README.md` §Atributo calculado pelo br). O
+  `null` explícito na criação tem **dois** desfechos conforme o tipo — em campo numérico a linha não
+  materializa; em texto ela materializa com a palavra `"null"`, que parece dado. `""` numa `Date` ou
+  `Timestamp` responde `200` e a gravação da projeção falha em silêncio — daí o marcador das datas ser o
+  epoch também no opcional. E o processor **não deve validar o valor que chega** num campo `computed`:
+  uma regra de faixa recusa o marcador `0` e, com ele, o próprio comando. Nenhum marcador mudou.
+
+## 1.45 — 2026-09-25
+
+- **`computed` volta a nunca mandar `null` — e a 1.44 fica desdita.** A 1.44 fazia o campo que aceita nulo
+  receber `null` explícito. Medido depois por um sistema consumidor, direto no persistence-crs, o `null`
+  explícito **quebra a leitura**: na criação a projeção **não materializa a linha** (o agregado existe, a
+  consulta não o acha), e na transição o write model grava `NULL` enquanto a projeção **mantém o valor
+  anterior**. Só valor explícito não nulo deixa os dois lados iguais. O marcador passa a ser sempre não
+  nulo; no texto, `""` se o campo aceita nulo e `"computed"` se é obrigatório (`bff/README.md`
+  §Atributo calculado pelo br, com a tabela medida). **A 1.44 nunca chegou ao ar** — o deploy foi
+  segurado antes. A regra do processor fica uma só: nunca devolver `null`; para limpar, o vazio do tipo.
+
+## 1.44 — 2026-09-25
+
+- **`computed`: o campo que aceita nulo passa a receber `null` explícito, não um valor do tipo**
+  (`bff/README.md` §Atributo calculado pelo br). Até a 1.43, todo campo calculado recebia `"computed"`,
+  `0`, `1970-01-01`… — e, como o motor **ignora o `null`** que o processor devolve, um processor que anula
+  de propósito um bloco opcional gravaria o marcador em toda operação comum. Achado pelo `clubflow` ao
+  avaliar o impacto da 1.43, antes de qualquer declaração em produção. O `null` explícito sobrevive até
+  a mescla e é substituível (lido no motor pelo `interpreter`). O obrigatório segue com o valor do tipo.
+  A página passa também a dizer que **devolver `null` não limpa campo nenhum**, e que value object
+  ausente não é criado pelo marcador.
+
+## 1.43 — 2026-09-25
+
+- **Atributo calculado pelo br — `computed`** (`bff/README.md`, nova seção; `shell/contrato-miolo.md`).
+  O modelo passa a poder declarar, ao lado dos comandos do agregado, quais atributos o processor de
+  regra de negócio **preenche** — escalares e campos de value object. A capacidade os marca com o papel
+  novo `computed`, o miolo genérico não os desenha, e o BFF os envia **sempre** com um marcador do tipo,
+  que o processor sobrescreve. Antes, a chave calculada não chegava ao processor — a mescla dele só
+  substitui chave presente, e o BFF descarta `""`/`null` —, e a única saída era o cliente digitar um
+  placeholder. Declaração inválida, inclusive em comando sem `br.route`, recusa o comando com `500`.
+  ⚠️ **Não é a forma definitiva:** se o processor não devolver o campo, o marcador é gravado sem aviso.
+  Pedido do `conceptnatal`.
+
+> **Quem já integrou não precisa mexer em nada:** sem a declaração, nenhum atributo é `computed` e tudo
+> se comporta como antes. Consumidor que trate `role` como conjunto fechado de quatro valores precisa
+> aceitar o quinto.
+
+## 1.42 — 2026-09-23
+
+- **As chaves de cache internas saem da doc MASCARADAS** — por ordem do dono, hoje. Onde a página
+  precisava falar delas, o prefixo interno virou `<prefixo-interno>` e **o aviso de que o formato está
+  mascarado vem colado à apresentação da chave**, não em rodapé: quem lê não pode sair daqui achando que
+  copiou um literal. O **sentido** fica inteiro, porque o que a doc afirma nunca foi o valor — é a
+  **distinção** entre as duas chaves (uma termina em `:wm`, o write model que a capacidade lê; a outra
+  guarda a spec de entidades, que o motor usa) e o fato de que **o que apaga uma não apaga a outra**.
+  Atingidos: `bff/README.md` §Capacidade e `forger/endpoints/model.md`, no corpo do `201` — ali a nota diz
+  com todas as letras que **a resposta real traz a chave completa, e é de lá que se lê**, não da doc.
+
+- **Nome de classe e de método também saíram**, pela mesma razão e no mesmo lugar: `bff/README.md` passa
+  a dizer *"o controlador de modelo do forger manda o serviço de cache remover a entrada daquele tenant"*.
+  Implementação não é contrato; quem integra não precisa do nome, e quem mantém o serviço não lê esta doc
+  para descobri-lo.
+
+- **`orgid/endpoints/ua-papel.md`: o terceiro padrão de rota liberada também está mascarado.** A passagem
+  continua explicando o que precisava explicar — por que o orgid **sozinho** responde `401` num endpoint
+  documentado como público —, dizendo que além de `/open/**` e `/z/**` **existe** um terceiro padrão
+  interno, sem publicar qual. A config de segurança deixou de ser nomeada por classe.
+
+> **O que NÃO mudou:** nenhum comportamento, nenhum contrato, nenhum endpoint. É a mesma doc dizendo as
+> mesmas coisas com menos valor interno exposto. Quem já integrou não precisa mexer em nada.
+
+## 1.41 — 2026-09-23
+
+> As três correções abaixo viviam numa seção *"Histórico de correções"* dentro da página do BFF. A
+> página passa a dizer só **como é**; o que ela corrigiu, e quando, mora aqui. As datas são as das
+> correções, não a desta revisão.
+
+- **2026-09-13 · `valueObjects` passou a existir na capacidade.** Antes disso o comando aceitava o
+  campo no envio e a capacidade não o descrevia: quem montava tela a partir dela concluía que o campo
+  não existia, sem aviso, e o miolo genérico **não conseguia disparar comando com value object
+  obrigatório**, por montar o formulário só de `attributes`. Medido de fora, comparando o modelo
+  publicado com a capacidade devolvida.
+
+- **2026-09-10 · o modelo publicado nunca teve TTL** — e a doc afirmou o contrário por catorze dias.
+  A afirmação **era verdadeira quando foi escrita**: até 2026-08-31 o forger gravava com prazo de 24h
+  configurável. Naquele dia ele passou a gravar sem prazo e a propriedade sumiu; esta fatia não foi
+  atualizada junto. **O risco é estrutural e não se resolve conferindo melhor: doc de comportamento
+  alheio envelhece quando o dono do comportamento muda sem avisar quem documentou.** A primeira
+  correção ainda errou de chave, mandando investigar o bracket de um modelo cuja remoção não passa por
+  ali — são **dois serviços de cache distintos**: um grava o **write model** (o que o BFF lê), o outro
+  grava o **read model** (o que o bracket remove), e confundi-los é o que levou a investigar o lado errado. **Parágrafo cuja receita sempre dá certo — aqui, republicar —
+  não avisa quando a explicação está errada.**
+
+- **2026-09-13 · a regra do `readProjection` deixou de copiar a do `scope` de linha.** A regra antiga
+  era *"vários papéis, um deles fora da declaração → lê tudo"*, correta **quando o outro papel de fato
+  lê a entity** — e o BFF não tem como saber isso, porque quem concede leitura é o `accessControl.read`
+  do `_conf`, que ele não enxerga. Medido com conta real: um usuário `[VISITANTE, RECEPCIONISTA]`
+  recebia a ficha inteira **com CPF**, porque `VISITANTE` não estava na declaração, embora não tivesse
+  leitura nenhuma naquela entity. Como quase todo usuário acumula papéis, o controle era praticamente
+  inerte. A regra atual **falha fechando**.
+
+## 1.40 — 2026-09-23
+
+- **BFF — `serverStamp` é o `whenAttribute` do evento, e não mais o sufixo do nome.** Até esta revisão
+  a doc descrevia `serverStamp` só como "carimbo do servidor", e a implementação classificava por
+  `Timestamp` com nome terminado em `em` — o que retirava do comando atributos que o modelo declarava
+  como dados, inclusive `nullable:false`. Quem tinha contorno para isso (renomear o atributo, ou
+  declará-lo como `whenAttribute` de um evento só para o valor ser aceito) não precisa mais dele.
+  Páginas: [bff](bff/README.md), [contrato do miolo](shell/contrato-miolo.md).
+
+- **BFF — as quatro rotas de arquivo anexo de agregado passam a existir**: `/session/files/upload`,
+  `/download`, `/list` e `/delete`, proxy do [filer](filer/README.md) pelo cookie de sessão. Página:
+  [bff](bff/README.md#arquivos-anexos-de-agregado-sessionfiles).
+
+- **Teto de arquivo: a página do BFF diz 3 MiB; a do filer ainda anuncia "≈10 MB".** O valor que vale
+  para quem passa pelo BFF é 3 MiB — é o `max-file-size` do próprio serviço. A página do filer será
+  reconciliada por quem responde por ela.
+
+## 1.39 — 2026-09-23
+
+- **O recorte de leitura passa a ter DUAS dimensões, e elas são independentes.** `rows.by` responde
+  quais **linhas** são suas; `attributes`, quais **colunas** você vê. Vale nos dois lugares: no
+  `_conf.accessControl.scope.read` da **entity** ([entity](forger/endpoints/entity.md)) e no
+  `roles.scope.read` do **aggregate** ([model](forger/endpoints/model.md)). Declare uma, a outra, ou as
+  duas.
+
+- **`rows` deixou de ser obrigatório**, e é isso que destrava o caso real: uma **conta de integração**
+  não é titular de linha nenhuma — não existe `rows.by` possível para ela —, então, enquanto
+  `attributes` só valesse dentro de um bloco que exigia `rows`, o caso ficava de fora por construção.
+  O que essa conta precisa é ver **duas colunas de todas as linhas**, em vez das vinte e quatro.
+
+- **Papel sem nenhuma das duas dimensões passa a ser recusado com `400`.** Recorte que não corta nada
+  se lê como proteção e não é. É a única recusa nova.
+
+- **Os nomes em `attributes` NÃO são conferidos na publicação**, de propósito: nome desconhecido o motor
+  ignora com aviso, e lista inteira errada devolve resposta vazia. Recusar por typo transformaria erro
+  de modelagem em entity indisponível. O contraste com `rows.by` é deliberado — lá o nome **é**
+  conferido, porque um `by` errado não devolve menos, devolve **errado**.
+
+- **Vigência: EM PRODUÇÃO desde 2026-09-23T02:38Z**, em `yc-composer:amd64-9884832-74f6`
+  (`composer@9884832`, `forger@8b906dd`, `auth@537991a`, `orgid@697f402`). A outra metade — o motor que
+  **aplica** o corte — subiu às 02:28:11Z em `tinterpreter:amd64-538ea49-2eca`
+  (`ufrn.loco3@22fcb89`, `persistence-crs@40493a0`).
+
+  **As duas metades no ar é o que torna o recurso real:** a publicação aceitar `attributes` sem o motor
+  cortar seria proteção declarada e não aplicada. Medido dentro do contêiner em execução, e não no jar
+  da máquina de build: o `schema/aggregate-schema.json` que está rodando contém `write-model-v2` e
+  `attributes`.
+
+## 1.38 — 2026-09-21
+
+- **O histórico de um agregado tocado por coordenação volta a responder.** O `GET` de histórico desses
+  agregados devolvia erro permanente; agora responde `200`. **Os eventos gravados a partir desta imagem
+  trazem a autoria; os anteriores vêm sem ela** — a identidade não foi gravada quando eles aconteceram, e
+  não há de onde tirá-la. Histórico antigo aparece legível, com alguns eventos sem autor.
+
+- **Todo comando passa a carimbar quem o fez.** O dado do agregado ganha a chave `loguser` nas
+  respostas. Ela **não** desce para a projeção — o modelo de leitura segue com as colunas que você
+  declarou.
+
+- ⚠️ **A autoria passa a valer na materialização da projeção.** O autor do comando de origem agora
+  acompanha a coordenação até a escrita da projeção, e o `accessControl.write` da entity de destino é
+  conferido de verdade. **Se o papel do autor não estiver no `write` da entity alvo, a projeção não
+  materializa** — vale conferir as coordenações em que quem inicia tem papel diferente do que o destino
+  aceita.
+
+- **Campo declarado `nullable: false` passa a ser exigido pelo motor, e não só pelo BFF.** Comando que
+  não traga o campo, ou que o traga nulo, é **recusado**. Até aqui a declaração era lida pelo BFF do
+  Stager e nada mais: comando que entrasse por outro caminho — coordenação, despacho de comando-alvo,
+  chamada direta ao endpoint — era aceito com o campo ausente. ⚠️ Se o seu modelo declara
+  `nullable: false` num campo que **o processador de regra de negócio calcula**, esse comando passa a ser
+  recusado **antes** de a regra rodar.
+
+- **Falha de projeção por chave divergente deixa de ser silenciosa.** A notificação era descartada sem
+  log, sem métrica e sem fila de erro — indistinguível de "nada aconteceu". Agora sai registro com as
+  chaves que o modelo tem, contador e erro publicado; e identificador de agregado malformado passa a ser
+  descartado com motivo, em vez de derrubar o processamento do lote.
+
+- **Vigência:** em **teste** desde `yc-interpreter:amd64-260921` (campo obrigatório e descarte com
+  registro; `yc.cqrs-c@9e2ea51`, `yc.es@0b981db`) e `:amd64-260921b` (histórico, `loguser` e autoria na
+  coordenação; `yc.cqrs-c@0f600d3`, `persistence-crs@8ba070f`, `ufrn.loco3@b8a944b`), implantadas em
+  2026-09-21. **Produção ainda não** — o interpreter segue em `:amd64-260913c`. A validação do
+  metamodelo, que subiu em produção no mesmo dia, está na 1.37 e não se repete aqui.
+
+## 1.37 — 2026-09-21
+
+- **Produção passou a rodar `yc-composer:amd64-260921` (`sha256:fecea707b971`), implantado às
+  16:39:59Z.** Tudo o que as entradas 1.34, 1.35 e 1.36 descreviam como *"em `develop`, ainda não em
+  produção"* **vale agora em produção**, e é por isso que esta entrada existe. São três comportamentos,
+  todos na publicação de modelo (`POST .../model`):
+
+  - **o documento é validado contra o metamodelo**, e a publicação responde `400` listando todas as
+    violações de uma vez (1.34);
+  - **a chave do agregado tem de ser `<boundedContext.name>.<type>`** — antes, chave divergente fazia o
+    evento ser descartado sem log, sem métrica e sem DLQ (1.34);
+  - **`roles` no nível do agregado** é aceito na publicação, e o recorte **declarado** é conferido, com
+    cinco recusas em `400` (1.36).
+
+  ⚠️ **Conferir a declaração não é aplicar o recorte.** O que subiu em produção é a publicação passar a
+  aceitar e validar a chave. **Quem aplica o corte na leitura é o interpreter, e esse lado ainda não
+  está em produção** (ver 1.38 — segue em `:amd64-260913c`). Até ele subir, declarar `roles` publica e
+  **não recorta nada**: quem precisa do corte valendo espera a imagem do interpreter.
+
+- **O que continua valendo, e é o que evita susto:** modelo **já publicado não é revalidado** — a
+  checagem é na publicação. Quem publicou ontem e não publica hoje não muda de comportamento por causa
+  desta subida. Agregado sem `roles` publica e lê como antes.
+
+- **Como ler as datas de vigência daqui para trás:** as entradas 1.34, 1.35 e 1.36 dizem *"ainda não em
+  produção"* porque era verdade quando foram escritas. **Esta entrada é o corte.** As páginas de uso
+  descrevem o comportamento corrente e não carregam mais vigência; quem precisa saber *desde quando*
+  vem a este arquivo.
+
+## 1.36 — 2026-09-21
+
+- **O aggregate passa a aceitar `roles`, que declara o recorte de LEITURA.** Opcional: quem não a usa
+  publica e lê como antes. A forma é
+  `{ read: [...], author: [...], scope: { read: { <PAPEL>: { rows: { by: <atributo> } } } } }`, e a
+  publicação recusa com `400` o recorte incoerente — papel no `scope.read` fora de `roles.read`,
+  `MASTER` no `scope`, `rows` sem `by`, `by` em metadado da plataforma, `by` em atributo não declarado
+  em comando nenhum do aggregate. São as mesmas cinco recusas que o `accessControl.scope` da entity já
+  fazia: o recorte é o mesmo dos dois lados, e divergir publicaria aggregate que passa e entity que não.
+
+- **⚠️ `roles` agora existe em dois níveis, com formas diferentes.** No **comando** é **array** e
+  **obrigatório**, e diz quem pode **executar**. No **aggregate** é **objeto** e **opcional**, e diz
+  quem pode **ler**. O nível desambigua, e não há conversão entre os dois. Em
+  [forger · model](forger/endpoints/model.md#recorte-de-leitura-do-aggregate-roles).
+
+- Vigência: em `develop` do forger, **ainda não em produção**, como a 1.34 e a 1.35.
+
+## 1.35 — 2026-09-21
+
+- **Os exemplos de modelo deixaram de ensinar chave morta.** O introdutório
+  [`acme.vendas.model.json`](examples/acme.vendas.model.json) perdeu `schema` e `concurrency` — nenhuma
+  das duas é lida por serviço nenhum — e perdeu um `"length": 0` num atributo `Long`, onde `length` não
+  significa nada. É o arquivo que a doc indica como ponto de partida, então era ele que estava
+  ensinando o que não precisa existir. Os cinco "reais (sanitizados)" **continuam** com as duas chaves,
+  porque espelham modelos publicados antes disso ser medido; o
+  [README dos exemplos](examples/README.md) agora diz isso na cara, em vez de deixar quem copia
+  descobrir sozinho.
+
+- **`domainBus.triggerProjection` tem DUAS formas, e a doc só conhecia uma.** Item **string** é a
+  projeção same-tenant; item **objeto** é a cross-tenant/cross-BC, e nela `targetTenantId` é
+  **obrigatório** — sem ele o destino é descartado no despacho e a projeção não dispara. A publicação
+  passa a recusar o objeto sem `targetTenantId`, e a recusa está na tabela de
+  [forger · model](forger/endpoints/model.md).
+
+- **Correção de rota:** a 1.34 tratava `triggerProjection` como lista de strings apenas. Estava errado
+  desde que foi escrito, e quem denunciou foi o próprio metamodelo, ao reprovar um exemplo deste acervo
+  que o motor aceita. A validação de publicação continua **em `develop` do forger, ainda não em
+  produção** — vale a partir da imagem que a carregar.
+
+## 1.34 — 2026-09-16
+
+- **`POST .../model` passa a recusar com `400` modelo que o motor não executaria** — e a página
+  [forger · model](forger/endpoints/model.md) descreve as três recusas mais comuns. ⚠️ **Em `develop` do
+  forger, ainda NÃO em produção:** vale a partir da imagem que carregar essa mudança. Até lá a
+  publicação continua aceitando os três casos, que seguem falhando — ou silenciando — em runtime, que é
+  exatamente a razão da mudança.
+
+  A mais cara das três: **a chave do agregado tem de ser `<boundedContext.name>.<type>`**. Ela é o
+  endereço do agregado no despacho do evento *e* a chave que o cliente manda no comando; divergindo, o
+  evento é descartado **sem log, sem métrica e sem DLQ** — do lado de fora, indistinguível de "nada
+  aconteceu".
+
+- **Chaves que um modelo novo não precisa trazer**, na mesma página: `schema.forWriteModel.name`,
+  `schema.forReadModel.name`, `concurrency.*`, `readProjection` e `queue` **não são lidas por serviço
+  nenhum**. Continuam aceitas — modelo publicado não precisa ser reescrito —, mas quem **gera** modelo
+  novo não deve emiti-las. A página diz, para cada uma, quem decide de fato aquilo que ela aparenta
+  decidir.
+
+- **`boundedContext.name` documentado como o que ele é**: além de compor o endereço do agregado, ele
+  **nomeia o schema** onde o log de consumo do evento é gravado. Divergir do dataschema do tenant faz o
+  consumo gravar no schema de outro ambiente sem um único erro em log.
+
+## 1.33 — 2026-09-16
+
+- **Produção passou a rodar a mesma imagem do ambiente de teste: `yc-interpreter:amd64-260913c`.** Tudo
+  o que as entradas 1.30, 1.31 e 1.32 descreviam como *"em teste; produção ainda não"* **vale agora
+  também em produção**, e é por isso que esta entrada existe. São três comportamentos:
+
+  - **datas normalizadas na entrada do comando**, com o agregado e a projeção devolvendo a mesma string,
+    e o filtro de coluna `Timestamp` deixando de falhar (entradas 1.31 e 1.32);
+  - **`NAO-MATERIALIZOU` como termo único** na busca de log de projeção que não materializou (1.31);
+  - **consulta por campo dentro de atributo `Json`** valendo também quando o `valueObject` é *single*,
+    e coluna vazia deixando de casar com `neq` (1.30).
+
+- **Como ler as datas de vigência daqui para trás:** as entradas anteriores dizem *"produção ainda não"*
+  porque era verdade quando foram escritas. **Esta entrada é o corte**: a partir de 2026-09-16, produção
+  e teste rodam a mesma imagem para esses três itens. As páginas de uso descrevem o comportamento
+  corrente e não carregam mais vigência — quem precisa saber *desde quando* vem a este arquivo.
+
+- **Pré-requisito que acompanhou a promoção**, e que só interessa a quem opera banco: o event store de
+  produção ganhou a coluna `client.aggregate.natural_key` e o índice único parcial que a acompanha, sem
+  os quais essa imagem recusa a criação de agregado de modelo que declare `identity.fields`.
+
+- ⚠️ **Mudança de comportamento que vem junto, e é visível para quem usa a API:** com a chave natural
+  valendo, **o segundo agregado criado com a mesma combinação declarada em `identity.fields` é recusado
+  pelo banco** — antes, dois iguais eram aceitos em silêncio. Vale para os agregados criados **a partir
+  de agora**: os anteriores não foram verificados e podem conter repetições, como a entrada 1.28 já
+  advertia.
+
+## 1.32 — 2026-09-13
+
+- **Datas são normalizadas na entrada do comando, e os dois endpoints passam a devolver a mesma string.**
+  Antes, a data do cliente atravessava a plataforma crua: o endpoint de agregado a devolvia como veio — com
+  fuso, com fração, com espaço — e o de projeção devolvia a forma do banco. O mesmo instante em duas
+  grafias. Agora todo `Timestamp` sai como `2026-09-12T20:19:09` (UTC) e todo `Date` como `2026-09-13`, em
+  [persistence-crs/spec/model-format.md](persistence-crs/spec/model-format.md).
+
+- **Inclusive a data que a regra de negócio devolve.** A resposta do processador é mesclada depois de o
+  comando ser lido, e passa pela mesma normalização.
+
+- **`Date` não tem conversão de fuso:** vale o dia como escrito.
+
+- ⚠️ **Mudança visível:** o carimbo automático (`whenAttribute`) no endpoint de agregado passa de
+  `2026-09-12 20:19:09` para `2026-09-12T20:19:09` — igual ao que a projeção já devolvia.
+
+- **A documentação de datas foi para onde cada leitor procura, com exemplo:** a regra e a tabela de
+  formas aceitas em [spec/model-format.md](persistence-crs/spec/model-format.md); um corpo de comando com
+  data em [endpoints/comando.md](persistence-crs/endpoints/comando.md); o estado do agregado com datas em
+  [endpoints/agregado-leitura.md](persistence-crs/endpoints/agregado-leitura.md); e **como converter para
+  o horário de Brasília no front** em
+  [persistence-q/endpoints/consulta.md](persistence-q/endpoints/consulta.md#resposta) — com o erro de
+  esquecer o `Z`, que desloca 3 horas em silêncio.
+
+- **Vigência:** em teste desde `yc-interpreter:amd64-260913c` (`yc.cqrs-c@0a5c450`, `yc.dbr-driver@0334d08`).
+  Produção ainda não.
+
+- ⚠️ **A imagem anterior, `amd64-260913b`, trazia a normalização com um defeito:** a data com `T` era recusada
+  pelo driver do banco na **criação** de registro — o comando respondia `200` e a projeção nunca
+  aparecia. Transições funcionavam. Consertado em `amd64-260913c` e validado com dado real. Se você criou
+  registro com data nesse intervalo e a linha não apareceu, **não recrie**: a mensagem está guardada e é
+  reprocessável.
+
+## 1.31 — 2026-09-13
+
+- **Carimbos de tempo são gravados e devolvidos em UTC, sem fuso — agora escrito.** A conversão para o fuso
+  de quem lê (`-03:00`, no Brasil) é do front. Não é convenção escolhida: é o que está gravado, medido nos
+  serviços e nos bancos. Um `2026-09-12T20:19:09` devolvido significa 20:19 UTC, 17:19 em Brasília. Em
+  [persistence-q/query-controls.md](persistence-q/query-controls.md#filtrar-por-data-e-hora-date-timestamp).
+
+- **Filtrar por coluna `Timestamp` passa a funcionar.** Respondia `510` para praticamente qualquer valor:
+  só um formato era aceito — com espaço **e fração obrigatória** —, e nem o valor que a própria consulta
+  devolve podia ser mandado de volta. Passam a valer sem fuso (lido como UTC), só data, com `Z` ou
+  `-03:00` (convertido para UTC) e epoch em milissegundos. Formato irreconhecível vira `400` com a lista
+  do que vale.
+
+- ⚠️ **O erro mais fácil de cometer está em destaque:** mandar hora local sem fuso. `"2026-09-13
+  00:00:00"` é meia-noite **UTC** — 21:00 do dia anterior em Brasília. A seção traz o filtro de um dia
+  inteiro em Brasília com o fuso junto.
+
+- **Vigência:** em teste desde `yc-interpreter:amd64-260913b` (`ufrn.loco3@66652cf`) — o filtro funcionava nessa
+  imagem; a criação com data, só a partir de `amd64-260913c`. Produção ainda não.
+  Onde a imagem for anterior, só `"2026-09-13 00:00:00.000"`, com a fração e já em UTC.
+
+## 1.30 — 2026-09-12
+
+- **Dá para filtrar pelos campos de dentro de um atributo `Json`, e agora isso está escrito.** A
+  capacidade existia e não constava em lugar nenhum da documentação: o critério aceita um nível a mais,
+  com os campos internos do valueObject. Em
+  [persistence-q/query-controls.md](persistence-q/query-controls.md#filtrar-por-campo-dentro-de-um-atributo-json).
+
+- **As duas formas do valueObject passam a funcionar.** A escrita sempre aceitou objeto (`single`) e
+  lista de objetos (`multiple`), e a leitura devolve as duas — mas o filtro só sabia lidar com lista, e
+  **falhava** quando a coluna guardava um objeto. Quem modelou um valueObject `single` não conseguia
+  consultar por dentro dele.
+
+- **Passam a valer `neq`, `gt`, `gte`, `lt`, `lte` e `in`**, além de `eq`, `like` e `ilike`. Operador
+  fora da lista continua sendo `400` que nomeia o operador — a lista cresceu, o silêncio não voltou.
+
+- ⚠️ **O tipo do valor que você envia decide a comparação.** `{"gt": 10}` compara como número; `{"gt":
+  "10"}` compara como texto, e aí `"9"` é maior que `"10"`. É a única informação de tipo disponível — o
+  modelo declara a coluna como `Json` e não descreve o que existe dentro. **As aspas mudam o resultado.**
+
+- **Coluna vazia não casa com nada, nem com `neq`** — e isso teve de ser consertado antes de sair.
+  Ausência de valor respondia **duas coisas diferentes** conforme estivesse gravada como lista vazia ou
+  como nula: a nula aparecia num filtro "diferente de". Agora as duas ficam de fora, igual.
+
+- **Vigência:** em teste desde `yc-interpreter:amd64-260913` (`ufrn.loco3@6152345`). Produção ainda não.
+
+## 1.29 — 2026-09-12
+
+- **Passar `unique` de `false` para `true` deixou de ser recusado pelo forger — quem julga duplicata é
+  o banco.** A recusa anterior dizia "requires all existing values to be unique" e **nunca consultava a
+  tabela**: recusava também com a tabela **vazia**, que é o caso mais comum de quem está modelando. Pior,
+  trancava o sistema contra si mesmo, porque a conferência de chave manda marcar o atributo como
+  `unique` quando o agregado declara `identity.fields` de um campo — a instrução da recusa era proibida
+  pela validação seguinte, e quem a seguisse não tinha saída. Vale para atributo e para associação.
+
+- **A recusa da conferência de projeção passa a dizer COMO SAIR, e não só a causa.** O dataschema fica
+  em `MODELING` de propósito, mas **fechar de novo dá a mesma recusa**: a única saída é retirar a
+  declaração (`_conf.projectionOf: []`) e fechar. É o oposto do que quem está corrigindo tenta fazer,
+  então ninguém descobre por tentativa — e até descobrir, o contexto fica inoperante. Em
+  [forger/erros.md](forger/erros.md#projeção-que-não-confere-com-o-modelo-de-escrita--400-na-volta-a-running).
+
+- **Vigência:** `forger@7e32720`, em teste desde `yc-composer:amd64-260912e`.
+
+## 1.28 — 2026-09-12
+
+- **A conferência de chave passou a olhar os DOIS lugares também quando `identity.fields` está vazio.**
+  A versão anterior recusava `unique` num atributo sem lastro, mas deixava passar `_conf.uniqueKey` — é a
+  mesma unicidade sem respaldo no modelo de escrita, só declarada no outro lugar, e é justamente a forma
+  que uma chave composta usa. Bastaria um agregado esvaziar o `identity.fields` para a projeção seguir
+  impondo a chave composta em silêncio, que é a classe de defeito que esta conferência existe para pegar.
+  Quadro atualizado em
+  [forger/endpoints/entity.md](forger/endpoints/entity.md#a-chave-identityfields-do-agregado-contra-a-da-projeção).
+  **Vigência:** `forger@e95f65c`, em teste desde `yc-composer:amd64-260912d`.
+
+## 1.27 — 2026-09-12
+
+- **A conferência da projeção passa a cobrir também a CHAVE, e ela mora em dois lugares conforme a
+  cardinalidade.** O `identity.fields` do agregado é o espaço de chave do modelo de escrita; na projeção,
+  chave de **um** campo se declara no atributo (`unique: true`) e chave de **dois ou mais** em
+  `_conf.uniqueKey`, que é o lugar da composta e exige 2+ atributos. A conferência segue essa divisão em
+  vez de olhar sempre para o mesmo campo. Em
+  [forger/endpoints/entity.md](forger/endpoints/entity.md#a-chave-identityfields-do-agregado-contra-a-da-projeção).
+
+- **O caso que motivou:** um agregado deixou de exigir chave natural — `identity.fields` virou vazio —
+  e a coluna continuou única na projeção. O segundo registro legítimo nunca materializava, sem erro
+  visível a quem chamou. Agora `unique` sem lastro no `identity.fields` é recusado no fechamento da
+  edição.
+
+- **Dois limites ditos com todas as letras, porque calar seria pior:** com **dois ou mais** agregados em
+  `projectionOf` a conferência de chave é **pulada** — cada agregado tem o seu `identity.fields`, e
+  uni-los inventaria uma chave que nenhum declarou; e a conferência compara **definição com definição**,
+  então **índice único já existente no banco** que tenha saído da definição **não é alcançado** — mudar
+  o modelo não derruba índice criado antes.
+
+- **Vigência:** `forger@eb82d28`, em teste desde `yc-composer:amd64-260912c`.
+
+## 1.26 — 2026-09-12
+
+- **A entity passa a poder declarar de que agregados ela é projeção — `_conf.projectionOf` — e o
+  fechamento da edição confere as duas coisas contra o modelo de escrita.** Até aqui a tabela de leitura
+  e a definição de escrita descreviam a mesma coisa, eram publicadas por caminhos diferentes, e **nada
+  as confrontava**: a divergência só aparecia quando um evento tentava gravar, e aí não havia conserto —
+  o comando já respondera `200`, a projeção falhava depois, e reemitir o comando falha com o agregado em
+  outro estado. Em [forger/endpoints/entity.md](forger/endpoints/entity.md#declarar-que-a-entity-é-projeção--_confprojectionof-regra),
+  com as recusas em [forger/erros.md](forger/erros.md#projeção-que-não-confere-com-o-modelo-de-escrita--400-na-volta-a-running).
+
+- **São dois sentidos, e faltar é muito pior que sobrar.** *Teto*: a projeção não pode declarar atributo
+  que agregado nenhum dos nomeados escreve — o efeito é coluna órfã, sempre vazia. *Piso*: a projeção
+  tem de declarar **tudo** o que eles escrevem, carimbo de evento incluído — sem a coluna, o motor
+  recusa a gravação **inteira** e a linha nunca materializa. Por isso **a projeção não pode ser mais
+  estreita que o agregado**: não é escolha de desenho, é que uma chave ausente derruba a gravação toda,
+  não só aquele campo.
+
+- **A conferência roda no fechamento da edição, e não na publicação de cada artefato.** A entity e o
+  `.model.json` são publicados por caminhos diferentes e em **qualquer ordem**; conferir um contra o
+  outro no ato de publicar recusaria sequência legítima, porque o segundo artefato ainda não existe. Na
+  transição `MODELING → RUNNING` os dois estão na mesa. A recusa é `400`, **nada é gravado**, e o
+  dataschema **continua em `MODELING`**.
+
+- **O item de `projectionOf` é o `type` do agregado, não a chave do mapa `aggregate`.** No `.model.json`
+  o agregado aparece sob chave composta (`"ensino.aula"`) e tem um campo `"type": "aula"`; o roteamento
+  da projeção usa o `type` cru. A recusa lista os **dois** vocabulários, porque o erro provável é copiar
+  o que se vê no arquivo.
+
+- **É opt-in, e isso é o que protege quem já existe:** entity sem `projectionOf` não é conferida, e
+  nenhum dataschema publicado hoje passa a ser recusado. **Vigência:** a partir da imagem que carregar
+  `forger@04ee971` — em teste desde `yc-composer:amd64-260912`.
+
+- **Corrigido: recurso inexistente respondia `510 "Falha inesperada, solicite suporte."` em vez de
+  `404`.** Valia para entity, dataschema, atributo e associação não encontrados — oito lançamentos do
+  mesmo controller, todos sem o prefixo de status que o tradutor de erro usa para decidir o código. Quem
+  integra não conseguia distinguir "não existe" de "o serviço quebrou", e `510` manda procurar suporte
+  por uma condição perfeitamente normal. O catálogo já documentava `404`; era o comportamento que estava
+  errado. **Vigência:** `forger@5c13391`, em teste desde
+  `yc-composer:amd64-260912b`.
+
+## 1.25 — 2026-09-10
+
+- **O que separa teste de produção são dois critérios, não um** — e o documento não dizia nenhum dos
+  dois. [Arquitetura](01-arquitetura.md) ganha a seção *Teste e produção — o que separa um do outro*, na
+  Fase 3: a **escrita** se separa pela **superfície** (o prefixo `/t/` entra numa instância de teste do
+  motor, que escreve no event store de teste); a **leitura** se separa pelo **tenant**, e não por nome
+  ou instância de banco — dois tenants podem ter o mesmo modelo de leitura, um de teste e outro de
+  produção, materializados até no mesmo banco.
+
+- **Por que a lacuna importava:** sem esse critério escrito, é natural inferir o ambiente do lugar onde
+  o dado está — "esta linha está no banco X, logo é produção". A inferência é inválida, e leva a tratar
+  como delicado um dado de teste, ou o contrário. A pergunta que classifica é **de que tenant é a
+  linha**; o tenant de teste existe desde o começo, o de produção só quando o sistema vai ao ar.
+
+## 1.25 — 2026-09-12
+
+- **"O comando respondeu `200` e a linha não apareceu" ganhou seção própria, com a receita para achar a
+  causa.** É o sintoma mais caro da plataforma, e o mal-entendido está no `200`: ele responde pela
+  **escrita**. A projeção é aplicada depois, a partir de uma fila, e quando falha não há para quem
+  responder — quem chamou já foi embora. A seção diz o que fazer nessa ordem: conferir a projeção depois
+  de qualquer transição nova, procurar o rastro no log de serviço, e ler o que voltou. Em
+  [persistence-crs/erros.md](persistence-crs/erros.md#o-comando-respondeu-200-e-a-linha-não-apareceu),
+  com ponteiro do [persistence-q](persistence-q/README.md).
+
+- **A busca virou uma palavra só: `NAO-MATERIALIZOU`.** A mesma classe de falha saía sob três termos
+  diferentes, conforme o caminho — projeção do tenant, projeção entre contextos, saga —, e o endpoint de
+  logs recebe o termo **na própria rota**. Quem errava a palavra recebia `204`, que é indistinguível de
+  "não houve falha": foi assim que um cliente concluiu que a falha era silenciosa quando ela estava
+  registrada sob outro nome. **Vigência:** em teste desde `yc-interpreter:amd64-260913`
+  (`persistence-crs@9bc1b28`); em produção, os três termos antigos continuam sendo o caminho.
+
+- **Registrado também que `204` na busca de log significa "não achei esse termo"** — nunca "não houve
+  falha". A distinção não era óbvia e custou uma investigação inteira.
+
+## 1.24 — 2026-09-10
+
+- **Pare de invalidar cache à mão: a plataforma já repõe o modelo sozinha.** Até esta versão, a
+  documentação do [persistence-crs](persistence-crs/README.md#depois-de-alterar-o-modelo) e do
+  [persistence-q](persistence-q/README.md) mandava, depois de alterar um modelo, **apagar duas chaves de
+  cache** antes de republicar. Era **trabalho desnecessário**: fechar a edição do dataschema
+  (`MODELING` → `RUNNING`) já republica o modelo de leitura, e republicar o `.model.json` já sobrescreve
+  o de escrita. Quem seguia aquele texto fazia uma operação delicada, à mão, sem precisar. **Se é o seu
+  caso, pode parar.**
+
+- **E são dois modelos, não duas cópias do mesmo** — o que a redação anterior escondia. O **de escrita**
+  (agregados e comandos) e o **de leitura** (projeções) têm gatilhos diferentes e não se atualizam
+  juntos. A seção agora diz, numa tabela, o que repõe cada um.
+
+- **O que morde não é editar entities: é deixar a edição aberta.** Enquanto o dataschema está em
+  `MODELING` o modelo de leitura não existe, e a consulta falha com `510`. Ele volta ao fechar. Isso não
+  estava dito em lugar nenhum, e a ausência fazia o `510` parecer defeito.
+
+- **A edição de um schema passa a fechar o tenant inteiro.** Até aqui, entrar em edição fazia a consulta
+  falhar e **o comando continuar sendo aceito** sobre um modelo em remodelagem. Agora a janela recusa os
+  dois. O mecanismo, o roteiro e o pré-requisito para voltar a `RUNNING` estão em
+  [forger/dataschema](forger/endpoints/dataschema.md#o-que-a-transição-faz-com-o-modelo-no-cache), que é
+  a fatia de quem publica e remove os modelos.
+
+- **A cópia em memória de cada instância deixou de existir na instância de teste.** Até 2026-09-10 cada
+  instância guardava o modelo por até uma hora, e uma alteração podia "pegar" numa e não noutra. No
+  `tinterpreter`, desde a imagem `amd64-260910`, essas cópias estão **desligadas**: o modelo é relido a
+  cada requisição e **republicar passa a valer na requisição seguinte**. Onde continuarem ligadas, a
+  defasagem de até uma hora ainda vale.
+
+## 1.23 — 2026-09-09
+
+- **Uma entity pode declarar que um papel lê apenas as linhas de que o usuário é titular.** Até aqui o
+  controle de acesso só sabia dizer *"este papel lê esta tabela"* ou *"não lê"* — não havia como dizer
+  *"lê só o que é dele"*, e a consequência era que qualquer usuário final autenticado lia a tabela
+  inteira de dados pessoais dos demais. A declaração é `accessControl.scope`, e as duas metades estão
+  documentadas onde cada uma acontece: **como declarar** em [forger — entity](forger/endpoints/entity.md)
+  e **o efeito na consulta** em [persistence-q](persistence-q/README.md#recorte-de-leitura-por-titular).
+
+- **A seção do recorte deixou de ser lista de consequências e virou percurso.** Ela respondia *"o que
+  acontece se…"* sete vezes e nunca *"como eu faço"*. Agora vai do modelo declarado à resposta, com a
+  requisição no meio — e ganhou o que faltava para modelar sem errar: **o que torna uma linha "sua"**, a
+  tabela-verdade de `read` × `scope`, e **como o processador deve ser escrito**.
+
+- **`scope` nunca concede acesso, só estreita o que o `read` já permitiu.** Era a regra que amarrava
+  tudo e não estava escrita em lugar nenhum: papel fora do `read` não lê e portanto nunca chega ao
+  recorte; papel no `read` e fora do `scope` lê a tabela inteira. Sem ela, *"acumular papéis amplia"*
+  soava arbitrário em vez de decorrer da regra.
+
+- **⚠️ Atributo de titular vazio torna a ficha invisível para o próprio dono** — com `200` e lista
+  vazia, indistinguível de *"não existe"*. É a armadilha de modelagem mais provável do recurso, e ela
+  vale especialmente quando a ficha é cadastrada por outra pessoa. Está em
+  [o que torna uma linha "sua"](persistence-q/README.md#o-que-torna-uma-linha-sua).
+
+- **Usar o token do usuário num processador que precisa ver dado de terceiro devolve lista vazia com
+  `200`** — não um erro. Quando a entity é recortada, aquele token restringe a leitura ao próprio
+  usuário. Para ver além, o caminho é o endpoint interno de cluster.
+
+- **Errata em `identity.fields`: a garantia prometida não existia, e agora existe.** O texto afirmava
+  que a combinação declarada era única e que *"não pode haver dois registros com a mesma combinação"* —
+  **nada no processamento do comando lia esse campo**, e dois agregados iguais eram aceitos. A partir de
+  `amd64-260909c` a combinação **é imposta na criação**. Consequência para quem já tem dados: **os
+  registros criados antes não foram verificados** e podem conter repetições. Ver
+  [identidade e unicidade](persistence-crs/spec/model-format.md#identidade-e-unicidade-identity).
+
+- **E como escolher os `fields`, que faltava.** A pergunta não é *"quais campos são obrigatórios"*, é
+  **"o que faz dois destes serem o mesmo?"**. Com a armadilha por extenso: **recriar depois de encerrar
+  costuma ser legítimo** — o aluno que sai da turma e volta no semestre seguinte é matrícula nova, e uma
+  chave que não os distingue passaria a recusar operação correta.
+
+- **Toda afirmação sensível a versão passou a ser datada por versão, e não por expectativa.** Duas vezes
+  no mesmo dia um texto envelheceu em horas: uma ressalva de indisponibilidade que a implantação
+  desmentiu, e uma errata que a implementação desmentiu. Doc ausente faz perguntar; **doc errada faz
+  agir**.
+
 ## 1.22 — 2026-09-09
 
 - **O br-service tem TRÊS contratos, não um — e a doc apresentava um só.** O serviço é acionado de três
