@@ -2,6 +2,15 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.76 — 2026-09-27
+
+- **Fatia nova: monitor — relatos de suporte** (`monitor/README.md`, `monitor/endpoints/relatos.md`,
+  `monitor/erros.md`, `monitor/exemplos.md`). O BFF grava e lê, em nome do usuário, os relatos que a casca
+  monta: credencial de serviço, e o relator vem em cabeçalhos, nunca do corpo. A equipe atende pela tela do
+  monitor, e cada organização vê os seus. A fatia cobre estados, não lido, redação de credenciais no texto
+  livre e retenção contada do fechamento. Pedido do yc.app, a mando do dono. Implantado em 2026-09-27
+  (monitor `76a072f`); a rota na borda foi pedida e ainda não está publicada.
+
 ## 1.75 — 2026-09-27
 
 - **O relato de suporte leva o diagnóstico da tela** (`shell/contrato-miolo.md` §hostContext,

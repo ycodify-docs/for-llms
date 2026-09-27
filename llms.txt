@@ -91,6 +91,10 @@
 - [Erros da borda](gateway/erros.md): **quem produziu a resposta** — borda ou serviço. Como distinguir o `404` da borda do `404` do serviço pelos cabeçalhos `X-Blocked-By`/`X-Blocked-Reason`; `401`/`400` de cabeçalho; `413` por serviço; `429`; `503`; CORS duplicado.
 - [Exemplos](gateway/exemplos.md): requisição bem formada, o erro comum de mandar os dois cabeçalhos, e como inspecionar a resposta para saber a origem do erro.
 
+## monitor (relatos de suporte) — atendimento aos usuários da aplicação
+- [Guia](monitor/README.md): quem grava (o BFF, com credencial de serviço) e quem atende (a equipe, pela tela do monitor); estados do relato, não lido, o que o servidor faz com o texto e o diagnóstico, retenção contada do fechamento, e como a organização do relator decide quem o vê.
+- [endpoints de relato](monitor/endpoints/relatos.md) · [Erros](monitor/erros.md) · [Exemplos](monitor/exemplos.md)
+
 ## Exemplos
 - [Modelos de domínio](examples/README.md): 6 modelos `.model.json` (1 curado + 5 reais sanitizados), com fluxo ponta a ponta.
 
