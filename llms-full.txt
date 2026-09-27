@@ -5577,9 +5577,8 @@ guarda; o `id` é a chave da linha na projeção e não serve de referência.
 - Chaves `_`-prefixadas são metadado, removidas na publicação, como no `.model.json`.
 
 > **Em produção desde 2026-09-26** (ver [CHANGELOG 1.68](../../CHANGELOG.md)), incluindo o `DELETE` que responde o
-> estado, as chaves da plataforma do canon e o `GET` para papel de administrador ou de engenheiro. **A chave
-> `genero` está em `develop` do forger desde 2026-09-27 e ainda não em produção**: até o próximo deploy, a
-> publicação a recusa como chave desconhecida (`400`).
+> estado, as chaves da plataforma do canon e o `GET` para papel de administrador ou de engenheiro. A chave
+> `genero` está em produção desde 2026-09-27 (ver [CHANGELOG 1.74](../../CHANGELOG.md)).
 
 <!-- ===== forger/erros.md ===== -->
 
