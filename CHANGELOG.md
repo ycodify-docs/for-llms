@@ -2,6 +2,16 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.75 — 2026-09-27
+
+- **O relato de suporte leva o diagnóstico da tela** (`shell/contrato-miolo.md` §hostContext,
+  `shell/seguranca.md` §Diagnóstico do relato de suporte, `bff/README.md` §Id de requisição). O
+  `hostContext` ganha `diagnostico` (`erro` e `trilha`, para o miolo registrar o que só ele sabe) e
+  `openSupport` aceita o erro em foco; a página de segurança diz o que o diagnóstico leva e o que nunca leva;
+  o BFF adota o `x-request-id` de quem chama (ou gera um) e o devolve em toda resposta, ligando o relato à
+  linha do log. Nada sai sem o usuário relatar. Pedido do dono de 2026-09-26; em `develop` do yc.app
+  (`5242624`), deploy em stager pedido.
+
 ## 1.74 — 2026-09-27
 
 - **Manifesto: `genero` em produção** (`forger/endpoints/presentation.md`) — sai o aviso de que a publicação
