@@ -30,7 +30,8 @@ O contrato **mínimo obrigatório** é `mount` (e o `dispose` que ele devolve). 
   "prefs":        { "formMode": "inline" | "modal" },
   "canConfigure": false,
   "savePrefs":    "(formMode) => Promise<void>",
-  "openSupport":  "(contexto) => void"
+  "openSupport":  "(contexto, focoErro?) => void",
+  "diagnostico":  { "erro": "(e, extra?) => id", "trilha": "(evento, detalhes?) => void" }
 }
 ```
 
@@ -116,10 +117,29 @@ O contrato **mínimo obrigatório** é `mount` (e o `dispose` que ele devolve). 
   capacidade. Como preencher cada chave e publicar: [apresentacao](apresentacao.md). Forma completa e
   regras de publicação: [forger — manifesto de apresentação](../forger/endpoints/presentation.md). Referência órfã (atributo
   que o modelo não tem mais) o miolo ignora.
-- **`openSupport(contexto)`** — abre o suporte da casca com o contexto técnico que o miolo tem (registro,
-  estado, versão; e, vindo de um comando recusado, o status, a mensagem e o horário), como pares
-  `{ rótulo: valor }`. A casca acrescenta tenant e tela. ⚠️ **Hoje o suporte é um mockup declarado:** a
-  tela diz que nada é enviado a ninguém.
+- **`openSupport(contexto, focoErro?)`** — abre o suporte da casca com o contexto técnico que o miolo tem
+  (registro, estado, versão; e, vindo de um comando recusado, o status, a mensagem e o horário), como pares
+  `{ rótulo: valor }`. A casca acrescenta tenant e tela, e o **diagnóstico da tela** (abaixo). `focoErro` é o
+  id que `diagnostico.erro` devolveu: põe aquele erro à frente do relato. ⚠️ **Hoje o suporte é um mockup
+  declarado:** a tela diz que nada é enviado a ninguém.
+- **`diagnostico`** — a caixa-preta da casca, para o miolo contar o que só ele sabe. O que ela guarda vai
+  junto do relato **só quando o usuário relata**, e ele vê e pode remover cada parte antes de enviar
+  ([segurança](seguranca.md#diagnóstico-do-relato-de-suporte)).
+
+  | Método | Para quê |
+  |---|---|
+  | `erro(e, extra?)` | registra um erro que o miolo pegou (comando recusado, falha que ele tratou) e devolve o **id** para `openSupport` |
+  | `trilha(evento, detalhes?)` | anota o que o usuário fez: comando aberto, filtro aplicado, registro selecionado, aba |
+
+  `extra` e `detalhes` são pares `{ nome: texto }` com **nomes e ids** — nome de comando, de atributo, id
+  do registro. **Nunca valor de registro nem o que o usuário digitou.** A casca redige o que escapar (token,
+  e-mail, CPF) e corta o que passar do teto, mas a regra é não mandar.
+
+  Erro que o miolo **não** pega também chega ao diagnóstico: a casca escuta os erros não tratados e as
+  promessas rejeitadas do documento inteiro, o que alcança qualquer miolo, GEN ou CUSTOM, e atribui ao miolo
+  pelo endereço do código na pilha. Um miolo com raiz React própria deve pôr um **limite de erro** em volta
+  da sua árvore: sem ele, um erro de renderização apaga a tela do miolo sem aviso. O miolo GEN já tem o seu.
+  Ausente numa casca anterior: o miolo confere antes de usar, e segue sem ele.
 
 > **Ainda não providos:** `navigation` (navegação da casca) e `i18n` estiveram previstos neste
 > contrato, mas **não existem** na implementação. Um miolo não deve contar com eles. Quando forem

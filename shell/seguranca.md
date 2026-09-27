@@ -37,6 +37,26 @@
   duração**. Ao expirar (`401`), a casca trata como **re-login**.
 - Encerrar sessão limpa o cookie no BFF.
 
+## Diagnóstico do relato de suporte
+
+O relato de suporte leva o **diagnóstico da tela**: o que a casca registrou na aba para quem for investigar.
+Fica só na memória da aba, e **nada sai sem o usuário relatar** — ele vê cada parte na gaveta de suporte,
+desmarca o que não quiser enviar e pode copiá-lo.
+
+| Parte | O que leva | O que **nunca** leva |
+|---|---|---|
+| **erros e avisos** (até 20 de cada) | origem (casca, miolo, rede, injeção), mensagem, pilha, pilha de componentes, instante, tela; as últimas linhas de erro e aviso do console | token, cookie, senha |
+| **chamadas ao servidor** (até 30) | método, caminho com **só as chaves** da query, status, duração, `x-request-id` | corpo da requisição ou da resposta, valor de parâmetro |
+| **o que foi feito na tela** (até 50) | org, contexto, agregado, comando aberto ou recusado, **nomes** dos campos filtrados, **id** do registro selecionado | valor de campo, texto digitado |
+| **versões e ambiente** | versão da casca e do miolo, navegador, tamanho da tela, tema, esquema, tenant, papel ativo, fuso | — |
+
+- **Todo texto passa por um redator** antes de entrar: JWT, `Bearer …`, e-mail, CPF e sequência longa de
+  letras e números saem trocados por marcadores. Mensagem até 500 caracteres, pilha até 4000, diagnóstico
+  inteiro até 64 KB — acima disso sai primeiro o mais antigo e o que menos explica.
+- **O `x-request-id` liga o relato à linha do log do BFF** ([bff](../bff/README.md#id-de-requisição-x-request-id)).
+  Não é credencial: não autentica nada e não carrega dado do usuário.
+- **O miolo contribui por `hostContext.diagnostico`** só com nomes e ids ([contrato](contrato-miolo.md)).
+
 ## Checklist do agente
 
 - [ ] Nunca expor o token à casca/miolo — **cookie httpOnly**, corpo sem token.
@@ -44,3 +64,4 @@
 - [ ] Nunca tratar o gating da UI como segurança — o servidor **revalida**.
 - [ ] Nunca resolver tenant fora do token do usuário.
 - [ ] Nunca escrever segredo/credencial/endereço sensível em documentação pública.
+- [ ] Nunca pôr valor de registro, texto digitado ou corpo de requisição no diagnóstico — só nomes e ids.

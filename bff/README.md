@@ -28,6 +28,7 @@
 - [Autocadastro (`/ua/*`)](#autocadastro-ua)
 - [Preferências da organização (org-scoped)](#preferências-da-organização-org-scoped)
 - [Cabeçalhos que o BFF injeta (contrato de saída)](#cabeçalhos-que-o-bff-injeta-contrato-de-saída)
+- [Id de requisição (`x-request-id`)](#id-de-requisição-x-request-id)
 - [Operação](#operação)
 - [Erros](#erros)
 - [Checklist do agente](#checklist-do-agente)
@@ -669,6 +670,19 @@ Tudo composto **no servidor**. Nenhum deles é montado — nem visto — pelo br
 > `sign-in` passa por ele (ver [06-autenticacao](../06-autenticacao.md)). Por isso o BFF precisa dela em
 > configuração: **sem ela, o login falha com `401` no gateway**, e não por credencial de usuário inválida.
 > É segredo: nunca vai ao browser, nunca em código, nunca em doc.
+
+## Id de requisição (`x-request-id`)
+
+**Toda resposta do BFF traz `x-request-id`**, e é o mesmo id que aparece na linha do log do BFF daquela
+requisição. Serve para ligar um relato de suporte ao que o servidor viu.
+
+- **Quem chama pode mandar o seu** no cabeçalho `x-request-id` — a casca manda um por chamada. O BFF o
+  adota se tiver **forma de id**: de 8 a 64 caracteres, só letras, dígitos e hífen. Fora disso (ou sem
+  cabeçalho), o BFF gera um UUID e devolve esse. Texto livre nunca chega ao log.
+- **No browser**, o CORS do BFF **expõe** o cabeçalho, e `fetch` o lê em `res.headers.get('x-request-id')`.
+- **Não é autenticação** nem chave de idempotência: não muda o que a rota faz, e repetir o id não repete
+  nem bloqueia nada.
+- Ausente numa versão anterior do BFF: quem lê trata a falta como "sem id".
 
 ## Operação
 
