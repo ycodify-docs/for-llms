@@ -2,6 +2,13 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.68 — 2026-09-27
+
+- **Manifesto: as três correções da 1.61 estão em produção** (`forger/endpoints/presentation.md`) — o `DELETE`
+  que responde `{ "deleted": true }` sempre que não resta manifesto, as chaves da plataforma do canon
+  (`aggregateid`, `status`, `version`) e o `GET` também para papel de administrador ou de engenheiro. Sai a
+  nota das "três diferenças até o próximo deploy".
+
 ## 1.67 — 2026-09-27
 
 - **`shell/README.md` e `shell/injecao.md` descrevem o menu e a injeção como são desde a 1.62**: menu
