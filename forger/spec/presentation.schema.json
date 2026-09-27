@@ -54,6 +54,13 @@
         "plural": {
           "$ref": "#/definitions/texto"
         },
+        "genero": {
+          "enum": [
+            "feminino",
+            "masculino"
+          ],
+          "description": "Genero gramatical do nome do agregado, para a tela concordar artigo e adjetivo ('Nova modalidade'). Ausente = masculino."
+        },
         "titleKey": {
           "$ref": "#/definitions/nome",
           "description": "Atributo cujo valor identifica a linha para o usuario."
