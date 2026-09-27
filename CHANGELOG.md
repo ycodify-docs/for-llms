@@ -2,6 +2,11 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.74 — 2026-09-27
+
+- **Manifesto: `genero` em produção** (`forger/endpoints/presentation.md`) — sai o aviso de que a publicação
+  ainda recusava a chave.
+
 ## 1.73 — 2026-09-27
 
 - **A tela concorda com o gênero do agregado** (`shell/apresentacao.md` §O que cada chave faz na tela e
