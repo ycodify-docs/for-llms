@@ -2,6 +2,12 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.69 — 2026-09-27
+
+- **`shell/apresentacao.md` perde duas ressalvas vencidas pelo deploy do composer** (forger em produção desde
+  2026-09-27T00:29Z): a conta de plataforma que publica **já confere pelo `GET`** (o composer mediu `204` com
+  token de plataforma às 00:31Z), e `aggregateid` como `valueKey` já é aceito em produção.
+
 ## 1.68 — 2026-09-27
 
 - **Manifesto: as três correções da 1.61 estão em produção** (`forger/endpoints/presentation.md`) — o `DELETE`
