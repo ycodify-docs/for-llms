@@ -2,6 +2,15 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.71 — 2026-09-27
+
+- **A tela usa campo de value object (`grupo.campo`) em todo lugar que o forger aceita**
+  (`shell/apresentacao.md` §Campos de value object; `shell/contrato-miolo.md` §hostContext): coluna,
+  título, formato, filtro e seleção, além do rótulo. Grupo `multiple` mostra os valores dos itens por
+  vírgula, e o filtro casa com qualquer item. Decisão do dono de 2026-09-27, depois que a 1.70 do forger
+  documentou que a publicação já aceitava `grupo.campo` nessas chaves e a tela os ignorava. Em `develop`
+  do yc.app (`3ac23a5`), ainda não em stager.
+
 ## 1.70 — 2026-09-27
 
 - **Manifesto: o que cada chave aceita, chave por chave** (`forger/endpoints/presentation.md` §Referências
