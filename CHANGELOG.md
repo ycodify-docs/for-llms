@@ -37,6 +37,9 @@
   `aggregateid`, `status`, `version` e os metadados de auditoria. A página listava só `id` e a auditoria, e a
   publicação recusava `status` em coluna e `aggregateid` como `valueKey` de referência. Apontado pelo yc.app;
   em produção a partir do próximo deploy.
+- **Manifesto: o `GET` aceita também papel de administrador ou de engenheiro na org** — quem publica usa
+  token de plataforma, que não carrega os tenants, e recebia `403` ao conferir o que publicou. Medido pelo
+  conceptnatal; em produção a partir do próximo deploy.
 
 ## 1.60 — 2026-09-26
 

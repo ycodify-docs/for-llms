@@ -36,14 +36,15 @@ estava publicado.
 
 `GET /org/{org}/project/{project}/tenant/{tenantId}/presentation`
 
-**Lê quem tem o tenant no token** — não exige papel de administrador nem de engenheiro. É a exceção à
-regra geral do serviço.
+**Lê quem tem o tenant no token** — sem exigir papel de administrador nem de engenheiro, que é a exceção
+à regra geral do serviço — **ou** quem tem papel de administrador ou de engenheiro em `{org}`: é assim que
+quem publica confere o que publicou, porque o token de plataforma não carrega os tenants.
 
 | Resposta | Quando |
 |---|---|
 | `200` | o manifesto, como publicado (sem as chaves `_`) |
 | `204` sem corpo | o tenant não tem manifesto — é o caso normal, e a tela deriva do nome e do tipo |
-| `403` | o tenant não está no token |
+| `403` | o tenant não está no token, e o usuário não tem papel de administrador nem de engenheiro em `{org}` |
 | `404` | tenant inexistente ou de outro project |
 
 ## Remover
@@ -115,7 +116,8 @@ Toda referência tem de existir no **modelo publicado do mesmo tenant**:
   próxima publicação do manifesto recusa.
 - Chaves `_`-prefixadas são metadado, removidas na publicação, como no `.model.json`.
 
-> **Em produção desde 2026-09-26** (ver [CHANGELOG 1.61](../../CHANGELOG.md)). Até o próximo deploy, duas
+> **Em produção desde 2026-09-26** (ver [CHANGELOG 1.61](../../CHANGELOG.md)). Até o próximo deploy, três
 > diferenças em produção: o `DELETE` ainda responde `{ "deleted": false }` quando não havia manifesto —
-> inclusive numa repetição da mesma chamada, com o manifesto já apagado pela primeira —, e a publicação
-> ainda recusa `aggregateid`, `status` e `version` como atributo.
+> inclusive numa repetição da mesma chamada, com o manifesto já apagado pela primeira —; a publicação
+> ainda recusa `aggregateid`, `status` e `version` como atributo; e o `GET` ainda responde `403` a quem só
+> tem papel de administrador ou de engenheiro, sem o tenant no token.
