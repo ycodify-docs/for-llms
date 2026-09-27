@@ -8805,7 +8805,7 @@ A chave de `aggregate` é a **mesma** do `.model.json` (`<boundedContext>.<tipo>
 | `fmt` | como o valor é **mostrado** na tabela, no cartão, na aba Dados e no histórico | ver [formatos](#formatos). Só muda a exibição: o comando e a exportação continuam com o valor cru |
 | `cols` | as colunas visíveis **por padrão**, na ordem | de 4 a 6, as que se lê para decidir. **Não** ponha `status` (o Estado é sempre a última coluna) nem campo técnico. O usuário pode mudar as colunas; "Restaurar padrão" volta a esta lista |
 | `filters` | os campos do **painel de filtros** | os que se usa para achar registro. Sem a chave, todos os atributos aparecem no filtro |
-| `options` | o campo do formulário vira **seleção** | lista fixa: os **valores exatos** que o comando grava. Referência `{ aggregate, valueKey, labelKey }`: a tela consulta até 200 registros do outro agregado, mostra `labelKey` e grava `valueKey` — então `valueKey` é o atributo do outro agregado que **este** campo guarda |
+| `options` | o campo do formulário vira **seleção** | lista fixa: os **valores exatos** que o comando grava. Referência `{ aggregate, valueKey, labelKey }`: a tela consulta até 200 registros do outro agregado, mostra `labelKey` e grava `valueKey` — então `valueKey` é o atributo do outro agregado que **este** campo guarda: num campo de referência, costuma ser `aggregateid` (o que a produção aceita, ver a página do forger) |
 | `stateHue` | a **cor** da pílula de cada estado (matiz de 0 a 359) | para dar à cor um significado: em torno de 150 verde, 25 vermelho, 250 azul, 80 amarelo. Sem ela, a cor sai do nome do estado e é a mesma em qualquer tela |
 
 **Não entra no manifesto** o nome de exibição de **comando** e de **evento**: é o `alias`, declarado no
@@ -8856,8 +8856,13 @@ monoespaçada. `fmt` serve sobretudo para **dinheiro** e **telefone**, que o tip
    `POST /org/{org}/project/{project}/tenant/{tenantId}/presentation` no forger. A publicação confere a
    forma e cada referência contra o modelo **já publicado** do tenant — publique o modelo primeiro.
    Detalhe e erros: [forger — manifesto de apresentação](../forger/endpoints/presentation.md).
-2. **Conferir o que ficou gravado**: `GET` no mesmo caminho (lê quem tem o tenant no token), ou
-   `GET /session/presentation?tenant={tenantId}` no [BFF](../bff/README.md#manifesto-de-apresentação).
+2. **Conferir o que ficou gravado** — com um **usuário do app** que tenha o tenant: `GET` no mesmo
+   caminho do forger, ou `GET /session/presentation?tenant={tenantId}` no
+   [BFF](../bff/README.md#manifesto-de-apresentação).
+   ⚠️ **A conta de plataforma que publica não confere pelo `GET`**: o token dela não carrega os tenants, e
+   o forger responde `403` `tenant <id> is not in the token` — medido no stager em 2026-09-27T00:09Z, com o
+   token de plataforma do conceptnatal, que lia o `/model` do mesmo tenant com `200`. O `201` da
+   publicação já diz que a forma e as referências passaram.
 3. **Ver na tela**: a casca lê o manifesto quando o agregado é aberto. Depois de publicar, abra o
    agregado de novo no menu.
 

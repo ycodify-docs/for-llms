@@ -2,6 +2,15 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.63 — 2026-09-27
+
+- **`shell/apresentacao.md` deixa de mandar quem publica conferir o manifesto pelo `GET`.** A conta de
+  plataforma que publica recebe `403` `tenant <id> is not in the token` no `GET` do forger, porque o token
+  dela não carrega os tenants — medido no stager em 2026-09-27T00:09Z com o token de plataforma do
+  conceptnatal, que lia o `/model` do mesmo tenant com `200`. A conferência passa a ser com um usuário do
+  app que tenha o tenant (forger ou BFF), ou pela tela. E `options` por referência diz que o `valueKey`
+  de um campo de referência costuma ser `aggregateid`.
+
 ## 1.62 — 2026-09-26
 
 - **O agregado passa a ser escolhido no menu da casca** (`shell/contrato-miolo.md` §hostContext;
