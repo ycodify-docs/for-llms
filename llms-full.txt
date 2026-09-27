@@ -5563,11 +5563,8 @@ Toda referência tem de existir no **modelo publicado do mesmo tenant**:
   próxima publicação do manifesto recusa.
 - Chaves `_`-prefixadas são metadado, removidas na publicação, como no `.model.json`.
 
-> **Em produção desde 2026-09-26** (ver [CHANGELOG 1.61](../../CHANGELOG.md)). Até o próximo deploy, três
-> diferenças em produção: o `DELETE` ainda responde `{ "deleted": false }` quando não havia manifesto —
-> inclusive numa repetição da mesma chamada, com o manifesto já apagado pela primeira —; a publicação
-> ainda recusa `aggregateid`, `status` e `version` como atributo; e o `GET` ainda responde `403` a quem só
-> tem papel de administrador ou de engenheiro, sem o tenant no token.
+> **Em produção desde 2026-09-26** (ver [CHANGELOG 1.68](../../CHANGELOG.md)), incluindo o `DELETE` que responde o
+> estado, as chaves da plataforma do canon e o `GET` para papel de administrador ou de engenheiro.
 
 <!-- ===== forger/erros.md ===== -->
 
