@@ -26,14 +26,27 @@ A chave de `aggregate` é a **mesma** do `.model.json` (`<boundedContext>.<tipo>
 |---|---|---|
 | `singular` | botão **"Novo {singular}"**, estado vazio ("Nenhum registro de {singular} ainda"), nome do arquivo exportado (`{singular}-AAAA-MM-DD.csv`) | em **minúsculas**, porque entra no meio da frase: `"aluno"`, `"pedido"` |
 | `plural` | **título da página** do agregado; elemento raiz do XML exportado | com inicial maiúscula: `"Alunos"` |
-| `titleKey` | título do registro no **painel lateral**, no **cartão** do celular e em "Ações deste registro" | o atributo que uma pessoa usa para reconhecer o registro: nome, número, placa. Sem ele, a tela usa o primeiro texto do registro |
+| `titleKey` | título do registro no **painel lateral**, no **cartão** do celular e em "Ações deste registro" | o atributo (ou `grupo.campo`) que uma pessoa usa para reconhecer o registro: nome, número, placa. Sem ele, a tela usa o primeiro texto do registro |
 | `labels` | cabeçalho da coluna, rótulo do filtro, rótulo do campo no formulário, linhas do histórico, aba Dados, cópia de linha | para **todo** atributo que aparece na tela. Value object pelo nome = título do grupo no formulário; `grupo.campo` = campo dentro dele |
 | `stateLabels` | a **pílula de estado** (tabela, painel, ações, formulário, histórico) | o estado como o usuário diz: `"matriculado"` → `"Matriculado"` |
-| `fmt` | como o valor é **mostrado** na tabela, no cartão, na aba Dados e no histórico | ver [formatos](#formatos). Só muda a exibição: o comando e a exportação continuam com o valor cru |
-| `cols` | as colunas visíveis **por padrão**, na ordem | de 4 a 6, as que se lê para decidir. **Não** ponha `status` (o Estado é sempre a última coluna) nem campo técnico. O usuário pode mudar as colunas; "Restaurar padrão" volta a esta lista |
-| `filters` | os campos do **painel de filtros** | os que se usa para achar registro. Sem a chave, todos os atributos aparecem no filtro |
-| `options` | o campo do formulário vira **seleção** | lista fixa: os **valores exatos** que o comando grava. Referência `{ aggregate, valueKey, labelKey }`: a tela consulta até 200 registros do outro agregado, mostra `labelKey` e grava `valueKey` — então `valueKey` é o atributo do outro agregado que **este** campo guarda: num campo de referência, costuma ser `aggregateid` |
+| `fmt` | como o valor é **mostrado** na tabela, no cartão, na aba Dados e no histórico — também de `grupo.campo` | ver [formatos](#formatos). Só muda a exibição: o comando e a exportação continuam com o valor cru |
+| `cols` | as colunas visíveis **por padrão**, na ordem — `grupo.campo` vira coluna | de 4 a 6, as que se lê para decidir. **Não** ponha `status` (o Estado é sempre a última coluna) nem campo técnico. O usuário pode mudar as colunas; "Restaurar padrão" volta a esta lista |
+| `filters` | os campos do **painel de filtros** — `grupo.campo` filtra dentro do grupo | os que se usa para achar registro. Sem a chave, todos os atributos aparecem no filtro (campos de grupo, não) |
+| `options` | o campo do formulário vira **seleção** — atributo ou campo de grupo | lista fixa: os **valores exatos** que o comando grava. Referência `{ aggregate, valueKey, labelKey }`: a tela consulta até 200 registros do outro agregado, mostra `labelKey` e grava `valueKey` — então `valueKey` é o atributo do outro agregado que **este** campo guarda: num campo de referência, costuma ser `aggregateid` |
 | `stateHue` | a **cor** da pílula de cada estado (matiz de 0 a 359) | para dar à cor um significado: em torno de 150 verde, 25 vermelho, 250 azul, 80 amarelo. Sem ela, a cor sai do nome do estado e é a mesma em qualquer tela |
+
+### Campos de value object: `grupo.campo`
+
+Um value object guarda um grupo de campos num atributo só: o **endereço** (cidade, CEP) de um cadastro, as
+**matrículas** (plano, preço) de um aluno. `grupo.campo` aponta um campo de dentro do grupo, e a tela o usa
+em `labels`, `titleKey`, `fmt`, `cols`, `filters` e `options`:
+
+- grupo **único** (`single`): o campo do objeto — a coluna "Cidade" mostra `Natal`;
+- grupo **com vários itens** (`multiple`): os valores de todos os itens, separados por vírgula — a coluna
+  "Plano" mostra `Mensal, Anual`; no filtro, o registro entra se **algum** item casar;
+- na aba Dados, cada campo do grupo aparece numa linha própria, com o rótulo e o formato de `grupo.campo`.
+
+Sem manifesto, campo de grupo não entra nas colunas padrão nem no filtro: só aparece se o manifesto pedir.
 
 **Não entra no manifesto** o nome de exibição de **comando** e de **evento**: é o `alias`, declarado no
 próprio `.model.json` ([forger — model](../forger/endpoints/model.md#nome-de-exibicao)).

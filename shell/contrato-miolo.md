@@ -103,12 +103,12 @@ O contrato **mínimo obrigatório** é `mount` (e o `dispose` que ele devolve). 
   | Chave (por agregado) | O que é |
   |---|---|
   | `singular`, `plural` | como chamar o agregado |
-  | `titleKey` | atributo que dá título ao registro |
+  | `titleKey` | atributo (ou `grupo.campo`) que dá título ao registro |
   | `labels` | rótulo por atributo, por value object, ou por campo de value object como `grupo.campo` |
   | `stateLabels` | rótulo por estado |
-  | `fmt` | formato por atributo: `date` · `datetime` · `money` · `money:<casas>` (inteiro com casas implícitas) · `phone` · `bool` · `mono` |
-  | `cols`, `filters` | colunas visíveis por padrão; atributos oferecidos no filtro |
-  | `options` | opções de seleção: lista fixa, ou `{ aggregate, valueKey, labelKey }` de outro agregado do mesmo tenant |
+  | `fmt` | formato por atributo ou `grupo.campo`: `date` · `datetime` · `money` · `money:<casas>` (inteiro com casas implícitas) · `phone` · `bool` · `mono` |
+  | `cols`, `filters` | colunas visíveis por padrão; campos oferecidos no filtro — atributo ou `grupo.campo` (num grupo `multiple`, a coluna junta os valores dos itens e o filtro casa com qualquer item) |
+  | `options` | opções de seleção, de atributo ou de `grupo.campo`: lista fixa, ou `{ aggregate, valueKey, labelKey }` de outro agregado do mesmo tenant |
   | `stateHue` | matiz (0–359) da pílula de cada estado; sem ela, a matiz sai do nome do estado |
 
   O nome de exibição de **comando** e de **evento** não está aqui: é o `alias` do modelo, que já vem na
