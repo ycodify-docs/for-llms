@@ -2,6 +2,11 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.78 — 2026-09-27
+
+- **Relatos de suporte no ar** (`bff/README.md` §Relatos de suporte): as rotas `/session/suporte/*` estão em
+  stager desde 2026-09-27T04:23Z (yc.app `3dbf9d1`); sai o aviso de que dependiam da rota da borda.
+
 ## 1.77 — 2026-09-27
 
 - **BFF: relatos de suporte** (`bff/README.md` §Relatos de suporte; `shell/contrato-miolo.md` §hostContext,

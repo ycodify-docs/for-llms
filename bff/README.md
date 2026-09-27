@@ -665,8 +665,8 @@ fala com o monitor**. Todas exigem o cookie de sessão.
 - Por dentro (não é contrato de quem chama o BFF): o BFF fala com o monitor pela borda, com credencial de
   serviço — não com o token do usuário — e manda o `x-request-id` da chamada, que fica gravado no relato.
 
-> **Estado em 2026-09-27:** em `develop` do yc.app; vai ao ar em stager quando a rota da borda para o monitor
-> for publicada. Até lá, o stager mostra o suporte como mockup declarado.
+> **No ar em stager desde 2026-09-27T04:23Z** (yc.app `3dbf9d1`). Antes disso, o suporte do stager era um
+> mockup declarado, e nenhum relato saía da tela.
 
 ## Preferências da organização (org-scoped)
 
