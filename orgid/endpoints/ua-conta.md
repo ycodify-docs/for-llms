@@ -38,8 +38,8 @@ O `status` do corpo é **ignorado**: a conta mantém o que tem no cadastro.
 
 **Resposta:** `200` (sem corpo) quando gravou · `404` — `"account not found: nothing was updated."`
 
-> ⚠️ **O titular não troca o próprio status**, em `develop` do orgid desde 2026-09-25 e **ainda não em
-> produção**. Antes, `status` no corpo era gravado, e a **ausência** dele gravava `ACTIVE`: qualquer
+> ⚠️ **O titular não troca o próprio status**, em produção desde 2026-09-26 (ver [CHANGELOG 1.66](../../CHANGELOG.md)).
+> Antes, `status` no corpo era gravado, e a **ausência** dele gravava `ACTIVE`: qualquer
 > edição de perfil reativava conta `SUSPENDED` e ativava conta `PENDING` sem confirmação.
 
 ## PUT /ua/account/password
