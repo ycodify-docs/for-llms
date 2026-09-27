@@ -2,6 +2,14 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.65 — 2026-09-27
+
+- **Login do auth: as chaves da resposta são `accessToken`, `tokenType` e `mcpSessionId`** — e não `token`,
+  `type` e `sessionId`, como diziam `auth/endpoints/sign-in.md`, `auth/README.md`, `auth/exemplos.md` e o
+  `auth/openapi.yaml`. Quem lia `.token` ficava sem token. E a página passa a dizer que, pela borda, o login
+  leva **um** cabeçalho de identificação (`X-Tenant-Id` ou `X-Forger-Credential`); sem nenhum, `401`.
+  Medido pelo conceptnatal pela borda e conferido no código.
+
 ## 1.64 — 2026-09-27
 
 - **`shell/apresentacao.md` acompanha a decisão do dono sobre o `GET` do manifesto**: quem publica

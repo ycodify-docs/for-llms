@@ -2069,12 +2069,12 @@ Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md). Contrato de f
 Resposta de sucesso (`200`):
 
 ```jsonc
-{ "token": "<token de acesso>", "type": "Bearer",
+{ "accessToken": "<token de acesso>", "tokenType": "Bearer",
   "id": 0, "username": "...", "name": "...", "email": "...",
-  "roles": ["..."], "sessionId": "<uuid da sessão>" }
+  "roles": ["..."], "mcpSessionId": "<uuid da sessão>" }
 ```
 
-O **token de acesso** é o que vai em `Authorization: Bearer <token>`. Ele embute, como atributos
+O **token de acesso** (`accessToken`) é o que vai em `Authorization: Bearer <token>`. Ele embute, como atributos
 (claims): **usuário**, **papéis**, **organizações** e **tenants** (`tenantId`s + descritores). É de
 **curta duração** — renove pelo endpoint de renovação. (A plataforma também usa um token de renovação
 de duração maior, internamente.) Trate o token como **opaco**; não dependa de sua estrutura interna.
@@ -2125,19 +2125,22 @@ Corpo (JSON):
 | `username` | string | sim | Identificador do usuário. |
 | `password` | string | sim | Senha. |
 
-Cabeçalhos: `Content-Type: application/json`. **Não** exige `Authorization` (é o login).
+Cabeçalhos: `Content-Type: application/json`. **Não** exige `Authorization` (é o login). Pela borda, exige
+**um** cabeçalho de identificação — `X-Tenant-Id` **ou** `X-Forger-Credential`, nunca os dois; sem nenhum,
+`401` `missing_headers`. Ver [gateway](../../gateway/README.md).
 
 ## Resposta
 
 `200`:
 
 ```jsonc
-{ "token": "<token de acesso>", "type": "Bearer",
+{ "accessToken": "<token de acesso>", "tokenType": "Bearer",
   "id": 0, "username": "...", "name": "...", "email": "...",
-  "roles": ["..."], "sessionId": "<uuid da sessão>" }
+  "roles": ["..."], "mcpSessionId": "<uuid da sessão>" }
 ```
 
-Use `token` em `Authorization: Bearer <token>` nas chamadas seguintes. O token embute usuário, papéis,
+Use `accessToken` em `Authorization: Bearer <token>` nas chamadas seguintes — a chave é `accessToken`, e não
+`token`: quem lê `.token` fica sem token. O token embute usuário, papéis,
 organizações e tenants. Ver [README — claims](../README.md#o-que-o-login-retorna-token--claims).
 
 ## Diferenças entre domínios
@@ -2223,20 +2226,23 @@ Em erro, a resposta tem o **status HTTP** e um corpo com `status` + mensagem.
 
 ```
 POST /up/sign-in
+Headers: X-Forger-Credential: <credencial>
 { "username": "alice", "password": "•••" }
 → 200
-{ "token": "<token>", "type": "Bearer", "id": 1, "username": "alice",
-  "name": "Alice", "email": "alice@acme.com", "roles": ["API_MASTER"], "sessionId": "<uuid>" }
+{ "accessToken": "<token>", "tokenType": "Bearer", "id": 1, "username": "alice",
+  "name": "Alice", "email": "alice@acme.com", "roles": ["API_MASTER"], "mcpSessionId": "<uuid>" }
 ```
 
-Use o token nas chamadas seguintes: `Authorization: Bearer <token>`.
+Use o `accessToken` nas chamadas seguintes: `Authorization: Bearer <token>`. Pela borda, o login leva **um**
+cabeçalho de identificação, `X-Tenant-Id` ou `X-Forger-Credential` ([gateway](../gateway/README.md)).
 
 ## 2. Login externo
 
 ```
 POST /ua/sign-in
+Headers: X-Tenant-Id: <tenant-id>
 { "username": "cliente1", "password": "•••" }
-→ 200  { "token": "<token>", "type": "Bearer", ... }   // token inclui os tenants do usuário
+→ 200  { "accessToken": "<token>", "tokenType": "Bearer", ... }   // token inclui os tenants do usuário
 ```
 
 ## 3. Usar o token (em outro serviço)
@@ -2252,7 +2258,7 @@ Headers: Authorization: Bearer <token>, X-Tenant-Id: <tenant-id>
 ```
 GET /up/sign-in/renew
 Headers: Authorization: Bearer <token atual>
-→ 200  { "token": "<novo token>", ... }
+→ 200  { "accessToken": "<novo token>", ... }
 ```
 
 ## 5. Erros comuns
