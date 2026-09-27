@@ -57,12 +57,12 @@ Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md). Contrato de f
 Resposta de sucesso (`200`):
 
 ```jsonc
-{ "token": "<token de acesso>", "type": "Bearer",
+{ "accessToken": "<token de acesso>", "tokenType": "Bearer",
   "id": 0, "username": "...", "name": "...", "email": "...",
-  "roles": ["..."], "sessionId": "<uuid da sessão>" }
+  "roles": ["..."], "mcpSessionId": "<uuid da sessão>" }
 ```
 
-O **token de acesso** é o que vai em `Authorization: Bearer <token>`. Ele embute, como atributos
+O **token de acesso** (`accessToken`) é o que vai em `Authorization: Bearer <token>`. Ele embute, como atributos
 (claims): **usuário**, **papéis**, **organizações** e **tenants** (`tenantId`s + descritores). É de
 **curta duração** — renove pelo endpoint de renovação. (A plataforma também usa um token de renovação
 de duração maior, internamente.) Trate o token como **opaco**; não dependa de sua estrutura interna.
