@@ -153,7 +153,7 @@ paths:
       summary: Publicar manifesto de apresentação do tenant (sobrescreve); exige o modelo publicado
       requestBody: { required: true, content: { multipart/form-data: { schema: { type: object, properties: { file: { type: string, format: binary } } } } } }
       responses: { '201': { description: Publicado, content: { application/json: { schema: { type: object, properties: { stored: { type: boolean } } } } } }, '400': { $ref: '#/components/responses/BadRequest' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } }
-    get: { tags: [presentation], summary: Ler manifesto — quem tem o tenant no token, sem papel de administrador/engenheiro, responses: { '200': { description: OK }, '204': { description: Tenant sem manifesto }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } } }
+    get: { tags: [presentation], summary: Ler manifesto — quem tem o tenant no token, ou papel de administrador/engenheiro na org, responses: { '200': { description: OK }, '204': { description: Tenant sem manifesto }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { $ref: '#/components/responses/NotFound' } } }
     delete: { tags: [presentation], summary: Remover manifesto, responses: { '200': { description: OK, content: { application/json: { schema: { type: object, properties: { deleted: { type: boolean } } } } } } } }
 components:
   securitySchemes:
