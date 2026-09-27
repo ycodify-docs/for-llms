@@ -26,6 +26,7 @@ A chave de `aggregate` é a **mesma** do `.model.json` (`<boundedContext>.<tipo>
 |---|---|---|
 | `singular` | botão **"Novo {singular}"**, estado vazio ("Nenhum registro de {singular} ainda"), nome do arquivo exportado (`{singular}-AAAA-MM-DD.csv`) | em **minúsculas**, porque entra no meio da frase: `"aluno"`, `"pedido"` |
 | `plural` | **título da página** do agregado; elemento raiz do XML exportado | com inicial maiúscula: `"Alunos"` |
+| `genero` | a concordância do botão de criação e do estado vazio: **"Nova** modalidade", "criar **a primeira**" | `"feminino"` quando o nome do agregado é feminino; sem a chave, a tela diz "Novo" |
 | `titleKey` | título do registro no **painel lateral**, no **cartão** do celular e em "Ações deste registro" | o atributo (ou `grupo.campo`) que uma pessoa usa para reconhecer o registro: nome, número, placa. Sem ele, a tela usa o primeiro texto do registro |
 | `labels` | cabeçalho da coluna, rótulo do filtro, rótulo do campo no formulário, linhas do histórico, aba Dados, cópia de linha | para **todo** atributo que aparece na tela. Value object pelo nome = título do grupo no formulário; `grupo.campo` = campo dentro dele |
 | `stateLabels` | a **pílula de estado** (tabela, painel, ações, formulário, histórico) | o estado como o usuário diz: `"matriculado"` → `"Matriculado"` |
@@ -108,7 +109,7 @@ monoespaçada. `fmt` serve sobretudo para **dinheiro** e **telefone**, que o tip
 ## Checklist de quem escreve
 
 - [ ] A chave do agregado é a do `.model.json`, e todo atributo citado existe no modelo publicado.
-- [ ] `singular` em minúsculas; `plural` com inicial maiúscula.
+- [ ] `singular` em minúsculas; `plural` com inicial maiúscula; `genero: "feminino"` quando o nome é feminino.
 - [ ] `titleKey` é um atributo que identifica o registro para uma pessoa.
 - [ ] Todo atributo que aparece na tela tem `labels`; todo estado tem `stateLabels`.
 - [ ] Dinheiro em centavos usa `money:2`; telefone usa `phone`.

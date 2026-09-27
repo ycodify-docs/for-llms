@@ -2,6 +2,13 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.73 — 2026-09-27
+
+- **A tela concorda com o gênero do agregado** (`shell/apresentacao.md` §O que cada chave faz na tela e
+  checklist; `shell/contrato-miolo.md` §hostContext): com `genero: "feminino"` no manifesto (chave do forger
+  desde a 1.72), o botão de criação diz "Nova {singular}" e o estado vazio "criar a primeira". Decisão do
+  dono de 2026-09-27, depois de ver "Novo modalidade" no stager. Em `develop` do yc.app (`4538e42`), ainda não em stager.
+
 ## 1.72 — 2026-09-27
 
 - **Manifesto: `genero` do agregado** (`forger/endpoints/presentation.md` e `forger/spec/presentation.schema.json`).
