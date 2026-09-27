@@ -103,6 +103,7 @@ O contrato **mínimo obrigatório** é `mount` (e o `dispose` que ele devolve). 
   | Chave (por agregado) | O que é |
   |---|---|
   | `singular`, `plural` | como chamar o agregado |
+  | `genero` | `feminino` ou `masculino` (ausente = masculino): a tela concorda "Nova"/"Novo" |
   | `titleKey` | atributo (ou `grupo.campo`) que dá título ao registro |
   | `labels` | rótulo por atributo, por value object, ou por campo de value object como `grupo.campo` |
   | `stateLabels` | rótulo por estado |
