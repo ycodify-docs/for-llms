@@ -60,7 +60,7 @@ Repetir o `DELETE` é seguro e responde o mesmo.
   "formato": 1,
   "aggregate": {
     "loja.pedido": {
-      "singular": "Pedido", "plural": "Pedidos", "titleKey": "numero",
+      "singular": "Pedido", "plural": "Pedidos", "genero": "masculino", "titleKey": "numero",
       "labels": { "numero": "Número", "endereco.cep": "CEP" },
       "stateLabels": { "criado": "Criado", "pago": "Pago" },
       "fmt": { "total": "money:2", "criadoem": "datetime" },
@@ -81,6 +81,7 @@ do `.model.json` (`<boundedContext>.<type>`). Chave desconhecida é **recusada**
 | Chave | O que é |
 |---|---|
 | `singular` · `plural` | nome do agregado na tela; texto não vazio |
+| `genero` | gênero gramatical desse nome, para a tela concordar ("Nova modalidade"): `feminino` ou `masculino`; ausente = masculino |
 | `titleKey` | atributo (ou `grupo.campo`) cujo valor identifica a linha |
 | `labels` | rótulo por atributo, `grupo.campo` ou value object |
 | `stateLabels` | rótulo por estado |
@@ -129,4 +130,6 @@ guarda; o `id` é a chave da linha na projeção e não serve de referência.
 - Chaves `_`-prefixadas são metadado, removidas na publicação, como no `.model.json`.
 
 > **Em produção desde 2026-09-26** (ver [CHANGELOG 1.68](../../CHANGELOG.md)), incluindo o `DELETE` que responde o
-> estado, as chaves da plataforma do canon e o `GET` para papel de administrador ou de engenheiro.
+> estado, as chaves da plataforma do canon e o `GET` para papel de administrador ou de engenheiro. **A chave
+> `genero` está em `develop` do forger desde 2026-09-27 e ainda não em produção**: até o próximo deploy, a
+> publicação a recusa como chave desconhecida (`400`).

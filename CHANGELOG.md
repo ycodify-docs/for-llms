@@ -2,6 +2,13 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.72 — 2026-09-27
+
+- **Manifesto: `genero` do agregado** (`forger/endpoints/presentation.md` e `forger/spec/presentation.schema.json`).
+  Chave opcional por agregado, `feminino` ou `masculino` (ausente = masculino), para a tela concordar artigo
+  e adjetivo com o nome ("Nova modalidade", não "Novo modalidade"). Em `develop` do forger; até o próximo
+  deploy, a publicação em produção a recusa como chave desconhecida.
+
 ## 1.71 — 2026-09-27
 
 - **A tela usa campo de value object (`grupo.campo`) em todo lugar que o forger aceita**
