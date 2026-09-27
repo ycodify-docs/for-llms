@@ -2,6 +2,15 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.77 — 2026-09-27
+
+- **BFF: relatos de suporte** (`bff/README.md` §Relatos de suporte; `shell/contrato-miolo.md` §hostContext,
+  `openSupport`). Seis rotas de sessão em `/session/suporte/*` — criar, listar os meus, ler com a conversa,
+  responder, marcar lido, contar não lidos — que repassam ao monitor (contrato na 1.76). O BFF tira da sessão
+  quem relata e confere org e tenant; o erro do monitor passa inteiro. O `openSupport` deixa de dizer que o
+  suporte é mockup. Decisões do dono de 2026-09-27; em `develop` do yc.app (`7e8dc7a`), no ar quando a rota da
+  borda for publicada.
+
 ## 1.76 — 2026-09-27
 
 - **Fatia nova: monitor — relatos de suporte** (`monitor/README.md`, `monitor/endpoints/relatos.md`,
