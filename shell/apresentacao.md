@@ -32,7 +32,7 @@ A chave de `aggregate` é a **mesma** do `.model.json` (`<boundedContext>.<tipo>
 | `fmt` | como o valor é **mostrado** na tabela, no cartão, na aba Dados e no histórico | ver [formatos](#formatos). Só muda a exibição: o comando e a exportação continuam com o valor cru |
 | `cols` | as colunas visíveis **por padrão**, na ordem | de 4 a 6, as que se lê para decidir. **Não** ponha `status` (o Estado é sempre a última coluna) nem campo técnico. O usuário pode mudar as colunas; "Restaurar padrão" volta a esta lista |
 | `filters` | os campos do **painel de filtros** | os que se usa para achar registro. Sem a chave, todos os atributos aparecem no filtro |
-| `options` | o campo do formulário vira **seleção** | lista fixa: os **valores exatos** que o comando grava. Referência `{ aggregate, valueKey, labelKey }`: a tela consulta até 200 registros do outro agregado, mostra `labelKey` e grava `valueKey` — então `valueKey` é o atributo do outro agregado que **este** campo guarda: num campo de referência, costuma ser `aggregateid` (o que a produção aceita, ver a página do forger) |
+| `options` | o campo do formulário vira **seleção** | lista fixa: os **valores exatos** que o comando grava. Referência `{ aggregate, valueKey, labelKey }`: a tela consulta até 200 registros do outro agregado, mostra `labelKey` e grava `valueKey` — então `valueKey` é o atributo do outro agregado que **este** campo guarda: num campo de referência, costuma ser `aggregateid` |
 | `stateHue` | a **cor** da pílula de cada estado (matiz de 0 a 359) | para dar à cor um significado: em torno de 150 verde, 25 vermelho, 250 azul, 80 amarelo. Sem ela, a cor sai do nome do estado e é a mesma em qualquer tela |
 
 **Não entra no manifesto** o nome de exibição de **comando** e de **evento**: é o `alias`, declarado no
@@ -85,12 +85,10 @@ monoespaçada. `fmt` serve sobretudo para **dinheiro** e **telefone**, que o tip
    Detalhe e erros: [forger — manifesto de apresentação](../forger/endpoints/presentation.md).
 2. **Conferir o que ficou gravado**: `GET` no mesmo caminho do forger. Lê quem tem o tenant no token
    **ou** quem tem papel de administrador ou de engenheiro na org — é assim que a conta que publica confere
-   o que publicou ([forger — ler](../forger/endpoints/presentation.md)). Pelo BFF, com um usuário do app:
-   `GET /session/presentation?tenant={tenantId}` ([BFF](../bff/README.md#manifesto-de-apresentação)).
-   ⚠️ **Até o próximo deploy do composer**, a conta de plataforma ainda recebe `403` `tenant <id> is not in
-   the token` no `GET` — medido no stager em 2026-09-27T00:09Z com o token de plataforma do conceptnatal,
-   que lia o `/model` do mesmo tenant com `200`. Até lá, confira com um usuário do app ou pela tela; o `201`
-   da publicação já diz que a forma e as referências passaram.
+   o que publicou ([forger — ler](../forger/endpoints/presentation.md)); `204` = não há manifesto. Pelo
+   BFF, com um usuário do app: `GET /session/presentation?tenant={tenantId}`
+   ([BFF](../bff/README.md#manifesto-de-apresentação)). O `201` da publicação já diz que a forma e as
+   referências passaram.
 3. **Ver na tela**: a casca lê o manifesto quando o agregado é aberto. Depois de publicar, abra o
    agregado de novo no menu.
 
