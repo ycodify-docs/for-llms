@@ -2,6 +2,13 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.66 — 2026-09-27
+
+- **Dois avisos de "ainda não em produção" saem do orgid** — `orgid/endpoints/publico.md` (em `/ua`, `R` só
+  ativa conta `PENDING`) e `orgid/endpoints/ua-conta.md` (o titular não troca o próprio status). As duas
+  travas estão em produção desde 2026-09-26, no mesmo deploy que levou a trava de papel público (1.58); a
+  1.58 não os tirou porque a frase quebrava de linha e a busca não os achou.
+
 ## 1.65 — 2026-09-27
 
 - **Login do auth: as chaves da resposta são `accessToken`, `tokenType` e `mcpSessionId`** — e não `token`,
