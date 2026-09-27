@@ -24,6 +24,10 @@
 - **Manifesto de apresentação em produção** (`forger/endpoints/presentation.md`): o aviso de "ainda não em
   produção" sai. E o `DELETE` passa a responder `{ "deleted": true }` sempre que não resta manifesto,
   para que a repetição da mesma chamada responda o mesmo; em produção a partir do próximo deploy.
+- **Manifesto: as chaves da plataforma aceitas como atributo passam a ser as do canon** — `id`,
+  `aggregateid`, `status`, `version` e os metadados de auditoria. A página listava só `id` e a auditoria, e a
+  publicação recusava `status` em coluna e `aggregateid` como `valueKey` de referência. Apontado pelo yc.app;
+  em produção a partir do próximo deploy.
 
 ## 1.60 — 2026-09-26
 

@@ -97,7 +97,10 @@ Toda referência tem de existir no **modelo publicado do mesmo tenant**:
 
 - **agregado** — chave de `aggregate` do modelo;
 - **atributo** — declarado em `data.attribute` de algum comando do agregado, ou `whenAttribute` de algum
-  evento dele, ou metadado da plataforma (`id`, `loguser`, `logrole`, `logversion`, `logdate`);
+  evento dele, ou chave da plataforma — `id`, `aggregateid`, `status`, `version` e os metadados de auditoria
+  (`loguser`, `logrole`, `logversion`, `logdate`), a lista do [model-format](../../persistence-crs/spec/model-format.md).
+  Para `options` por referência, o `valueKey` costuma ser `aggregateid`, que é o que um campo de referência guarda;
+  o `id` é a chave da linha na projeção e não serve de referência;
 - **`grupo.campo`** — só em value object que é **grupo de campos**; value object descrito como um
   atributo não tem campos para apontar;
 - **value object pelo nome** — só em `labels`;
@@ -112,6 +115,7 @@ Toda referência tem de existir no **modelo publicado do mesmo tenant**:
   próxima publicação do manifesto recusa.
 - Chaves `_`-prefixadas são metadado, removidas na publicação, como no `.model.json`.
 
-> **Em produção desde 2026-09-26** (ver [CHANGELOG 1.61](../../CHANGELOG.md)). Até o próximo deploy, o `DELETE`
-> em produção ainda responde `{ "deleted": false }` quando não havia manifesto — inclusive numa repetição
-> da mesma chamada, com o manifesto já apagado pela primeira.
+> **Em produção desde 2026-09-26** (ver [CHANGELOG 1.61](../../CHANGELOG.md)). Até o próximo deploy, duas
+> diferenças em produção: o `DELETE` ainda responde `{ "deleted": false }` quando não havia manifesto —
+> inclusive numa repetição da mesma chamada, com o manifesto já apagado pela primeira —, e a publicação
+> ainda recusa `aggregateid`, `status` e `version` como atributo.
