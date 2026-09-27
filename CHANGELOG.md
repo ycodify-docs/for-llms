@@ -2,6 +2,12 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.79 — 2026-09-27
+
+- **monitor: relatos publicados na borda** (`monitor/README.md`). Sai o aviso de que a rota
+  `/v3/monitor/suporte/**` não estava publicada: a infra mediu, às 04:13Z, a chamada pela borda chegando ao
+  monitor.
+
 ## 1.78 — 2026-09-27
 
 - **Relatos de suporte no ar** (`bff/README.md` §Relatos de suporte): as rotas `/session/suporte/*` estão em
