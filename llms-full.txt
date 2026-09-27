@@ -8858,13 +8858,14 @@ monoespaçada. `fmt` serve sobretudo para **dinheiro** e **telefone**, que o tip
    `POST /org/{org}/project/{project}/tenant/{tenantId}/presentation` no forger. A publicação confere a
    forma e cada referência contra o modelo **já publicado** do tenant — publique o modelo primeiro.
    Detalhe e erros: [forger — manifesto de apresentação](../forger/endpoints/presentation.md).
-2. **Conferir o que ficou gravado** — com um **usuário do app** que tenha o tenant: `GET` no mesmo
-   caminho do forger, ou `GET /session/presentation?tenant={tenantId}` no
-   [BFF](../bff/README.md#manifesto-de-apresentação).
-   ⚠️ **A conta de plataforma que publica não confere pelo `GET`**: o token dela não carrega os tenants, e
-   o forger responde `403` `tenant <id> is not in the token` — medido no stager em 2026-09-27T00:09Z, com o
-   token de plataforma do conceptnatal, que lia o `/model` do mesmo tenant com `200`. O `201` da
-   publicação já diz que a forma e as referências passaram.
+2. **Conferir o que ficou gravado**: `GET` no mesmo caminho do forger. Lê quem tem o tenant no token
+   **ou** quem tem papel de administrador ou de engenheiro na org — é assim que a conta que publica confere
+   o que publicou ([forger — ler](../forger/endpoints/presentation.md)). Pelo BFF, com um usuário do app:
+   `GET /session/presentation?tenant={tenantId}` ([BFF](../bff/README.md#manifesto-de-apresentação)).
+   ⚠️ **Até o próximo deploy do composer**, a conta de plataforma ainda recebe `403` `tenant <id> is not in
+   the token` no `GET` — medido no stager em 2026-09-27T00:09Z com o token de plataforma do conceptnatal,
+   que lia o `/model` do mesmo tenant com `200`. Até lá, confira com um usuário do app ou pela tela; o `201`
+   da publicação já diz que a forma e as referências passaram.
 3. **Ver na tela**: a casca lê o manifesto quando o agregado é aberto. Depois de publicar, abra o
    agregado de novo no menu.
 

@@ -2,6 +2,13 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.64 — 2026-09-27
+
+- **`shell/apresentacao.md` acompanha a decisão do dono sobre o `GET` do manifesto**: quem publica
+  (administrador ou engenheiro na org) passa a conferir pelo `GET` do forger, como a página do forger já
+  diz; até o próximo deploy do composer, a produção ainda responde `403` a essa conta, e a página diz
+  isso com a medição. Desfaz o "não confere pelo GET" da 1.63, que valia só para o código em produção.
+
 ## 1.63 — 2026-09-27
 
 - **`shell/apresentacao.md` deixa de mandar quem publica conferir o manifesto pelo `GET`.** A conta de
