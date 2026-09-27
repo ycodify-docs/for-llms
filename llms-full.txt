@@ -5528,12 +5528,12 @@ do `.model.json` (`<boundedContext>.<type>`). Chave desconhecida é **recusada**
 | Chave | O que é |
 |---|---|
 | `singular` · `plural` | nome do agregado na tela; texto não vazio |
-| `titleKey` | atributo cujo valor identifica a linha |
-| `labels` | rótulo por atributo, value object ou `grupo.campo` |
+| `titleKey` | atributo (ou `grupo.campo`) cujo valor identifica a linha |
+| `labels` | rótulo por atributo, `grupo.campo` ou value object |
 | `stateLabels` | rótulo por estado |
-| `fmt` | formato por atributo: `date` · `datetime` · `money` · `money:<casas>` · `phone` · `bool` · `mono`. `money:2` é inteiro com 2 casas implícitas (`1050` = `10,50`) |
-| `cols` · `filters` | atributos das colunas padrão, na ordem, e atributos filtráveis; lista não vazia, sem repetição |
-| `options` | por atributo, lista fixa de valores **ou** `{ aggregate, valueKey, labelKey }` apontando outro agregado |
+| `fmt` | formato por atributo ou `grupo.campo`: `date` · `datetime` · `money` · `money:<casas>` · `phone` · `bool` · `mono`. `money:2` é inteiro com 2 casas implícitas (`1050` = `10,50`) |
+| `cols` · `filters` | colunas padrão, na ordem, e campos filtráveis — atributo ou `grupo.campo`; lista não vazia, sem repetição |
+| `options` | por atributo ou `grupo.campo`, lista fixa de valores **ou** `{ aggregate, valueKey, labelKey }` apontando um agregado |
 | `stateHue` | matiz da cor de cada estado, inteiro de `0` a `359` |
 
 O nome de exibição de **comando** e de **evento** não entra aqui: é o `alias`, declarado no próprio modelo
@@ -5541,20 +5541,32 @@ O nome de exibição de **comando** e de **evento** não entra aqui: é o `alias
 
 ## Referências conferidas na publicação
 
-Toda referência tem de existir no **modelo publicado do mesmo tenant**:
+Toda referência tem de existir no **modelo publicado do mesmo tenant**. Cinco tipos:
 
 - **agregado** — chave de `aggregate` do modelo;
 - **atributo** — declarado em `data.attribute` de algum comando do agregado, ou `whenAttribute` de algum
   evento dele, ou chave da plataforma — `id`, `aggregateid`, `status`, `version` e os metadados de auditoria
-  (`loguser`, `logrole`, `logversion`, `logdate`), a lista do [model-format](../../persistence-crs/spec/model-format.md).
-  Para `options` por referência, o `valueKey` costuma ser `aggregateid`, que é o que um campo de referência guarda;
-  o `id` é a chave da linha na projeção e não serve de referência;
-- **`grupo.campo`** — só em value object que é **grupo de campos**; value object descrito como um
-  atributo não tem campos para apontar;
-- **value object pelo nome** — só em `labels`;
-- **estado** (`stateLabels`, `stateHue`) — chave de evento do agregado;
-- **`options` por referência** — outro agregado do **mesmo** modelo, com `valueKey` e `labelKey` entre os
-  atributos **dele**.
+  (`loguser`, `logrole`, `logversion`, `logdate`), a lista do [model-format](../../persistence-crs/spec/model-format.md);
+- **`grupo.campo`** — campo de um value object (`single` ou `multiple`) que é **grupo de campos**; value
+  object descrito como um atributo (com `type` no próprio nó) não tem campos para apontar;
+- **value object pelo nome** — o nome do grupo sozinho;
+- **estado** — chave de evento do agregado.
+
+O que cada chave aceita — é exatamente o que a publicação confere; o resto é `400`:
+
+| Chave | Aceita |
+|---|---|
+| `titleKey` | atributo ou `grupo.campo` |
+| `labels` (chave) | atributo, `grupo.campo` ou value object pelo nome — **só aqui** o nome do grupo sozinho vale |
+| `fmt` (chave) | atributo ou `grupo.campo` |
+| `cols` · `filters` (item) | atributo ou `grupo.campo` |
+| `options` (chave) | atributo ou `grupo.campo` |
+| `options` por referência: `aggregate` | agregado do mesmo modelo, inclusive o próprio |
+| `options` por referência: `valueKey` · `labelKey` | atributo ou `grupo.campo` **do agregado apontado** |
+| `stateLabels` · `stateHue` (chave) | estado |
+
+Em `options` por referência, o `valueKey` costuma ser `aggregateid`, que é o que um campo de referência
+guarda; o `id` é a chave da linha na projeção e não serve de referência.
 
 ## Ciclo de vida
 

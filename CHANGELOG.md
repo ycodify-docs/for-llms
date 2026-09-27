@@ -2,6 +2,15 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.70 — 2026-09-27
+
+- **Manifesto: o que cada chave aceita, chave por chave** (`forger/endpoints/presentation.md` §Referências
+  conferidas na publicação). A tabela de chaves dizia "formato por atributo" em `fmt`, e a seção de
+  referências dava `grupo.campo` como válido — duas leituras opostas. Agora uma tabela diz, para `titleKey`,
+  `labels`, `fmt`, `cols`, `filters`, `options` e estados, o que a publicação aceita: `fmt`, `cols`, `filters`,
+  `titleKey` e as chaves de `options` aceitam atributo **ou** `grupo.campo`; só `labels` aceita o nome do value
+  object sozinho. Nenhum comportamento mudou — é o que o forger em produção já confere. Pedido do conceptnatal.
+
 ## 1.69 — 2026-09-27
 
 - **`shell/apresentacao.md` perde duas ressalvas vencidas pelo deploy do composer** (forger em produção desde
