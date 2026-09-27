@@ -59,11 +59,19 @@
 
 ## Chrome da casca (o que é fixo)
 
-- **Barra superior**: marca, **seletor de organização** (organizações do token), busca/paleta de comando,
-  **tema** (claro/escuro), notificações, **perfil**, encerrar sessão.
-- **Menu**: **1 entrada por bounded context** da organização ativa; estado ativo destacado com o acento.
-- **Estados da área central**: **carregando** / **erro** / **pronto** (o miolo montado). "Vazio" é do
-  **miolo** (conteúdo), não da casca.
+- **Barra superior** (64px): marca, **seletor de organização** (organizações do token), busca/paleta de
+  comando, agente, **tema** (claro/escuro), **suporte**, notificações e o **menu da conta** — é nele, e só
+  nele, que fica **encerrar sessão**.
+- **Menu lateral**: **Projeto → Contexto → Agregados** da organização ativa. Continua sendo **1 entrada
+  por bounded context**, agora com os agregados dela como filhos, cada um com a contagem de registros; o
+  agregado ativo fica destacado com o acento. O agregado se escolhe **aqui**, e a escolha remonta o miolo
+  (ver [contrato-miolo](contrato-miolo.md)). No rodapé: suporte, a chave do tenant (clicar copia) e o
+  status do miolo, medido por health check.
+- **Larguras**: abaixo de 1000px o menu lateral vira gaveta; a barra superior encolhe por faixas (nome do
+  usuário some abaixo de 1100px, a busca vira ícone abaixo de 860px, agente e tema somem abaixo de 720px).
+  A página nunca rola na horizontal.
+- **Estados da área central**: **vazio** (nenhum agregado escolhido), **carregando** (esqueleto),
+  **erro** e **pronto** (o miolo montado). O vazio **de conteúdo** — agregado sem registros — é do miolo.
 - **Tipografia**: uma família de texto e uma **monoespaçada** (identificadores técnicos: tenant, papéis).
 
 ## Regras a respeitar (checklist)
