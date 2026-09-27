@@ -26,6 +26,7 @@
 - [Atributo calculado pelo br — `computed`](#atributo-calculado-pelo-br--computed)
 - [`predicates` é a forma do persistence-q — não há dialeto do BFF](#predicates-é-a-forma-do-persistence-q-não-há-dialeto-do-bff)
 - [Autocadastro (`/ua/*`)](#autocadastro-ua)
+- [Relatos de suporte (`/session/suporte/*`)](#relatos-de-suporte-sessionsuporte)
 - [Preferências da organização (org-scoped)](#preferências-da-organização-org-scoped)
 - [Cabeçalhos que o BFF injeta (contrato de saída)](#cabeçalhos-que-o-bff-injeta-contrato-de-saída)
 - [Id de requisição (`x-request-id`)](#id-de-requisição-x-request-id)
@@ -635,6 +636,38 @@ Contrato de origem: [orgid/publico](../orgid/endpoints/publico.md) e [orgid/ua-p
 
 Monte a tela de cadastro a partir de `GET /ua/roles`: são exatamente os papéis que o servidor aceita.
 
+## Relatos de suporte (`/session/suporte/*`)
+
+O usuário relata uma falha, tira uma dúvida ou sugere, e acompanha a resposta da **equipe da plataforma**.
+Quem guarda é o **monitor** ([contrato](../monitor/endpoints/relatos.md)); o BFF repassa, e **o browser nunca
+fala com o monitor**. Todas exigem o cookie de sessão.
+
+| Operação | Método · Path | Resposta |
+|---|---|---|
+| Criar relato | `POST /session/suporte/relatos?tenant=<tenantId>` ou `?org=<org>` | `201 { id, estado, criadoEm }` |
+| Meus relatos | `GET /session/suporte/relatos?limit&offset` | `{ total, limit, offset, rows: [{ id, tipo, titulo, estado, criadoEm, atualizadoEm, fechadoEm, naoLido }] }` |
+| Um relato com a conversa | `GET /session/suporte/relatos/:id` | a linha, mais `contexto` e `mensagens: [{ id, autor: USUARIO \| EQUIPE, texto, em }]` |
+| Responder | `POST /session/suporte/relatos/:id/mensagens` · `{ texto }` | `201`; relato fechado → `409` |
+| Marcar como lido | `POST /session/suporte/relatos/:id/lido` (sem corpo) | `204` |
+| Quantos têm resposta nova | `GET /session/suporte/nao-lidos` | `{ total }` |
+
+- **Corpo do relato**: `{ tipo, titulo?, contexto?, mensagens: [{ texto }], diagnostico? }` — `tipo` é `Falha`,
+  `Dúvida` ou `Sugestão`, e volta como `FALHA`, `DUVIDA` ou `SUGESTAO`. O `diagnostico` é o da tela
+  ([o que leva](../shell/seguranca.md#diagnóstico-do-relato-de-suporte)). Até **256 KB** no todo; acima, `413`
+  no próprio BFF.
+- **Quem relata não se declara.** O BFF tira da **sessão** o usuário, e do parâmetro a org e o tenant — só se
+  forem do usuário (senão `404`). Com `tenant`, a org é a dele. Usuário, org e tenant que vierem no corpo são
+  ignorados pelo monitor.
+- **Só os relatos do próprio usuário**: relato de outro responde `404`, como se não existisse.
+- **Erro do monitor passa inteiro**, com status e corpo `{ error: "<código>", details: "<motivo>" }`
+  ([erros](../monitor/erros.md)): o texto para a tela é o `details`.
+- **Sem o serviço configurado** neste ambiente, as seis respondem `503`.
+- Por dentro (não é contrato de quem chama o BFF): o BFF fala com o monitor pela borda, com credencial de
+  serviço — não com o token do usuário — e manda o `x-request-id` da chamada, que fica gravado no relato.
+
+> **Estado em 2026-09-27:** em `develop` do yc.app; vai ao ar em stager quando a rota da borda para o monitor
+> for publicada. Até lá, o stager mostra o suporte como mockup declarado.
+
 ## Preferências da organização (org-scoped)
 
 Preferências de **apresentação por organização** — valem para **todos** os usuários da org, persistidas no
@@ -706,7 +739,7 @@ que o gateway, o cache ou o persistence respondem.
 | `500` | configuração ausente no servidor (ex.: o path do endpoint de cache não configurado) · **`readProjection` inválido no modelo do tenant** — a leitura é recusada em vez de recortada pela metade · **`computed` inválido no modelo do tenant** — o comando é recusado em vez de gravar marcador |
 | `413` | arquivo acima do teto do filer (3 MiB) em `POST /session/files/upload` |
 | `502` | falha ao falar com um serviço da plataforma |
-| `503` | serviço de arquivos (filer) não configurado neste ambiente |
+| `503` | serviço de arquivos (filer) ou de suporte (monitor) não configurado neste ambiente |
 
 ### `401` diz **por que** não há sessão
 

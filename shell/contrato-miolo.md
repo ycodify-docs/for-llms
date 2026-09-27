@@ -120,8 +120,8 @@ O contrato **mínimo obrigatório** é `mount` (e o `dispose` que ele devolve). 
 - **`openSupport(contexto, focoErro?)`** — abre o suporte da casca com o contexto técnico que o miolo tem
   (registro, estado, versão; e, vindo de um comando recusado, o status, a mensagem e o horário), como pares
   `{ rótulo: valor }`. A casca acrescenta tenant e tela, e o **diagnóstico da tela** (abaixo). `focoErro` é o
-  id que `diagnostico.erro` devolveu: põe aquele erro à frente do relato. ⚠️ **Hoje o suporte é um mockup
-  declarado:** a tela diz que nada é enviado a ninguém.
+  id que `diagnostico.erro` devolveu: põe aquele erro à frente do relato. O relato vai à equipe da plataforma, que responde na mesma gaveta
+  ([bff](../bff/README.md#relatos-de-suporte-sessionsuporte), onde está também desde quando isso vale no ar).
 - **`diagnostico`** — a caixa-preta da casca, para o miolo contar o que só ele sabe. O que ela guarda vai
   junto do relato **só quando o usuário relata**, e ele vê e pode remover cada parte antes de enviar
   ([segurança](seguranca.md#diagnóstico-do-relato-de-suporte)).
