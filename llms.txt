@@ -79,6 +79,7 @@
 ## shell (casca universal + BFF) — camada de aplicação
 - [Guia](shell/README.md): a aplicação única para todos os clientes; casca fixa + BFF; fronteira casca↔miolo; consome os oito serviços via BFF.
 - [Contrato casca↔miolo](shell/contrato-miolo.md): `MioloModule`, `hostContext`, modelo de capacidade.
+- [Manifesto de apresentação — como preencher](shell/apresentacao.md): o que cada chave faz na tela do Stager, formatos, exemplo, publicação e conferência; para quem escreve o `.model.json`.
 - [Injeção do miolo](shell/injecao.md): federação de módulos, resolução tenant→remoto, de onde vem o build do miolo.
 - [Estilo](shell/estilo.md): tokens semânticos, tema claro/escuro, marca sobrescrevível por tenant.
 - [Segurança](shell/seguranca.md): segredo só no BFF; capacidade = UX; revalidação no servidor.

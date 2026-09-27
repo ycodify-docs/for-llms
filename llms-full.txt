@@ -8588,17 +8588,24 @@ O contrato **mínimo obrigatório** é `mount` (e o `dispose` que ele devolve). 
 {
   "tenant":       { "org": "...", "project": "...", "boundedContext": "...", "tenantId": "..." },
   "capability":   { /* modelo de capacidade — abaixo */ },
+  "aggregate":    "...",
+  "presentation": { /* manifesto de apresentação — abaixo */ } | null,
   "identity":     { "username": "...", "name": "...", "email": "..." },
   "roles":        ["..."],
   "activeRole":   null,
-  "api":          { "command": "…", "query": "…", "aggregate": "…", "history": "…" },
+  "api":          { "command": "…", "query": "…", "count": "…", "aggregate": "…", "history": "…" },
   "prefs":        { "formMode": "inline" | "modal" },
   "canConfigure": false,
-  "savePrefs":    "(formMode) => Promise<void>"
+  "savePrefs":    "(formMode) => Promise<void>",
+  "openSupport":  "(contexto) => void"
 }
 ```
 
 - **`tenant`** — o bounded context selecionado (org/projeto/BC + `tenantId` **opaco**).
+- **`aggregate`** — o agregado que o usuário escolheu **no menu da casca** (o valor de
+  `capability.aggregates[].aggregate`). O menu é **Projeto → Contexto → Agregados**: o agregado se escolhe
+  na casca, e cada escolha **remonta** o miolo — seleção, busca, filtros e comando em andamento recomeçam.
+  O miolo mostra só esse agregado. Ausente numa casca anterior a esta regra: o miolo abre o primeiro.
 - **`capability`** — o **modelo de capacidade** (abaixo): o que o usuário pode fazer ali.
 - **`identity`** — dados **não-sensíveis** do usuário. **Sem token, sem senha.**
 - **`roles`** — os papéis **ativos** do usuário **na organização deste tenant** (UPPERCASE, sem `ROLE_`).
@@ -8609,14 +8616,20 @@ O contrato **mínimo obrigatório** é `mount` (e o `dispose` que ele devolve). 
     o que o papel pode fazer com os dados. Esconder um campo na tela não impede ninguém de enviá-lo.
   - Não confundir com `capability.commands[].roles`, que são os papéis que o **modelo** autoriza no
     comando, e não os do usuário.
-- **`api`** — as quatro operações de domínio, todas contra o **BFF** (nunca a plataforma direto):
+- **`api`** — as operações de domínio, todas contra o **BFF** (nunca a plataforma direto):
 
   | Método | Para quê |
   |---|---|
   | `command({ tenantId, aggregate, command, data, id?, status? })` | dispara um comando (escrita) |
   | `query({ tenantId, aggregate, predicates?, paging?, sorting? })` | consulta a projeção (leitura) |
+  | `count({ tenantId, aggregate, predicates? })` | **quantos** registros a consulta traria sem teto, sob o mesmo filtro — para o "X de Y" |
   | `aggregate({ tenantId, aggregate, id })` | **estado autoritativo** do agregado |
   | `history({ tenantId, aggregate, id })` | histórico de eventos do agregado |
+
+  **Comando recusado** rejeita com um erro que traz `message` (a mensagem legível da plataforma), `status`
+  (o HTTP) e `em` (o instante, em epoch ms: o `timestamp` do corpo de erro, ou a hora da resposta). A
+  plataforma **não** tem código de erro estável além do status nem id de correlação — o miolo não deve
+  exibir nem inventar nenhum dos dois.
 
   O miolo **não** compõe `Authorization` nem `X-Tenant-Id` — o BFF injeta no servidor (ver
   [seguranca](seguranca.md), [bff](../bff/README.md)).
@@ -8636,8 +8649,8 @@ O contrato **mínimo obrigatório** é `mount` (e o `dispose` que ele devolve). 
   > query-controls](../persistence-q/query-controls.md).
   >
   > **Saber se há mais** sem uma segunda consulta: peça `_maxRegisters` registros; se vierem
-  > exatamente esse tanto, provavelmente há mais. `_count: true` devolve o total **no lugar** das
-  > linhas, então totalizar custa outra ida à rede.
+  > exatamente esse tanto, provavelmente há mais. O total exato é o `count()`, que custa outra ida à
+  > rede.
 
   > Use `aggregate()` — não `query()` — para carregar o estado de um agregado antes de uma transição:
   > a projeção é **assíncrona** e pode ainda não refletir o último comando. Depois de escrever,
@@ -8648,6 +8661,31 @@ O contrato **mínimo obrigatório** é `mount` (e o `dispose` que ele devolve). 
 - **`canConfigure`** — se **este** usuário pode alterar a preferência (é `MASTER` na org). É dica de
   UX: o BFF **revalida** no servidor.
 - **`savePrefs(formMode)`** — persiste a preferência da org. Só tem efeito se o BFF confirmar o papel.
+- **`presentation`** — o **manifesto de apresentação** do tenant, ou `null` quando ele não tem um. Diz
+  como a tela apresenta cada agregado; **não é domínio** (o motor não o lê). É publicado no forger por
+  quem tem conta de plataforma, como o `.model.json`, e o BFF o lê por tenant
+  ([bff](../bff/README.md#manifesto-de-apresentação)). Chaveado pelo mesmo nome de
+  `capability.aggregates[].aggregate`; tudo nele é opcional, e o que faltar o miolo deriva do nome e do tipo:
+
+  | Chave (por agregado) | O que é |
+  |---|---|
+  | `singular`, `plural` | como chamar o agregado |
+  | `titleKey` | atributo que dá título ao registro |
+  | `labels` | rótulo por atributo, por value object, ou por campo de value object como `grupo.campo` |
+  | `stateLabels` | rótulo por estado |
+  | `fmt` | formato por atributo: `date` · `datetime` · `money` · `money:<casas>` (inteiro com casas implícitas) · `phone` · `bool` · `mono` |
+  | `cols`, `filters` | colunas visíveis por padrão; atributos oferecidos no filtro |
+  | `options` | opções de seleção: lista fixa, ou `{ aggregate, valueKey, labelKey }` de outro agregado do mesmo tenant |
+  | `stateHue` | matiz (0–359) da pílula de cada estado; sem ela, a matiz sai do nome do estado |
+
+  O nome de exibição de **comando** e de **evento** não está aqui: é o `alias` do modelo, que já vem na
+  capacidade. Como preencher cada chave e publicar: [apresentacao](apresentacao.md). Forma completa e
+  regras de publicação: [forger — manifesto de apresentação](../forger/endpoints/presentation.md). Referência órfã (atributo
+  que o modelo não tem mais) o miolo ignora.
+- **`openSupport(contexto)`** — abre o suporte da casca com o contexto técnico que o miolo tem (registro,
+  estado, versão; e, vindo de um comando recusado, o status, a mensagem e o horário), como pares
+  `{ rótulo: valor }`. A casca acrescenta tenant e tela. ⚠️ **Hoje o suporte é um mockup declarado:** a
+  tela diz que nada é enviado a ninguém.
 
 > **Ainda não providos:** `navigation` (navegação da casca) e `i18n` estiveram previstos neste
 > contrato, mas **não existem** na implementação. Um miolo não deve contar com eles. Quando forem
@@ -8726,6 +8764,109 @@ não diz **como se vê** (isso é o miolo).
 - **Nada de segredo no miolo**: toda escrita/leitura de domínio passa pelo `api` → **BFF** → plataforma,
   que **revalida** a autorização no servidor.
 - **Ciclo de vida**: `mount` ao selecionar o bounded context; `dispose` ao trocar de BC ou encerrar.
+
+<!-- ===== shell/apresentacao.md ===== -->
+
+# shell · como preencher e publicar o manifesto de apresentação
+
+> Para **quem escreve** o manifesto de apresentação de um tenant — a hierarquia de agentes que já escreve
+> o `.model.json`. Diz o que cada chave **faz na tela** do Stager, como escolher o valor, e como publicar
+> e conferir. A **forma** do arquivo e o que a publicação recusa estão em
+> [forger — manifesto de apresentação](../forger/endpoints/presentation.md); o que a casca entrega ao
+> miolo, em [contrato-miolo](contrato-miolo.md). Pré: [README](README.md).
+
+## Por que escrever um
+
+Sem manifesto a tela funciona, mas fala a língua do modelo: o rótulo é o nome técnico humanizado
+(`emailcorporativo` vira "Emailcorporativo"), a data sai como data e o número como número — sem moeda,
+sem telefone, sem saber qual campo identifica o registro. O manifesto é o que faz a tela falar a língua
+de quem a usa. **Não é domínio**: o motor não o lê, e nada nele muda o que um comando aceita.
+
+- **Um manifesto por tenant**, no mesmo escopo do `.model.json` daquele tenant.
+- **Escreva-o junto com o modelo**, e **republique-o quando o modelo mudar**: referência a atributo que
+  deixou de existir a tela ignora, e a próxima publicação recusa.
+- Tudo é **opcional**. O que faltar, a tela deriva do nome e do tipo.
+
+## O que cada chave faz na tela
+
+A chave de `aggregate` é a **mesma** do `.model.json` (`<boundedContext>.<tipo>`).
+
+| Chave | Onde aparece | Como escolher |
+|---|---|---|
+| `singular` | botão **"Novo {singular}"**, estado vazio ("Nenhum registro de {singular} ainda"), nome do arquivo exportado (`{singular}-AAAA-MM-DD.csv`) | em **minúsculas**, porque entra no meio da frase: `"aluno"`, `"pedido"` |
+| `plural` | **título da página** do agregado; elemento raiz do XML exportado | com inicial maiúscula: `"Alunos"` |
+| `titleKey` | título do registro no **painel lateral**, no **cartão** do celular e em "Ações deste registro" | o atributo que uma pessoa usa para reconhecer o registro: nome, número, placa. Sem ele, a tela usa o primeiro texto do registro |
+| `labels` | cabeçalho da coluna, rótulo do filtro, rótulo do campo no formulário, linhas do histórico, aba Dados, cópia de linha | para **todo** atributo que aparece na tela. Value object pelo nome = título do grupo no formulário; `grupo.campo` = campo dentro dele |
+| `stateLabels` | a **pílula de estado** (tabela, painel, ações, formulário, histórico) | o estado como o usuário diz: `"matriculado"` → `"Matriculado"` |
+| `fmt` | como o valor é **mostrado** na tabela, no cartão, na aba Dados e no histórico | ver [formatos](#formatos). Só muda a exibição: o comando e a exportação continuam com o valor cru |
+| `cols` | as colunas visíveis **por padrão**, na ordem | de 4 a 6, as que se lê para decidir. **Não** ponha `status` (o Estado é sempre a última coluna) nem campo técnico. O usuário pode mudar as colunas; "Restaurar padrão" volta a esta lista |
+| `filters` | os campos do **painel de filtros** | os que se usa para achar registro. Sem a chave, todos os atributos aparecem no filtro |
+| `options` | o campo do formulário vira **seleção** | lista fixa: os **valores exatos** que o comando grava. Referência `{ aggregate, valueKey, labelKey }`: a tela consulta até 200 registros do outro agregado, mostra `labelKey` e grava `valueKey` — então `valueKey` é o atributo do outro agregado que **este** campo guarda |
+| `stateHue` | a **cor** da pílula de cada estado (matiz de 0 a 359) | para dar à cor um significado: em torno de 150 verde, 25 vermelho, 250 azul, 80 amarelo. Sem ela, a cor sai do nome do estado e é a mesma em qualquer tela |
+
+**Não entra no manifesto** o nome de exibição de **comando** e de **evento**: é o `alias`, declarado no
+próprio `.model.json` ([forger — model](../forger/endpoints/model.md#nome-de-exibicao)).
+
+### Formatos
+
+| `fmt` | Mostra | Para |
+|---|---|---|
+| `date` | `26/09/2026` | `Date`, ou texto `AAAA-MM-DD` |
+| `datetime` | `26/09/2026 14:30`, no fuso de quem lê | `Timestamp` |
+| `money` | `R$ 199,00` a partir de `199` | valor em reais |
+| `money:<casas>` | `R$ 199,00` a partir de `19900` com `money:2` | inteiro com casas implícitas — o caso comum de centavos em `Long` |
+| `phone` | `(84) 99999-0001` | 10 ou 11 dígitos; outro tamanho sai como veio |
+| `bool` | `Sim` / `Não` | `Boolean` |
+| `mono` | o valor em fonte monoespaçada | documentos, códigos, identificadores |
+
+Sem `fmt`, `Date` e `Timestamp` já saem formatados, `Boolean` sai como Sim/Não e número sai em
+monoespaçada. `fmt` serve sobretudo para **dinheiro** e **telefone**, que o tipo não revela.
+
+## Exemplo
+
+```json
+{
+  "formato": 1,
+  "aggregate": {
+    "cadastro.aluno": {
+      "singular": "aluno",
+      "plural": "Alunos",
+      "titleKey": "fullname",
+      "labels": { "fullname": "Nome completo", "cpf": "CPF", "phone": "Telefone", "birthdate": "Nascimento", "plano": "Plano" },
+      "stateLabels": { "criado": "Criado", "matriculado": "Matriculado", "cancelado": "Cancelado" },
+      "fmt": { "cpf": "mono", "phone": "phone", "birthdate": "date" },
+      "cols": ["fullname", "cpf", "phone", "birthdate"],
+      "filters": ["fullname", "cpf", "status"],
+      "options": { "gender": ["Feminino", "Masculino", "Outro"], "plano": { "aggregate": "cadastro.plano", "valueKey": "codigo", "labelKey": "name" } },
+      "stateHue": { "matriculado": 155, "cancelado": 25 }
+    }
+  }
+}
+```
+
+> Ilustrativo: nomes de agregado, atributo e estado são exemplos, não JSON literal a copiar.
+
+## Como publicar e conferir
+
+1. **Publicar** com a **conta de plataforma**, a mesma autorização do `.model.json`:
+   `POST /org/{org}/project/{project}/tenant/{tenantId}/presentation` no forger. A publicação confere a
+   forma e cada referência contra o modelo **já publicado** do tenant — publique o modelo primeiro.
+   Detalhe e erros: [forger — manifesto de apresentação](../forger/endpoints/presentation.md).
+2. **Conferir o que ficou gravado**: `GET` no mesmo caminho (lê quem tem o tenant no token), ou
+   `GET /session/presentation?tenant={tenantId}` no [BFF](../bff/README.md#manifesto-de-apresentação).
+3. **Ver na tela**: a casca lê o manifesto quando o agregado é aberto. Depois de publicar, abra o
+   agregado de novo no menu.
+
+## Checklist de quem escreve
+
+- [ ] A chave do agregado é a do `.model.json`, e todo atributo citado existe no modelo publicado.
+- [ ] `singular` em minúsculas; `plural` com inicial maiúscula.
+- [ ] `titleKey` é um atributo que identifica o registro para uma pessoa.
+- [ ] Todo atributo que aparece na tela tem `labels`; todo estado tem `stateLabels`.
+- [ ] Dinheiro em centavos usa `money:2`; telefone usa `phone`.
+- [ ] `cols` tem de 4 a 6 atributos, sem `status` e sem campo técnico.
+- [ ] Textos em português, diretos, sem jargão para o usuário final.
+- [ ] O `alias` de comando e de evento ficou no `.model.json`, não aqui.
 
 <!-- ===== shell/injecao.md ===== -->
 
@@ -8839,11 +8980,19 @@ casca ──registra + carrega + mount(hostContext)──▶ MIOLO renderiza no 
 
 ## Chrome da casca (o que é fixo)
 
-- **Barra superior**: marca, **seletor de organização** (organizações do token), busca/paleta de comando,
-  **tema** (claro/escuro), notificações, **perfil**, encerrar sessão.
-- **Menu**: **1 entrada por bounded context** da organização ativa; estado ativo destacado com o acento.
-- **Estados da área central**: **carregando** / **erro** / **pronto** (o miolo montado). "Vazio" é do
-  **miolo** (conteúdo), não da casca.
+- **Barra superior** (64px): marca, **seletor de organização** (organizações do token), busca/paleta de
+  comando, agente, **tema** (claro/escuro), **suporte**, notificações e o **menu da conta** — é nele, e só
+  nele, que fica **encerrar sessão**.
+- **Menu lateral**: **Projeto → Contexto → Agregados** da organização ativa. Continua sendo **1 entrada
+  por bounded context**, agora com os agregados dela como filhos, cada um com a contagem de registros; o
+  agregado ativo fica destacado com o acento. O agregado se escolhe **aqui**, e a escolha remonta o miolo
+  (ver [contrato-miolo](contrato-miolo.md)). No rodapé: suporte, a chave do tenant (clicar copia) e o
+  status do miolo, medido por health check.
+- **Larguras**: abaixo de 1000px o menu lateral vira gaveta; a barra superior encolhe por faixas (nome do
+  usuário some abaixo de 1100px, a busca vira ícone abaixo de 860px, agente e tema somem abaixo de 720px).
+  A página nunca rola na horizontal.
+- **Estados da área central**: **vazio** (nenhum agregado escolhido), **carregando** (esqueleto),
+  **erro** e **pronto** (o miolo montado). O vazio **de conteúdo** — agregado sem registros — é do miolo.
 - **Tipografia**: uma família de texto e uma **monoespaçada** (identificadores técnicos: tenant, papéis).
 
 ## Regras a respeitar (checklist)
@@ -9257,6 +9406,30 @@ Resolve `tenant → URL` do miolo (ver [injecao](../shell/injecao.md)). Só para
 > serviço) **não** chama este endpoint — não há miolo a injetar. Sessão, capacidade e proxy valem
 > integralmente para ele.
 
+## Manifesto de apresentação
+
+| Operação | Método · Path | Resposta |
+|---|---|---|
+| Manifesto de apresentação do tenant | `GET /session/presentation?tenant={tenantId}` | `{ "tenantId": "...", "presentation": { … } \| null }` |
+
+O manifesto diz **como a tela apresenta** cada agregado do tenant — rótulos, formatos, opções de
+seleção, colunas padrão, rótulo e matiz de estado. **Não é domínio**: o motor não o lê, e quem não o
+tiver segue funcionando, com a tela derivando tudo do nome e do tipo. A forma, do lado de quem consome,
+está em [contrato-miolo](../shell/contrato-miolo.md) (`hostContext.presentation`).
+
+- **Quem publica** é quem tem conta de plataforma no forger, pelo mesmo caminho do `.model.json`. O
+  forger o guarda **em disco**, ligado ao tenant (o modelo vai para o cache; o manifesto, para o disco).
+- **Quem lê** é qualquer usuário que tenha o tenant no token. O BFF o busca no forger com o token da
+  sessão: `GET /org/{org}/project/{project}/tenant/{tenantId}/presentation`.
+- `presentation: null` quando o tenant **não tem** manifesto (o forger responde `204`). Qualquer outro
+  erro do forger **passa inteiro** — status e corpo —, porque "não há manifesto" e "não consegui ler o
+  manifesto" são coisas diferentes. `404` = o tenant não está na sua sessão.
+
+Como preencher cada chave, com o efeito dela na tela: [shell — apresentacao](../shell/apresentacao.md).
+A forma completa do arquivo, as referências que a publicação confere e o ciclo de vida estão na página
+de quem publica: [forger — manifesto de apresentação](../forger/endpoints/presentation.md). Se o caminho
+não passar pelo gateway, o BFF repassa o erro que receber, e a casca segue sem manifesto.
+
 ## Proxy de domínio
 
 O BFF expõe escrita e leitura de domínio ao consumidor (no caso da casca, via `api` do hostContext),
@@ -9268,6 +9441,7 @@ O consumidor **não** compõe esses cabeçalhos nem conhece o token.
 |---|---|---|---|
 | Executar comando | `POST /session/command` | `{ tenantId, aggregate, command, data, id?, status? }` | persistence-crs (escrita) |
 | Consultar projeção | `POST /session/query` | `{ tenantId, aggregate, predicates?, paging?, sorting? }` | persistence-q (leitura) |
+| Contar registros | `POST /session/query` | `{ tenantId, aggregate, predicates?, count: true }` → `{ entity, total }` | persistence-q (`_count`) |
 | Estado atual do agregado | `POST /session/aggregate` | `{ tenantId, aggregate, id }` | persistence-crs (leitura) |
 | Histórico do agregado | `POST /session/history` | `{ tenantId, aggregate, id }` | persistence-crs (`/history`) |
 
@@ -9291,6 +9465,9 @@ O consumidor **não** compõe esses cabeçalhos nem conhece o token.
 - **Atributo `computed` não é entrada de ninguém.** O BFF o envia sempre com um marcador explícito e
   não nulo, e o processor br o sobrescreve; o consumidor não precisa mandá-lo, e o que mandar é ignorado — ver
   [Atributo calculado pelo br](#atributo-calculado-pelo-br--computed).
+- **`count: true` devolve o total, não as linhas** — o `_count` do persistence-q, sob o mesmo filtro,
+  sem teto. **Não se combina com `paging` nem `sorting`** (`400`): contar não pagina nem ordena, e o
+  persistence-q os ignoraria em silêncio. Resposta em forma desconhecida vira `502`, nunca um zero.
 - `/session/aggregate` existe porque a **projeção é assíncrona**: para carregar o estado autoritativo de
   um agregado (ex.: preencher um form de transição) não se deve ler o read model.
 

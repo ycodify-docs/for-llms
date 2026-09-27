@@ -2,6 +2,23 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.62 — 2026-09-26
+
+- **O agregado passa a ser escolhido no menu da casca** (`shell/contrato-miolo.md` §hostContext;
+  `shell/estilo.md` §Chrome da casca). O menu vira Projeto → Contexto → Agregados, com contagem de
+  registros; cada escolha remonta o miolo. O `hostContext` ganha `aggregate`, `presentation` (o
+  manifesto de apresentação do tenant, ou `null`), `openSupport(contexto)` e `api.count`; comando
+  recusado rejeita com `status` e `em` além da mensagem. "Encerrar sessão" fica só no menu da conta; a
+  barra ganha agente e suporte (este, por ora, mockup declarado).
+- **Página nova: como preencher e publicar o manifesto de apresentação** (`shell/apresentacao.md`), para a
+  hierarquia de agentes que escreve o `.model.json`: o que cada chave faz na tela do Stager, como
+  escolher o valor, os formatos, um exemplo e o caminho de publicação e conferência.
+- **BFF: manifesto de apresentação e contagem** (`bff/README.md` §Manifesto de apresentação e §Proxy de
+  domínio). `GET /session/presentation?tenant=` lê no forger, com o token da sessão, o manifesto
+  publicado ([forger — presentation](forger/endpoints/presentation.md), 1.60); `null` quando não há.
+  `POST /session/query` aceita `count: true` e devolve `{ entity, total }`. Em `develop` do yc.app (merge
+  `7c9c55f`), ainda não em produção.
+
 ## 1.61 — 2026-09-26
 
 - **Manifesto de apresentação em produção** (`forger/endpoints/presentation.md`): o aviso de "ainda não em

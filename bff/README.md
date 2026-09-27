@@ -203,6 +203,30 @@ Resolve `tenant → URL` do miolo (ver [injecao](../shell/injecao.md)). Só para
 > serviço) **não** chama este endpoint — não há miolo a injetar. Sessão, capacidade e proxy valem
 > integralmente para ele.
 
+## Manifesto de apresentação
+
+| Operação | Método · Path | Resposta |
+|---|---|---|
+| Manifesto de apresentação do tenant | `GET /session/presentation?tenant={tenantId}` | `{ "tenantId": "...", "presentation": { … } \| null }` |
+
+O manifesto diz **como a tela apresenta** cada agregado do tenant — rótulos, formatos, opções de
+seleção, colunas padrão, rótulo e matiz de estado. **Não é domínio**: o motor não o lê, e quem não o
+tiver segue funcionando, com a tela derivando tudo do nome e do tipo. A forma, do lado de quem consome,
+está em [contrato-miolo](../shell/contrato-miolo.md) (`hostContext.presentation`).
+
+- **Quem publica** é quem tem conta de plataforma no forger, pelo mesmo caminho do `.model.json`. O
+  forger o guarda **em disco**, ligado ao tenant (o modelo vai para o cache; o manifesto, para o disco).
+- **Quem lê** é qualquer usuário que tenha o tenant no token. O BFF o busca no forger com o token da
+  sessão: `GET /org/{org}/project/{project}/tenant/{tenantId}/presentation`.
+- `presentation: null` quando o tenant **não tem** manifesto (o forger responde `204`). Qualquer outro
+  erro do forger **passa inteiro** — status e corpo —, porque "não há manifesto" e "não consegui ler o
+  manifesto" são coisas diferentes. `404` = o tenant não está na sua sessão.
+
+Como preencher cada chave, com o efeito dela na tela: [shell — apresentacao](../shell/apresentacao.md).
+A forma completa do arquivo, as referências que a publicação confere e o ciclo de vida estão na página
+de quem publica: [forger — manifesto de apresentação](../forger/endpoints/presentation.md). Se o caminho
+não passar pelo gateway, o BFF repassa o erro que receber, e a casca segue sem manifesto.
+
 ## Proxy de domínio
 
 O BFF expõe escrita e leitura de domínio ao consumidor (no caso da casca, via `api` do hostContext),
@@ -214,6 +238,7 @@ O consumidor **não** compõe esses cabeçalhos nem conhece o token.
 |---|---|---|---|
 | Executar comando | `POST /session/command` | `{ tenantId, aggregate, command, data, id?, status? }` | persistence-crs (escrita) |
 | Consultar projeção | `POST /session/query` | `{ tenantId, aggregate, predicates?, paging?, sorting? }` | persistence-q (leitura) |
+| Contar registros | `POST /session/query` | `{ tenantId, aggregate, predicates?, count: true }` → `{ entity, total }` | persistence-q (`_count`) |
 | Estado atual do agregado | `POST /session/aggregate` | `{ tenantId, aggregate, id }` | persistence-crs (leitura) |
 | Histórico do agregado | `POST /session/history` | `{ tenantId, aggregate, id }` | persistence-crs (`/history`) |
 
@@ -237,6 +262,9 @@ O consumidor **não** compõe esses cabeçalhos nem conhece o token.
 - **Atributo `computed` não é entrada de ninguém.** O BFF o envia sempre com um marcador explícito e
   não nulo, e o processor br o sobrescreve; o consumidor não precisa mandá-lo, e o que mandar é ignorado — ver
   [Atributo calculado pelo br](#atributo-calculado-pelo-br--computed).
+- **`count: true` devolve o total, não as linhas** — o `_count` do persistence-q, sob o mesmo filtro,
+  sem teto. **Não se combina com `paging` nem `sorting`** (`400`): contar não pagina nem ordena, e o
+  persistence-q os ignoraria em silêncio. Resposta em forma desconhecida vira `502`, nunca um zero.
 - `/session/aggregate` existe porque a **projeção é assíncrona**: para carregar o estado autoritativo de
   um agregado (ex.: preencher um form de transição) não se deve ler o read model.
 
