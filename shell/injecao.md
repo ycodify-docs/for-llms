@@ -6,13 +6,17 @@
 
 ## Quando
 
-Ao o usuário **selecionar um bounded context** no menu. Trocar de BC = **desmonta** o miolo atual
-(`dispose`) e **injeta** o próximo. Adicionar um tenant **não** exige rebuild da casca.
+Quando o usuário **escolhe um agregado** no menu (Projeto → Contexto → Agregados). **Toda** escolha —
+outro agregado, do mesmo bounded context ou não — **desmonta** o miolo atual (`dispose`) e **injeta** de
+novo, com o `hostContext` daquele agregado: seleção, busca, filtros e comando em andamento recomeçam.
+Adicionar um tenant **não** exige rebuild da casca.
 
 ## Como (runtime)
 
 1. A casca pede ao BFF a URL do miolo do tenant:
-   `GET /tenant/{tenantId}/miolo-manifest` → devolve a **URL do ponto de entrada** do remoto.
+   `GET /tenant/{tenantId}/miolo-manifest` → devolve a **URL do ponto de entrada** do remoto. Em paralelo,
+   pede a **capacidade** e o **manifesto de apresentação** do tenant, que vão no `hostContext`
+   ([bff](../bff/README.md)).
 2. A casca **registra o remoto** daquele tenant e **carrega** o módulo `mount`.
 3. A casca chama `mount(el, hostContext)` (ver [contrato-miolo](contrato-miolo.md)).
 

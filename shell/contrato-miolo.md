@@ -21,17 +21,24 @@ O contrato **mínimo obrigatório** é `mount` (e o `dispose` que ele devolve). 
 {
   "tenant":       { "org": "...", "project": "...", "boundedContext": "...", "tenantId": "..." },
   "capability":   { /* modelo de capacidade — abaixo */ },
+  "aggregate":    "...",
+  "presentation": { /* manifesto de apresentação — abaixo */ } | null,
   "identity":     { "username": "...", "name": "...", "email": "..." },
   "roles":        ["..."],
   "activeRole":   null,
-  "api":          { "command": "…", "query": "…", "aggregate": "…", "history": "…" },
+  "api":          { "command": "…", "query": "…", "count": "…", "aggregate": "…", "history": "…" },
   "prefs":        { "formMode": "inline" | "modal" },
   "canConfigure": false,
-  "savePrefs":    "(formMode) => Promise<void>"
+  "savePrefs":    "(formMode) => Promise<void>",
+  "openSupport":  "(contexto) => void"
 }
 ```
 
 - **`tenant`** — o bounded context selecionado (org/projeto/BC + `tenantId` **opaco**).
+- **`aggregate`** — o agregado que o usuário escolheu **no menu da casca** (o valor de
+  `capability.aggregates[].aggregate`). O menu é **Projeto → Contexto → Agregados**: o agregado se escolhe
+  na casca, e cada escolha **remonta** o miolo — seleção, busca, filtros e comando em andamento recomeçam.
+  O miolo mostra só esse agregado. Ausente numa casca anterior a esta regra: o miolo abre o primeiro.
 - **`capability`** — o **modelo de capacidade** (abaixo): o que o usuário pode fazer ali.
 - **`identity`** — dados **não-sensíveis** do usuário. **Sem token, sem senha.**
 - **`roles`** — os papéis **ativos** do usuário **na organização deste tenant** (UPPERCASE, sem `ROLE_`).
@@ -42,14 +49,20 @@ O contrato **mínimo obrigatório** é `mount` (e o `dispose` que ele devolve). 
     o que o papel pode fazer com os dados. Esconder um campo na tela não impede ninguém de enviá-lo.
   - Não confundir com `capability.commands[].roles`, que são os papéis que o **modelo** autoriza no
     comando, e não os do usuário.
-- **`api`** — as quatro operações de domínio, todas contra o **BFF** (nunca a plataforma direto):
+- **`api`** — as operações de domínio, todas contra o **BFF** (nunca a plataforma direto):
 
   | Método | Para quê |
   |---|---|
   | `command({ tenantId, aggregate, command, data, id?, status? })` | dispara um comando (escrita) |
   | `query({ tenantId, aggregate, predicates?, paging?, sorting? })` | consulta a projeção (leitura) |
+  | `count({ tenantId, aggregate, predicates? })` | **quantos** registros a consulta traria sem teto, sob o mesmo filtro — para o "X de Y" |
   | `aggregate({ tenantId, aggregate, id })` | **estado autoritativo** do agregado |
   | `history({ tenantId, aggregate, id })` | histórico de eventos do agregado |
+
+  **Comando recusado** rejeita com um erro que traz `message` (a mensagem legível da plataforma), `status`
+  (o HTTP) e `em` (o instante, em epoch ms: o `timestamp` do corpo de erro, ou a hora da resposta). A
+  plataforma **não** tem código de erro estável além do status nem id de correlação — o miolo não deve
+  exibir nem inventar nenhum dos dois.
 
   O miolo **não** compõe `Authorization` nem `X-Tenant-Id` — o BFF injeta no servidor (ver
   [seguranca](seguranca.md), [bff](../bff/README.md)).
@@ -69,8 +82,8 @@ O contrato **mínimo obrigatório** é `mount` (e o `dispose` que ele devolve). 
   > query-controls](../persistence-q/query-controls.md).
   >
   > **Saber se há mais** sem uma segunda consulta: peça `_maxRegisters` registros; se vierem
-  > exatamente esse tanto, provavelmente há mais. `_count: true` devolve o total **no lugar** das
-  > linhas, então totalizar custa outra ida à rede.
+  > exatamente esse tanto, provavelmente há mais. O total exato é o `count()`, que custa outra ida à
+  > rede.
 
   > Use `aggregate()` — não `query()` — para carregar o estado de um agregado antes de uma transição:
   > a projeção é **assíncrona** e pode ainda não refletir o último comando. Depois de escrever,
@@ -81,6 +94,31 @@ O contrato **mínimo obrigatório** é `mount` (e o `dispose` que ele devolve). 
 - **`canConfigure`** — se **este** usuário pode alterar a preferência (é `MASTER` na org). É dica de
   UX: o BFF **revalida** no servidor.
 - **`savePrefs(formMode)`** — persiste a preferência da org. Só tem efeito se o BFF confirmar o papel.
+- **`presentation`** — o **manifesto de apresentação** do tenant, ou `null` quando ele não tem um. Diz
+  como a tela apresenta cada agregado; **não é domínio** (o motor não o lê). É publicado no forger por
+  quem tem conta de plataforma, como o `.model.json`, e o BFF o lê por tenant
+  ([bff](../bff/README.md#manifesto-de-apresentação)). Chaveado pelo mesmo nome de
+  `capability.aggregates[].aggregate`; tudo nele é opcional, e o que faltar o miolo deriva do nome e do tipo:
+
+  | Chave (por agregado) | O que é |
+  |---|---|
+  | `singular`, `plural` | como chamar o agregado |
+  | `titleKey` | atributo que dá título ao registro |
+  | `labels` | rótulo por atributo, por value object, ou por campo de value object como `grupo.campo` |
+  | `stateLabels` | rótulo por estado |
+  | `fmt` | formato por atributo: `date` · `datetime` · `money` · `money:<casas>` (inteiro com casas implícitas) · `phone` · `bool` · `mono` |
+  | `cols`, `filters` | colunas visíveis por padrão; atributos oferecidos no filtro |
+  | `options` | opções de seleção: lista fixa, ou `{ aggregate, valueKey, labelKey }` de outro agregado do mesmo tenant |
+  | `stateHue` | matiz (0–359) da pílula de cada estado; sem ela, a matiz sai do nome do estado |
+
+  O nome de exibição de **comando** e de **evento** não está aqui: é o `alias` do modelo, que já vem na
+  capacidade. Como preencher cada chave e publicar: [apresentacao](apresentacao.md). Forma completa e
+  regras de publicação: [forger — manifesto de apresentação](../forger/endpoints/presentation.md). Referência órfã (atributo
+  que o modelo não tem mais) o miolo ignora.
+- **`openSupport(contexto)`** — abre o suporte da casca com o contexto técnico que o miolo tem (registro,
+  estado, versão; e, vindo de um comando recusado, o status, a mensagem e o horário), como pares
+  `{ rótulo: valor }`. A casca acrescenta tenant e tela. ⚠️ **Hoje o suporte é um mockup declarado:** a
+  tela diz que nada é enviado a ninguém.
 
 > **Ainda não providos:** `navigation` (navegação da casca) e `i18n` estiveram previstos neste
 > contrato, mas **não existem** na implementação. Um miolo não deve contar com eles. Quando forem

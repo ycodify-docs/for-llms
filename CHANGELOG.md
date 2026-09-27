@@ -2,6 +2,92 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.67 — 2026-09-27
+
+- **`shell/README.md` e `shell/injecao.md` descrevem o menu e a injeção como são desde a 1.62**: menu
+  Projeto → Contexto → Agregados, o miolo montado ao escolher o **agregado** (e remontado a cada escolha),
+  e a casca pedindo capacidade, manifesto de apresentação e URL do miolo. O README ganha a página
+  `apresentacao` na tabela de documentos. As duas páginas ainda falavam em "selecionar um bounded context".
+
+## 1.66 — 2026-09-27
+
+- **Dois avisos de "ainda não em produção" saem do orgid** — `orgid/endpoints/publico.md` (em `/ua`, `R` só
+  ativa conta `PENDING`) e `orgid/endpoints/ua-conta.md` (o titular não troca o próprio status). As duas
+  travas estão em produção desde 2026-09-26, no mesmo deploy que levou a trava de papel público (1.58); a
+  1.58 não os tirou porque a frase quebrava de linha e a busca não os achou.
+
+## 1.65 — 2026-09-27
+
+- **Login do auth: as chaves da resposta são `accessToken`, `tokenType` e `mcpSessionId`** — e não `token`,
+  `type` e `sessionId`, como diziam `auth/endpoints/sign-in.md`, `auth/README.md`, `auth/exemplos.md` e o
+  `auth/openapi.yaml`. Quem lia `.token` ficava sem token. E a página passa a dizer que, pela borda, o login
+  leva **um** cabeçalho de identificação (`X-Tenant-Id` ou `X-Forger-Credential`); sem nenhum, `401`.
+  Medido pelo conceptnatal pela borda e conferido no código.
+
+## 1.64 — 2026-09-27
+
+- **`shell/apresentacao.md` acompanha a decisão do dono sobre o `GET` do manifesto**: quem publica
+  (administrador ou engenheiro na org) passa a conferir pelo `GET` do forger, como a página do forger já
+  diz; até o próximo deploy do composer, a produção ainda responde `403` a essa conta, e a página diz
+  isso com a medição. Desfaz o "não confere pelo GET" da 1.63, que valia só para o código em produção.
+
+## 1.63 — 2026-09-27
+
+- **`shell/apresentacao.md` deixa de mandar quem publica conferir o manifesto pelo `GET`.** A conta de
+  plataforma que publica recebe `403` `tenant <id> is not in the token` no `GET` do forger, porque o token
+  dela não carrega os tenants — medido no stager em 2026-09-27T00:09Z com o token de plataforma do
+  conceptnatal, que lia o `/model` do mesmo tenant com `200`. A conferência passa a ser com um usuário do
+  app que tenha o tenant (forger ou BFF), ou pela tela. E `options` por referência diz que o `valueKey`
+  de um campo de referência costuma ser `aggregateid`.
+
+## 1.62 — 2026-09-26
+
+- **O agregado passa a ser escolhido no menu da casca** (`shell/contrato-miolo.md` §hostContext;
+  `shell/estilo.md` §Chrome da casca). O menu vira Projeto → Contexto → Agregados, com contagem de
+  registros; cada escolha remonta o miolo. O `hostContext` ganha `aggregate`, `presentation` (o
+  manifesto de apresentação do tenant, ou `null`), `openSupport(contexto)` e `api.count`; comando
+  recusado rejeita com `status` e `em` além da mensagem. "Encerrar sessão" fica só no menu da conta; a
+  barra ganha agente e suporte (este, por ora, mockup declarado).
+- **Página nova: como preencher e publicar o manifesto de apresentação** (`shell/apresentacao.md`), para a
+  hierarquia de agentes que escreve o `.model.json`: o que cada chave faz na tela do Stager, como
+  escolher o valor, os formatos, um exemplo e o caminho de publicação e conferência.
+- **BFF: manifesto de apresentação e contagem** (`bff/README.md` §Manifesto de apresentação e §Proxy de
+  domínio). `GET /session/presentation?tenant=` lê no forger, com o token da sessão, o manifesto
+  publicado ([forger — presentation](forger/endpoints/presentation.md), 1.60); `null` quando não há.
+  `POST /session/query` aceita `count: true` e devolve `{ entity, total }`. Em `develop` do yc.app (merge
+  `7c9c55f`), ainda não em produção.
+
+## 1.61 — 2026-09-26
+
+- **Manifesto de apresentação em produção** (`forger/endpoints/presentation.md`): o aviso de "ainda não em
+  produção" sai. E o `DELETE` passa a responder `{ "deleted": true }` sempre que não resta manifesto,
+  para que a repetição da mesma chamada responda o mesmo; em produção a partir do próximo deploy.
+- **Manifesto: as chaves da plataforma aceitas como atributo passam a ser as do canon** — `id`,
+  `aggregateid`, `status`, `version` e os metadados de auditoria. A página listava só `id` e a auditoria, e a
+  publicação recusava `status` em coluna e `aggregateid` como `valueKey` de referência. Apontado pelo yc.app;
+  em produção a partir do próximo deploy.
+- **Manifesto: o `GET` aceita também papel de administrador ou de engenheiro na org** — quem publica usa
+  token de plataforma, que não carrega os tenants, e recebia `403` ao conferir o que publicou. Medido pelo
+  conceptnatal; em produção a partir do próximo deploy.
+
+## 1.60 — 2026-09-26
+
+- **Manifesto de apresentação por tenant** (`forger/endpoints/presentation.md`, página nova, e
+  `forger/spec/presentation.schema.json`). `POST`/`GET`/`DELETE .../tenant/{tenantId}/presentation`: publicar
+  e remover com a autorização do model; ler basta o tenant no token (`204` sem manifesto). A publicação
+  confere a forma e cada referência contra o modelo publicado do tenant; o manifesto não é removido com o
+  modelo. Índices: `forger/README.md`, `forger/openapi.yaml`, `llms.txt`, `README.md`. Em `develop` do
+  forger, ainda não em produção.
+
+## 1.59 — 2026-09-26
+
+- **A casca adota a paleta e a fonte do Stager Console** (`shell/Principios de Design - Shell Universal.md`
+  §Marca e cor e §Tipografia; `shell/estilo.md` §Grupos de token). Marca `#00d676` → `#00c875`, com
+  os acentos `#08653c` · `#dff5ea` · `#063d24`; erro em `oklch`. **JetBrains Mono** substitui a IBM
+  Plex Mono, como decisão registrada no guia. Tokens novos: `sidebar` (menu lateral), `ink`/`ink-fg`
+  (botão escuro), `danger-line` (borda de erro) e `pill-bg-l`/`pill-fg-l` (luminosidade da pílula de
+  estado, cuja matiz sai do nome do estado). Em `develop` do yc.app (merge `c9f1935`), ainda não em produção.
+
 ## 1.58 — 2026-09-26
 
 - **`alias`, `computed` e a trava de papel público do autocadastro entram em produção** — três avisos

@@ -48,7 +48,7 @@
 
 ## forger (implanta recursos) — primeiro serviço usado
 - [Guia](forger/README.md): papel, regras de nome/limites, atributos reservados, ciclo de vida.
-- [dbconn](forger/endpoints/dbconn.md) · [database](forger/endpoints/database.md) · [project](forger/endpoints/project.md) · [dataschema](forger/endpoints/dataschema.md) · [entity](forger/endpoints/entity.md) · [model](forger/endpoints/model.md) · [process (filas)](forger/endpoints/process.md) · [email](forger/endpoints/email.md)
+- [dbconn](forger/endpoints/dbconn.md) · [database](forger/endpoints/database.md) · [project](forger/endpoints/project.md) · [dataschema](forger/endpoints/dataschema.md) · [entity](forger/endpoints/entity.md) · [model](forger/endpoints/model.md) · [process (filas)](forger/endpoints/process.md) · [email](forger/endpoints/email.md) · [presentation](forger/endpoints/presentation.md)
 - [Erros](forger/erros.md) · [Exemplos](forger/exemplos.md) · [Gramáticas BNF dos payloads](forger/bnfs/README.md) · [OpenAPI](forger/openapi.yaml)
 
 ## persistence-q (consultas)
@@ -79,6 +79,7 @@
 ## shell (casca universal + BFF) — camada de aplicação
 - [Guia](shell/README.md): a aplicação única para todos os clientes; casca fixa + BFF; fronteira casca↔miolo; consome os oito serviços via BFF.
 - [Contrato casca↔miolo](shell/contrato-miolo.md): `MioloModule`, `hostContext`, modelo de capacidade.
+- [Manifesto de apresentação — como preencher](shell/apresentacao.md): o que cada chave faz na tela do Stager, formatos, exemplo, publicação e conferência; para quem escreve o `.model.json`.
 - [Injeção do miolo](shell/injecao.md): federação de módulos, resolução tenant→remoto, de onde vem o build do miolo.
 - [Estilo](shell/estilo.md): tokens semânticos, tema claro/escuro, marca sobrescrevível por tenant.
 - [Segurança](shell/seguranca.md): segredo só no BFF; capacidade = UX; revalidação no servidor.
@@ -95,4 +96,5 @@
 
 ## Optional
 - [Schema do .model.json (JSON Schema)](persistence-crs/spec/model.schema.json): validação machine-readable; valida os 6 exemplos.
+- [Schema do .presentation.json (JSON Schema)](forger/spec/presentation.schema.json): forma do manifesto de apresentação; as referências são conferidas contra o modelo na publicação.
 - [CHANGELOG](CHANGELOG.md): histórico de revisões desta documentação.

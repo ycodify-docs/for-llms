@@ -48,15 +48,20 @@ browser ──▶ casca (app) ──▶ BFF ──▶ plataforma (gateway: auth/
 
 1. **Login** → o BFF autentica no [auth](../auth/README.md), guarda o token **no servidor** (não vai ao
    browser) e devolve a identidade + a **árvore de tenants** + os **papéis** (org-scoped) do token.
-2. A casca monta o **menu**: **1 entrada por bounded context** (da árvore de tenants).
-3. O usuário **seleciona um BC** → a casca pede ao BFF a **capacidade** e a **URL do miolo** do tenant.
-4. A casca **injeta o miolo** e passa o **hostContext** (ver [contrato-miolo](contrato-miolo.md)).
+2. A casca monta o **menu**: **Projeto → Contexto → Agregados**. Continua sendo **1 entrada por bounded
+   context** (da árvore de tenants); ao abrir o contexto, a casca pede a **capacidade** dele ao BFF e lista
+   os agregados autorizados, com a contagem de registros.
+3. O usuário **escolhe um agregado** → a casca pede ao BFF a **capacidade**, o **manifesto de
+   apresentação** e a **URL do miolo** do tenant.
+4. A casca **injeta o miolo** e passa o **hostContext**, com o agregado escolhido (ver
+   [contrato-miolo](contrato-miolo.md)). Cada escolha no menu remonta o miolo.
 
 ## Documentos da seção
 
 | Documento | Cobre |
 |---|---|
 | [contrato-miolo](contrato-miolo.md) | interface casca↔miolo: `MioloModule`, `hostContext`, modelo de capacidade |
+| [apresentacao](apresentacao.md) | como preencher e publicar o **manifesto de apresentação** de um tenant |
 | [injecao](injecao.md) | como/quando injetar; resolução tenant→remoto; **de onde vem o build** do miolo |
 | [estilo](estilo.md) | guia-mestre de estilo: tokens semânticos, tema claro/escuro, **marca sobrescrevível** |
 | [seguranca](seguranca.md) | segredo só no BFF; cookie; capacidade = UX; revalidação no servidor |

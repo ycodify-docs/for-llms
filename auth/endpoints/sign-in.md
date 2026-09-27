@@ -14,19 +14,22 @@ Corpo (JSON):
 | `username` | string | sim | Identificador do usuário. |
 | `password` | string | sim | Senha. |
 
-Cabeçalhos: `Content-Type: application/json`. **Não** exige `Authorization` (é o login).
+Cabeçalhos: `Content-Type: application/json`. **Não** exige `Authorization` (é o login). Pela borda, exige
+**um** cabeçalho de identificação — `X-Tenant-Id` **ou** `X-Forger-Credential`, nunca os dois; sem nenhum,
+`401` `missing_headers`. Ver [gateway](../../gateway/README.md).
 
 ## Resposta
 
 `200`:
 
 ```jsonc
-{ "token": "<token de acesso>", "type": "Bearer",
+{ "accessToken": "<token de acesso>", "tokenType": "Bearer",
   "id": 0, "username": "...", "name": "...", "email": "...",
-  "roles": ["..."], "sessionId": "<uuid da sessão>" }
+  "roles": ["..."], "mcpSessionId": "<uuid da sessão>" }
 ```
 
-Use `token` em `Authorization: Bearer <token>` nas chamadas seguintes. O token embute usuário, papéis,
+Use `accessToken` em `Authorization: Bearer <token>` nas chamadas seguintes — a chave é `accessToken`, e não
+`token`: quem lê `.token` fica sem token. O token embute usuário, papéis,
 organizações e tenants. Ver [README — claims](../README.md#o-que-o-login-retorna-token--claims).
 
 ## Diferenças entre domínios

@@ -119,8 +119,8 @@ Executa a ação do hash.
 **Resposta:** `200` (sem corpo) — em `R`, ativa a conta; em `PR`, troca a senha · `404` —
 `"account not found: the hash action was not executed."`
 
-> ⚠️ **Em `/ua`, `R` só ativa conta `PENDING`**, em `develop` do orgid desde 2026-09-25 e **ainda não em
-> produção**. Conta já `ACTIVE` responde `200` sem gravar nada; conta `SUSPENDED` responde `403`
+> ⚠️ **Em `/ua`, `R` só ativa conta `PENDING`**, em produção desde 2026-09-26 (ver [CHANGELOG 1.66](../../CHANGELOG.md)).
+> Conta já `ACTIVE` responde `200` sem gravar nada; conta `SUSPENDED` responde `403`
 > (`"account is not pending: registration was not confirmed."`). Antes, `R` punha qualquer conta não
 > cancelada em `ACTIVE`: uma conta suspensa voltava a valer pelo próprio e-mail. **Em `/up` nada mudou.**
 

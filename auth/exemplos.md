@@ -8,20 +8,23 @@
 
 ```
 POST /up/sign-in
+Headers: X-Forger-Credential: <credencial>
 { "username": "alice", "password": "•••" }
 → 200
-{ "token": "<token>", "type": "Bearer", "id": 1, "username": "alice",
-  "name": "Alice", "email": "alice@acme.com", "roles": ["API_MASTER"], "sessionId": "<uuid>" }
+{ "accessToken": "<token>", "tokenType": "Bearer", "id": 1, "username": "alice",
+  "name": "Alice", "email": "alice@acme.com", "roles": ["API_MASTER"], "mcpSessionId": "<uuid>" }
 ```
 
-Use o token nas chamadas seguintes: `Authorization: Bearer <token>`.
+Use o `accessToken` nas chamadas seguintes: `Authorization: Bearer <token>`. Pela borda, o login leva **um**
+cabeçalho de identificação, `X-Tenant-Id` ou `X-Forger-Credential` ([gateway](../gateway/README.md)).
 
 ## 2. Login externo
 
 ```
 POST /ua/sign-in
+Headers: X-Tenant-Id: <tenant-id>
 { "username": "cliente1", "password": "•••" }
-→ 200  { "token": "<token>", "type": "Bearer", ... }   // token inclui os tenants do usuário
+→ 200  { "accessToken": "<token>", "tokenType": "Bearer", ... }   // token inclui os tenants do usuário
 ```
 
 ## 3. Usar o token (em outro serviço)
@@ -37,7 +40,7 @@ Headers: Authorization: Bearer <token>, X-Tenant-Id: <tenant-id>
 ```
 GET /up/sign-in/renew
 Headers: Authorization: Bearer <token atual>
-→ 200  { "token": "<novo token>", ... }
+→ 200  { "accessToken": "<novo token>", ... }
 ```
 
 ## 5. Erros comuns

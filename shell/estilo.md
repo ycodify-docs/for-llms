@@ -40,19 +40,38 @@
 
 | Grupo | Exemplos | Uso |
 |---|---|---|
-| superfícies | `bg`, `surface`, `surface-2` | fundos de tela/painel/hover |
+| superfícies | `bg`, `surface`, `surface-2`, `sidebar` | fundos de tela/painel/hover; `sidebar` é o menu lateral |
 | bordas | `border`, `border-2` | separadores, contornos |
 | texto | `text`, `text-2`, `text-3` | primário / secundário / terciário |
 | acento (deriva da marca) | `accent`, `accent-fg`, `accent-weak`, `accent-ink` | ação primária, realce, texto legível sobre claro |
-| estados | `ok`, `warn`, `info`, `danger` (+ `-weak`) | status, alertas |
+| tinta | `ink`, `ink-fg` | botão escuro de ação secundária forte (ex.: relatar ao suporte); inverte no escuro |
+| estados | `ok`, `warn`, `info`, `danger` (+ `-weak`; `danger-line` para borda) | status, alertas, campo com erro |
+| pílula de estado | `pill-bg-l`, `pill-fg-l` | só a **luminosidade** por tema; ver abaixo |
+
+## Pílula de estado do agregado
+
+- Cada estado tem **uma matiz**, estável entre telas: a pílula usa
+  `oklch(var(--pill-bg-l) <croma> <matiz>)` no fundo e `oklch(var(--pill-fg-l) <croma> <matiz>)` no texto.
+  O tema troca só a luminosidade; a matiz é a mesma no claro e no escuro.
+- A matiz **não se escreve por cliente no código**: sai do nome do estado por uma função estável — o
+  mesmo nome dá sempre a mesma cor, em qualquer tela e para qualquer tenant.
+- Texto da pílula em monoespaçada.
 
 ## Chrome da casca (o que é fixo)
 
-- **Barra superior**: marca, **seletor de organização** (organizações do token), busca/paleta de comando,
-  **tema** (claro/escuro), notificações, **perfil**, encerrar sessão.
-- **Menu**: **1 entrada por bounded context** da organização ativa; estado ativo destacado com o acento.
-- **Estados da área central**: **carregando** / **erro** / **pronto** (o miolo montado). "Vazio" é do
-  **miolo** (conteúdo), não da casca.
+- **Barra superior** (64px): marca, **seletor de organização** (organizações do token), busca/paleta de
+  comando, agente, **tema** (claro/escuro), **suporte**, notificações e o **menu da conta** — é nele, e só
+  nele, que fica **encerrar sessão**.
+- **Menu lateral**: **Projeto → Contexto → Agregados** da organização ativa. Continua sendo **1 entrada
+  por bounded context**, agora com os agregados dela como filhos, cada um com a contagem de registros; o
+  agregado ativo fica destacado com o acento. O agregado se escolhe **aqui**, e a escolha remonta o miolo
+  (ver [contrato-miolo](contrato-miolo.md)). No rodapé: suporte, a chave do tenant (clicar copia) e o
+  status do miolo, medido por health check.
+- **Larguras**: abaixo de 1000px o menu lateral vira gaveta; a barra superior encolhe por faixas (nome do
+  usuário some abaixo de 1100px, a busca vira ícone abaixo de 860px, agente e tema somem abaixo de 720px).
+  A página nunca rola na horizontal.
+- **Estados da área central**: **vazio** (nenhum agregado escolhido), **carregando** (esqueleto),
+  **erro** e **pronto** (o miolo montado). O vazio **de conteúdo** — agregado sem registros — é do miolo.
 - **Tipografia**: uma família de texto e uma **monoespaçada** (identificadores técnicos: tenant, papéis).
 
 ## Regras a respeitar (checklist)
