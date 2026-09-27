@@ -2,6 +2,13 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.67 — 2026-09-27
+
+- **`shell/README.md` e `shell/injecao.md` descrevem o menu e a injeção como são desde a 1.62**: menu
+  Projeto → Contexto → Agregados, o miolo montado ao escolher o **agregado** (e remontado a cada escolha),
+  e a casca pedindo capacidade, manifesto de apresentação e URL do miolo. O README ganha a página
+  `apresentacao` na tabela de documentos. As duas páginas ainda falavam em "selecionar um bounded context".
+
 ## 1.66 — 2026-09-27
 
 - **Dois avisos de "ainda não em produção" saem do orgid** — `orgid/endpoints/publico.md` (em `/ua`, `R` só
