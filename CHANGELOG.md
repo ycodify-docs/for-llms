@@ -2,6 +2,12 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.80 — 2026-09-27
+
+- **`llms-full.txt`: o bloco do CHANGELOG volta a acompanhar o `CHANGELOG.md`.** Ele estava parado na 1.22,
+  e o agente de contexto pequeno não via as revisões 1.23 a 1.79. Só esse bloco foi regenerado, a partir do
+  `CHANGELOG.md`; nenhum outro documento mudou. Decisão do dono de 2026-09-27.
+
 ## 1.79 — 2026-09-27
 
 - **monitor: relatos publicados na borda** (`monitor/README.md`). Sai o aviso de que a rota
