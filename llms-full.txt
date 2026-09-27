@@ -10446,11 +10446,6 @@ responde, chame um endpoint dele.
 > tela do monitor. O relato **não** vira ticket em outro sistema.
 > Pré-requisitos: [conceitos](../02-conceitos.md), [borda](../gateway/README.md), [BFF](../bff/README.md).
 
-> **Estado em 2026-09-27:** o serviço está **implantado**, e a tela do monitor já tem a aba Suporte. A
-> **rota na borda** (`/v3/monitor/suporte/**`) foi pedida e ainda não está publicada. Até lá, a borda recusa
-> a chamada antes de ela chegar ao monitor
-> ([gateway/erros.md](../gateway/erros.md#404--a-borda-não-reconheceu-a-rota)).
-
 ## Quem chama o quê
 
 | Quem | Por onde | Como se identifica | O que alcança |
