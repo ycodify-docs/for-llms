@@ -197,9 +197,16 @@ Quando o modelo declara `alias` em `command.<cmd>` ou em `event.<evt>`
 
 | Operação | Método · Path | Resposta |
 |---|---|---|
-| Manifesto do miolo | `GET /tenant/{tenantId}/miolo-manifest` | `{ "tenantId": "...", "manifestUrl": "..." }` |
+| Manifesto do miolo | `GET /tenant/{tenantId}/miolo-manifest?aggregate={agregado}` | `{ "tenantId": "...", "aggregate": "...", "manifestUrl": "..." }` |
 
-Resolve `tenant → URL` do miolo (ver [injecao](../shell/injecao.md)). Só para tenant do usuário.
+Resolve `tenant → URL` do miolo (ver [injecao](../shell/injecao.md)). Só para tenant do usuário (`404` fora
+dele, e `404` quando nada cobre o tenant).
+
+- **`aggregate`** — o agregado escolhido no menu (o valor de `capability.aggregates[].aggregate`).
+  Opcional: sem ele, vale só o miolo que cobre o tenant inteiro, e o `aggregate` sai da resposta.
+- **O registro cobre o tenant inteiro ou só alguns agregados dele.** Ordem: o miolo registrado **para o
+  agregado** → o miolo registrado para o **resto do tenant** (`*`) → o **miolo GEN**. Um miolo CUSTOM
+  que trata só um agregado não esconde os outros: eles abrem no GEN.
 
 > **Única operação exclusiva de quem usa a casca.** Consumidor **sem UI** (app móvel, integração,
 > serviço) **não** chama este endpoint — não há miolo a injetar. Sessão, capacidade e proxy valem
