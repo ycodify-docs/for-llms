@@ -2,6 +2,14 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.81 — 2026-09-28
+
+- **Miolo CUSTOM cobrindo só parte do tenant** (`shell/injecao.md` §De onde vem o build; `bff/README.md`
+  §Miolo). O mapa do BFF passa a aceitar um miolo **por agregado**, além do miolo do tenant inteiro; o
+  agregado que o mapa não cobre abre no **miolo GEN**. A casca manda o agregado escolhido em
+  `GET /tenant/{tenantId}/miolo-manifest?aggregate=`. Decisão do dono de 2026-09-28, a pedido do
+  `conceptnatal`; em `develop` do yc.app (`2cf1a87`), no ar quando a infra implantar.
+
 ## 1.80 — 2026-09-27
 
 - **`llms-full.txt`: o bloco do CHANGELOG volta a acompanhar o `CHANGELOG.md`.** Ele estava parado na 1.22,
