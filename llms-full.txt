@@ -9110,8 +9110,9 @@ resto:
 [model-format — `references`](../persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado),
 o que o BFF faz com ela em
 [bff — declarada no modelo](../bff/README.md#declarada-no-modelo-references-pedida-e-ainda-não-em-vigor)) passa a
-valer sobre este `options` e alcança **outro bounded context** do mesmo org, como a aula da agenda apontando
-o professor do cadastro. Até lá, o `options` por referência é a forma que vale, e só no mesmo modelo.
+valer sobre este `options` e alcança **outro projeto** do mesmo org pelo endereço `"<projeto>.<bc>.<tipo>"`,
+como a aula da agenda apontando o professor do cadastro. `"<bc>.<tipo>"` fica no próprio modelo. Até lá, o
+`options` por referência é a forma que vale, e só no mesmo modelo.
 
 Quem resolve é o BFF ([bff — referência entre agregados](../bff/README.md#referência-entre-agregados-sessionrefs)),
 com o token de quem usa a tela. Duas regras de forma: o agregado apontado tem de estar **no mesmo modelo**
@@ -9853,11 +9854,12 @@ rótulo.
 
 ### Declarada no modelo: `references`, pedida e ainda não em vigor
 
-> **Estado em 2026-09-29:** a **forma** está no formato do modelo,
-> [model-format — `references`](../persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado)
-> (interpreter, 1.84), e é ela que vale se esta seção divergir. **Falta** a validação na publicação (forger,
-> pedida ao composer), e **o BFF ainda não lê esta chave**. Até valer, a referência vem só do `options` por
-> referência do manifesto, e só no mesmo tenant. Esta seção diz **o que o BFF faz** com ela.
+> **Estado em 2026-09-29:** a **forma** está no
+> [formato do modelo](../persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado)
+> (1.87), e é ela que vale se esta seção divergir. O forger já confere a chave em `develop`
+> (`forger@2ab9b8d`, [recusas](../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references)),
+> **mas ainda não em produção**. **O BFF ainda não lê esta chave:** até valer, a referência vem só do
+> `options` por referência do manifesto, e só no mesmo tenant. Esta seção diz **o que o BFF fará** com ela.
 
 A referência é **fato do domínio**: declara-se no `.model.json`, no nível do agregado, irmã de `command` e
 `event`, e vale para qualquer consumidor, com tela ou sem.
@@ -9867,10 +9869,10 @@ A referência é **fato do domínio**: declara-se no `.model.json`, no nível do
   "command": { … },
   "event": { … },
   "references": {
-    "teacherid": "cadastro.professor",                                 // forma curta
-    "serviceid": { "aggregate": "cadastro.modalidade" },               // forma longa, mesma coisa
-    "alunocpf":  { "aggregate": "cadastro.aluno", "valueKey": "cpf" }, // guarda outra chave do alvo
-    "matriculas.planoid": "cadastro.plano"                             // campo de value object de grupo
+    "regraid":   "agenda.regra",                                               // alvo no PRÓPRIO modelo
+    "teacherid": "cadastro.cadastro.professor",                                // alvo em outro projeto do org
+    "serviceid": { "aggregate": "cadastro.cadastro.modalidade" },              // forma longa, mesma coisa
+    "alunocpf":  { "aggregate": "cadastro.cadastro.aluno", "valueKey": "cpf" } // guarda outra chave do alvo
   }
 }
 ```
@@ -9881,17 +9883,26 @@ A referência é **fato do domínio**: declara-se no `.model.json`, no nível do
 - **Chave:** atributo declarado em `data.attribute` de algum comando do agregado, ou `grupo.campo` de value
   object de grupo. Nunca uma chave da plataforma (`id`, `aggregateid`, `status`, `version`, auditoria), nem um
   campo dentro de valor `Json`.
-- **Valor:** o texto `"<bc>.<tipo>"` (a chave de agregado, na forma do modelo), ou o objeto
-  `{ "aggregate": "<bc>.<tipo>", "valueKey"?: "<atributo do alvo>" }`. `valueKey` é o atributo do alvo que
-  este campo guarda, com padrão `aggregateid`; outra chave no objeto é recusada.
-- `references` vazio é recusado.
+- **Valor:** o **endereço** do alvo, em texto, ou o objeto `{ "aggregate": "<endereço>", "valueKey"?:
+  "<atributo do alvo>" }`. `valueKey` é o atributo do alvo que este campo guarda, com padrão
+  `aggregateid`; outra chave no objeto é recusada.
+- **O endereço diz onde está o alvo, sem busca:**
+
+  | Endereço | Onde está o alvo |
+  |---|---|
+  | `"<bc>.<tipo>"` | **só no próprio modelo**, no mesmo tenant. Nunca em outro modelo |
+  | `"<projeto>.<bc>.<tipo>"` | no projeto `<projeto>` do **mesmo org**, publicado em **exatamente um** tenant dele. É a forma do FQN `<org>.<projeto>.<bc>.<tipo>`, sem o org |
+
+- `references` vazio é recusado. As demais recusas (tipo do atributo, `valueKey`, alvo inexistente ou
+  ambíguo) são do forger: [forger — `references`](../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references).
 
 **Semântica.**
 - **Afirma** que todo valor não vazio do atributo é o `valueKey` de um registro do alvo. É declaração de
   **leitura**: o motor não a lê e não confere, no comando, se o alvo existe.
-- **O alvo** fica no mesmo modelo ou no modelo publicado **do mesmo org** que declara `<bc>.<tipo>` (outro
-  bounded context, outro projeto). **Sem `tenantId`**: o BFF acha o tenant do alvo entre os tenants do org
-  na sessão, pelo bounded context, e o mesmo modelo vale em qualquer ambiente.
+- **O alvo** está onde o endereço diz. Com `"<bc>.<tipo>"`, no próprio tenant. Com
+  `"<projeto>.<bc>.<tipo>"`, o BFF pega na sessão o tenant do **mesmo org** com aquele projeto e aquele
+  bounded context; se ele não está no token do usuário, o estado é `sem-acesso`. **Sem `tenantId`** na
+  declaração: o mesmo modelo vale em qualquer ambiente.
 - **Quem lê** é o usuário, com o próprio token, no tenant do alvo. Sem esse tenant no token, ou sem papel
   de leitura nele, o estado é `sem-acesso`: **a referência não amplia leitura**.
 - **Nome e busca** não se declaram aqui: vêm do alvo, na mesma ordem desta seção (`titleKey` →
@@ -11030,6 +11041,14 @@ O usuário abre um relato novo.
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.89 — 2026-09-29
+
+- **`references`: a fatia do BFF segue o endereço qualificado** (`bff/README.md` §Declarada no modelo;
+  `shell/apresentacao.md`). `"<bc>.<tipo>"` é só o próprio modelo; o alvo em outro projeto do org se escreve
+  `"<projeto>.<bc>.<tipo>"`, e o BFF acha o tenant dele na sessão pelo projeto e pelo bounded context, sem
+  busca. Decisão do dono de 2026-09-29, já no forger (`develop`) e no formato do modelo (1.87). O BFF ainda
+  não lê a chave.
 
 ## 1.88 — 2026-09-29
 
