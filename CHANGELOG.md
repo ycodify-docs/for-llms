@@ -2,6 +2,13 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.85 — 2026-09-29
+
+- **`references`: a fatia do BFF aponta a forma autoritativa** (`bff/README.md` §Declarada no modelo;
+  `shell/apresentacao.md`). A forma passa a ser a do
+  [model-format](persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado) (1.84),
+  que vale se as duas divergirem. Continuam faltando a validação na publicação (forger) e a leitura no BFF.
+
 ## 1.84 — 2026-09-29
 
 - **`computed`, `readProjection` e `references` entram no formato do modelo** (`persistence-crs/spec/model-format.md`

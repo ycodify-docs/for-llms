@@ -9033,7 +9033,9 @@ resto:
   **O seletor não aceita texto livre**: se a lista não vem, o erro aparece no campo.
 
 **A declaração vai para o modelo.** Referência é fato do domínio: a chave `references` do `.model.json`
-(pedida em 2026-09-29, **ainda não em vigor**; sintaxe e semântica em
+(**ainda não em vigor**; a forma em
+[model-format — `references`](../persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado),
+o que o BFF faz com ela em
 [bff — declarada no modelo](../bff/README.md#declarada-no-modelo-references-pedida-e-ainda-não-em-vigor)) passa a
 valer sobre este `options` e alcança **outro bounded context** do mesmo org, como a aula da agenda apontando
 o professor do cadastro. Até lá, o `options` por referência é a forma que vale, e só no mesmo modelo.
@@ -9778,10 +9780,11 @@ rótulo.
 
 ### Declarada no modelo: `references`, pedida e ainda não em vigor
 
-> **Estado em 2026-09-29:** pedida ao forger (validação na publicação) e ao interpreter (formato do modelo,
-> em [model-format](../persistence-crs/spec/model-format.md)). **O BFF ainda não lê esta chave.** Até valer,
-> a referência vem só do `options` por referência do manifesto, e só no mesmo tenant. Quando o
-> model-format a publicar, a **forma** autoritativa é a de lá; esta seção diz **o que o BFF faz** com ela.
+> **Estado em 2026-09-29:** a **forma** está no formato do modelo,
+> [model-format — `references`](../persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado)
+> (interpreter, 1.84), e é ela que vale se esta seção divergir. **Falta** a validação na publicação (forger,
+> pedida ao composer), e **o BFF ainda não lê esta chave**. Até valer, a referência vem só do `options` por
+> referência do manifesto, e só no mesmo tenant. Esta seção diz **o que o BFF faz** com ela.
 
 A referência é **fato do domínio**: declara-se no `.model.json`, no nível do agregado, irmã de `command` e
 `event`, e vale para qualquer consumidor, com tela ou sem.
@@ -10954,6 +10957,13 @@ O usuário abre um relato novo.
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.85 — 2026-09-29
+
+- **`references`: a fatia do BFF aponta a forma autoritativa** (`bff/README.md` §Declarada no modelo;
+  `shell/apresentacao.md`). A forma passa a ser a do
+  [model-format](persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado) (1.84),
+  que vale se as duas divergirem. Continuam faltando a validação na publicação (forger) e a leitura no BFF.
 
 ## 1.84 — 2026-09-29
 

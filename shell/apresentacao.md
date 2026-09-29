@@ -86,7 +86,9 @@ resto:
   **O seletor não aceita texto livre**: se a lista não vem, o erro aparece no campo.
 
 **A declaração vai para o modelo.** Referência é fato do domínio: a chave `references` do `.model.json`
-(pedida em 2026-09-29, **ainda não em vigor**; sintaxe e semântica em
+(**ainda não em vigor**; a forma em
+[model-format — `references`](../persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado),
+o que o BFF faz com ela em
 [bff — declarada no modelo](../bff/README.md#declarada-no-modelo-references-pedida-e-ainda-não-em-vigor)) passa a
 valer sobre este `options` e alcança **outro bounded context** do mesmo org, como a aula da agenda apontando
 o professor do cadastro. Até lá, o `options` por referência é a forma que vale, e só no mesmo modelo.
