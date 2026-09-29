@@ -125,8 +125,53 @@
           "type": "object",
           "minProperties": 1,
           "additionalProperties": { "$ref": "#/$defs/event" }
+        },
+        "computed": {
+          "type": "object",
+          "description": "Opcional. Por comando, os atributos que o processor br preenche. Chave = nome de comando do agregado; nome sem ponto = atributo de data.attribute daquele comando; '<vo>.<campo>' = campo de value object de grupo. O motor nao le; quem le e o BFF. Ver spec/model-format.md § computed.",
+          "additionalProperties": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "pattern": "^[a-z]+(\\.[a-z]+)?$" }
+          }
+        },
+        "readProjection": {
+          "type": "object",
+          "description": "Opcional. Por papel, as colunas que ele ve nas leituras pelo BFF; '*' = a linha inteira. Exaustiva por agregado. O motor nao le; quem le e o BFF. Ver spec/model-format.md § readProjection.",
+          "additionalProperties": {
+            "oneOf": [
+              { "const": "*" },
+              { "type": "array", "minItems": 1, "items": { "type": "string" } }
+            ]
+          }
+        },
+        "references": {
+          "type": "object",
+          "minProperties": 1,
+          "description": "Opcional. Atributo (ou '<grupo>.<campo>' de value object de grupo) -> agregado alvo. Forma curta '<bc>.<tipo>' ou longa { aggregate, valueKey? }; valueKey padrao = aggregateid. O motor nao le. Ver spec/model-format.md § references.",
+          "propertyNames": { "pattern": "^[a-z]+(\\.[a-z]+)?$" },
+          "additionalProperties": {
+            "oneOf": [
+              { "$ref": "#/$defs/aggregateKey" },
+              {
+                "type": "object",
+                "required": ["aggregate"],
+                "additionalProperties": false,
+                "properties": {
+                  "aggregate": { "$ref": "#/$defs/aggregateKey" },
+                  "valueKey": { "type": "string", "pattern": "^[a-z]+$", "description": "Atributo do alvo que este campo guarda. Padrao: aggregateid." }
+                }
+              }
+            ]
+          }
         }
       }
+    },
+    "aggregateKey": {
+      "type": "string",
+      "pattern": "^[^.\\s]+\\.[^.\\s]+$",
+      "description": "Chave de agregado '<boundedContext.name>.<type>', a mesma forma da chave sob 'aggregate'."
     },
     "command": {
       "type": "object",
