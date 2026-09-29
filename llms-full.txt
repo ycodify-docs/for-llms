@@ -5467,10 +5467,6 @@ Integridade, quando o negócio exigir, é regra do processor br. Quem lê é o B
 (token do usuário, rótulo, precedência sobre o `options` do manifesto) está no
 [formato do modelo](../../persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado).
 
-> ⚠️ **Divergência aberta em 2026-09-29.** O formato do modelo (1.84) diz que `"<bc>.<tipo>"` alcança
-> outro modelo do mesmo org. **O forger não aceita isso:** `"<bc>.<tipo>"` é só o próprio modelo, e o alvo
-> em outro projeto se escreve `"<projeto>.<bc>.<tipo>"`. A correção do formato foi pedida ao guardião dele.
->
 > **Estado:** aceita pelo forger em `develop` desde `forger@2ab9b8d`; **ainda não em produção**. Até lá a
 > chave publica sem conferência. Modelo publicado não é revalidado: se o alvo for republicado sem o
 > aggregate, a origem só é recusada na próxima publicação dela.
@@ -11034,6 +11030,12 @@ O usuário abre um relato novo.
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.88 — 2026-09-29
+
+- **`references`: sai a nota de divergência da seção do forger** (`forger/endpoints/model.md` §Atributo que
+  aponta outro agregado). O formato do modelo (1.87) passou a dizer o mesmo que o forger valida: `"<bc>.<tipo>"`
+  é só o próprio modelo, e `"<projeto>.<bc>.<tipo>"`, outro projeto do org.
 
 ## 1.87 — 2026-09-29
 
