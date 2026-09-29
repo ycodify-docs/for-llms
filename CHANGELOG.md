@@ -2,6 +2,18 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.82 — 2026-09-29
+
+- **Referência entre agregados legível** (`bff/README.md` §Referência entre agregados;
+  `shell/contrato-miolo.md` `api.refs`; `shell/apresentacao.md` §Referência a outro agregado). O campo
+  declarado como `options` por referência passa a mostrar o **nome** do registro apontado em toda a tela
+  (tabela, Dados, histórico, título, filtro, cópia, e na exportação ao lado do id), e se preenche por
+  **busca** sem teto de registros. O nome vem do agregado apontado: `labelKey` → `titleKey` →
+  `identity.fields` → primeiro texto. Todo estado é dito (não encontrado, sem acesso, rótulo indisponível).
+  BFF: `POST /session/refs/labels` e `POST /session/refs/search`, com o token do usuário e o recorte de
+  coluna; só o mesmo tenant por ora. Decisão do dono de 2026-09-29, a pedido do `conceptnatal`; em
+  `develop` do yc.app (`c3e57bd`), no ar quando a infra implantar.
+
 ## 1.81 — 2026-09-28
 
 - **Miolo CUSTOM cobrindo só parte do tenant** (`shell/injecao.md` §De onde vem o build; `bff/README.md`
