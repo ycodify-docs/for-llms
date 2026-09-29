@@ -2,6 +2,12 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.91 — 2026-09-29
+
+- **`references`: o BFF que a lê está no ar em stager** (`bff/README.md` §Declarada no modelo), desde
+  2026-09-29T19:04Z (yc.app `56f3cd9`). A validação do forger segue só em `develop`, então em produção a
+  publicação aceita a chave sem conferir. Até o forger subir, declará-la é por conta de quem publica.
+
 ## 1.90 — 2026-09-29
 
 - **A capacidade leva `ref` no atributo declarado em `references`** (`shell/contrato-miolo.md` `attributes[].ref`;
