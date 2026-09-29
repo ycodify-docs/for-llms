@@ -320,9 +320,11 @@ rótulo.
 > [formato do modelo](../persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado)
 > (1.87), e é ela que vale se esta seção divergir. O forger já confere a chave em `develop`
 > (`forger@2ab9b8d`, [recusas](../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references)),
-> **mas ainda não em produção**. **O BFF lê a chave em `develop`** (yc.app `abc83c8`), **ainda não no ar**:
-> até a infra implantar, a referência vem só do `options` por referência do manifesto, e só no mesmo
-> tenant. Esta seção diz **o que o BFF faz** com ela.
+> **mas ainda não em produção**. **O BFF lê a chave no ar em stager desde 2026-09-29T19:04Z** (yc.app
+> `56f3cd9`); sem a declaração no modelo, vale o `options` por referência do manifesto, só no mesmo tenant.
+> Enquanto o forger de produção não confere a chave, declará-la é **por conta de quem publica**: um
+> endereço errado só aparece na tela, como `sem-tenant`, `sem-acesso` ou `erro`. Esta seção diz **o que o
+> BFF faz** com ela.
 
 A referência é **fato do domínio**: declara-se no `.model.json`, no nível do agregado, irmã de `command` e
 `event`, e vale para qualquer consumidor, com tela ou sem.
