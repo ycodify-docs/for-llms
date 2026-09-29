@@ -2,6 +2,15 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.90 — 2026-09-29
+
+- **A capacidade leva `ref` no atributo declarado em `references`** (`shell/contrato-miolo.md` `attributes[].ref`;
+  `bff/README.md` §Capacidade e §Declarada no modelo). `ref: { aggregate, valueKey }` traz o endereço
+  (`<bc>.<tipo>` ou `<projeto>.<bc>.<tipo>`) e a chave do alvo, também em campo de value object, e vale sobre
+  o `options` por referência do manifesto. O BFF passa a ler `references` e a achar o tenant do alvo em
+  outro projeto pela sessão (em `develop` do yc.app, `abc83c8`; ainda não no ar). Corrige a descrição de
+  `lookup`: é heurística de nome, não referência declarada.
+
 ## 1.89 — 2026-09-29
 
 - **`references`: a fatia do BFF segue o endereço qualificado** (`bff/README.md` §Declarada no modelo;

@@ -116,7 +116,7 @@ forger é quem **grava** ali ao publicar o `.model.json`) — e cruza com os **p
 
 | Chave | O que traz |
 |---|---|
-| `attributes` | os atributos escalares, com `type`, `nullable` e o papel de apresentação (`input`, `status`, `serverStamp`, `lookup`, `computed`) |
+| `attributes` | os atributos escalares, com `type`, `nullable`, o papel de apresentação (`input`, `status`, `serverStamp`, `lookup`, `computed`) e, quando o modelo declara em `references`, `ref: { aggregate, valueKey }`, o agregado que o atributo aponta (também nos campos de value object) |
 | `valueObjects` | os **value objects** do comando, com `name`, `cardinality` (`single` · `multiple`) e `fields`. **Ausente** quando o comando não declara nenhum |
 
 **`serverStamp` é o `whenAttribute` do evento, e só ele.** O BFF **não envia** esse atributo no comando,
@@ -320,8 +320,9 @@ rótulo.
 > [formato do modelo](../persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado)
 > (1.87), e é ela que vale se esta seção divergir. O forger já confere a chave em `develop`
 > (`forger@2ab9b8d`, [recusas](../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references)),
-> **mas ainda não em produção**. **O BFF ainda não lê esta chave:** até valer, a referência vem só do
-> `options` por referência do manifesto, e só no mesmo tenant. Esta seção diz **o que o BFF fará** com ela.
+> **mas ainda não em produção**. **O BFF lê a chave em `develop`** (yc.app `abc83c8`), **ainda não no ar**:
+> até a infra implantar, a referência vem só do `options` por referência do manifesto, e só no mesmo
+> tenant. Esta seção diz **o que o BFF faz** com ela.
 
 A referência é **fato do domínio**: declara-se no `.model.json`, no nível do agregado, irmã de `command` e
 `event`, e vale para qualquer consumidor, com tela ou sem.
