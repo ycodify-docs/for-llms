@@ -2,6 +2,16 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.86 — 2026-09-29
+
+- **`references`: o forger aceita e valida na publicação, e o endereço decide onde está o alvo**
+  (`forger/endpoints/model.md` §Atributo que aponta outro agregado). `"<bc>.<tipo>"` é **só o próprio
+  modelo**; alvo em outro projeto do mesmo org se escreve `"<projeto>.<bc>.<tipo>"` e tem de estar em
+  exatamente um tenant do projeto — decisão do dono, porque procurar `"<bc>.<tipo>"` no org seria ambíguo por
+  construção. **Diverge do formato do modelo (1.84)**, que diz que a forma curta alcança outro modelo do org;
+  a correção foi pedida ao guardião do formato. Recusas `400` tabeladas. Aceita em `develop` desde `forger@2ab9b8d`;
+  **ainda não em produção**. Issue composer `forger.pedido.references-no-model-json.20260929`.
+
 ## 1.85 — 2026-09-29
 
 - **`references`: a fatia do BFF aponta a forma autoritativa** (`bff/README.md` §Declarada no modelo;
