@@ -20,6 +20,7 @@
 - [Capacidade](#capacidade)
 - [Miolo](#miolo)
 - [Proxy de domínio](#proxy-de-domínio)
+- [Referência entre agregados (`/session/refs/*`)](#referência-entre-agregados-sessionrefs)
 - [Arquivos anexos de agregado (`/session/files/*`)](#arquivos-anexos-de-agregado-sessionfiles)
 - [Quem autoriza a leitura](#quem-autoriza-a-leitura)
 - [Limitar os campos que um papel lê — `readProjection`](#limitar-os-campos-que-um-papel-lê-readprojection)
@@ -276,6 +277,42 @@ O consumidor **não** compõe esses cabeçalhos nem conhece o token.
   persistence-q os ignoraria em silêncio. Resposta em forma desconhecida vira `502`, nunca um zero.
 - `/session/aggregate` existe porque a **projeção é assíncrona**: para carregar o estado autoritativo de
   um agregado (ex.: preencher um form de transição) não se deve ler o read model.
+
+## Referência entre agregados (`/session/refs/*`)
+
+Quando um atributo aponta outro agregado (a aula aponta o professor), quem mostra ou preenche o campo
+precisa do **nome** do registro apontado, não do id. As duas rotas resolvem isso **uma vez, no BFF**,
+para qualquer consumidor: a casca (GEN e CUSTOM, via `api.refs`) e o cliente sem UI.
+
+| Operação | Método · Path | Corpo | Resposta |
+|---|---|---|---|
+| Rótulos em lote | `POST /session/refs/labels` | `{ tenantId, aggregate, ids: { "<atributo>": ["<id>", …] } }` | `{ refs: { "<atributo>": { alvo, rotulos: { "<id>": Parte[] }, faltam: ["<id>"] } \| { alvo?, estado, status? } } }` |
+| Busca para seletor | `POST /session/refs/search` | `{ tenantId, aggregate, attr, texto?, paging }` | `{ alvo, itens: [{ valor, rotulo: Parte[] }], truncated?, semBusca? }` |
+
+`Parte = { valor, tipo, fmt? }`. O rótulo vem **cru e em partes**, e quem mostra formata cada uma (tipo e
+`fmt`), porque só a tela conhece o fuso de quem lê. `valor` é a **chave que o comando grava**, nunca o
+rótulo.
+
+- **A chamada é endereçada pela origem** (`tenantId`, `aggregate`, atributo): o BFF acha a declaração e o
+  alvo. O consumidor **não escolhe** o agregado apontado nem o tenant dele.
+- **A declaração** é o `options` por referência do manifesto
+  (`{ aggregate, valueKey, labelKey }`, ver [shell — apresentacao](../shell/apresentacao.md)). Atributo
+  sem essa declaração: `sem-declaracao` nos rótulos, `404` na busca.
+- **O rótulo vem do alvo**, nesta ordem: `labelKey` declarado → `titleKey` do alvo no manifesto →
+  `identity.fields` do alvo no modelo → o primeiro atributo de texto que ele declara. A **busca** usa os
+  atributos do rótulo mais `identity.fields`, só os de texto e de primeiro nível, por `ilike` e com `OR`
+  entre eles. Sem nenhum atributo desses, a busca lista sem filtro e responde `semBusca: true`.
+- **Quem lê é o usuário**: a consulta ao alvo vai com o token da sessão, e o persistence-q decide. O
+  recorte de coluna ([`readProjection`](#limitar-os-campos-que-um-papel-lê-readprojection)) vale: se a
+  coluna do rótulo está cortada, o rótulo desce para o nível seguinte da ordem, e nunca vaza.
+- **Estados, nunca silêncio.** Nos rótulos: id pedido e não achado vai em `faltam`; `403` do
+  persistence-q → `estado: "sem-acesso"`; outro erro → `estado: "erro"` com o `status`; nada legível que
+  identifique o registro → `sem-acesso`. Na busca, o erro do persistence-q **passa inteiro**.
+- **Limites:** até 20 atributos e 500 ids por atributo nos rótulos (ids em lotes de 200 por consulta, um
+  lote por alvo e chave); até 50 itens por página na busca (`paging` obrigatório).
+- **Só o mesmo tenant, por ora.** O alvo tem de estar no modelo do tenant de origem: é o único que a
+  publicação do manifesto aceita. Fora dele: `estado: "sem-tenant"` nos rótulos e `422` na busca.
+  **Referência dentro de um valor `Json` não se resolve**: só atributo ou `grupo.campo`.
 
 ## Arquivos anexos de agregado (`/session/files/*`)
 
@@ -779,6 +816,8 @@ sem explicação — e ninguém consegue medir a frequência do problema.
 - [ ] Endereços de serviço = **config de deploy**, nunca hardcode nem em doc pública.
 - [ ] Em `/session/files/*`: `entityId` da chave = **`aggregateid`**; prefixo em `delete` é **lote**; e
       o anexo é protegido **por papel na entity**, nunca por titular — ver o aviso da seção.
+- [ ] Referência a outro agregado: peça o nome em `/session/refs/labels` e busque em `/session/refs/search`,
+  e grave o `valor` do item. Nunca o rótulo, e nunca peça ao usuário que cole um id.
 - [ ] Atributo que o processor preenche: declare-o em `computed`, e faça o processor **sempre**
       devolvê-lo não nulo — senão o marcador é gravado.
 

@@ -26,7 +26,7 @@ O contrato **mínimo obrigatório** é `mount` (e o `dispose` que ele devolve). 
   "identity":     { "username": "...", "name": "...", "email": "..." },
   "roles":        ["..."],
   "activeRole":   null,
-  "api":          { "command": "…", "query": "…", "count": "…", "aggregate": "…", "history": "…" },
+  "api":          { "command": "…", "query": "…", "count": "…", "aggregate": "…", "history": "…", "refs": { "labels": "…", "search": "…" } },
   "prefs":        { "formMode": "inline" | "modal" },
   "canConfigure": false,
   "savePrefs":    "(formMode) => Promise<void>",
@@ -59,6 +59,15 @@ O contrato **mínimo obrigatório** é `mount` (e o `dispose` que ele devolve). 
   | `count({ tenantId, aggregate, predicates? })` | **quantos** registros a consulta traria sem teto, sob o mesmo filtro — para o "X de Y" |
   | `aggregate({ tenantId, aggregate, id })` | **estado autoritativo** do agregado |
   | `history({ tenantId, aggregate, id })` | histórico de eventos do agregado |
+  | `refs.labels({ tenantId, aggregate, ids: { "<atributo>": [ids] } })` | o **nome** dos registros que um atributo aponta, em lote — ou o estado de cada atributo (`sem-acesso`, `erro`, `sem-tenant`, `sem-declaracao`) e os ids não achados (`faltam`) |
+  | `refs.search({ tenantId, aggregate, attr, texto?, paging })` | página de `{ valor, rotulo }` do agregado apontado, para o **seletor**. Grava-se o `valor` |
+
+  **Referência a outro agregado** (`refs`): o atributo declarado no manifesto como `options` por
+  referência mostra o **nome** do registro apontado, e se preenche por **busca**, nunca colando um id.
+  O rótulo chega em partes cruas (`{ valor, tipo, fmt? }`), e o miolo formata cada uma no fuso de quem
+  lê. A chamada é endereçada pela origem (este tenant, este agregado, o atributo); quem resolve o alvo é o
+  BFF. Erro da busca rejeita com `status` e, quando há, `estado`. **Opcional**: casca anterior a
+  2026-09-29 não oferece `refs`. Contrato das rotas: [bff — referência entre agregados](../bff/README.md#referência-entre-agregados-sessionrefs).
 
   **Comando recusado** rejeita com um erro que traz `message` (a mensagem legível da plataforma), `status`
   (o HTTP) e `em` (o instante, em epoch ms: o `timestamp` do corpo de erro, ou a hora da resposta). A
