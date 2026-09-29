@@ -172,7 +172,7 @@ não diz **como se vê** (isso é o miolo).
           "roles": ["..."],
           "fromState": ["..."],
           "endState": "...",
-          "attributes": [ { "name": "...", "type": "...", "role": "input|status|serverStamp|lookup|computed" } ],
+          "attributes": [ { "name": "...", "type": "...", "role": "input|status|serverStamp|lookup|computed", "ref"?: { "aggregate": "...", "valueKey": "..." } } ],
           "valueObjects": [ { "name": "...", "cardinality": "single|multiple",
                               "fields": [ { "name": "...", "type": "...", "role": "..." } ], "scalar": false } ]
         }
@@ -190,6 +190,12 @@ não diz **como se vê** (isso é o miolo).
   casar o evento do histórico: [bff — Nome de exibição](../bff/README.md#nome-de-exibicao).
 - **`fromState`** — de quais estados o comando aparece; a casca/miolo habilita a transição só quando o
   agregado está num estado válido.
+- **`attributes[].ref`** — o agregado que o atributo aponta, **como o modelo declara** em `references`:
+  `aggregate` é o endereço (`<bc>.<tipo>` no próprio modelo, `<projeto>.<bc>.<tipo>` em outro projeto do
+  org), e `valueKey` é a chave do alvo que o atributo guarda. Vem também em `valueObjects[].fields`.
+  **Ausente** quando o modelo não declara. Nome e busca se pedem a `api.refs`, e o `options` por referência
+  do manifesto vale só onde não há `ref`. Ver
+  [bff — declarada no modelo](../bff/README.md#declarada-no-modelo-references-pedida-e-ainda-não-em-vigor).
 - **`attributes[].role`** — classificação que guia a apresentação:
   - `input` — campo editável comum.
   - `status` — campo de transição/concorrência (não é entrada do usuário).
@@ -197,7 +203,8 @@ não diz **como se vê** (isso é o miolo).
     ⚠️ **É o atributo que o agregado declara como `whenAttribute` de um evento — nunca "Timestamp com
     nome terminado em `em`".** Atributo de data que o negócio calcula, ou que o usuário informa, é
     `input`: viaja normalmente no comando. Só o carimbo declarado fica de fora.
-  - `lookup` — referência a outro agregado (widget de seleção).
+  - `lookup` — **heurística de nome** (texto terminado em `id`): **não** é referência declarada. A tela só
+    dá a dica "id de …". Quem aponta outro agregado de fato traz `ref` (abaixo).
   - `computed` — o **processor de regra de negócio preenche**: **oculto no formulário**, e o BFF o envia
     com um marcador que o processor sobrescreve. Nasce de declaração no modelo, nunca de nome. Vale
     também para `valueObjects[].fields` — e um value object em que todo campo é `computed` não se
