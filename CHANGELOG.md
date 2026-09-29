@@ -2,6 +2,16 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.83 — 2026-09-29
+
+- **`references` no `.model.json`: sintaxe e semântica, do lado de quem lê** (`bff/README.md` §Declarada no
+  modelo; `shell/apresentacao.md` §Referência a outro agregado). A referência entre agregados passa a ser
+  declarada no **modelo**, no nível do agregado: `"<atributo>": "<bc>.<tipo>"` ou
+  `{ aggregate, valueKey? }`. Ela alcança outro bounded context do mesmo org, sem `tenantId`, lê com o token
+  do usuário (não amplia leitura) e vale sobre o `options` por referência do manifesto. **Ainda não está em
+  vigor:** pedida ao forger (validação na publicação) e ao interpreter (formato do modelo), a mando do dono;
+  o BFF ainda não a lê.
+
 ## 1.82 — 2026-09-29
 
 - **Referência entre agregados legível** (`bff/README.md` §Referência entre agregados;

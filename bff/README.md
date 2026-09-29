@@ -314,6 +314,56 @@ rótulo.
   publicação do manifesto aceita. Fora dele: `estado: "sem-tenant"` nos rótulos e `422` na busca.
   **Referência dentro de um valor `Json` não se resolve**: só atributo ou `grupo.campo`.
 
+### Declarada no modelo: `references`, pedida e ainda não em vigor
+
+> **Estado em 2026-09-29:** pedida ao forger (validação na publicação) e ao interpreter (formato do modelo,
+> em [model-format](../persistence-crs/spec/model-format.md)). **O BFF ainda não lê esta chave.** Até valer,
+> a referência vem só do `options` por referência do manifesto, e só no mesmo tenant. Quando o
+> model-format a publicar, a **forma** autoritativa é a de lá; esta seção diz **o que o BFF faz** com ela.
+
+A referência é **fato do domínio**: declara-se no `.model.json`, no nível do agregado, irmã de `command` e
+`event`, e vale para qualquer consumidor, com tela ou sem.
+
+```jsonc
+"agenda.aula": {
+  "command": { … },
+  "event": { … },
+  "references": {
+    "teacherid": "cadastro.professor",                                 // forma curta
+    "serviceid": { "aggregate": "cadastro.modalidade" },               // forma longa, mesma coisa
+    "alunocpf":  { "aggregate": "cadastro.aluno", "valueKey": "cpf" }, // guarda outra chave do alvo
+    "matriculas.planoid": "cadastro.plano"                             // campo de value object de grupo
+  }
+}
+```
+
+> Ilustrativo: nomes de agregado e de atributo são exemplos, não JSON literal a copiar.
+
+**Sintaxe.**
+- **Chave:** atributo declarado em `data.attribute` de algum comando do agregado, ou `grupo.campo` de value
+  object de grupo. Nunca uma chave da plataforma (`id`, `aggregateid`, `status`, `version`, auditoria), nem um
+  campo dentro de valor `Json`.
+- **Valor:** o texto `"<bc>.<tipo>"` (a chave de agregado, na forma do modelo), ou o objeto
+  `{ "aggregate": "<bc>.<tipo>", "valueKey"?: "<atributo do alvo>" }`. `valueKey` é o atributo do alvo que
+  este campo guarda, com padrão `aggregateid`; outra chave no objeto é recusada.
+- `references` vazio é recusado.
+
+**Semântica.**
+- **Afirma** que todo valor não vazio do atributo é o `valueKey` de um registro do alvo. É declaração de
+  **leitura**: o motor não a lê e não confere, no comando, se o alvo existe.
+- **O alvo** fica no mesmo modelo ou no modelo publicado **do mesmo org** que declara `<bc>.<tipo>` (outro
+  bounded context, outro projeto). **Sem `tenantId`**: o BFF acha o tenant do alvo entre os tenants do org
+  na sessão, pelo bounded context, e o mesmo modelo vale em qualquer ambiente.
+- **Quem lê** é o usuário, com o próprio token, no tenant do alvo. Sem esse tenant no token, ou sem papel
+  de leitura nele, o estado é `sem-acesso`: **a referência não amplia leitura**.
+- **Nome e busca** não se declaram aqui: vêm do alvo, na mesma ordem desta seção (`titleKey` →
+  `identity.fields` → primeiro texto). A referência diz só **para onde** aponta e **por qual chave**.
+- **Precedência:** para o mesmo atributo, a declaração no modelo vale sobre o `options` por referência do
+  manifesto. A capacidade passa a levar a referência no atributo, e GEN, CUSTOM e cliente sem UI sabem
+  dela sem ler o manifesto.
+- **Cópia local** (ex.: `teachername` gravado junto) é "o nome na época"; a referência dá "o nome hoje".
+  Uma não substitui a outra.
+
 ## Arquivos anexos de agregado (`/session/files/*`)
 
 O BFF faz **proxy do [filer](../filer/README.md)**, o serviço de arquivos da plataforma, pelas mesmas

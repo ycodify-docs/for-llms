@@ -85,6 +85,12 @@ resto:
   acesso" (o papel não lê o agregado apontado) ou "rótulo indisponível" (falha, registrada no diagnóstico).
   **O seletor não aceita texto livre**: se a lista não vem, o erro aparece no campo.
 
+**A declaração vai para o modelo.** Referência é fato do domínio: a chave `references` do `.model.json`
+(pedida em 2026-09-29, **ainda não em vigor**; sintaxe e semântica em
+[bff — declarada no modelo](../bff/README.md#declarada-no-modelo-references-pedida-e-ainda-não-em-vigor)) passa a
+valer sobre este `options` e alcança **outro bounded context** do mesmo org, como a aula da agenda apontando
+o professor do cadastro. Até lá, o `options` por referência é a forma que vale, e só no mesmo modelo.
+
 Quem resolve é o BFF ([bff — referência entre agregados](../bff/README.md#referência-entre-agregados-sessionrefs)),
 com o token de quem usa a tela. Duas regras de forma: o agregado apontado tem de estar **no mesmo modelo**
 (é o que a publicação confere), e a referência vive em **atributo ou `grupo.campo`**, nunca dentro de um
