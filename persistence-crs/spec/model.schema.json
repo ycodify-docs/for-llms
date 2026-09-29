@@ -149,17 +149,17 @@
         "references": {
           "type": "object",
           "minProperties": 1,
-          "description": "Opcional. Atributo (ou '<grupo>.<campo>' de value object de grupo) -> agregado alvo. Forma curta '<bc>.<tipo>' ou longa { aggregate, valueKey? }; valueKey padrao = aggregateid. O motor nao le. Ver spec/model-format.md § references.",
+          "description": "Opcional. Atributo (ou '<grupo>.<campo>' de value object de grupo) -> agregado alvo. Forma curta = o endereco; longa = { aggregate: <endereco>, valueKey? }; valueKey padrao = aggregateid. O motor nao le. Ver spec/model-format.md § references.",
           "propertyNames": { "pattern": "^[a-z]+(\\.[a-z]+)?$" },
           "additionalProperties": {
             "oneOf": [
-              { "$ref": "#/$defs/aggregateKey" },
+              { "$ref": "#/$defs/referenceAddress" },
               {
                 "type": "object",
                 "required": ["aggregate"],
                 "additionalProperties": false,
                 "properties": {
-                  "aggregate": { "$ref": "#/$defs/aggregateKey" },
+                  "aggregate": { "$ref": "#/$defs/referenceAddress" },
                   "valueKey": { "type": "string", "pattern": "^[a-z]+$", "description": "Atributo do alvo que este campo guarda. Padrao: aggregateid." }
                 }
               }
@@ -168,10 +168,10 @@
         }
       }
     },
-    "aggregateKey": {
+    "referenceAddress": {
       "type": "string",
-      "pattern": "^[^.\\s]+\\.[^.\\s]+$",
-      "description": "Chave de agregado '<boundedContext.name>.<type>', a mesma forma da chave sob 'aggregate'."
+      "pattern": "^([a-z][a-z0-9]*\\.)?[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+      "description": "Endereco do alvo de references. '<bc>.<tipo>' = agregado do PROPRIO modelo; '<projeto>.<bc>.<tipo>' = agregado de outro projeto do mesmo org, publicado em exatamente um tenant dele."
     },
     "command": {
       "type": "object",

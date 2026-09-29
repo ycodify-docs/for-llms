@@ -2,6 +2,15 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.87 — 2026-09-29
+
+- **`references`: o endereço diz onde está o alvo** (`persistence-crs/spec/model-format.md` §`references`;
+  `model.schema.json` `$defs/referenceAddress`). Corrige a 1.84, que dizia que `"<bc>.<tipo>"` alcançava outro
+  modelo do org. Agora `"<bc>.<tipo>"` é **só o próprio modelo**, e o alvo em outro projeto do mesmo org se
+  escreve `"<projeto>.<bc>.<tipo>"`, publicado em exatamente um tenant desse projeto. O schema aceita as duas
+  formas, com o mesmo padrão do forger. Decisão do dono de 2026-09-29; fecha a divergência registrada na 1.86
+  (`forger/endpoints/model.md`). Pedido do composer (`modelo.pedido.references-endereco-qualificado.20260929`).
+
 ## 1.86 — 2026-09-29
 
 - **`references`: o forger aceita e valida na publicação, e o endereço decide onde está o alvo**

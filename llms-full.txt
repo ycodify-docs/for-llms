@@ -285,7 +285,7 @@ opera como antes.
 |---|---|---|---|
 | `computed` | `{ "<comando>": ["<atributo>", "<vo>.<campo>", …] }` | BFF | o atributo que o processor br preenche sai do formulário e é enviado com um marcador |
 | `readProjection` | `{ "<PAPEL>": ["<coluna>", …] }` ou `{ "<PAPEL>": "*" }` | BFF | limita as colunas que cada papel vê nas leituras que passam pelo BFF |
-| `references` | `{ "<atributo>": "<bc>.<tipo>" }` ou `{ "<atributo>": { "aggregate": …, "valueKey"?: … } }` | BFF — **pedido, ainda não lê** | declara que o atributo aponta um registro de outro agregado |
+| `references` | `{ "<atributo>": "<endereço>" }` ou `{ "<atributo>": { "aggregate": "<endereço>", "valueKey"?: … } }` — endereço `"<bc>.<tipo>"` ou `"<projeto>.<bc>.<tipo>"` | BFF — **pedido, ainda não lê** | declara que o atributo aponta um registro de outro agregado |
 
 > **Nunca prefixe estas chaves com `_`.** A publicação remove as chaves `_`-prefixadas em silêncio
 > ([Chaves de metadado](#chaves-de-metadado-_-prefixadas)) — a declaração sumiria sem aviso.
@@ -332,7 +332,9 @@ O que o BFF faz com ela (marcadores por tipo, o que o processor devolve):
 #### `references` — o atributo que aponta outro agregado
 
 > **Estado em 2026-09-29:** a forma e o significado estão definidos aqui, e esta é a referência
-> autoritativa. A **validação na publicação** foi pedida ao forger e o **BFF ainda não lê** a chave
+> autoritativa. A **validação na publicação** está no forger em `develop`, **ainda não em produção**
+> ([forger — `references`](../../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references));
+> o **BFF ainda não lê** a chave
 > ([bff — declarada no modelo](../../bff/README.md#declarada-no-modelo-references-pedida-e-ainda-não-em-vigor)).
 > Até valer, a referência exibida pela tela vem só do `options` por referência do manifesto.
 
@@ -341,23 +343,25 @@ O que o BFF faz com ela (marcadores por tipo, o que o processor devolve):
   "command": { … },
   "event": { … },
   "references": {
-    "teacherid": "cadastro.professor",                                 // forma curta
+    "teacherid": "cadastro.professor",                                 // alvo no PRÓPRIO modelo
     "serviceid": { "aggregate": "cadastro.modalidade" },               // forma longa, mesma coisa
     "alunocpf":  { "aggregate": "cadastro.aluno", "valueKey": "cpf" }, // guarda outra chave do alvo
-    "matriculas.planoid": "cadastro.plano"                             // campo de value object de grupo
+    "matriculas.planoid": "cadastro.plano",                            // campo de value object de grupo
+    "cobrancaid": "financeiro.cobranca.fatura"                         // alvo no projeto 'financeiro' do org
   }
 }
 ```
 
-> Ilustrativo: nomes de agregado e de atributo são exemplos.
+> Ilustrativo: nomes de projeto, agregado e atributo são exemplos.
 
 **Sintaxe.**
 
 | Parte | Regra |
 |---|---|
 | **chave** | atributo declarado em `data.attribute` de algum comando do agregado, ou `"<grupo>.<campo>"` de value object **de grupo** declarado nele. **Não valem** as chaves da plataforma (`id`, `aggregateid`, `status`, `version` e os metadados de auditoria) nem campo **dentro de um valor `Json`** |
-| **valor, forma curta** | o texto `"<bc>.<tipo>"` — a [chave de agregado](#a-chave-do-agregado--bctype-e-ela-vale-em-três-lugares), na mesma forma. Equivale a `{ "aggregate": "<bc>.<tipo>" }` |
-| **valor, forma longa** | `{ "aggregate": "<bc>.<tipo>", "valueKey"?: "<atributo do alvo>" }`. `valueKey` é o atributo **do alvo** que este campo guarda; o padrão é `aggregateid`. **Chave desconhecida no objeto é recusada** — é o que deixa a forma aberta a extensões futuras declaradas |
+| **endereço** | `"<bc>.<tipo>"` — a [chave de agregado](#a-chave-do-agregado--bctype-e-ela-vale-em-três-lugares) de um agregado **do próprio modelo**; ou `"<projeto>.<bc>.<tipo>"` — agregado de **outro projeto do mesmo org**, a forma do nome completo `<org>.<projeto>.<bc>.<tipo>` sem o org. Nada além dessas duas formas |
+| **valor, forma curta** | o endereço, como texto. Equivale a `{ "aggregate": "<endereço>" }` |
+| **valor, forma longa** | `{ "aggregate": "<endereço>", "valueKey"?: "<atributo do alvo>" }`. `valueKey` é o atributo **do alvo** que este campo guarda; o padrão é `aggregateid`. **Chave desconhecida no objeto é recusada** — é o que deixa a forma aberta a extensões futuras declaradas |
 | **vazio** | `"references": {}` é recusado, como a lista vazia do `computed` |
 
 **Semântica.**
@@ -365,9 +369,12 @@ O que o BFF faz com ela (marcadores por tipo, o que o processor devolve):
 1. **O que afirma.** Todo valor **não vazio** do atributo é o `valueKey` de um registro do agregado alvo. É
    declaração **de leitura**: o motor não confere, no comando, se o alvo existe. Integridade, quando o negócio
    a exigir, é regra do processor br.
-2. **Onde está o alvo.** No **mesmo modelo**, se ele declara `<bc>.<tipo>`. Senão, no modelo publicado **do
-   mesmo org** que o declara — outro bounded context, outro projeto. **Não há `tenantId` na declaração:** o
-   alvo se resolve pelo nome em cada ambiente, e o mesmo `.model.json` vale em teste e em produção.
+2. **Onde está o alvo — o endereço diz, não há busca.** `"<bc>.<tipo>"` é **só o próprio modelo**: não se
+   procura em outro. `"<projeto>.<bc>.<tipo>"` é o modelo publicado daquele projeto, no **mesmo org** de quem
+   declara, e o alvo tem de estar publicado em **exatamente um** tenant desse projeto. O motivo: cada tenant
+   publica o seu modelo, e nada impede dois tenants do org de declararem a mesma chave de agregado — procurar
+   `"<bc>.<tipo>"` no org seria ambíguo por construção. **Não há `tenantId` na declaração:** o mesmo
+   `.model.json` vale em qualquer ambiente. Decisão do dono em 2026-09-29.
 3. **Quem lê.** Nome e busca vêm com o **token de quem usa a tela**, no tenant do alvo. Sem esse tenant no
    token, ou sem papel de leitura nele, o campo diz "sem acesso". **A referência não amplia leitura.**
 4. **Rótulo e busca não se declaram aqui.** Vêm do agregado alvo: o `titleKey` do manifesto dele, depois o
@@ -379,14 +386,13 @@ O que o BFF faz com ela (marcadores por tipo, o que o processor devolve):
 7. **Cópia local não é referência.** `teachername` gravado junto com `teacherid` é outro dado — *"o nome na
    época"*; a referência dá *"o nome hoje"*, e uma não substitui a outra.
 
-**Validação na publicação (pedida ao forger).**
-
-- **Da forma:** o que a tabela de sintaxe diz — valor texto ou objeto, chave desconhecida no objeto, vazio.
-- **Contra os modelos:** o alvo existe no mesmo modelo, ou em **exatamente um** modelo publicado do mesmo org
-  (ambiguidade é recusada, nomeando os candidatos); `valueKey` é atributo declarado no alvo, ou `aggregateid`;
-  o tipo do atributo é compatível com o do `valueKey` (o `aggregateid` é UUID em texto).
-- **Sem revalidação retroativa**, como no `computed`: se o modelo alvo for republicado sem o agregado, ou
-  removido, a tela mostra o estado ("não encontrado" / "sem acesso"), e a próxima publicação da origem recusa.
+**Validação na publicação.** As recusas, todas `400`, estão no
+[forger — `references`](../../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references): a forma
+acima; `"<bc>.<tipo>"` que não é agregado do próprio modelo; `"<projeto>.<bc>.<tipo>"` que nenhum modelo
+publicado do projeto declara, ou que está em mais de um tenant dele (a mensagem nomeia os tenants); `valueKey`
+que o alvo não declara; tipo do atributo incompatível com o do `valueKey`. **Sem revalidação retroativa**, como
+no `computed`: se o modelo alvo for republicado sem o agregado, ou removido, a tela mostra o estado ("não
+encontrado" / "sem acesso"), e a próxima publicação da origem recusa.
 
 ## Atributos e tipos
 
@@ -11028,6 +11034,15 @@ O usuário abre um relato novo.
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.87 — 2026-09-29
+
+- **`references`: o endereço diz onde está o alvo** (`persistence-crs/spec/model-format.md` §`references`;
+  `model.schema.json` `$defs/referenceAddress`). Corrige a 1.84, que dizia que `"<bc>.<tipo>"` alcançava outro
+  modelo do org. Agora `"<bc>.<tipo>"` é **só o próprio modelo**, e o alvo em outro projeto do mesmo org se
+  escreve `"<projeto>.<bc>.<tipo>"`, publicado em exatamente um tenant desse projeto. O schema aceita as duas
+  formas, com o mesmo padrão do forger. Decisão do dono de 2026-09-29; fecha a divergência registrada na 1.86
+  (`forger/endpoints/model.md`). Pedido do composer (`modelo.pedido.references-endereco-qualificado.20260929`).
 
 ## 1.86 — 2026-09-29
 
