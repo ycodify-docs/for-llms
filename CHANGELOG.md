@@ -2,6 +2,12 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.88 — 2026-09-29
+
+- **`references`: sai a nota de divergência da seção do forger** (`forger/endpoints/model.md` §Atributo que
+  aponta outro agregado). O formato do modelo (1.87) passou a dizer o mesmo que o forger valida: `"<bc>.<tipo>"`
+  é só o próprio modelo, e `"<projeto>.<bc>.<tipo>"`, outro projeto do org.
+
 ## 1.87 — 2026-09-29
 
 - **`references`: o endereço diz onde está o alvo** (`persistence-crs/spec/model-format.md` §`references`;
