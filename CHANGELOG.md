@@ -2,6 +2,17 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.84 — 2026-09-29
+
+- **`computed`, `readProjection` e `references` entram no formato do modelo** (`persistence-crs/spec/model-format.md`
+  §Chaves que só quem lê usa; `model.schema.json` `$defs/aggregate`). As três são chaves opcionais do nível do
+  agregado que **o motor não lê** — o BFF lê. `computed` e `readProjection` já eram aceitas pelo forger e lidas
+  pelo BFF, mas faltavam no formato e no schema. `references` tem aqui a **forma autoritativa**: sintaxe (forma
+  curta `"<bc>.<tipo>"`, longa `{ aggregate, valueKey? }`, vazio recusado) e semântica (alvo no mesmo org, sem
+  `tenantId`, leitura com o token do usuário). **Ainda não está em vigor:** a validação na publicação foi pedida
+  ao forger, e o BFF ainda não lê a chave. Pedido do yc.app, a mando do dono
+  (`modelo.pedido.references-no-model-format.20260929`).
+
 ## 1.83 — 2026-09-29
 
 - **`references` no `.model.json`: sintaxe e semântica, do lado de quem lê** (`bff/README.md` §Declarada no
