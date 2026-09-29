@@ -2,6 +2,13 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.92 — 2026-09-29
+
+- **`references` em produção desde 2026-09-29T19:11:32Z** (`forger/endpoints/model.md` §Atributo que aponta
+  outro agregado). A conferência na publicação (1.86) está no ar no forger `2ab9b8d`; a frase "ainda não em
+  produção" deixou de valer nesse instante e ficou até aqui por falta de atualização. Fonte: encerramento do
+  pedido de deploy pela infra (`infra/hostinger/issues/deploy.pedido.composer-com-references-no-model-json.20260929`).
+
 ## 1.91 — 2026-09-29
 
 - **`references`: o BFF que a lê está no ar em stager** (`bff/README.md` §Declarada no modelo), desde

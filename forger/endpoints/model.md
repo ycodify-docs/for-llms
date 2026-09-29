@@ -190,9 +190,10 @@ Integridade, quando o negócio exigir, é regra do processor br. Quem lê é o B
 (token do usuário, rótulo, precedência sobre o `options` do manifesto) está no
 [formato do modelo](../../persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado).
 
-> **Estado:** aceita pelo forger em `develop` desde `forger@2ab9b8d`; **ainda não em produção**. Até lá a
-> chave publica sem conferência. Modelo publicado não é revalidado: se o alvo for republicado sem o
-> aggregate, a origem só é recusada na próxima publicação dela.
+> **Em produção desde 2026-09-29T19:11:32Z** (`forger@2ab9b8d`; ver [CHANGELOG 1.92](../../CHANGELOG.md)).
+> Modelo publicado antes disso não é revalidado: uma declaração que não se sustenta e já estava no cache
+> continua lá até a próxima publicação. Idem se o alvo for republicado sem o aggregate: a origem só é
+> recusada na próxima publicação dela.
 
 ### Chaves que um modelo novo não precisa trazer
 
