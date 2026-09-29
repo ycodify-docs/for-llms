@@ -316,10 +316,11 @@ rótulo.
 
 ### Declarada no modelo: `references`, pedida e ainda não em vigor
 
-> **Estado em 2026-09-29:** pedida ao forger (validação na publicação) e ao interpreter (formato do modelo,
-> em [model-format](../persistence-crs/spec/model-format.md)). **O BFF ainda não lê esta chave.** Até valer,
-> a referência vem só do `options` por referência do manifesto, e só no mesmo tenant. Quando o
-> model-format a publicar, a **forma** autoritativa é a de lá; esta seção diz **o que o BFF faz** com ela.
+> **Estado em 2026-09-29:** a **forma** está no formato do modelo,
+> [model-format — `references`](../persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado)
+> (interpreter, 1.84), e é ela que vale se esta seção divergir. **Falta** a validação na publicação (forger,
+> pedida ao composer), e **o BFF ainda não lê esta chave**. Até valer, a referência vem só do `options` por
+> referência do manifesto, e só no mesmo tenant. Esta seção diz **o que o BFF faz** com ela.
 
 A referência é **fato do domínio**: declara-se no `.model.json`, no nível do agregado, irmã de `command` e
 `event`, e vale para qualquer consumidor, com tela ou sem.
