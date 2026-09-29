@@ -2,6 +2,14 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.89 — 2026-09-29
+
+- **`references`: a fatia do BFF segue o endereço qualificado** (`bff/README.md` §Declarada no modelo;
+  `shell/apresentacao.md`). `"<bc>.<tipo>"` é só o próprio modelo; o alvo em outro projeto do org se escreve
+  `"<projeto>.<bc>.<tipo>"`, e o BFF acha o tenant dele na sessão pelo projeto e pelo bounded context, sem
+  busca. Decisão do dono de 2026-09-29, já no forger (`develop`) e no formato do modelo (1.87). O BFF ainda
+  não lê a chave.
+
 ## 1.88 — 2026-09-29
 
 - **`references`: sai a nota de divergência da seção do forger** (`forger/endpoints/model.md` §Atributo que

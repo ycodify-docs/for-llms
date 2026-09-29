@@ -90,8 +90,9 @@ resto:
 [model-format — `references`](../persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado),
 o que o BFF faz com ela em
 [bff — declarada no modelo](../bff/README.md#declarada-no-modelo-references-pedida-e-ainda-não-em-vigor)) passa a
-valer sobre este `options` e alcança **outro bounded context** do mesmo org, como a aula da agenda apontando
-o professor do cadastro. Até lá, o `options` por referência é a forma que vale, e só no mesmo modelo.
+valer sobre este `options` e alcança **outro projeto** do mesmo org pelo endereço `"<projeto>.<bc>.<tipo>"`,
+como a aula da agenda apontando o professor do cadastro. `"<bc>.<tipo>"` fica no próprio modelo. Até lá, o
+`options` por referência é a forma que vale, e só no mesmo modelo.
 
 Quem resolve é o BFF ([bff — referência entre agregados](../bff/README.md#referência-entre-agregados-sessionrefs)),
 com o token de quem usa a tela. Duas regras de forma: o agregado apontado tem de estar **no mesmo modelo**
