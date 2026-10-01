@@ -43,6 +43,7 @@ Erros: `400` (arquivo vazio, extensão diferente de `.json`, documento inválido
 > | `computed` que nomeia comando ou atributo inexistente | ver [atributos preenchidos pelo processor](#atributos-preenchidos-pelo-processor-computed) |
 > | `alias` vazio, só de espaços ou que não é texto, em comando ou evento | ver [nome de exibição](#nome-de-exibicao) |
 > | `references` com atributo, alvo, `valueKey` ou tipo que não se sustenta | ver [atributo que aponta outro agregado](#atributo-que-aponta-outro-agregado-references) |
+> | `subscriptions` fora da forma, ou com tipo ou evento que não é do modelo | ver [assinatura externa de eventos](#assinatura-externa-de-eventos-subscriptions) |
 
 ### Recorte de leitura do aggregate: `roles`
 
@@ -194,6 +195,53 @@ Integridade, quando o negócio exigir, é regra do processor br. Quem lê é o B
 > Modelo publicado antes disso não é revalidado: uma declaração que não se sustenta e já estava no cache
 > continua lá até a próxima publicação. Idem se o alvo for republicado sem o aggregate: a origem só é
 > recusada na próxima publicação dela.
+
+### Assinatura externa de eventos: `subscriptions`
+
+**Opcional.** Declara quem, fora da plataforma, lê os eventos dos aggregates deste modelo. Assinatura é ato de
+**modelagem**: existe porque o modelo a declara e é publicada com ele; **não há cadastro por API**. Decisão do
+dono em 2026-10-01. **Modelo sem a chave publica como antes.**
+
+Fica **dentro** de `<org>.<projeto>`, ao lado de `aggregate` — nunca na raiz do arquivo:
+
+```jsonc
+{
+  "acme.agenda": {
+    "aggregate": { "agenda.aula": { … } },
+    "subscriptions": {
+      "korc-aulas": {
+        "reader": "korc.acme",                                         // usuário que lê o feed
+        "aggregateTypes": ["agenda.aula"],                             // <bc>.<tipo> deste modelo
+        "events": ["agenda.aula.agendada", "agenda.aula.cancelada"],   // opcional: ausente = todos
+        "from": "beginning"                                            // opcional: "now" (padrão) ou "beginning"
+      }
+    }
+  }
+}
+```
+
+> Ilustrativo: `…` é placeholder, e os nomes são exemplos.
+
+Recusas na publicação, todas `400`:
+
+| Recusa | Por quê |
+|---|---|
+| `subscriptions: {}`; nome fora de `^[a-z][a-z0-9-]{0,62}$`; chave desconhecida na declaração | forma |
+| `reader` ausente ou só de espaços | sem leitor, ninguém lê o feed |
+| `aggregateTypes` ausente, vazio, repetido ou fora de `<bc>.<tipo>` | forma |
+| `events` vazio, repetido ou fora de `<bc>.<tipo>.<evento>` | ausente quer dizer **todos**; vazio confundiria com nenhum |
+| `from` diferente de `now` e `beginning` | forma |
+| tipo em `aggregateTypes` que não é aggregate **deste** modelo | o feed lê só o modelo do tenant: serviria vazio |
+| evento de tipo fora de `aggregateTypes`, ou que o aggregate não declara em `event` | o evento nunca chegaria |
+
+**O `reader` não é conferido** contra os usuários do cliente: o modelo pode ser publicado antes de o usuário
+existir, e até ele existir ninguém lê o feed. Decisão do dono em 2026-10-01.
+
+Quem lê a declaração é o es-n, que serve o feed: ver
+[es-n — assinatura externa de eventos](../../es-n/endpoints/assinaturas.md).
+
+> **Estado:** aceita pelo forger em `develop` desde `forger@fb3201c`; **ainda não em produção**. Até lá a
+> chave publica sem conferência.
 
 ### Chaves que um modelo novo não precisa trazer
 
