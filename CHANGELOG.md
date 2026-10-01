@@ -2,6 +2,12 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.96 — 2026-10-01
+
+- **`subscriptions` no formato do modelo segue o que o forger valida** (`persistence-crs/spec/model-format.md`
+  §Assinaturas externas; `model.schema.json`): `events`, se presente, tem ao menos um item; listas sem repetição;
+  chave desconhecida na declaração é recusada. Para "todos os eventos", omite-se `events`.
+
 ## 1.95 — 2026-10-01
 
 - **`subscriptions`: o forger aceita e valida na publicação** (`forger/endpoints/model.md` §Assinatura externa de
