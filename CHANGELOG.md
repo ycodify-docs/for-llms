@@ -2,6 +2,14 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.93 — 2026-10-01
+
+- **Assinatura externa de eventos** (`es-n/endpoints/assinaturas.md`, novo; `es-n/README.md` §Assinatura
+  externa de eventos). Quem está fora da plataforma lê, por cursor opaco, o que aconteceu num tenant, sem o
+  conteúdo do evento e sem autoria. Cadastro por administrador do tenant, leitura pelo papel de assinante, intervalo mínimo entre leituras (`429`), atraso visível
+  por assinatura. `/v3/es/…` é a instância de produção; `/v3/es/t/…` é a de teste. **Ainda não está no ar:** faltam a implantação, a rota na
+  porta de entrada e o papel de assinante. Pedido do da-agents, autorizado pelo dono.
+
 ## 1.92 — 2026-09-29
 
 - **`references` em produção desde 2026-09-29T19:11:32Z** (`forger/endpoints/model.md` §Atributo que aponta
