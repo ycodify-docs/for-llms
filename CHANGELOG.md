@@ -2,6 +2,15 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.95 — 2026-10-01
+
+- **`subscriptions`: o forger aceita e valida na publicação** (`forger/endpoints/model.md` §Assinatura externa de
+  eventos). A assinatura externa é declarada no modelo, dentro de `<org>.<projeto>` ao lado de `aggregate`, como ato
+  de modelagem — decisão do dono; o es-n já a lê. Recusas `400` tabeladas: forma (a mesma que o es-n exige
+  ao ler, mais `events` vazio e chave desconhecida) e coerência com o próprio modelo (tipo e evento existem nele).
+  O `reader` não é conferido contra os usuários do cliente, por decisão do dono. Em `develop` desde
+  `forger@fb3201c`; **ainda não em produção**. Issue composer `forger.pedido.subscriptions-no-model-json.20261001`.
+
 ## 1.94 — 2026-10-01
 
 - **Assinatura externa de eventos passa a ser declarada no modelo** (`persistence-crs/spec/model-format.md`
