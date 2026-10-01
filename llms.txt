@@ -58,7 +58,7 @@
 ## es-n (despacho de eventos)
 - [Guia](es-n/README.md): pipeline, três despachos, ordenação, topologia de filas (fixa).
 - [acionar processamento](es-n/endpoints/processar-eventos.md) · [Erros](es-n/erros.md) · [Exemplos](es-n/exemplos.md)
-- [Assinatura externa de eventos](es-n/endpoints/assinaturas.md): feed por cursor para quem está fora da plataforma — cadastro, leitura, cursor, erros.
+- [Assinatura externa de eventos](es-n/endpoints/assinaturas.md): feed por cursor para quem está fora da plataforma — declarada no modelo; leitura, cursor, erros.
 
 ## br-service (regras e coordenação)
 - [Guia](br-service/README.md): porta de entrada por pergunta, posição no fluxo, forma canônica da rota, índice de endpoints.

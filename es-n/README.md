@@ -132,8 +132,9 @@ O es-n expõe **uma** operação de serviço para **acionar o processamento** do
 ## Assinatura externa de eventos
 
 Quem está **fora** da plataforma lê, por cursor, **o que** aconteceu num tenant — tipo de agregado, id,
-evento, quando —, sem o conteúdo e sem receber chamada nenhuma. É leitura: não muda o pipeline, o checkpoint
-nem o despacho. Ver [endpoints/assinaturas.md](endpoints/assinaturas.md).
+evento, quando —, sem o conteúdo e sem receber chamada nenhuma. A assinatura é **declarada no modelo** do
+tenant, não cadastrada em execução. É leitura: não muda o pipeline, o checkpoint nem o despacho. Ver
+[endpoints/assinaturas.md](endpoints/assinaturas.md).
 
 ## Pontos de coordenação
 - **CP-3** — recebe a notificação de mudança de estado do persistence-crs.

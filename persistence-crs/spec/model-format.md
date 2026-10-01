@@ -10,6 +10,7 @@
 
 ## Contents
 - Estrutura de topo
+- Assinaturas externas
 - Nível do agregado
 - Atributos e tipos
 - Comandos
@@ -27,7 +28,8 @@
   "<org>.<project>": {              // chave = organização.projeto (um projeto é um bounded context)
     "aggregate": {
       "<bc>.<aggregateType>": { ... } // um ou mais agregados
-    }
+    },
+    "subscriptions": { ... }          // OPCIONAL — ver "Assinaturas externas"
   }
 }
 ```
@@ -47,6 +49,42 @@ validação e do JSON publicado) e o grid de interpretação (persistence-crs/es
 > **Escopo:** esta convenção `_` é do **`.model.json`**. A definição de **entity** (forger) tem contrato
 > próprio e usa **`_conf` obrigatório** (semântico) — lá `_` **não** é removido. Ver
 > [forger/entity](../../forger/endpoints/entity.md).
+
+### Assinaturas externas (`subscriptions`)
+
+Declara o que um sistema **de fora** da plataforma pode acompanhar deste tenant: ele lê, por cursor, **o que**
+aconteceu — tipo de agregado, id, evento, quando —, sem o conteúdo. Dizer o que um sistema de fora consome do
+domínio é decisão de **quem modela**: por isso a assinatura mora no modelo e é publicada com ele, e não se
+cadastra em execução. O feed está em [es-n — assinatura externa](../../es-n/endpoints/assinaturas.md).
+
+```jsonc
+"acme.vendas": {
+  "aggregate": { ... },
+  "subscriptions": {
+    "monitor-externo": {
+      "reader": "svc-monitor",                       // a ÚNICA conta que lê este feed
+      "aggregateTypes": ["vendas.pedido"],           // <bc>.<tipo> deste modelo
+      "events": ["vendas.pedido.cancelado"],         // opcional: ausente = todos os eventos dos tipos
+      "from": "now"                                  // opcional: "now" (padrão) ou "beginning"
+    }
+  }
+}
+```
+
+| Parte | Regra |
+|---|---|
+| **lugar** | **dentro** de `<org>.<projeto>`, irmã de `aggregate` — nunca na raiz do documento |
+| **nome** | `^[a-z][a-z0-9-]{0,62}$`; é o que vai no caminho do feed |
+| `reader` | o `username` da conta que lê; ela precisa do papel `SUBSCRIBER` no tenant. Outra conta, mesmo com o papel, recebe `403` |
+| `aggregateTypes` | ao menos um; `<bc>.<tipo>` de agregado deste modelo |
+| `events` | `<bc>.<tipo>.<evento>`, de um dos tipos acima |
+| `from` | onde a leitura começa na **primeira** leitura: `now` = só o que acontecer depois; `beginning` = desde o primeiro evento |
+
+**O motor de comandos não lê esta chave.** Mudar o filtro é republicar o modelo: a próxima leitura já usa a
+declaração nova, e o cursor de quem lê não se perde. Remover a assinatura do modelo faz o feed responder `404`.
+
+> **Estado em 2026-10-01:** a leitura já existe no serviço de eventos; a **validação na publicação** foi
+> pedida à gestão de modelos e ainda não vale. Até lá, declaração fora da forma faz o feed responder `500`.
 
 ## Nível do agregado
 
