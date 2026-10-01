@@ -86,6 +86,11 @@ A resposta é **imediata**: não há espera por evento novo. Com `hasMore: false
 Para ler o detalhe de um evento: [leitura de agregado](../../persistence-crs/endpoints/agregado-leitura.md)
 e o histórico dele, com o mesmo token — e com o recorte de leitura que esse token tiver.
 
+> ⚠️ **`SUBSCRIBER` lê o feed, não o detalhe.** Para ler o agregado e o histórico, a conta leitora precisa
+> também de um papel de **leitura** naquele agregado (`roles.read` do modelo). Sem ele, o detalhe responde
+> `204` sem corpo — a mesma resposta de um id que não existe, de propósito: dizer "existe e você não pode"
+> entregaria a existência do registro.
+
 ## Acompanhar o atraso
 
 `GET /subscriptions/{name}` → `200` com a declaração (`aggregateTypes`, `events`, `reader`) e `lag`:
@@ -112,4 +117,6 @@ ainda não lidos, contados até 10000; `pendingCapped` diz se o teto foi atingid
 | `429` | leitura antes de `minIntervalMs`; o cabeçalho `Retry-After` diz em quantos segundos |
 | `500` | a declaração no modelo está fora da forma — corrija e republique o modelo |
 
-Corpo do erro: `{ "status": <HTTP>, "message": "<motivo>" }`.
+Corpo do erro: `{ "status": <HTTP>, "message": "<motivo>" }` — exceto o `401`, que vem da camada de
+autenticação, antes do feed, com corpo próprio (`path`, `error`, `message`, `status`). Trate o `401` pelo
+status, não pelo corpo.

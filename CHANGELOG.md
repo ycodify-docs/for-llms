@@ -2,6 +2,13 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.99 — 2026-10-01
+
+- **Feed de assinatura externa: dois desvios do teste ponta a ponta viram doc** (`es-n/endpoints/assinaturas.md`).
+  `SUBSCRIBER` lê o feed, não o detalhe: o agregado e o histórico pedem papel de leitura, e sem ele a resposta é
+  `204` sem corpo. O `401` vem da camada de autenticação, com corpo próprio. Os outros dois desvios eram de
+  código, consertados no serviço de eventos.
+
 ## 1.98 — 2026-10-01
 
 - **Feed de assinatura externa no ar na instância de teste** (`es-n/endpoints/assinaturas.md`,
