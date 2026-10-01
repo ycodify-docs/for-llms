@@ -2,6 +2,13 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.101 — 2026-10-01
+
+- **Login: só `X-Forger-Credential`** (`auth/endpoints/sign-in.md` §Cabeçalhos; `auth/exemplos.md` §1 e §2). A
+  doc dizia que o login aceitava `X-Tenant-Id` **ou** `X-Forger-Credential`, e o exemplo do login externo usava
+  `X-Tenant-Id` — que responde `401`. A rota de auth exige `X-Forger-Credential` como única credencial; decisão
+  do dono em 2026-10-01. Erro relatado pelo conceptnatal, medido em produção por ele.
+
 ## 1.100 — 2026-10-01
 
 - **Leitura de agregado: papel fora de `roles.read` responde `403`, não `204`** (`persistence-crs/endpoints/agregado-leitura.md`

@@ -2291,8 +2291,9 @@ Corpo (JSON):
 | `password` | string | sim | Senha. |
 
 Cabeçalhos: `Content-Type: application/json`. **Não** exige `Authorization` (é o login). Pela borda, exige
-**um** cabeçalho de identificação — `X-Tenant-Id` **ou** `X-Forger-Credential`, nunca os dois; sem nenhum,
-`401` `missing_headers`. Ver [gateway](../../gateway/README.md).
+**`X-Forger-Credential`** — é a **única** credencial da rota de auth, e não há alternativa. Com `X-Tenant-Id` no
+lugar dele, o login responde `401` de corpo vazio; sem nenhum dos dois, `401` `missing_headers`. Ver
+[gateway](../../gateway/README.md).
 
 ## Resposta
 
@@ -2398,14 +2399,15 @@ Headers: X-Forger-Credential: <credencial>
   "name": "Alice", "email": "alice@acme.com", "roles": ["API_MASTER"], "mcpSessionId": "<uuid>" }
 ```
 
-Use o `accessToken` nas chamadas seguintes: `Authorization: Bearer <token>`. Pela borda, o login leva **um**
-cabeçalho de identificação, `X-Tenant-Id` ou `X-Forger-Credential` ([gateway](../gateway/README.md)).
+Use o `accessToken` nas chamadas seguintes: `Authorization: Bearer <token>`. Pela borda, o login leva
+**`X-Forger-Credential`**, a única credencial da rota de auth; com `X-Tenant-Id` no lugar dele, `401`
+([gateway](../gateway/README.md)).
 
 ## 2. Login externo
 
 ```
 POST /ua/sign-in
-Headers: X-Tenant-Id: <tenant-id>
+Headers: X-Forger-Credential: <credencial>        // X-Tenant-Id aqui dá 401
 { "username": "cliente1", "password": "•••" }
 → 200  { "accessToken": "<token>", "tokenType": "Bearer", ... }   // token inclui os tenants do usuário
 ```
@@ -11339,6 +11341,13 @@ O usuário abre um relato novo.
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.101 — 2026-10-01
+
+- **Login: só `X-Forger-Credential`** (`auth/endpoints/sign-in.md` §Cabeçalhos; `auth/exemplos.md` §1 e §2). A
+  doc dizia que o login aceitava `X-Tenant-Id` **ou** `X-Forger-Credential`, e o exemplo do login externo usava
+  `X-Tenant-Id` — que responde `401`. A rota de auth exige `X-Forger-Credential` como única credencial; decisão
+  do dono em 2026-10-01. Erro relatado pelo conceptnatal, medido em produção por ele.
 
 ## 1.100 — 2026-10-01
 
