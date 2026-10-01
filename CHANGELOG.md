@@ -2,6 +2,16 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.94 — 2026-10-01
+
+- **Assinatura externa de eventos passa a ser declarada no modelo** (`persistence-crs/spec/model-format.md`
+  §Assinaturas externas; `model.schema.json` `subscriptions`; `es-n/endpoints/assinaturas.md`, reescrito).
+  Corrige a 1.93: não há mais cadastro por API. A assinatura é a chave `subscriptions` dentro de
+  `<org>.<projeto>` no `.model.json`, publicada com o modelo, e nomeia a única conta que lê (`reader`). O feed
+  fica em `GET /subscriptions/{name}/events` e o atraso em `GET /subscriptions/{name}`. Decisão do dono:
+  declarar o que um sistema de fora consome é ato de modelagem. **Ainda não está no ar nesta forma:** faltam a
+  implantação, a validação na publicação (pedida à gestão de modelos) e o papel de assinante.
+
 ## 1.93 — 2026-10-01
 
 - **Assinatura externa de eventos** (`es-n/endpoints/assinaturas.md`, novo; `es-n/README.md` §Assinatura
