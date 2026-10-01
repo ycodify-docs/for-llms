@@ -2,6 +2,12 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.98 — 2026-10-01
+
+- **Feed de assinatura externa no ar na instância de teste** (`es-n/endpoints/assinaturas.md`,
+  `persistence-crs/spec/model-format.md`): o estado dizia "ainda não está no ar". Teste desde 04:19:19Z;
+  validação na publicação desde 04:23:36Z; produção ainda não.
+
 ## 1.97 — 2026-10-01
 
 - **`subscriptions` em produção desde 2026-10-01T04:23:36Z** (`forger/endpoints/model.md` §Assinatura externa de
