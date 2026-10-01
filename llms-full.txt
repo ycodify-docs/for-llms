@@ -19,6 +19,7 @@
 
 ## Contents
 - Estrutura de topo
+- Assinaturas externas
 - Nível do agregado
 - Atributos e tipos
 - Comandos
@@ -36,7 +37,8 @@
   "<org>.<project>": {              // chave = organização.projeto (um projeto é um bounded context)
     "aggregate": {
       "<bc>.<aggregateType>": { ... } // um ou mais agregados
-    }
+    },
+    "subscriptions": { ... }          // OPCIONAL — ver "Assinaturas externas"
   }
 }
 ```
@@ -56,6 +58,43 @@ validação e do JSON publicado) e o grid de interpretação (persistence-crs/es
 > **Escopo:** esta convenção `_` é do **`.model.json`**. A definição de **entity** (forger) tem contrato
 > próprio e usa **`_conf` obrigatório** (semântico) — lá `_` **não** é removido. Ver
 > [forger/entity](../../forger/endpoints/entity.md).
+
+### Assinaturas externas (`subscriptions`)
+
+Declara o que um sistema **de fora** da plataforma pode acompanhar deste tenant: ele lê, por cursor, **o que**
+aconteceu — tipo de agregado, id, evento, quando —, sem o conteúdo. Dizer o que um sistema de fora consome do
+domínio é decisão de **quem modela**: por isso a assinatura mora no modelo e é publicada com ele, e não se
+cadastra em execução. O feed está em [es-n — assinatura externa](../../es-n/endpoints/assinaturas.md).
+
+```jsonc
+"acme.vendas": {
+  "aggregate": { ... },
+  "subscriptions": {
+    "monitor-externo": {
+      "reader": "svc-monitor",                       // a ÚNICA conta que lê este feed
+      "aggregateTypes": ["vendas.pedido"],           // <bc>.<tipo> deste modelo
+      "events": ["vendas.pedido.cancelado"],         // opcional: ausente = todos os eventos dos tipos
+      "from": "now"                                  // opcional: "now" (padrão) ou "beginning"
+    }
+  }
+}
+```
+
+| Parte | Regra |
+|---|---|
+| **lugar** | **dentro** de `<org>.<projeto>`, irmã de `aggregate` — nunca na raiz do documento |
+| **nome** | `^[a-z][a-z0-9-]{0,62}$`; é o que vai no caminho do feed |
+| `reader` | o `username` da conta que lê; ela precisa do papel `SUBSCRIBER` no tenant. Outra conta, mesmo com o papel, recebe `403` |
+| `aggregateTypes` | ao menos um, sem repetição; `<bc>.<tipo>` de agregado deste modelo |
+| `events` | opcional; se presente, ao menos um e sem repetição — `<bc>.<tipo>.<evento>`, de um dos tipos acima. Para "todos os eventos", omita a chave: lista vazia é recusada |
+| **outras chaves** | recusadas na publicação |
+| `from` | onde a leitura começa na **primeira** leitura: `now` = só o que acontecer depois; `beginning` = desde o primeiro evento |
+
+**O motor de comandos não lê esta chave.** Mudar o filtro é republicar o modelo: a próxima leitura já usa a
+declaração nova, e o cursor de quem lê não se perde. Remover a assinatura do modelo faz o feed responder `404`.
+
+> **Estado em 2026-10-01:** a **validação na publicação** vale desde 04:23:36Z — declaração fora da forma é
+> recusada com `400`. O feed está no ar na instância de teste; na de produção, ainda não.
 
 ## Nível do agregado
 
@@ -80,7 +119,12 @@ validação e do JSON publicado) e o grid de interpretação (persistence-crs/es
   "roles": { ... },   // OPCIONAL — quem pode LER este agregado. Ver "Quem pode ler"
 
   "command": { ... },
-  "event":   { ... }
+  "event":   { ... },
+
+  // OPCIONAIS — o motor não as lê. Ver "Chaves que só quem lê usa"
+  "computed":       { ... },   // atributos que o processor br preenche
+  "readProjection": { ... },   // colunas que cada papel vê, pelo BFF
+  "references":     { ... }    // atributo que aponta outro agregado
 }
 ```
 
@@ -267,6 +311,127 @@ agregado (ver [regra do `status`](../README.md#estados-transições-e-concorrên
 > - **Identidade:** `projecao.aggregateid == aggregate.id` (o `aggregateid` da projeção é o mesmo UUID).
 > - **Falha:** enviar o `id` (Long) da projeção onde a persistence-crs espera o UUID → `510`
 >   "Invalid UUID string". Ex.: `GET /a/vendas/pedido/1` falha; `GET /a/vendas/pedido/<uuid>` funciona.
+
+### Chaves que só quem lê usa: `computed`, `readProjection`, `references`
+
+Três chaves **opcionais** do nível do agregado, irmãs de `command` e `event`. **O motor (yc.cqrs-c,
+persistence-crs, es-n) não as lê:** ele busca cada parte do agregado pelo nome (`command`, `event`,
+`identity`, `tenantId`, …) e só percorre o **mapa de agregados**, nunca as chaves de dentro de um. Nenhuma
+das três muda o que o comando valida ou grava, o evento, a projeção ou a rota. Agregado sem elas publica e
+opera como antes.
+
+| Chave | Forma | Quem lê | Para quê |
+|---|---|---|---|
+| `computed` | `{ "<comando>": ["<atributo>", "<vo>.<campo>", …] }` | BFF | o atributo que o processor br preenche sai do formulário e é enviado com um marcador |
+| `readProjection` | `{ "<PAPEL>": ["<coluna>", …] }` ou `{ "<PAPEL>": "*" }` | BFF | limita as colunas que cada papel vê nas leituras que passam pelo BFF |
+| `references` | `{ "<atributo>": "<endereço>" }` ou `{ "<atributo>": { "aggregate": "<endereço>", "valueKey"?: … } }` — endereço `"<bc>.<tipo>"` ou `"<projeto>.<bc>.<tipo>"` | BFF — **pedido, ainda não lê** | declara que o atributo aponta um registro de outro agregado |
+
+> **Nunca prefixe estas chaves com `_`.** A publicação remove as chaves `_`-prefixadas em silêncio
+> ([Chaves de metadado](#chaves-de-metadado-_-prefixadas)) — a declaração sumiria sem aviso.
+
+#### `computed` — atributo que o processor preenche
+
+```jsonc
+"cadastro.aluno": {
+  "command": { "criar": { … } },
+  "computed": { "criar": ["username", "matriculas.iscurrent"] }
+}
+```
+
+- **Chave:** nome de um comando do agregado.
+- **Valor:** lista **não vazia e sem repetição**. Nome sem ponto é atributo de `data.attribute` **daquele
+  comando**; `"<vo>.<campo>"` é campo de value object declarado como grupo.
+- `computed` **não cria atributo**: marca um que o comando já declara.
+
+Recusas na publicação e o que ainda não é conferido: [forger — `computed`](../../forger/endpoints/model.md#atributos-preenchidos-pelo-processor-computed).
+O que o BFF faz com ela (marcadores por tipo, o que o processor devolve):
+[bff — atributo calculado pelo br](../../bff/README.md#atributo-calculado-pelo-br--computed).
+
+#### `readProjection` — as colunas que cada papel vê
+
+```jsonc
+"pessoal.aluno": {
+  "command": { … },
+  "readProjection": {
+    "RECEPCIONISTA": ["nome", "email", "telefone", "genero"],
+    "ADMINISTRADOR": "*"
+  }
+}
+```
+
+- **Chave:** papel. **Valor:** lista de colunas, ou `"*"` para a linha inteira.
+- **A declaração é exaustiva por agregado:** papel do usuário fora dela **não** alarga o recorte. Quem deve ver
+  tudo é declarado com `"*"`.
+- `id`, `aggregateid` e `status` nunca se recortam.
+
+> ⚠️ **`readProjection` tira o campo da tela, não do banco.** Só vale para quem lê pelo BFF; o forger aceita
+> a chave sem conferir o conteúdo, e é o BFF que recusa a leitura quando a declaração não se sustenta.
+> Tabela de efeito e limites: [bff — limitar os campos que um papel lê](../../bff/README.md#limitar-os-campos-que-um-papel-lê--readprojection).
+
+#### `references` — o atributo que aponta outro agregado
+
+> **Estado em 2026-09-29:** a forma e o significado estão definidos aqui, e esta é a referência
+> autoritativa. A **validação na publicação** está no forger em `develop`, **ainda não em produção**
+> ([forger — `references`](../../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references));
+> o **BFF ainda não lê** a chave
+> ([bff — declarada no modelo](../../bff/README.md#declarada-no-modelo-references-pedida-e-ainda-não-em-vigor)).
+> Até valer, a referência exibida pela tela vem só do `options` por referência do manifesto.
+
+```jsonc
+"agenda.aula": {
+  "command": { … },
+  "event": { … },
+  "references": {
+    "teacherid": "cadastro.professor",                                 // alvo no PRÓPRIO modelo
+    "serviceid": { "aggregate": "cadastro.modalidade" },               // forma longa, mesma coisa
+    "alunocpf":  { "aggregate": "cadastro.aluno", "valueKey": "cpf" }, // guarda outra chave do alvo
+    "matriculas.planoid": "cadastro.plano",                            // campo de value object de grupo
+    "cobrancaid": "financeiro.cobranca.fatura"                         // alvo no projeto 'financeiro' do org
+  }
+}
+```
+
+> Ilustrativo: nomes de projeto, agregado e atributo são exemplos.
+
+**Sintaxe.**
+
+| Parte | Regra |
+|---|---|
+| **chave** | atributo declarado em `data.attribute` de algum comando do agregado, ou `"<grupo>.<campo>"` de value object **de grupo** declarado nele. **Não valem** as chaves da plataforma (`id`, `aggregateid`, `status`, `version` e os metadados de auditoria) nem campo **dentro de um valor `Json`** |
+| **endereço** | `"<bc>.<tipo>"` — a [chave de agregado](#a-chave-do-agregado--bctype-e-ela-vale-em-três-lugares) de um agregado **do próprio modelo**; ou `"<projeto>.<bc>.<tipo>"` — agregado de **outro projeto do mesmo org**, a forma do nome completo `<org>.<projeto>.<bc>.<tipo>` sem o org. Nada além dessas duas formas |
+| **valor, forma curta** | o endereço, como texto. Equivale a `{ "aggregate": "<endereço>" }` |
+| **valor, forma longa** | `{ "aggregate": "<endereço>", "valueKey"?: "<atributo do alvo>" }`. `valueKey` é o atributo **do alvo** que este campo guarda; o padrão é `aggregateid`. **Chave desconhecida no objeto é recusada** — é o que deixa a forma aberta a extensões futuras declaradas |
+| **vazio** | `"references": {}` é recusado, como a lista vazia do `computed` |
+
+**Semântica.**
+
+1. **O que afirma.** Todo valor **não vazio** do atributo é o `valueKey` de um registro do agregado alvo. É
+   declaração **de leitura**: o motor não confere, no comando, se o alvo existe. Integridade, quando o negócio
+   a exigir, é regra do processor br.
+2. **Onde está o alvo — o endereço diz, não há busca.** `"<bc>.<tipo>"` é **só o próprio modelo**: não se
+   procura em outro. `"<projeto>.<bc>.<tipo>"` é o modelo publicado daquele projeto, no **mesmo org** de quem
+   declara, e o alvo tem de estar publicado em **exatamente um** tenant desse projeto. O motivo: cada tenant
+   publica o seu modelo, e nada impede dois tenants do org de declararem a mesma chave de agregado — procurar
+   `"<bc>.<tipo>"` no org seria ambíguo por construção. **Não há `tenantId` na declaração:** o mesmo
+   `.model.json` vale em qualquer ambiente. Decisão do dono em 2026-09-29.
+3. **Quem lê.** Nome e busca vêm com o **token de quem usa a tela**, no tenant do alvo. Sem esse tenant no
+   token, ou sem papel de leitura nele, o campo diz "sem acesso". **A referência não amplia leitura.**
+4. **Rótulo e busca não se declaram aqui.** Vêm do agregado alvo: o `titleKey` do manifesto dele, depois o
+   [`identity.fields`](#identidade-e-unicidade-identity) do modelo dele, por fim o primeiro atributo de texto.
+   A referência diz só **para onde aponta** e **por qual chave**.
+5. **Value object `multiple`.** Cada item aponta um registro.
+6. **Precedência.** Declarada no modelo, a referência vale sobre o `options` por referência do manifesto para o
+   mesmo atributo. O `options` por referência fica como a forma antiga, só do mesmo tenant.
+7. **Cópia local não é referência.** `teachername` gravado junto com `teacherid` é outro dado — *"o nome na
+   época"*; a referência dá *"o nome hoje"*, e uma não substitui a outra.
+
+**Validação na publicação.** As recusas, todas `400`, estão no
+[forger — `references`](../../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references): a forma
+acima; `"<bc>.<tipo>"` que não é agregado do próprio modelo; `"<projeto>.<bc>.<tipo>"` que nenhum modelo
+publicado do projeto declara, ou que está em mais de um tenant dele (a mensagem nomeia os tenants); `valueKey`
+que o alvo não declara; tipo do atributo incompatível com o do `valueKey`. **Sem revalidação retroativa**, como
+no `computed`: se o modelo alvo for republicado sem o agregado, ou removido, a tela mostra o estado ("não
+encontrado" / "sem acesso"), e a próxima publicação da origem recusa.
 
 ## Atributos e tipos
 
@@ -5193,6 +5358,8 @@ Erros: `400` (arquivo vazio, extensão diferente de `.json`, documento inválido
 > | `roles` do aggregate com recorte incoerente | ver [recorte de leitura do aggregate](#recorte-de-leitura-do-aggregate-roles) |
 > | `computed` que nomeia comando ou atributo inexistente | ver [atributos preenchidos pelo processor](#atributos-preenchidos-pelo-processor-computed) |
 > | `alias` vazio, só de espaços ou que não é texto, em comando ou evento | ver [nome de exibição](#nome-de-exibicao) |
+> | `references` com atributo, alvo, `valueKey` ou tipo que não se sustenta | ver [atributo que aponta outro agregado](#atributo-que-aponta-outro-agregado-references) |
+> | `subscriptions` fora da forma, ou com tipo ou evento que não é do modelo | ver [assinatura externa de eventos](#assinatura-externa-de-eventos-subscriptions) |
 
 ### Recorte de leitura do aggregate: `roles`
 
@@ -5277,6 +5444,121 @@ BFF, que o leva na capacidade do tenant: ver [bff — nome de exibição](../../
 
 > **Em produção desde 2026-09-26** (ver [CHANGELOG 1.58](../../CHANGELOG.md)). Modelo publicado antes
 > disso não é revalidado: um `alias` vazio que já estava no cache continua lá até a próxima publicação.
+
+### Atributo que aponta outro agregado: `references`
+
+**Opcional**, no nível do aggregate. Declara que o atributo guarda a chave de um registro de **outro
+aggregate**, para que a tela mostre e busque pelo nome em vez do id. **Aggregate sem a chave publica como
+antes.**
+
+```jsonc
+"agenda.aula": {
+  "command": { … },
+  "event": { … },
+  "references": {
+    "teacherid": "cadastro.professor",                                 // alvo no PRÓPRIO modelo
+    "serviceid": { "aggregate": "cadastro.modalidade" },               // forma longa, mesma coisa
+    "alunocpf":  { "aggregate": "cadastro.aluno", "valueKey": "cpf" }, // guarda outra chave do alvo
+    "planoid":   "financeiro.cobranca.plano"                           // alvo no projeto 'financeiro' do org
+  }
+}
+```
+
+> Ilustrativo: `…` é placeholder, e os nomes são exemplos.
+
+**O endereço diz onde está o alvo — não há busca.**
+
+| Endereço | Onde o forger procura o alvo |
+|---|---|
+| `"<bc>.<tipo>"` | **só no próprio modelo** que está sendo publicado. Não procura em outro modelo |
+| `"<projeto>.<bc>.<tipo>"` | nos modelos **publicados** do projeto `<projeto>` do **mesmo org**. O alvo tem de estar em **exatamente um** tenant desse projeto |
+
+Procurar `"<bc>.<tipo>"` no org inteiro seria ambíguo por construção: cada tenant publica o seu modelo, e
+nada impede dois deles de declararem a mesma chave de aggregate. Por isso o endereço carrega o projeto
+quando o alvo está fora do modelo — a mesma forma do FQN `<org>.<projeto>.<bc>.<tipo>`, sem o org, que é
+sempre o de quem publica. **Não há `tenantId` na declaração:** o mesmo `.model.json` vale em qualquer
+ambiente. Decisão do dono em 2026-09-29.
+
+**Sintaxe.** A chave é um atributo declarado em `data.attribute` de algum comando do aggregate, ou
+`"<valueObject>.<campo>"`. O valor é o endereço (forma curta) ou `{ "aggregate": "<endereço>",
+"valueKey"?: "<atributo do alvo>" }` (forma longa); `valueKey` ausente é `aggregateid`.
+
+Recusas na publicação, todas `400`:
+
+| Recusa | Por quê |
+|---|---|
+| `references: {}`, valor que não é texto nem objeto, chave desconhecida no objeto, endereço fora das duas formas | forma — metamodelo |
+| chave da plataforma (`id`, `aggregateid`, `status`, `version`, `loguser`, `logrole`, `logversion`, `logdate`) | o modelo não declara esse dado, então não declara para onde ele aponta |
+| atributo não declarado em comando nenhum do aggregate | a tela procuraria um campo que não existe |
+| `<valueObject>.<campo>` com value object não declarado em `data.valueObject.single`/`multiple` de comando nenhum | inclui campo **dentro** de um valor `Json`, que não é alvo de referência |
+| atributo `Json` ou `Jsonb` | um valor Json não guarda **uma** chave de outro registro |
+| `"<bc>.<tipo>"` que não é aggregate do próprio modelo | a mensagem indica a forma `"<projeto>.<bc>.<tipo>"` |
+| `"<projeto>.<bc>.<tipo>"` que nenhum modelo publicado do projeto declara | o alvo não existe onde o endereço aponta |
+| `"<projeto>.<bc>.<tipo>"` publicado em **mais de um** tenant do projeto | ambíguo — a mensagem nomeia os tenants |
+| `valueKey` que não está em `data.attribute` de comando nenhum do alvo | o alvo não tem esse dado |
+| `valueKey` ausente (`aggregateid`) e atributo que não é `Text` nem `String` com `length` ≥ 36 | o `aggregateid` é UUID em texto, 36 caracteres |
+| tipo do atributo de outra família que o do `valueKey` | famílias: texto (`String`, `Text`), inteiro (`Integer`, `Long`), decimal (`Double`, `Float`); as demais, só o mesmo tipo |
+
+**O que não é conferido:** o **campo** de `<valueObject>.<campo>` e o tipo dele — a forma interna do value
+object não foi medida no motor; confere-se só que o value object existe.
+
+**O motor não lê esta chave** e **não confere**, no comando, se o alvo existe: é declaração de leitura.
+Integridade, quando o negócio exigir, é regra do processor br. Quem lê é o BFF; a semântica de leitura
+(token do usuário, rótulo, precedência sobre o `options` do manifesto) está no
+[formato do modelo](../../persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado).
+
+> **Em produção desde 2026-09-29T19:11:32Z** (`forger@2ab9b8d`; ver [CHANGELOG 1.92](../../CHANGELOG.md)).
+> Modelo publicado antes disso não é revalidado: uma declaração que não se sustenta e já estava no cache
+> continua lá até a próxima publicação. Idem se o alvo for republicado sem o aggregate: a origem só é
+> recusada na próxima publicação dela.
+
+### Assinatura externa de eventos: `subscriptions`
+
+**Opcional.** Declara quem, fora da plataforma, lê os eventos dos aggregates deste modelo. Assinatura é ato de
+**modelagem**: existe porque o modelo a declara e é publicada com ele; **não há cadastro por API**. Decisão do
+dono em 2026-10-01. **Modelo sem a chave publica como antes.**
+
+Fica **dentro** de `<org>.<projeto>`, ao lado de `aggregate` — nunca na raiz do arquivo:
+
+```jsonc
+{
+  "acme.agenda": {
+    "aggregate": { "agenda.aula": { … } },
+    "subscriptions": {
+      "korc-aulas": {
+        "reader": "korc.acme",                                         // usuário que lê o feed
+        "aggregateTypes": ["agenda.aula"],                             // <bc>.<tipo> deste modelo
+        "events": ["agenda.aula.agendada", "agenda.aula.cancelada"],   // opcional: ausente = todos
+        "from": "beginning"                                            // opcional: "now" (padrão) ou "beginning"
+      }
+    }
+  }
+}
+```
+
+> Ilustrativo: `…` é placeholder, e os nomes são exemplos.
+
+Recusas na publicação, todas `400`:
+
+| Recusa | Por quê |
+|---|---|
+| `subscriptions: {}`; nome fora de `^[a-z][a-z0-9-]{0,62}$`; chave desconhecida na declaração | forma |
+| `reader` ausente ou só de espaços | sem leitor, ninguém lê o feed |
+| `aggregateTypes` ausente, vazio, repetido ou fora de `<bc>.<tipo>` | forma |
+| `events` vazio, repetido ou fora de `<bc>.<tipo>.<evento>` | ausente quer dizer **todos**; vazio confundiria com nenhum |
+| `from` diferente de `now` e `beginning` | forma |
+| tipo em `aggregateTypes` que não é aggregate **deste** modelo | o feed lê só o modelo do tenant: serviria vazio |
+| evento de tipo fora de `aggregateTypes`, ou que o aggregate não declara em `event` | o evento nunca chegaria |
+
+**O `reader` não é conferido** contra os usuários do cliente: o modelo pode ser publicado antes de o usuário
+existir, e até ele existir ninguém lê o feed. Decisão do dono em 2026-10-01.
+
+Quem lê a declaração é o es-n, que serve o feed: ver
+[es-n — assinatura externa de eventos](../../es-n/endpoints/assinaturas.md).
+
+> **Em produção desde 2026-10-01T04:23:36Z** (`forger@fb3201c`; ver [CHANGELOG 1.97](../../CHANGELOG.md)).
+> Modelo publicado antes disso não é revalidado: uma declaração que não se sustenta e já estava no cache
+> continua lá até a próxima publicação.
 
 ### Chaves que um modelo novo não precisa trazer
 
@@ -6397,6 +6679,7 @@ POST /
 - Os três tipos de despacho
 - Ordenação e idempotência
 - Endpoint (operacional)
+- Assinatura externa de eventos
 - Pontos de coordenação
 - Pitfalls (ao modelar eventos)
 
@@ -6512,6 +6795,13 @@ Ponto importante para quem modela domínios cross-contexto:
 O es-n expõe **uma** operação de serviço para **acionar o processamento** dos eventos de um tenant
 (uso operacional/interno, não é uma API de cliente): ver
 [endpoints/processar-eventos.md](endpoints/processar-eventos.md).
+
+## Assinatura externa de eventos
+
+Quem está **fora** da plataforma lê, por cursor, **o que** aconteceu num tenant — tipo de agregado, id,
+evento, quando —, sem o conteúdo e sem receber chamada nenhuma. A assinatura é **declarada no modelo** do
+tenant, não cadastrada em execução. É leitura: não muda o pipeline, o checkpoint nem o despacho. Ver
+[endpoints/assinaturas.md](endpoints/assinaturas.md).
 
 ## Pontos de coordenação
 - **CP-3** — recebe a notificação de mudança de estado do persistence-crs.
@@ -6635,6 +6925,124 @@ POST /api/event-processor/tenants/<tenant-id>/process
 Após o despacho, a **projeção** no banco de leitura reflete o novo estado e pode ser consultada via
 [persistence-q](../persistence-q/README.md). Eventos com `triggerCoordination` podem gerar **novos
 comandos** automaticamente (saga), visíveis como novos eventos no histórico do agregado-alvo.
+
+<!-- ===== es-n/endpoints/assinaturas.md ===== -->
+
+# es-n · endpoints · assinatura externa de eventos
+
+> Para quem está **fora** da plataforma e precisa saber **quando** algo acontece num tenant, sem receber
+> chamada nenhuma: a conta leitora **lê** um feed por cursor, no ritmo dela. O feed diz **o que** aconteceu e
+> **onde**, nunca o conteúdo — o detalhe se lê pelas consultas normais, com o recorte de leitura de quem
+> consulta. Guia: [../README.md](../README.md).
+
+> **Estado em 2026-10-01:** **no ar na instância de teste** (`/v3/es/t/…`) desde 04:19:19Z, com a validação da
+> declaração na publicação do modelo em produção desde 04:23:36Z. **Na instância de produção (`/v3/es/…`), ainda
+> não.** Falta o papel de assinante na gestão de contas para a primeira leitura com conta real.
+
+## Contents
+- A assinatura é declarada no modelo
+- Onde
+- Quem lê
+- Ler o feed
+- Acompanhar o atraso
+- O cursor
+- Erros
+
+## A assinatura é declarada no modelo
+
+Não há cadastro por API. A assinatura é parte do `.model.json` do tenant — chave `subscriptions` — e passa a
+valer quando o modelo é publicado: dizer o que um sistema de fora consome do domínio é decisão de quem modela.
+Forma e regras: [model-format — assinaturas externas](../../persistence-crs/spec/model-format.md#assinaturas-externas-subscriptions).
+
+## Onde
+
+| Superfície | Eventos de |
+|---|---|
+| `/v3/es/…` | a instância de produção |
+| `/v3/es/t/…` | a instância de **teste** |
+
+Como na persistência, **a rota decide a instância**, e cada instância tem o seu armazém de eventos. Um tenant
+que escreveu pelas duas rotas tem eventos nas duas, e cada feed vê só os da sua. Os caminhos abaixo são
+relativos a essas superfícies.
+
+## Quem lê
+
+Toda requisição leva `Authorization` e `X-Tenant-Id`. Lê **só** a conta que a declaração nomeia em `reader`,
+e ela precisa:
+
+- ter o tenant entre os do token;
+- ter o papel `SUBSCRIBER` (nome **a confirmar** pela gestão de contas).
+
+Outra conta do mesmo tenant, mesmo com o papel, recebe `403`.
+
+## Ler o feed
+
+`GET /subscriptions/{name}/events?after=<cursor>&limit=<N>`
+
+- `{name}` — o nome da assinatura no modelo.
+- `after` — o `next` da resposta anterior. Ausente: o início da assinatura (`from` da declaração, fixado na
+  primeira leitura).
+- `limit` — de 1 a 500; padrão 100.
+
+```json
+{
+  "events": [
+    {
+      "cursor": "v1.MTIzNDo1Ng",
+      "context": "vendas",
+      "aggregateType": "acme.vendas.vendas.pedido",
+      "aggregateId": "00000000-0000-4000-8000-000000000001",
+      "event": "cancelado",
+      "eventId": 56,
+      "occurredAt": "2026-10-01T02:09:33"
+    }
+  ],
+  "next": "v1.MTIzNDo1Ng",
+  "hasMore": false,
+  "minIntervalMs": 1000
+}
+```
+
+| Campo | Significado |
+|---|---|
+| `events` | em ordem; **sem conteúdo do evento e sem autoria**. `aggregateType` no nome completo `<org>.<projeto>.<bc>.<tipo>`; `occurredAt` em UTC, sem fuso |
+| `next` | onde a próxima leitura começa. **Avança mesmo sem evento do tenant**: um tenant quieto não volta a examinar o que já foi examinado |
+| `hasMore` | há mais a ler agora — leia de novo sem esperar |
+| `minIntervalMs` | intervalo mínimo entre duas leituras da mesma assinatura |
+
+A resposta é **imediata**: não há espera por evento novo. Com `hasMore: false`, leia de novo depois de
+`minIntervalMs` ou mais.
+
+Para ler o detalhe de um evento: [leitura de agregado](../../persistence-crs/endpoints/agregado-leitura.md)
+e o histórico dele, com o mesmo token — e com o recorte de leitura que esse token tiver.
+
+## Acompanhar o atraso
+
+`GET /subscriptions/{name}` → `200` com a declaração (`aggregateTypes`, `events`, `reader`) e `lag`:
+`delivered` (último `next` entregue), `head` (posição mais recente já legível), `pending` (eventos do filtro
+ainda não lidos, contados até 10000; `pendingCapped` diz se o teto foi atingido) e `lastReadAt`.
+
+## O cursor
+
+- **Opaco**: guarde e devolva como veio; não monte nem interprete.
+- **Sem perda nem repetição**: o feed só entrega o que já não pode mudar de lugar na ordem — um evento cuja
+  gravação ainda está em curso segura a fila até terminar, e nenhum evento aparece depois atrás de um cursor
+  já entregue.
+- **Reler é permitido**: um `after` antigo devolve de novo o que veio depois dele.
+- **Republicar o modelo não perde o cursor**: o filtro novo vale a partir da próxima leitura.
+
+## Erros
+
+| HTTP | Quando |
+|---|---|
+| `400` | `after` que não é cursor; `limit` fora de 1 a 500 |
+| `401` | sem credencial |
+| `403` | tenant fora do token; sem o papel `SUBSCRIBER`; conta diferente da que a declaração nomeia |
+| `404` | o modelo publicado do tenant não declara a assinatura |
+| `429` | leitura antes de `minIntervalMs`; o cabeçalho `Retry-After` diz em quantos segundos |
+| `500` | a declaração no modelo está fora da forma — corrija e republique o modelo |
+
+Corpo do erro: `{ "status": <HTTP>, "message": "<motivo>" }`.
 
 <!-- ===== br-service/README.md ===== -->
 
@@ -8621,11 +9029,12 @@ O contrato **mínimo obrigatório** é `mount` (e o `dispose` que ele devolve). 
   "identity":     { "username": "...", "name": "...", "email": "..." },
   "roles":        ["..."],
   "activeRole":   null,
-  "api":          { "command": "…", "query": "…", "count": "…", "aggregate": "…", "history": "…" },
+  "api":          { "command": "…", "query": "…", "count": "…", "aggregate": "…", "history": "…", "refs": { "labels": "…", "search": "…" } },
   "prefs":        { "formMode": "inline" | "modal" },
   "canConfigure": false,
   "savePrefs":    "(formMode) => Promise<void>",
-  "openSupport":  "(contexto) => void"
+  "openSupport":  "(contexto, focoErro?) => void",
+  "diagnostico":  { "erro": "(e, extra?) => id", "trilha": "(evento, detalhes?) => void" }
 }
 ```
 
@@ -8653,6 +9062,15 @@ O contrato **mínimo obrigatório** é `mount` (e o `dispose` que ele devolve). 
   | `count({ tenantId, aggregate, predicates? })` | **quantos** registros a consulta traria sem teto, sob o mesmo filtro — para o "X de Y" |
   | `aggregate({ tenantId, aggregate, id })` | **estado autoritativo** do agregado |
   | `history({ tenantId, aggregate, id })` | histórico de eventos do agregado |
+  | `refs.labels({ tenantId, aggregate, ids: { "<atributo>": [ids] } })` | o **nome** dos registros que um atributo aponta, em lote — ou o estado de cada atributo (`sem-acesso`, `erro`, `sem-tenant`, `sem-declaracao`) e os ids não achados (`faltam`) |
+  | `refs.search({ tenantId, aggregate, attr, texto?, paging })` | página de `{ valor, rotulo }` do agregado apontado, para o **seletor**. Grava-se o `valor` |
+
+  **Referência a outro agregado** (`refs`): o atributo declarado no manifesto como `options` por
+  referência mostra o **nome** do registro apontado, e se preenche por **busca**, nunca colando um id.
+  O rótulo chega em partes cruas (`{ valor, tipo, fmt? }`), e o miolo formata cada uma no fuso de quem
+  lê. A chamada é endereçada pela origem (este tenant, este agregado, o atributo); quem resolve o alvo é o
+  BFF. Erro da busca rejeita com `status` e, quando há, `estado`. **Opcional**: casca anterior a
+  2026-09-29 não oferece `refs`. Contrato das rotas: [bff — referência entre agregados](../bff/README.md#referência-entre-agregados-sessionrefs).
 
   **Comando recusado** rejeita com um erro que traz `message` (a mensagem legível da plataforma), `status`
   (o HTTP) e `em` (o instante, em epoch ms: o `timestamp` do corpo de erro, ou a hora da resposta). A
@@ -8711,10 +9129,29 @@ O contrato **mínimo obrigatório** é `mount` (e o `dispose` que ele devolve). 
   capacidade. Como preencher cada chave e publicar: [apresentacao](apresentacao.md). Forma completa e
   regras de publicação: [forger — manifesto de apresentação](../forger/endpoints/presentation.md). Referência órfã (atributo
   que o modelo não tem mais) o miolo ignora.
-- **`openSupport(contexto)`** — abre o suporte da casca com o contexto técnico que o miolo tem (registro,
-  estado, versão; e, vindo de um comando recusado, o status, a mensagem e o horário), como pares
-  `{ rótulo: valor }`. A casca acrescenta tenant e tela. ⚠️ **Hoje o suporte é um mockup declarado:** a
-  tela diz que nada é enviado a ninguém.
+- **`openSupport(contexto, focoErro?)`** — abre o suporte da casca com o contexto técnico que o miolo tem
+  (registro, estado, versão; e, vindo de um comando recusado, o status, a mensagem e o horário), como pares
+  `{ rótulo: valor }`. A casca acrescenta tenant e tela, e o **diagnóstico da tela** (abaixo). `focoErro` é o
+  id que `diagnostico.erro` devolveu: põe aquele erro à frente do relato. O relato vai à equipe da plataforma, que responde na mesma gaveta
+  ([bff](../bff/README.md#relatos-de-suporte-sessionsuporte), onde está também desde quando isso vale no ar).
+- **`diagnostico`** — a caixa-preta da casca, para o miolo contar o que só ele sabe. O que ela guarda vai
+  junto do relato **só quando o usuário relata**, e ele vê e pode remover cada parte antes de enviar
+  ([segurança](seguranca.md#diagnóstico-do-relato-de-suporte)).
+
+  | Método | Para quê |
+  |---|---|
+  | `erro(e, extra?)` | registra um erro que o miolo pegou (comando recusado, falha que ele tratou) e devolve o **id** para `openSupport` |
+  | `trilha(evento, detalhes?)` | anota o que o usuário fez: comando aberto, filtro aplicado, registro selecionado, aba |
+
+  `extra` e `detalhes` são pares `{ nome: texto }` com **nomes e ids** — nome de comando, de atributo, id
+  do registro. **Nunca valor de registro nem o que o usuário digitou.** A casca redige o que escapar (token,
+  e-mail, CPF) e corta o que passar do teto, mas a regra é não mandar.
+
+  Erro que o miolo **não** pega também chega ao diagnóstico: a casca escuta os erros não tratados e as
+  promessas rejeitadas do documento inteiro, o que alcança qualquer miolo, GEN ou CUSTOM, e atribui ao miolo
+  pelo endereço do código na pilha. Um miolo com raiz React própria deve pôr um **limite de erro** em volta
+  da sua árvore: sem ele, um erro de renderização apaga a tela do miolo sem aviso. O miolo GEN já tem o seu.
+  Ausente numa casca anterior: o miolo confere antes de usar, e segue sem ele.
 
 > **Ainda não providos:** `navigation` (navegação da casca) e `i18n` estiveram previstos neste
 > contrato, mas **não existem** na implementação. Um miolo não deve contar com eles. Quando forem
@@ -8738,7 +9175,7 @@ não diz **como se vê** (isso é o miolo).
           "roles": ["..."],
           "fromState": ["..."],
           "endState": "...",
-          "attributes": [ { "name": "...", "type": "...", "role": "input|status|serverStamp|lookup|computed" } ],
+          "attributes": [ { "name": "...", "type": "...", "role": "input|status|serverStamp|lookup|computed", "ref"?: { "aggregate": "...", "valueKey": "..." } } ],
           "valueObjects": [ { "name": "...", "cardinality": "single|multiple",
                               "fields": [ { "name": "...", "type": "...", "role": "..." } ], "scalar": false } ]
         }
@@ -8756,6 +9193,12 @@ não diz **como se vê** (isso é o miolo).
   casar o evento do histórico: [bff — Nome de exibição](../bff/README.md#nome-de-exibicao).
 - **`fromState`** — de quais estados o comando aparece; a casca/miolo habilita a transição só quando o
   agregado está num estado válido.
+- **`attributes[].ref`** — o agregado que o atributo aponta, **como o modelo declara** em `references`:
+  `aggregate` é o endereço (`<bc>.<tipo>` no próprio modelo, `<projeto>.<bc>.<tipo>` em outro projeto do
+  org), e `valueKey` é a chave do alvo que o atributo guarda. Vem também em `valueObjects[].fields`.
+  **Ausente** quando o modelo não declara. Nome e busca se pedem a `api.refs`, e o `options` por referência
+  do manifesto vale só onde não há `ref`. Ver
+  [bff — declarada no modelo](../bff/README.md#declarada-no-modelo-references-pedida-e-ainda-não-em-vigor).
 - **`attributes[].role`** — classificação que guia a apresentação:
   - `input` — campo editável comum.
   - `status` — campo de transição/concorrência (não é entrada do usuário).
@@ -8763,7 +9206,8 @@ não diz **como se vê** (isso é o miolo).
     ⚠️ **É o atributo que o agregado declara como `whenAttribute` de um evento — nunca "Timestamp com
     nome terminado em `em`".** Atributo de data que o negócio calcula, ou que o usuário informa, é
     `input`: viaja normalmente no comando. Só o carimbo declarado fica de fora.
-  - `lookup` — referência a outro agregado (widget de seleção).
+  - `lookup` — **heurística de nome** (texto terminado em `id`): **não** é referência declarada. A tela só
+    dá a dica "id de …". Quem aponta outro agregado de fato traz `ref` (abaixo).
   - `computed` — o **processor de regra de negócio preenche**: **oculto no formulário**, e o BFF o envia
     com um marcador que o processor sobrescreve. Nasce de declaração no modelo, nunca de nome. Vale
     também para `valueObjects[].fields` — e um value object em que todo campo é `computed` não se
@@ -8825,13 +9269,13 @@ A chave de `aggregate` é a **mesma** do `.model.json` (`<boundedContext>.<tipo>
 | `singular` | botão **"Novo {singular}"**, estado vazio ("Nenhum registro de {singular} ainda"), nome do arquivo exportado (`{singular}-AAAA-MM-DD.csv`) | em **minúsculas**, porque entra no meio da frase: `"aluno"`, `"pedido"` |
 | `plural` | **título da página** do agregado; elemento raiz do XML exportado | com inicial maiúscula: `"Alunos"` |
 | `genero` | a concordância do botão de criação e do estado vazio: **"Nova** modalidade", "criar **a primeira**" | `"feminino"` quando o nome do agregado é feminino; sem a chave, a tela diz "Novo" |
-| `titleKey` | título do registro no **painel lateral**, no **cartão** do celular e em "Ações deste registro" | o atributo (ou `grupo.campo`) que uma pessoa usa para reconhecer o registro: nome, número, placa. Sem ele, a tela usa o primeiro texto do registro |
+| `titleKey` | título do registro no **painel lateral**, no **cartão** do celular e em "Ações deste registro"; e o **nome** do registro onde outro agregado o aponta (ver [Referência a outro agregado](#referência-a-outro-agregado)) | o atributo (ou `grupo.campo`) que uma pessoa usa para reconhecer o registro: nome, número, placa. Sem ele, a tela usa o primeiro texto do registro |
 | `labels` | cabeçalho da coluna, rótulo do filtro, rótulo do campo no formulário, linhas do histórico, aba Dados, cópia de linha | para **todo** atributo que aparece na tela. Value object pelo nome = título do grupo no formulário; `grupo.campo` = campo dentro dele |
 | `stateLabels` | a **pílula de estado** (tabela, painel, ações, formulário, histórico) | o estado como o usuário diz: `"matriculado"` → `"Matriculado"` |
 | `fmt` | como o valor é **mostrado** na tabela, no cartão, na aba Dados e no histórico — também de `grupo.campo` | ver [formatos](#formatos). Só muda a exibição: o comando e a exportação continuam com o valor cru |
 | `cols` | as colunas visíveis **por padrão**, na ordem — `grupo.campo` vira coluna | de 4 a 6, as que se lê para decidir. **Não** ponha `status` (o Estado é sempre a última coluna) nem campo técnico. O usuário pode mudar as colunas; "Restaurar padrão" volta a esta lista |
 | `filters` | os campos do **painel de filtros** — `grupo.campo` filtra dentro do grupo | os que se usa para achar registro. Sem a chave, todos os atributos aparecem no filtro (campos de grupo, não) |
-| `options` | o campo do formulário vira **seleção** — atributo ou campo de grupo | lista fixa: os **valores exatos** que o comando grava. Referência `{ aggregate, valueKey, labelKey }`: a tela consulta até 200 registros do outro agregado, mostra `labelKey` e grava `valueKey` — então `valueKey` é o atributo do outro agregado que **este** campo guarda: num campo de referência, costuma ser `aggregateid` |
+| `options` | lista fixa: o campo do formulário vira **seleção**. Referência: o campo mostra o **nome** do registro apontado em toda a tela e se preenche por **busca** — atributo ou campo de grupo | lista fixa: os **valores exatos** que o comando grava. Referência `{ aggregate, valueKey, labelKey }`: `valueKey` é o atributo do outro agregado que **este** campo guarda (num campo de referência, costuma ser `aggregateid`); `labelKey`, o que a tela mostra. Ver [Referência a outro agregado](#referência-a-outro-agregado) |
 | `stateHue` | a **cor** da pílula de cada estado (matiz de 0 a 359) | para dar à cor um significado: em torno de 150 verde, 25 vermelho, 250 azul, 80 amarelo. Sem ela, a cor sai do nome do estado e é a mesma em qualquer tela |
 
 ### Campos de value object: `grupo.campo`
@@ -8864,6 +9308,38 @@ próprio `.model.json` ([forger — model](../forger/endpoints/model.md#nome-de-
 
 Sem `fmt`, `Date` e `Timestamp` já saem formatados, `Boolean` sai como Sim/Não e número sai em
 monoespaçada. `fmt` serve sobretudo para **dinheiro** e **telefone**, que o tipo não revela.
+
+### Referência a outro agregado
+
+`options` na forma `{ aggregate, valueKey, labelKey }` declara que o campo **aponta outro agregado**: a aula
+aponta o professor; o aluno, nas matrículas, aponta o plano. É a **única** declaração, e a tela deriva o
+resto:
+
+- **onde se vê** — tabela, cartão, aba Dados, histórico (antes → depois), título, cópia e filtro mostram o
+  **nome** do registro apontado, e não o id. A exportação leva as duas coisas: a coluna do id e, ao lado,
+  `<atributo>_rotulo`;
+- **onde se preenche** — no formulário (atributo ou campo de grupo) e no filtro ("é"), o campo vira um
+  **seletor com busca**, página a página, sem teto de registros. Grava `valueKey`, nunca o nome;
+- **qual nome** — `labelKey`; se ele faltar, ou se o papel não o ler, o `titleKey` do agregado apontado;
+  depois, o `identity.fields` dele no modelo; por fim, o primeiro texto que ele declara. A busca procura
+  nesses atributos de texto;
+- **quando não há nome** — a tela diz o motivo: "não encontrado" (o id não está na projeção), "sem
+  acesso" (o papel não lê o agregado apontado) ou "rótulo indisponível" (falha, registrada no diagnóstico).
+  **O seletor não aceita texto livre**: se a lista não vem, o erro aparece no campo.
+
+**A declaração vai para o modelo.** Referência é fato do domínio: a chave `references` do `.model.json`
+(**ainda não em vigor**; a forma em
+[model-format — `references`](../persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado),
+o que o BFF faz com ela em
+[bff — declarada no modelo](../bff/README.md#declarada-no-modelo-references-pedida-e-ainda-não-em-vigor)) passa a
+valer sobre este `options` e alcança **outro projeto** do mesmo org pelo endereço `"<projeto>.<bc>.<tipo>"`,
+como a aula da agenda apontando o professor do cadastro. `"<bc>.<tipo>"` fica no próprio modelo. Até lá, o
+`options` por referência é a forma que vale, e só no mesmo modelo.
+
+Quem resolve é o BFF ([bff — referência entre agregados](../bff/README.md#referência-entre-agregados-sessionrefs)),
+com o token de quem usa a tela. Duas regras de forma: o agregado apontado tem de estar **no mesmo modelo**
+(é o que a publicação confere), e a referência vive em **atributo ou `grupo.campo`**, nunca dentro de um
+valor `Json`, onde a tela não tem o que interpretar.
 
 ## Exemplo
 
@@ -8908,7 +9384,8 @@ monoespaçada. `fmt` serve sobretudo para **dinheiro** e **telefone**, que o tip
 
 - [ ] A chave do agregado é a do `.model.json`, e todo atributo citado existe no modelo publicado.
 - [ ] `singular` em minúsculas; `plural` com inicial maiúscula; `genero: "feminino"` quando o nome é feminino.
-- [ ] `titleKey` é um atributo que identifica o registro para uma pessoa.
+- [ ] `titleKey` é um atributo que identifica o registro para uma pessoa — é também o nome dele onde outro agregado o aponta.
+- [ ] Todo campo que guarda o id de outro agregado tem `options` por referência: sem ela, a tela mostra e pede o id.
 - [ ] Todo atributo que aparece na tela tem `labels`; todo estado tem `stateLabels`.
 - [ ] Dinheiro em centavos usa `money:2`; telefone usa `phone`.
 - [ ] `cols` tem de 4 a 6 atributos, sem `status` e sem campo técnico.
@@ -8932,8 +9409,9 @@ Adicionar um tenant **não** exige rebuild da casca.
 
 ## Como (runtime)
 
-1. A casca pede ao BFF a URL do miolo do tenant:
-   `GET /tenant/{tenantId}/miolo-manifest` → devolve a **URL do ponto de entrada** do remoto. Em paralelo,
+1. A casca pede ao BFF a URL do miolo do tenant **para o agregado escolhido**:
+   `GET /tenant/{tenantId}/miolo-manifest?aggregate={agregado}` → devolve a **URL do ponto de entrada** do
+   remoto. Em paralelo,
    pede a **capacidade** e o **manifesto de apresentação** do tenant, que vão no `hostContext`
    ([bff](../bff/README.md)).
 2. A casca **registra o remoto** daquele tenant e **carrega** o módulo `mount`.
@@ -8947,11 +9425,16 @@ Adicionar um tenant **não** exige rebuild da casca.
   carrega é a **URL do ponto de entrada** desse build.
 - O **BFF mantém o mapa `tenant → URL`** do miolo. Publicar/atualizar um miolo = atualizar esse mapa;
   a **casca não é rebuildada** e o browser **nunca** carrega o mapa inteiro (só a URL do seu tenant).
+- **Um miolo CUSTOM pode cobrir só parte do tenant.** No mapa, o tenant aponta para **um** miolo (cobre
+  todos os agregados) **ou** para um miolo **por agregado** — o nome é o de
+  `capability.aggregates[].aggregate`, e `*` cobre o resto do tenant. **O agregado que o mapa não cobre
+  abre no miolo GEN.** Assim, um miolo que só desenha a grade de reservas não tira do administrador as
+  telas GEN com que ele publica as aulas, no mesmo tenant.
 
 ```
 repo do cliente ──build──▶ remoto federado (publicado num host/CDN)
                                    ▲
-casca ──GET /tenant/{id}/miolo-manifest──▶ BFF (mapa tenant→URL) ──devolve a URL──┘
+casca ──GET /tenant/{id}/miolo-manifest?aggregate=…──▶ BFF (mapa tenant[→agregado]→URL) ──devolve a URL──┘
 casca ──registra + carrega + mount(hostContext)──▶ MIOLO renderiza no bounded context
 ```
 
@@ -8965,7 +9448,9 @@ casca ──registra + carrega + mount(hostContext)──▶ MIOLO renderiza no 
 
 - **Dependências comuns** (framework de UI, runtime de tema) são **compartilhadas** entre casca e miolo,
   para evitar duplicação e divergência de versão.
-- A resolução `tenant → URL` é responsabilidade do **BFF** (ver [bff](bff.md)) — nunca do browser.
+- A resolução `tenant → URL` é responsabilidade do **BFF** (ver [bff](../bff/README.md)) — nunca do browser.
+- **Trocar de agregado pode trocar de miolo** (CUSTOM ↔ GEN) na mesma página: a casca desmonta um e
+  registra o outro sob o mesmo nome de remoto (`miolo`).
 - Só se resolve o miolo de um tenant que **pertence ao usuário** (consta no token) — ver [seguranca](seguranca.md).
 
 <!-- ===== shell/estilo.md ===== -->
@@ -9231,6 +9716,26 @@ Coloque a tela nova ao lado de qualquer tela existente. Se um usuário não cons
   duração**. Ao expirar (`401`), a casca trata como **re-login**.
 - Encerrar sessão limpa o cookie no BFF.
 
+## Diagnóstico do relato de suporte
+
+O relato de suporte leva o **diagnóstico da tela**: o que a casca registrou na aba para quem for investigar.
+Fica só na memória da aba, e **nada sai sem o usuário relatar** — ele vê cada parte na gaveta de suporte,
+desmarca o que não quiser enviar e pode copiá-lo.
+
+| Parte | O que leva | O que **nunca** leva |
+|---|---|---|
+| **erros e avisos** (até 20 de cada) | origem (casca, miolo, rede, injeção), mensagem, pilha, pilha de componentes, instante, tela; as últimas linhas de erro e aviso do console | token, cookie, senha |
+| **chamadas ao servidor** (até 30) | método, caminho com **só as chaves** da query, status, duração, `x-request-id` | corpo da requisição ou da resposta, valor de parâmetro |
+| **o que foi feito na tela** (até 50) | org, contexto, agregado, comando aberto ou recusado, **nomes** dos campos filtrados, **id** do registro selecionado | valor de campo, texto digitado |
+| **versões e ambiente** | versão da casca e do miolo, navegador, tamanho da tela, tema, esquema, tenant, papel ativo, fuso | — |
+
+- **Todo texto passa por um redator** antes de entrar: JWT, `Bearer …`, e-mail, CPF e sequência longa de
+  letras e números saem trocados por marcadores. Mensagem até 500 caracteres, pilha até 4000, diagnóstico
+  inteiro até 64 KB — acima disso sai primeiro o mais antigo e o que menos explica.
+- **O `x-request-id` liga o relato à linha do log do BFF** ([bff](../bff/README.md#id-de-requisição-x-request-id)).
+  Não é credencial: não autentica nada e não carrega dado do usuário.
+- **O miolo contribui por `hostContext.diagnostico`** só com nomes e ids ([contrato](contrato-miolo.md)).
+
 ## Checklist do agente
 
 - [ ] Nunca expor o token à casca/miolo — **cookie httpOnly**, corpo sem token.
@@ -9238,6 +9743,7 @@ Coloque a tela nova ao lado de qualquer tela existente. Se um usuário não cons
 - [ ] Nunca tratar o gating da UI como segurança — o servidor **revalida**.
 - [ ] Nunca resolver tenant fora do token do usuário.
 - [ ] Nunca escrever segredo/credencial/endereço sensível em documentação pública.
+- [ ] Nunca pôr valor de registro, texto digitado ou corpo de requisição no diagnóstico — só nomes e ids.
 
 <!-- ===== shell/bff.md ===== -->
 
@@ -9274,14 +9780,17 @@ sem UI — app móvel, integração, serviço —, então é serviço **irmão**
 - [Capacidade](#capacidade)
 - [Miolo](#miolo)
 - [Proxy de domínio](#proxy-de-domínio)
+- [Referência entre agregados (`/session/refs/*`)](#referência-entre-agregados-sessionrefs)
 - [Arquivos anexos de agregado (`/session/files/*`)](#arquivos-anexos-de-agregado-sessionfiles)
 - [Quem autoriza a leitura](#quem-autoriza-a-leitura)
 - [Limitar os campos que um papel lê — `readProjection`](#limitar-os-campos-que-um-papel-lê-readprojection)
 - [Atributo calculado pelo br — `computed`](#atributo-calculado-pelo-br--computed)
 - [`predicates` é a forma do persistence-q — não há dialeto do BFF](#predicates-é-a-forma-do-persistence-q-não-há-dialeto-do-bff)
 - [Autocadastro (`/ua/*`)](#autocadastro-ua)
+- [Relatos de suporte (`/session/suporte/*`)](#relatos-de-suporte-sessionsuporte)
 - [Preferências da organização (org-scoped)](#preferências-da-organização-org-scoped)
 - [Cabeçalhos que o BFF injeta (contrato de saída)](#cabeçalhos-que-o-bff-injeta-contrato-de-saída)
+- [Id de requisição (`x-request-id`)](#id-de-requisição-x-request-id)
 - [Operação](#operação)
 - [Erros](#erros)
 - [Checklist do agente](#checklist-do-agente)
@@ -9367,7 +9876,7 @@ forger é quem **grava** ali ao publicar o `.model.json`) — e cruza com os **p
 
 | Chave | O que traz |
 |---|---|
-| `attributes` | os atributos escalares, com `type`, `nullable` e o papel de apresentação (`input`, `status`, `serverStamp`, `lookup`, `computed`) |
+| `attributes` | os atributos escalares, com `type`, `nullable`, o papel de apresentação (`input`, `status`, `serverStamp`, `lookup`, `computed`) e, quando o modelo declara em `references`, `ref: { aggregate, valueKey }`, o agregado que o atributo aponta (também nos campos de value object) |
 | `valueObjects` | os **value objects** do comando, com `name`, `cardinality` (`single` · `multiple`) e `fields`. **Ausente** quando o comando não declara nenhum |
 
 **`serverStamp` é o `whenAttribute` do evento, e só ele.** O BFF **não envia** esse atributo no comando,
@@ -9449,9 +9958,16 @@ Quando o modelo declara `alias` em `command.<cmd>` ou em `event.<evt>`
 
 | Operação | Método · Path | Resposta |
 |---|---|---|
-| Manifesto do miolo | `GET /tenant/{tenantId}/miolo-manifest` | `{ "tenantId": "...", "manifestUrl": "..." }` |
+| Manifesto do miolo | `GET /tenant/{tenantId}/miolo-manifest?aggregate={agregado}` | `{ "tenantId": "...", "aggregate": "...", "manifestUrl": "..." }` |
 
-Resolve `tenant → URL` do miolo (ver [injecao](../shell/injecao.md)). Só para tenant do usuário.
+Resolve `tenant → URL` do miolo (ver [injecao](../shell/injecao.md)). Só para tenant do usuário (`404` fora
+dele, e `404` quando nada cobre o tenant).
+
+- **`aggregate`** — o agregado escolhido no menu (o valor de `capability.aggregates[].aggregate`).
+  Opcional: sem ele, vale só o miolo que cobre o tenant inteiro, e o `aggregate` sai da resposta.
+- **O registro cobre o tenant inteiro ou só alguns agregados dele.** Ordem: o miolo registrado **para o
+  agregado** → o miolo registrado para o **resto do tenant** (`*`) → o **miolo GEN**. Um miolo CUSTOM
+  que trata só um agregado não esconde os outros: eles abrem no GEN.
 
 > **Única operação exclusiva de quem usa a casca.** Consumidor **sem UI** (app móvel, integração,
 > serviço) **não** chama este endpoint — não há miolo a injetar. Sessão, capacidade e proxy valem
@@ -9521,6 +10037,106 @@ O consumidor **não** compõe esses cabeçalhos nem conhece o token.
   persistence-q os ignoraria em silêncio. Resposta em forma desconhecida vira `502`, nunca um zero.
 - `/session/aggregate` existe porque a **projeção é assíncrona**: para carregar o estado autoritativo de
   um agregado (ex.: preencher um form de transição) não se deve ler o read model.
+
+## Referência entre agregados (`/session/refs/*`)
+
+Quando um atributo aponta outro agregado (a aula aponta o professor), quem mostra ou preenche o campo
+precisa do **nome** do registro apontado, não do id. As duas rotas resolvem isso **uma vez, no BFF**,
+para qualquer consumidor: a casca (GEN e CUSTOM, via `api.refs`) e o cliente sem UI.
+
+| Operação | Método · Path | Corpo | Resposta |
+|---|---|---|---|
+| Rótulos em lote | `POST /session/refs/labels` | `{ tenantId, aggregate, ids: { "<atributo>": ["<id>", …] } }` | `{ refs: { "<atributo>": { alvo, rotulos: { "<id>": Parte[] }, faltam: ["<id>"] } \| { alvo?, estado, status? } } }` |
+| Busca para seletor | `POST /session/refs/search` | `{ tenantId, aggregate, attr, texto?, paging }` | `{ alvo, itens: [{ valor, rotulo: Parte[] }], truncated?, semBusca? }` |
+
+`Parte = { valor, tipo, fmt? }`. O rótulo vem **cru e em partes**, e quem mostra formata cada uma (tipo e
+`fmt`), porque só a tela conhece o fuso de quem lê. `valor` é a **chave que o comando grava**, nunca o
+rótulo.
+
+- **A chamada é endereçada pela origem** (`tenantId`, `aggregate`, atributo): o BFF acha a declaração e o
+  alvo. O consumidor **não escolhe** o agregado apontado nem o tenant dele.
+- **A declaração** é o `options` por referência do manifesto
+  (`{ aggregate, valueKey, labelKey }`, ver [shell — apresentacao](../shell/apresentacao.md)). Atributo
+  sem essa declaração: `sem-declaracao` nos rótulos, `404` na busca.
+- **O rótulo vem do alvo**, nesta ordem: `labelKey` declarado → `titleKey` do alvo no manifesto →
+  `identity.fields` do alvo no modelo → o primeiro atributo de texto que ele declara. A **busca** usa os
+  atributos do rótulo mais `identity.fields`, só os de texto e de primeiro nível, por `ilike` e com `OR`
+  entre eles. Sem nenhum atributo desses, a busca lista sem filtro e responde `semBusca: true`.
+- **Quem lê é o usuário**: a consulta ao alvo vai com o token da sessão, e o persistence-q decide. O
+  recorte de coluna ([`readProjection`](#limitar-os-campos-que-um-papel-lê-readprojection)) vale: se a
+  coluna do rótulo está cortada, o rótulo desce para o nível seguinte da ordem, e nunca vaza.
+- **Estados, nunca silêncio.** Nos rótulos: id pedido e não achado vai em `faltam`; `403` do
+  persistence-q → `estado: "sem-acesso"`; outro erro → `estado: "erro"` com o `status`; nada legível que
+  identifique o registro → `sem-acesso`. Na busca, o erro do persistence-q **passa inteiro**.
+- **Limites:** até 20 atributos e 500 ids por atributo nos rótulos (ids em lotes de 200 por consulta, um
+  lote por alvo e chave); até 50 itens por página na busca (`paging` obrigatório).
+- **Só o mesmo tenant, por ora.** O alvo tem de estar no modelo do tenant de origem: é o único que a
+  publicação do manifesto aceita. Fora dele: `estado: "sem-tenant"` nos rótulos e `422` na busca.
+  **Referência dentro de um valor `Json` não se resolve**: só atributo ou `grupo.campo`.
+
+### Declarada no modelo: `references`, pedida e ainda não em vigor
+
+> **Estado em 2026-09-29:** a **forma** está no
+> [formato do modelo](../persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado)
+> (1.87), e é ela que vale se esta seção divergir. O forger já confere a chave em `develop`
+> (`forger@2ab9b8d`, [recusas](../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references)),
+> **mas ainda não em produção**. **O BFF lê a chave no ar em stager desde 2026-09-29T19:04Z** (yc.app
+> `56f3cd9`); sem a declaração no modelo, vale o `options` por referência do manifesto, só no mesmo tenant.
+> Enquanto o forger de produção não confere a chave, declará-la é **por conta de quem publica**: um
+> endereço errado só aparece na tela, como `sem-tenant`, `sem-acesso` ou `erro`. Esta seção diz **o que o
+> BFF faz** com ela.
+
+A referência é **fato do domínio**: declara-se no `.model.json`, no nível do agregado, irmã de `command` e
+`event`, e vale para qualquer consumidor, com tela ou sem.
+
+```jsonc
+"agenda.aula": {
+  "command": { … },
+  "event": { … },
+  "references": {
+    "regraid":   "agenda.regra",                                               // alvo no PRÓPRIO modelo
+    "teacherid": "cadastro.cadastro.professor",                                // alvo em outro projeto do org
+    "serviceid": { "aggregate": "cadastro.cadastro.modalidade" },              // forma longa, mesma coisa
+    "alunocpf":  { "aggregate": "cadastro.cadastro.aluno", "valueKey": "cpf" } // guarda outra chave do alvo
+  }
+}
+```
+
+> Ilustrativo: nomes de agregado e de atributo são exemplos, não JSON literal a copiar.
+
+**Sintaxe.**
+- **Chave:** atributo declarado em `data.attribute` de algum comando do agregado, ou `grupo.campo` de value
+  object de grupo. Nunca uma chave da plataforma (`id`, `aggregateid`, `status`, `version`, auditoria), nem um
+  campo dentro de valor `Json`.
+- **Valor:** o **endereço** do alvo, em texto, ou o objeto `{ "aggregate": "<endereço>", "valueKey"?:
+  "<atributo do alvo>" }`. `valueKey` é o atributo do alvo que este campo guarda, com padrão
+  `aggregateid`; outra chave no objeto é recusada.
+- **O endereço diz onde está o alvo, sem busca:**
+
+  | Endereço | Onde está o alvo |
+  |---|---|
+  | `"<bc>.<tipo>"` | **só no próprio modelo**, no mesmo tenant. Nunca em outro modelo |
+  | `"<projeto>.<bc>.<tipo>"` | no projeto `<projeto>` do **mesmo org**, publicado em **exatamente um** tenant dele. É a forma do FQN `<org>.<projeto>.<bc>.<tipo>`, sem o org |
+
+- `references` vazio é recusado. As demais recusas (tipo do atributo, `valueKey`, alvo inexistente ou
+  ambíguo) são do forger: [forger — `references`](../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references).
+
+**Semântica.**
+- **Afirma** que todo valor não vazio do atributo é o `valueKey` de um registro do alvo. É declaração de
+  **leitura**: o motor não a lê e não confere, no comando, se o alvo existe.
+- **O alvo** está onde o endereço diz. Com `"<bc>.<tipo>"`, no próprio tenant. Com
+  `"<projeto>.<bc>.<tipo>"`, o BFF pega na sessão o tenant do **mesmo org** com aquele projeto e aquele
+  bounded context; se ele não está no token do usuário, o estado é `sem-acesso`. **Sem `tenantId`** na
+  declaração: o mesmo modelo vale em qualquer ambiente.
+- **Quem lê** é o usuário, com o próprio token, no tenant do alvo. Sem esse tenant no token, ou sem papel
+  de leitura nele, o estado é `sem-acesso`: **a referência não amplia leitura**.
+- **Nome e busca** não se declaram aqui: vêm do alvo, na mesma ordem desta seção (`titleKey` →
+  `identity.fields` → primeiro texto). A referência diz só **para onde** aponta e **por qual chave**.
+- **Precedência:** para o mesmo atributo, a declaração no modelo vale sobre o `options` por referência do
+  manifesto. A capacidade passa a levar a referência no atributo, e GEN, CUSTOM e cliente sem UI sabem
+  dela sem ler o manifesto.
+- **Cópia local** (ex.: `teachername` gravado junto) é "o nome na época"; a referência dá "o nome hoje".
+  Uma não substitui a outra.
 
 ## Arquivos anexos de agregado (`/session/files/*`)
 
@@ -9888,6 +10504,38 @@ Contrato de origem: [orgid/publico](../orgid/endpoints/publico.md) e [orgid/ua-p
 
 Monte a tela de cadastro a partir de `GET /ua/roles`: são exatamente os papéis que o servidor aceita.
 
+## Relatos de suporte (`/session/suporte/*`)
+
+O usuário relata uma falha, tira uma dúvida ou sugere, e acompanha a resposta da **equipe da plataforma**.
+Quem guarda é o **monitor** ([contrato](../monitor/endpoints/relatos.md)); o BFF repassa, e **o browser nunca
+fala com o monitor**. Todas exigem o cookie de sessão.
+
+| Operação | Método · Path | Resposta |
+|---|---|---|
+| Criar relato | `POST /session/suporte/relatos?tenant=<tenantId>` ou `?org=<org>` | `201 { id, estado, criadoEm }` |
+| Meus relatos | `GET /session/suporte/relatos?limit&offset` | `{ total, limit, offset, rows: [{ id, tipo, titulo, estado, criadoEm, atualizadoEm, fechadoEm, naoLido }] }` |
+| Um relato com a conversa | `GET /session/suporte/relatos/:id` | a linha, mais `contexto` e `mensagens: [{ id, autor: USUARIO \| EQUIPE, texto, em }]` |
+| Responder | `POST /session/suporte/relatos/:id/mensagens` · `{ texto }` | `201`; relato fechado → `409` |
+| Marcar como lido | `POST /session/suporte/relatos/:id/lido` (sem corpo) | `204` |
+| Quantos têm resposta nova | `GET /session/suporte/nao-lidos` | `{ total }` |
+
+- **Corpo do relato**: `{ tipo, titulo?, contexto?, mensagens: [{ texto }], diagnostico? }` — `tipo` é `Falha`,
+  `Dúvida` ou `Sugestão`, e volta como `FALHA`, `DUVIDA` ou `SUGESTAO`. O `diagnostico` é o da tela
+  ([o que leva](../shell/seguranca.md#diagnóstico-do-relato-de-suporte)). Até **256 KB** no todo; acima, `413`
+  no próprio BFF.
+- **Quem relata não se declara.** O BFF tira da **sessão** o usuário, e do parâmetro a org e o tenant — só se
+  forem do usuário (senão `404`). Com `tenant`, a org é a dele. Usuário, org e tenant que vierem no corpo são
+  ignorados pelo monitor.
+- **Só os relatos do próprio usuário**: relato de outro responde `404`, como se não existisse.
+- **Erro do monitor passa inteiro**, com status e corpo `{ error: "<código>", details: "<motivo>" }`
+  ([erros](../monitor/erros.md)): o texto para a tela é o `details`.
+- **Sem o serviço configurado** neste ambiente, as seis respondem `503`.
+- Por dentro (não é contrato de quem chama o BFF): o BFF fala com o monitor pela borda, com credencial de
+  serviço — não com o token do usuário — e manda o `x-request-id` da chamada, que fica gravado no relato.
+
+> **No ar em stager desde 2026-09-27T04:23Z** (yc.app `3dbf9d1`). Antes disso, o suporte do stager era um
+> mockup declarado, e nenhum relato saía da tela.
+
 ## Preferências da organização (org-scoped)
 
 Preferências de **apresentação por organização** — valem para **todos** os usuários da org, persistidas no
@@ -9924,6 +10572,19 @@ Tudo composto **no servidor**. Nenhum deles é montado — nem visto — pelo br
 > configuração: **sem ela, o login falha com `401` no gateway**, e não por credencial de usuário inválida.
 > É segredo: nunca vai ao browser, nunca em código, nunca em doc.
 
+## Id de requisição (`x-request-id`)
+
+**Toda resposta do BFF traz `x-request-id`**, e é o mesmo id que aparece na linha do log do BFF daquela
+requisição. Serve para ligar um relato de suporte ao que o servidor viu.
+
+- **Quem chama pode mandar o seu** no cabeçalho `x-request-id` — a casca manda um por chamada. O BFF o
+  adota se tiver **forma de id**: de 8 a 64 caracteres, só letras, dígitos e hífen. Fora disso (ou sem
+  cabeçalho), o BFF gera um UUID e devolve esse. Texto livre nunca chega ao log.
+- **No browser**, o CORS do BFF **expõe** o cabeçalho, e `fetch` o lê em `res.headers.get('x-request-id')`.
+- **Não é autenticação** nem chave de idempotência: não muda o que a rota faz, e repetir o id não repete
+  nem bloqueia nada.
+- Ausente numa versão anterior do BFF: quem lê trata a falta como "sem id".
+
 ## Operação
 
 | Operação | Método · Path | Resposta |
@@ -9946,7 +10607,7 @@ que o gateway, o cache ou o persistence respondem.
 | `500` | configuração ausente no servidor (ex.: o path do endpoint de cache não configurado) · **`readProjection` inválido no modelo do tenant** — a leitura é recusada em vez de recortada pela metade · **`computed` inválido no modelo do tenant** — o comando é recusado em vez de gravar marcador |
 | `413` | arquivo acima do teto do filer (3 MiB) em `POST /session/files/upload` |
 | `502` | falha ao falar com um serviço da plataforma |
-| `503` | serviço de arquivos (filer) não configurado neste ambiente |
+| `503` | serviço de arquivos (filer) ou de suporte (monitor) não configurado neste ambiente |
 
 ### `401` diz **por que** não há sessão
 
@@ -9979,6 +10640,8 @@ sem explicação — e ninguém consegue medir a frequência do problema.
 - [ ] Endereços de serviço = **config de deploy**, nunca hardcode nem em doc pública.
 - [ ] Em `/session/files/*`: `entityId` da chave = **`aggregateid`**; prefixo em `delete` é **lote**; e
       o anexo é protegido **por papel na entity**, nunca por titular — ver o aviso da seção.
+- [ ] Referência a outro agregado: peça o nome em `/session/refs/labels` e busque em `/session/refs/search`,
+  e grave o `valor` do item. Nunca o rótulo, e nunca peça ao usuário que cole um id.
 - [ ] Atributo que o processor preenche: declare-o em `computed`, e faça o processor **sempre**
       devolvê-lo não nulo — senão o marcador é gravado.
 
@@ -10348,11 +11011,1285 @@ Responder **não** significa que a plataforma está sã: a borda pode estar de p
 indisponíveis atrás dela — nesse caso as rotas devolvem `503`. Para saber se um serviço específico
 responde, chame um endpoint dele.
 
+<!-- ===== monitor/README.md ===== -->
+
+# monitor — relatos de suporte (guia)
+
+> **Papel:** guarda os **relatos de suporte** que os usuários da aplicação (casca + BFF) enviam e a
+> **conversa** entre o usuário e a equipe da plataforma sobre cada relato. Quem grava e lê em nome do usuário
+> é o **BFF**, com **credencial de serviço**. Quem atende é a **equipe** (`API_MASTER`/`API_ENGINEER`), pela
+> tela do monitor. O relato **não** vira ticket em outro sistema.
+> Pré-requisitos: [conceitos](../02-conceitos.md), [borda](../gateway/README.md), [BFF](../bff/README.md).
+
+## Quem chama o quê
+
+| Quem | Por onde | Como se identifica | O que alcança |
+|---|---|---|---|
+| **BFF**, em nome do usuário | `/v3/monitor/suporte/v1/…`, pela borda | credencial de serviço + cabeçalhos do relator | só os relatos **daquele usuário** |
+| **Equipe da plataforma** | tela do monitor | token de acesso com `API_MASTER` ou `API_ENGINEER` | os relatos **da própria organização**; o operador vê todos |
+
+**O browser nunca fala com o monitor.** O relator não se declara: o BFF tira da sessão, no servidor, o
+usuário, a organização e o tenant, e os manda em cabeçalhos
+([endpoints](endpoints/relatos.md#cabeçalhos)). **Campos com esses nomes no corpo são ignorados.**
+
+## Ciclo de vida do relato
+
+```
+ABERTO ──(equipe responde)──▶ RESPONDIDO ──(usuário responde)──▶ ABERTO …
+  │                               │
+  └─────────(equipe fecha)────────┴──────────▶ FECHADO
+```
+
+- **ABERTO** — o relato acabou de ser criado, ou o usuário escreveu depois da última resposta da equipe.
+- **RESPONDIDO** — a equipe respondeu e aguarda o usuário.
+- **FECHADO** — só a equipe fecha. Relato fechado **não aceita mensagem** (`409`); o usuário abre outro.
+
+**Não lido.** Para o usuário, o relato está não lido quando tem mensagem da equipe posterior à última vez que
+ele o marcou como lido. Para a equipe vale o simétrico. Quem escreve uma mensagem também conta como tendo lido.
+
+## O que o monitor faz com o conteúdo
+
+- **Diagnóstico da tela** (o `formato` versiona a carga): é guardado como veio, até 64 KB. O usuário **não o
+  recebe de volta**; só a equipe o vê.
+- **Texto livre** (título e mensagens): o servidor troca **credenciais** (`Bearer …` e tokens de acesso
+  soltos) por `[credencial removida]`. E-mail e CPF ficam, porque o usuário pode querer ser contatado por eles.
+- **Instantes** são os do servidor. O `em` que a casca manda nas mensagens é ignorado.
+
+## Retenção
+
+A retenção conta a partir do **fechamento**, e relato aberto não expira:
+
+- **30 dias** depois de fechado, o diagnóstico é apagado;
+- **90 dias** depois de fechado, o relato e a conversa são apagados.
+
+## Quem, na equipe, enxerga o relato
+
+A equipe enxerga o relato pela **organização do relator**, que vem no cabeçalho `X-Relator-Org`. O valor é o
+**nome da organização** (ex.: `acme`), sem sufixo. O monitor o compara com as organizações **ativas** em que o
+membro da equipe tem `API_MASTER` ou `API_ENGINEER`, conforme o token de acesso dele ([claims](../auth/README.md)). Se o
+nome vier noutro formato, **nenhum** membro da organização vê o relato, só o operador.
+
+## Documentos
+
+- [Endpoints de relato](endpoints/relatos.md) · [Erros](erros.md) · [Exemplos](exemplos.md)
+
+<!-- ===== monitor/endpoints/relatos.md ===== -->
+
+# monitor — endpoints de relato
+
+> Base pela borda: **`/v3/monitor/suporte/v1`**. Quem chama é **o BFF**, nunca o browser. Corpo e respostas
+> em JSON (UTF-8). Todas as rotas exigem os cabeçalhos abaixo. Guia: [monitor](../README.md).
+
+## Cabeçalhos
+
+| Cabeçalho | Obrigatório | O que é |
+|---|---|---|
+| `X-Monitor-Client-Key` | sim | credencial de serviço do chamador. A infra entrega o valor à configuração do BFF, e ele **nunca** passa por código, documento ou mensagem. O monitor guarda só um resumo criptográfico dela. |
+| `X-Relator-Username` | sim | o usuário da sessão. É por ele que cada rota alcança **só os relatos daquele usuário**. |
+| `X-Relator-Org` | não | o nome da organização do relator ([quem enxerga](../README.md#quem-na-equipe-enxerga-o-relato)) |
+| `X-Relator-Tenant` | não | o tenant do relator |
+| `X-Request-Id` | não | o id da chamada no BFF; fica gravado no relato e nas mensagens do usuário |
+
+- credencial ausente ou inválida → `401`;
+- `X-Relator-Username` ausente → `400`;
+- corpo acima de **256 KB** → `413`, antes de qualquer leitura.
+
+A borda aplica também um teto próprio por serviço
+([gateway/erros.md](../../gateway/erros.md#413--corpo-ou-cabeçalhos-grandes-demais)).
+
+## POST /relatos — criar
+
+A carga é a que a casca monta:
+
+```jsonc
+{
+  "tipo": "Falha",                           // Falha | Dúvida | Sugestão — com ou sem acento, qualquer caixa
+  "titulo": "…",                             // opcional; ausente ou vazio → 1ª linha da 1ª mensagem; corta em 80
+  "contexto": { "tela": "Pedidos" },         // opcional; objeto rótulo → valor, até 4 KB
+  "mensagens": [{ "texto": "…" }],           // 1 a 20; a 1ª é o relato; cada texto até 10.000 caracteres
+  "diagnostico": { "formato": 1 }            // opcional; objeto de até 64 KB (forma: shell/seguranca.md)
+}
+```
+
+Resposta `201`:
+
+```json
+{ "id": 42, "estado": "ABERTO", "criadoEm": "2026-09-27T04:00:00Z" }
+```
+
+## GET /relatos — os relatos do usuário
+
+Parâmetros: `limit` (padrão 50, máximo 200) e `offset`. A lista vem do relato atualizado mais recentemente
+ao mais antigo.
+
+Resposta `200`:
+
+```json
+{ "total": 1, "limit": 50, "offset": 0,
+  "rows": [{ "id": 42, "tipo": "FALHA", "titulo": "…", "estado": "RESPONDIDO",
+             "criadoEm": "…", "atualizadoEm": "…", "fechadoEm": null, "naoLido": true }] }
+```
+
+O `tipo` volta como `FALHA`, `DUVIDA` ou `SUGESTAO`.
+
+## GET /relatos/{id} — um relato com a conversa
+
+Resposta `200`: os campos da lista, mais `contexto` e
+`mensagens: [{ "id", "autor": "USUARIO" | "EQUIPE", "texto", "em" }]` em ordem cronológica. **O diagnóstico
+não vem.**
+
+Relato de outro usuário → `404`, como se não existisse.
+
+## POST /relatos/{id}/mensagens — o usuário responde
+
+Corpo: `{ "texto": "…" }`.
+
+Resposta `201`: `{ "id", "autor": "USUARIO", "em", "estado": "ABERTO" }`. Relato fechado → `409`.
+
+## POST /relatos/{id}/lido — marcar como lido
+
+Resposta `204`. Relato de outro usuário → `404`.
+
+## GET /nao-lidos — o ponto de não lido
+
+Resposta `200`: `{ "total": 2 }`, o número de relatos do usuário com resposta da equipe ainda não lida.
+
+## Lado da equipe (tela do monitor)
+
+A base é `/monitor/api/suporte`, com o token de acesso (`API_MASTER`/`API_ENGINEER`). `?org=` estreita a
+consulta à organização escolhida, como no resto da tela do monitor.
+
+| Rota | O que faz |
+|---|---|
+| `GET /relatos?estado=` | a fila, com `username`, `org`, `tenantId` e o `naoLido` da equipe |
+| `GET /relatos/{id}` | o relato completo, com o diagnóstico |
+| `POST /relatos/{id}/mensagens` | resposta da equipe → `RESPONDIDO` |
+| `POST /relatos/{id}/fechar` | `FECHADO`; fechar de novo → `409` |
+| `POST /relatos/{id}/lido` | marca como lido pela equipe |
+| `GET /nao-lidos` | quantos relatos têm mensagem do usuário ainda não lida |
+
+Erros: [erros.md](../erros.md). Exemplos: [exemplos.md](../exemplos.md).
+
+<!-- ===== monitor/erros.md ===== -->
+
+# monitor — erros dos endpoints de relato
+
+Todas as respostas de erro do monitor têm o formato `{ "error": "<código>", "details": "<motivo legível>" }`.
+O campo `details` diz qual regra foi violada.
+
+| HTTP | `error` | Quando acontece | O que fazer |
+|---|---|---|---|
+| 400 | `bad_request` | falta `X-Relator-Username`; cabeçalho do relator longo demais; JSON ilegível; `tipo` fora de Falha, Dúvida e Sugestão; nenhuma mensagem, mais de 20, texto vazio ou texto acima de 10.000 caracteres; `contexto` ou `diagnostico` que não são objeto; `estado` inválido no filtro da equipe | corrigir a requisição |
+| 401 | `unauthorized` | lado do BFF: credencial de serviço ausente, errada ou não configurada no monitor. Lado da equipe: token ausente, inválido ou expirado | conferir a configuração do BFF com a infra; não repetir a chamada em laço |
+| 403 | `forbidden` | só no lado da equipe: token sem `API_MASTER`/`API_ENGINEER` em organização ativa, ou `?org=` fora das organizações do portador | — |
+| 404 | `not_found` | relato inexistente **ou** de outro usuário ou organização. Os dois casos são indistinguíveis de propósito | conferir o id e o usuário do cabeçalho |
+| 409 | `conflict` | mensagem em relato fechado, ou fechamento de relato já fechado | o usuário abre um relato novo |
+| 413 | `payload_too_large` | corpo acima de 256 KB, `diagnostico` acima de 64 KB ou `contexto` acima de 4 KB | a casca já corta o diagnóstico no teto; conferir o que foi acrescentado a ele |
+
+> **Nem todo erro destas rotas vem do monitor.** Um `404` sem esse corpo e com cabeçalhos da borda vem da
+> **borda**, que não tem a rota ([gateway/erros.md](../gateway/erros.md#404--a-borda-não-reconheceu-a-rota)).
+> O mesmo vale para o `413` do teto da borda.
+
+<!-- ===== monitor/exemplos.md ===== -->
+
+# monitor — exemplos de relato
+
+Chamadas do BFF pela borda. `<chave>` é a credencial de serviço do BFF, que nunca é escrita em código.
+Todas as chamadas levam os mesmos cabeçalhos do relator ([endpoints](endpoints/relatos.md#cabeçalhos)).
+
+## Criar um relato
+
+```http
+POST /v3/monitor/suporte/v1/relatos
+X-Monitor-Client-Key: <chave>
+X-Relator-Username: maria
+X-Relator-Org: acme
+X-Relator-Tenant: <tenant>
+X-Request-Id: 9f1c2a
+Content-Type: application/json
+
+{"tipo":"Falha","titulo":"","contexto":{"tela":"Pedidos"},
+ "mensagens":[{"texto":"Cliquei em Salvar e nada aconteceu."}],
+ "diagnostico":{"formato":1,"geradoEm":"2026-09-27T02:51:47.062Z","erros":[],"rede":[],"trilha":[],"console":[],"ambiente":{}}}
+```
+
+```json
+201 {"id":42,"estado":"ABERTO","criadoEm":"2026-09-27T04:00:00Z"}
+```
+
+Como o `titulo` veio vazio, ele passa a ser a 1ª linha do relato.
+
+## "Meus chamados", com o ponto de não lido
+
+```http
+GET /v3/monitor/suporte/v1/relatos
+```
+
+```json
+200 {"total":1,"limit":50,"offset":0,"rows":[{"id":42,"tipo":"FALHA","titulo":"Cliquei em Salvar e nada aconteceu.",
+     "estado":"RESPONDIDO","criadoEm":"…","atualizadoEm":"…","fechadoEm":null,"naoLido":true}]}
+```
+
+## Ler a conversa e marcar como lida
+
+```http
+GET /v3/monitor/suporte/v1/relatos/42
+```
+
+```json
+200 {"id":42,"tipo":"FALHA","titulo":"…","estado":"RESPONDIDO","contexto":{"tela":"Pedidos"},"naoLido":true,
+     "mensagens":[{"id":1,"autor":"USUARIO","texto":"Cliquei em Salvar e nada aconteceu.","em":"…"},
+                  {"id":2,"autor":"EQUIPE","texto":"Corrigido, tente de novo.","em":"…"}]}
+```
+
+```http
+POST /v3/monitor/suporte/v1/relatos/42/lido      → 204
+```
+
+## Responder a um relato fechado
+
+```http
+POST /v3/monitor/suporte/v1/relatos/42/mensagens
+Content-Type: application/json
+
+{"texto":"Voltou a falhar."}
+```
+
+```json
+409 {"error":"conflict","details":"relato fechado: não aceita mensagem nem novo fechamento"}
+```
+
+O usuário abre um relato novo.
+
 <!-- ===== CHANGELOG.md ===== -->
 
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.98 — 2026-10-01
+
+- **Feed de assinatura externa no ar na instância de teste** (`es-n/endpoints/assinaturas.md`,
+  `persistence-crs/spec/model-format.md`): o estado dizia "ainda não está no ar". Teste desde 04:19:19Z;
+  validação na publicação desde 04:23:36Z; produção ainda não.
+
+## 1.97 — 2026-10-01
+
+- **`subscriptions` em produção desde 2026-10-01T04:23:36Z** (`forger/endpoints/model.md` §Assinatura externa de
+  eventos). A conferência na publicação (1.95) está no ar no forger `fb3201c`. Fonte: encerramento do pedido de
+  deploy pela infra (`infra/hostinger/issues/deploy.pedido.composer-com-subscriptions-no-model-json.20261001`).
+
+## 1.96 — 2026-10-01
+
+- **`subscriptions` no formato do modelo segue o que o forger valida** (`persistence-crs/spec/model-format.md`
+  §Assinaturas externas; `model.schema.json`): `events`, se presente, tem ao menos um item; listas sem repetição;
+  chave desconhecida na declaração é recusada. Para "todos os eventos", omite-se `events`.
+
+## 1.95 — 2026-10-01
+
+- **`subscriptions`: o forger aceita e valida na publicação** (`forger/endpoints/model.md` §Assinatura externa de
+  eventos). A assinatura externa é declarada no modelo, dentro de `<org>.<projeto>` ao lado de `aggregate`, como ato
+  de modelagem — decisão do dono; o es-n já a lê. Recusas `400` tabeladas: forma (a mesma que o es-n exige
+  ao ler, mais `events` vazio e chave desconhecida) e coerência com o próprio modelo (tipo e evento existem nele).
+  O `reader` não é conferido contra os usuários do cliente, por decisão do dono. Em `develop` desde
+  `forger@fb3201c`; **ainda não em produção**. Issue composer `forger.pedido.subscriptions-no-model-json.20261001`.
+
+## 1.94 — 2026-10-01
+
+- **Assinatura externa de eventos passa a ser declarada no modelo** (`persistence-crs/spec/model-format.md`
+  §Assinaturas externas; `model.schema.json` `subscriptions`; `es-n/endpoints/assinaturas.md`, reescrito).
+  Corrige a 1.93: não há mais cadastro por API. A assinatura é a chave `subscriptions` dentro de
+  `<org>.<projeto>` no `.model.json`, publicada com o modelo, e nomeia a única conta que lê (`reader`). O feed
+  fica em `GET /subscriptions/{name}/events` e o atraso em `GET /subscriptions/{name}`. Decisão do dono:
+  declarar o que um sistema de fora consome é ato de modelagem. **Ainda não está no ar nesta forma:** faltam a
+  implantação, a validação na publicação (pedida à gestão de modelos) e o papel de assinante.
+
+## 1.93 — 2026-10-01
+
+- **Assinatura externa de eventos** (`es-n/endpoints/assinaturas.md`, novo; `es-n/README.md` §Assinatura
+  externa de eventos). Quem está fora da plataforma lê, por cursor opaco, o que aconteceu num tenant, sem o
+  conteúdo do evento e sem autoria. Cadastro por administrador do tenant, leitura pelo papel de assinante, intervalo mínimo entre leituras (`429`), atraso visível
+  por assinatura. `/v3/es/…` é a instância de produção; `/v3/es/t/…` é a de teste. **Ainda não está no ar:** faltam a implantação, a rota na
+  porta de entrada e o papel de assinante. Pedido do da-agents, autorizado pelo dono.
+
+## 1.92 — 2026-09-29
+
+- **`references` em produção desde 2026-09-29T19:11:32Z** (`forger/endpoints/model.md` §Atributo que aponta
+  outro agregado). A conferência na publicação (1.86) está no ar no forger `2ab9b8d`; a frase "ainda não em
+  produção" deixou de valer nesse instante e ficou até aqui por falta de atualização. Fonte: encerramento do
+  pedido de deploy pela infra (`infra/hostinger/issues/deploy.pedido.composer-com-references-no-model-json.20260929`).
+
+## 1.91 — 2026-09-29
+
+- **`references`: o BFF que a lê está no ar em stager** (`bff/README.md` §Declarada no modelo), desde
+  2026-09-29T19:04Z (yc.app `56f3cd9`). A validação do forger segue só em `develop`, então em produção a
+  publicação aceita a chave sem conferir. Até o forger subir, declará-la é por conta de quem publica.
+
+## 1.90 — 2026-09-29
+
+- **A capacidade leva `ref` no atributo declarado em `references`** (`shell/contrato-miolo.md` `attributes[].ref`;
+  `bff/README.md` §Capacidade e §Declarada no modelo). `ref: { aggregate, valueKey }` traz o endereço
+  (`<bc>.<tipo>` ou `<projeto>.<bc>.<tipo>`) e a chave do alvo, também em campo de value object, e vale sobre
+  o `options` por referência do manifesto. O BFF passa a ler `references` e a achar o tenant do alvo em
+  outro projeto pela sessão (em `develop` do yc.app, `abc83c8`; ainda não no ar). Corrige a descrição de
+  `lookup`: é heurística de nome, não referência declarada.
+
+## 1.89 — 2026-09-29
+
+- **`references`: a fatia do BFF segue o endereço qualificado** (`bff/README.md` §Declarada no modelo;
+  `shell/apresentacao.md`). `"<bc>.<tipo>"` é só o próprio modelo; o alvo em outro projeto do org se escreve
+  `"<projeto>.<bc>.<tipo>"`, e o BFF acha o tenant dele na sessão pelo projeto e pelo bounded context, sem
+  busca. Decisão do dono de 2026-09-29, já no forger (`develop`) e no formato do modelo (1.87). O BFF ainda
+  não lê a chave.
+
+## 1.88 — 2026-09-29
+
+- **`references`: sai a nota de divergência da seção do forger** (`forger/endpoints/model.md` §Atributo que
+  aponta outro agregado). O formato do modelo (1.87) passou a dizer o mesmo que o forger valida: `"<bc>.<tipo>"`
+  é só o próprio modelo, e `"<projeto>.<bc>.<tipo>"`, outro projeto do org.
+
+## 1.87 — 2026-09-29
+
+- **`references`: o endereço diz onde está o alvo** (`persistence-crs/spec/model-format.md` §`references`;
+  `model.schema.json` `$defs/referenceAddress`). Corrige a 1.84, que dizia que `"<bc>.<tipo>"` alcançava outro
+  modelo do org. Agora `"<bc>.<tipo>"` é **só o próprio modelo**, e o alvo em outro projeto do mesmo org se
+  escreve `"<projeto>.<bc>.<tipo>"`, publicado em exatamente um tenant desse projeto. O schema aceita as duas
+  formas, com o mesmo padrão do forger. Decisão do dono de 2026-09-29; fecha a divergência registrada na 1.86
+  (`forger/endpoints/model.md`). Pedido do composer (`modelo.pedido.references-endereco-qualificado.20260929`).
+
+## 1.86 — 2026-09-29
+
+- **`references`: o forger aceita e valida na publicação, e o endereço decide onde está o alvo**
+  (`forger/endpoints/model.md` §Atributo que aponta outro agregado). `"<bc>.<tipo>"` é **só o próprio
+  modelo**; alvo em outro projeto do mesmo org se escreve `"<projeto>.<bc>.<tipo>"` e tem de estar em
+  exatamente um tenant do projeto — decisão do dono, porque procurar `"<bc>.<tipo>"` no org seria ambíguo por
+  construção. **Diverge do formato do modelo (1.84)**, que diz que a forma curta alcança outro modelo do org;
+  a correção foi pedida ao guardião do formato. Recusas `400` tabeladas. Aceita em `develop` desde `forger@2ab9b8d`;
+  **ainda não em produção**. Issue composer `forger.pedido.references-no-model-json.20260929`.
+
+## 1.85 — 2026-09-29
+
+- **`references`: a fatia do BFF aponta a forma autoritativa** (`bff/README.md` §Declarada no modelo;
+  `shell/apresentacao.md`). A forma passa a ser a do
+  [model-format](persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado) (1.84),
+  que vale se as duas divergirem. Continuam faltando a validação na publicação (forger) e a leitura no BFF.
+
+## 1.84 — 2026-09-29
+
+- **`computed`, `readProjection` e `references` entram no formato do modelo** (`persistence-crs/spec/model-format.md`
+  §Chaves que só quem lê usa; `model.schema.json` `$defs/aggregate`). As três são chaves opcionais do nível do
+  agregado que **o motor não lê** — o BFF lê. `computed` e `readProjection` já eram aceitas pelo forger e lidas
+  pelo BFF, mas faltavam no formato e no schema. `references` tem aqui a **forma autoritativa**: sintaxe (forma
+  curta `"<bc>.<tipo>"`, longa `{ aggregate, valueKey? }`, vazio recusado) e semântica (alvo no mesmo org, sem
+  `tenantId`, leitura com o token do usuário). **Ainda não está em vigor:** a validação na publicação foi pedida
+  ao forger, e o BFF ainda não lê a chave. Pedido do yc.app, a mando do dono
+  (`modelo.pedido.references-no-model-format.20260929`).
+
+## 1.83 — 2026-09-29
+
+- **`references` no `.model.json`: sintaxe e semântica, do lado de quem lê** (`bff/README.md` §Declarada no
+  modelo; `shell/apresentacao.md` §Referência a outro agregado). A referência entre agregados passa a ser
+  declarada no **modelo**, no nível do agregado: `"<atributo>": "<bc>.<tipo>"` ou
+  `{ aggregate, valueKey? }`. Ela alcança outro bounded context do mesmo org, sem `tenantId`, lê com o token
+  do usuário (não amplia leitura) e vale sobre o `options` por referência do manifesto. **Ainda não está em
+  vigor:** pedida ao forger (validação na publicação) e ao interpreter (formato do modelo), a mando do dono;
+  o BFF ainda não a lê.
+
+## 1.82 — 2026-09-29
+
+- **Referência entre agregados legível** (`bff/README.md` §Referência entre agregados;
+  `shell/contrato-miolo.md` `api.refs`; `shell/apresentacao.md` §Referência a outro agregado). O campo
+  declarado como `options` por referência passa a mostrar o **nome** do registro apontado em toda a tela
+  (tabela, Dados, histórico, título, filtro, cópia, e na exportação ao lado do id), e se preenche por
+  **busca** sem teto de registros. O nome vem do agregado apontado: `labelKey` → `titleKey` →
+  `identity.fields` → primeiro texto. Todo estado é dito (não encontrado, sem acesso, rótulo indisponível).
+  BFF: `POST /session/refs/labels` e `POST /session/refs/search`, com o token do usuário e o recorte de
+  coluna; só o mesmo tenant por ora. Decisão do dono de 2026-09-29, a pedido do `conceptnatal`; em
+  `develop` do yc.app (`c3e57bd`), no ar quando a infra implantar.
+
+## 1.81 — 2026-09-28
+
+- **Miolo CUSTOM cobrindo só parte do tenant** (`shell/injecao.md` §De onde vem o build; `bff/README.md`
+  §Miolo). O mapa do BFF passa a aceitar um miolo **por agregado**, além do miolo do tenant inteiro; o
+  agregado que o mapa não cobre abre no **miolo GEN**. A casca manda o agregado escolhido em
+  `GET /tenant/{tenantId}/miolo-manifest?aggregate=`. Decisão do dono de 2026-09-28, a pedido do
+  `conceptnatal`; em `develop` do yc.app (`2cf1a87`), no ar quando a infra implantar.
+
+## 1.80 — 2026-09-27
+
+- **`llms-full.txt`: o bloco do CHANGELOG volta a acompanhar o `CHANGELOG.md`.** Ele estava parado na 1.22,
+  e o agente de contexto pequeno não via as revisões 1.23 a 1.79. Só esse bloco foi regenerado, a partir do
+  `CHANGELOG.md`; nenhum outro documento mudou. Decisão do dono de 2026-09-27.
+
+## 1.79 — 2026-09-27
+
+- **monitor: relatos publicados na borda** (`monitor/README.md`). Sai o aviso de que a rota
+  `/v3/monitor/suporte/**` não estava publicada: a infra mediu, às 04:13Z, a chamada pela borda chegando ao
+  monitor.
+
+## 1.78 — 2026-09-27
+
+- **Relatos de suporte no ar** (`bff/README.md` §Relatos de suporte): as rotas `/session/suporte/*` estão em
+  stager desde 2026-09-27T04:23Z (yc.app `3dbf9d1`); sai o aviso de que dependiam da rota da borda.
+
+## 1.77 — 2026-09-27
+
+- **BFF: relatos de suporte** (`bff/README.md` §Relatos de suporte; `shell/contrato-miolo.md` §hostContext,
+  `openSupport`). Seis rotas de sessão em `/session/suporte/*` — criar, listar os meus, ler com a conversa,
+  responder, marcar lido, contar não lidos — que repassam ao monitor (contrato na 1.76). O BFF tira da sessão
+  quem relata e confere org e tenant; o erro do monitor passa inteiro. O `openSupport` deixa de dizer que o
+  suporte é mockup. Decisões do dono de 2026-09-27; em `develop` do yc.app (`7e8dc7a`), no ar quando a rota da
+  borda for publicada.
+
+## 1.76 — 2026-09-27
+
+- **Fatia nova: monitor — relatos de suporte** (`monitor/README.md`, `monitor/endpoints/relatos.md`,
+  `monitor/erros.md`, `monitor/exemplos.md`). O BFF grava e lê, em nome do usuário, os relatos que a casca
+  monta: credencial de serviço, e o relator vem em cabeçalhos, nunca do corpo. A equipe atende pela tela do
+  monitor, e cada organização vê os seus. A fatia cobre estados, não lido, redação de credenciais no texto
+  livre e retenção contada do fechamento. Pedido do yc.app, a mando do dono. Implantado em 2026-09-27
+  (monitor `76a072f`); a rota na borda foi pedida e ainda não está publicada.
+
+## 1.75 — 2026-09-27
+
+- **O relato de suporte leva o diagnóstico da tela** (`shell/contrato-miolo.md` §hostContext,
+  `shell/seguranca.md` §Diagnóstico do relato de suporte, `bff/README.md` §Id de requisição). O
+  `hostContext` ganha `diagnostico` (`erro` e `trilha`, para o miolo registrar o que só ele sabe) e
+  `openSupport` aceita o erro em foco; a página de segurança diz o que o diagnóstico leva e o que nunca leva;
+  o BFF adota o `x-request-id` de quem chama (ou gera um) e o devolve em toda resposta, ligando o relato à
+  linha do log. Nada sai sem o usuário relatar. Pedido do dono de 2026-09-26; em `develop` do yc.app
+  (`5242624`), deploy em stager pedido.
+
+## 1.74 — 2026-09-27
+
+- **Manifesto: `genero` em produção** (`forger/endpoints/presentation.md`) — sai o aviso de que a publicação
+  ainda recusava a chave.
+
+## 1.73 — 2026-09-27
+
+- **A tela concorda com o gênero do agregado** (`shell/apresentacao.md` §O que cada chave faz na tela e
+  checklist; `shell/contrato-miolo.md` §hostContext): com `genero: "feminino"` no manifesto (chave do forger
+  desde a 1.72), o botão de criação diz "Nova {singular}" e o estado vazio "criar a primeira". Decisão do
+  dono de 2026-09-27, depois de ver "Novo modalidade" no stager. Em `develop` do yc.app (`4538e42`), ainda não em stager.
+
+## 1.72 — 2026-09-27
+
+- **Manifesto: `genero` do agregado** (`forger/endpoints/presentation.md` e `forger/spec/presentation.schema.json`).
+  Chave opcional por agregado, `feminino` ou `masculino` (ausente = masculino), para a tela concordar artigo
+  e adjetivo com o nome ("Nova modalidade", não "Novo modalidade"). Em `develop` do forger; até o próximo
+  deploy, a publicação em produção a recusa como chave desconhecida.
+
+## 1.71 — 2026-09-27
+
+- **A tela usa campo de value object (`grupo.campo`) em todo lugar que o forger aceita**
+  (`shell/apresentacao.md` §Campos de value object; `shell/contrato-miolo.md` §hostContext): coluna,
+  título, formato, filtro e seleção, além do rótulo. Grupo `multiple` mostra os valores dos itens por
+  vírgula, e o filtro casa com qualquer item. Decisão do dono de 2026-09-27, depois que a 1.70 do forger
+  documentou que a publicação já aceitava `grupo.campo` nessas chaves e a tela os ignorava. Em `develop`
+  do yc.app (`3ac23a5`), ainda não em stager.
+
+## 1.70 — 2026-09-27
+
+- **Manifesto: o que cada chave aceita, chave por chave** (`forger/endpoints/presentation.md` §Referências
+  conferidas na publicação). A tabela de chaves dizia "formato por atributo" em `fmt`, e a seção de
+  referências dava `grupo.campo` como válido — duas leituras opostas. Agora uma tabela diz, para `titleKey`,
+  `labels`, `fmt`, `cols`, `filters`, `options` e estados, o que a publicação aceita: `fmt`, `cols`, `filters`,
+  `titleKey` e as chaves de `options` aceitam atributo **ou** `grupo.campo`; só `labels` aceita o nome do value
+  object sozinho. Nenhum comportamento mudou — é o que o forger em produção já confere. Pedido do conceptnatal.
+
+## 1.69 — 2026-09-27
+
+- **`shell/apresentacao.md` perde duas ressalvas vencidas pelo deploy do composer** (forger em produção desde
+  2026-09-27T00:29Z): a conta de plataforma que publica **já confere pelo `GET`** (o composer mediu `204` com
+  token de plataforma às 00:31Z), e `aggregateid` como `valueKey` já é aceito em produção.
+
+## 1.68 — 2026-09-27
+
+- **Manifesto: as três correções da 1.61 estão em produção** (`forger/endpoints/presentation.md`) — o `DELETE`
+  que responde `{ "deleted": true }` sempre que não resta manifesto, as chaves da plataforma do canon
+  (`aggregateid`, `status`, `version`) e o `GET` também para papel de administrador ou de engenheiro. Sai a
+  nota das "três diferenças até o próximo deploy".
+
+## 1.67 — 2026-09-27
+
+- **`shell/README.md` e `shell/injecao.md` descrevem o menu e a injeção como são desde a 1.62**: menu
+  Projeto → Contexto → Agregados, o miolo montado ao escolher o **agregado** (e remontado a cada escolha),
+  e a casca pedindo capacidade, manifesto de apresentação e URL do miolo. O README ganha a página
+  `apresentacao` na tabela de documentos. As duas páginas ainda falavam em "selecionar um bounded context".
+
+## 1.66 — 2026-09-27
+
+- **Dois avisos de "ainda não em produção" saem do orgid** — `orgid/endpoints/publico.md` (em `/ua`, `R` só
+  ativa conta `PENDING`) e `orgid/endpoints/ua-conta.md` (o titular não troca o próprio status). As duas
+  travas estão em produção desde 2026-09-26, no mesmo deploy que levou a trava de papel público (1.58); a
+  1.58 não os tirou porque a frase quebrava de linha e a busca não os achou.
+
+## 1.65 — 2026-09-27
+
+- **Login do auth: as chaves da resposta são `accessToken`, `tokenType` e `mcpSessionId`** — e não `token`,
+  `type` e `sessionId`, como diziam `auth/endpoints/sign-in.md`, `auth/README.md`, `auth/exemplos.md` e o
+  `auth/openapi.yaml`. Quem lia `.token` ficava sem token. E a página passa a dizer que, pela borda, o login
+  leva **um** cabeçalho de identificação (`X-Tenant-Id` ou `X-Forger-Credential`); sem nenhum, `401`.
+  Medido pelo conceptnatal pela borda e conferido no código.
+
+## 1.64 — 2026-09-27
+
+- **`shell/apresentacao.md` acompanha a decisão do dono sobre o `GET` do manifesto**: quem publica
+  (administrador ou engenheiro na org) passa a conferir pelo `GET` do forger, como a página do forger já
+  diz; até o próximo deploy do composer, a produção ainda responde `403` a essa conta, e a página diz
+  isso com a medição. Desfaz o "não confere pelo GET" da 1.63, que valia só para o código em produção.
+
+## 1.63 — 2026-09-27
+
+- **`shell/apresentacao.md` deixa de mandar quem publica conferir o manifesto pelo `GET`.** A conta de
+  plataforma que publica recebe `403` `tenant <id> is not in the token` no `GET` do forger, porque o token
+  dela não carrega os tenants — medido no stager em 2026-09-27T00:09Z com o token de plataforma do
+  conceptnatal, que lia o `/model` do mesmo tenant com `200`. A conferência passa a ser com um usuário do
+  app que tenha o tenant (forger ou BFF), ou pela tela. E `options` por referência diz que o `valueKey`
+  de um campo de referência costuma ser `aggregateid`.
+
+## 1.62 — 2026-09-26
+
+- **O agregado passa a ser escolhido no menu da casca** (`shell/contrato-miolo.md` §hostContext;
+  `shell/estilo.md` §Chrome da casca). O menu vira Projeto → Contexto → Agregados, com contagem de
+  registros; cada escolha remonta o miolo. O `hostContext` ganha `aggregate`, `presentation` (o
+  manifesto de apresentação do tenant, ou `null`), `openSupport(contexto)` e `api.count`; comando
+  recusado rejeita com `status` e `em` além da mensagem. "Encerrar sessão" fica só no menu da conta; a
+  barra ganha agente e suporte (este, por ora, mockup declarado).
+- **Página nova: como preencher e publicar o manifesto de apresentação** (`shell/apresentacao.md`), para a
+  hierarquia de agentes que escreve o `.model.json`: o que cada chave faz na tela do Stager, como
+  escolher o valor, os formatos, um exemplo e o caminho de publicação e conferência.
+- **BFF: manifesto de apresentação e contagem** (`bff/README.md` §Manifesto de apresentação e §Proxy de
+  domínio). `GET /session/presentation?tenant=` lê no forger, com o token da sessão, o manifesto
+  publicado ([forger — presentation](forger/endpoints/presentation.md), 1.60); `null` quando não há.
+  `POST /session/query` aceita `count: true` e devolve `{ entity, total }`. Em `develop` do yc.app (merge
+  `7c9c55f`), ainda não em produção.
+
+## 1.61 — 2026-09-26
+
+- **Manifesto de apresentação em produção** (`forger/endpoints/presentation.md`): o aviso de "ainda não em
+  produção" sai. E o `DELETE` passa a responder `{ "deleted": true }` sempre que não resta manifesto,
+  para que a repetição da mesma chamada responda o mesmo; em produção a partir do próximo deploy.
+- **Manifesto: as chaves da plataforma aceitas como atributo passam a ser as do canon** — `id`,
+  `aggregateid`, `status`, `version` e os metadados de auditoria. A página listava só `id` e a auditoria, e a
+  publicação recusava `status` em coluna e `aggregateid` como `valueKey` de referência. Apontado pelo yc.app;
+  em produção a partir do próximo deploy.
+- **Manifesto: o `GET` aceita também papel de administrador ou de engenheiro na org** — quem publica usa
+  token de plataforma, que não carrega os tenants, e recebia `403` ao conferir o que publicou. Medido pelo
+  conceptnatal; em produção a partir do próximo deploy.
+
+## 1.60 — 2026-09-26
+
+- **Manifesto de apresentação por tenant** (`forger/endpoints/presentation.md`, página nova, e
+  `forger/spec/presentation.schema.json`). `POST`/`GET`/`DELETE .../tenant/{tenantId}/presentation`: publicar
+  e remover com a autorização do model; ler basta o tenant no token (`204` sem manifesto). A publicação
+  confere a forma e cada referência contra o modelo publicado do tenant; o manifesto não é removido com o
+  modelo. Índices: `forger/README.md`, `forger/openapi.yaml`, `llms.txt`, `README.md`. Em `develop` do
+  forger, ainda não em produção.
+
+## 1.59 — 2026-09-26
+
+- **A casca adota a paleta e a fonte do Stager Console** (`shell/Principios de Design - Shell Universal.md`
+  §Marca e cor e §Tipografia; `shell/estilo.md` §Grupos de token). Marca `#00d676` → `#00c875`, com
+  os acentos `#08653c` · `#dff5ea` · `#063d24`; erro em `oklch`. **JetBrains Mono** substitui a IBM
+  Plex Mono, como decisão registrada no guia. Tokens novos: `sidebar` (menu lateral), `ink`/`ink-fg`
+  (botão escuro), `danger-line` (borda de erro) e `pill-bg-l`/`pill-fg-l` (luminosidade da pílula de
+  estado, cuja matiz sai do nome do estado). Em `develop` do yc.app (merge `c9f1935`), ainda não em produção.
+
+## 1.58 — 2026-09-26
+
+- **`alias`, `computed` e a trava de papel público do autocadastro entram em produção** — três avisos
+  de "ainda não em produção" saem da fatia do composer: `forger/endpoints/model.md` §Atributos
+  preenchidos pelo processor e §Nome de exibição de comando e evento, e `orgid/endpoints/publico.md`
+  (só papel público). Modelo publicado antes não é revalidado: vale a partir da próxima publicação.
+
+## 1.57 — 2026-09-26
+
+- **A capacidade passa a levar o `alias` de comando e de evento** (`bff/README.md` §Nome de exibição de
+  comando e evento; `shell/contrato-miolo.md` §Modelo de capacidade). `commands[].alias` e
+  `aggregates[].events.<evento>.alias`, os dois ausentes quando o modelo não declara. Quem exibe mostra o
+  alias e, sem ele, o nome; o comando continua sendo enviado pelo nome. O histórico não muda: o alias do
+  evento se acha pelo último segmento do `eventType`. A regra "o modelo não fornece rótulo" ganha essa
+  exceção. Complementa a 1.56. Em `develop` do yc.app, ainda não em produção.
+
+## 1.56 — 2026-09-26
+
+- **`alias` de comando e de evento no `.model.json`** (`forger/endpoints/model.md` §Nome de exibição de
+  comando e evento). Chave opcional em `command.<cmd>` e `event.<evt>`: o nome que a tela mostra no lugar
+  da chave. A publicação recusa com `400` o alias vazio, só de espaços ou que não é texto; ausente,
+  publica como antes. O motor não lê a chave. Em `develop` do forger, ainda não em produção.
+- **`alias` na gramática do `.model.json`** (`persistence-crs/spec/model-format.md` §Comandos e §Eventos,
+  `persistence-crs/spec/model.schema.json`). Opcional em `command.<cmd>` e `event.<evt>`, com a forma que o
+  forger valida: texto com ao menos um caractere que não seja espaço. O motor (yc.cqrs-c, yc.es, es-n,
+  persistence-crs) não lê a chave. O bloco do `model-format.md` no `llms-full.txt` volta a ser idêntico ao
+  arquivo.
+
+## 1.55 — 2026-09-26
+
+- **`readProjection` sai da lista de chaves que ninguém lê** (`forger/endpoints/model.md` §Chaves que um
+  modelo novo não precisa trazer). A página mandava não gerá-la em modelo novo, mas o **BFF** a lê para
+  limitar as colunas que cada papel vê (`bff/README.md` §Limitar os campos que um papel lê). Quem seguisse
+  a página perdia essa proteção sem erro. Apontado pelo yc.app.
+- **`llms-full.txt`: os nove blocos da fatia do composer que tinham ficado para trás voltam a ser
+  idênticos aos arquivos** — `forger/README.md`, `forger/endpoints/{dataschema,entity,model}.md`,
+  `forger/erros.md`, `forger/exemplos.md`, `orgid/endpoints/{publico,ua-conta,ua-papel}.md`. O bloco do
+  `model.md` ainda não tinha nem o metamodelo da 1.37. Os outros 79 blocos não foram tocados.
+
+## 1.54 — 2026-09-26
+
+- **`bff/README.md` alinha três avisos ao que o forger e o orgid passaram a fazer.** `readProjection` e
+  `computed` deixam de ser descritas como chaves que viajam só porque o forger as tolera: as duas são
+  **declaradas** no esquema do agregado, e a página diz o que a publicação confere e o que continua
+  sendo conferido pelo BFF. No autocadastro, a trava do papel público passa a existir **nos dois lados**
+  (o orgid também recusa papel não público); a da conta nascer `PENDING` continua **só do BFF**, porque
+  o orgid ainda aceita `status: ACTIVE` e a chave `from`.
+
+## 1.53 — 2026-09-26
+
+- **Coordenação com N alvos: encadear, não emitir de dentro do processor** (`persistence-crs/spec/model-format.md`
+  §O que o processor de coordenação devolve). A página dizia que quem precisa atingir N agregados "emite
+  os N comandos dentro do próprio processor". No caminho assíncrono não há JWT, e o comando assim
+  submetido roda sem conferência de papel e grava evento sem autor. O caminho é encadear: cada alvo gera
+  um evento, que dispara a coordenação do próximo, e a cadeia acaba quando o processor responde sem
+  `targetCommand`. `targetCommand` em forma de lista faz a coordenação falhar. A página passa também a
+  dizer o que vale com **várias entradas** em `triggerCoordination`: uma mensagem independente por
+  entrada, `name` distinto (a deduplicação é por evento e `name`), `targetTenantId` obrigatório (sem ele a
+  entrada é pulada em silêncio) e nenhuma ordem garantida entre elas. Lido no código do persistence-crs e
+  do es-n.
+
+## 1.52 — 2026-09-25
+
+- **O `hostContext` ganha `roles` e `activeRole`** (`shell/contrato-miolo.md`). O miolo passa a saber os
+  papéis **ativos** do usuário na organização do tenant e o papel escolhido na sessão. Antes só havia a
+  identidade, e um miolo que precisasse mostrar coisas diferentes por papel não tinha de onde tirar isso.
+  É **dica de apresentação**: o servidor segue autorizando cada chamada. Pedido do `conceptnatal` para o
+  miolo de agenda. Miolo que não lê os campos não percebe diferença.
+
+## 1.51 — 2026-09-25
+
+- **orgid `/ua`: três rotas deixam de conceder o que não deviam** (`orgid/endpoints/publico.md`,
+  `orgid/endpoints/ua-conta.md`, `orgid/openapi.yaml`). `POST /open/ua/account-role` só aceita papel
+  **público** (`403` no resto); `PUT /open/ua/account/{u}/R/hash/{h}` só ativa conta `PENDING` (`403` em
+  `SUSPENDED`); `PUT /ua/account` ignora o `status` do corpo. **Em `develop` do orgid, ainda não em
+  produção.** Quem registra conta com papel público e confirma cadastro de conta pendente não percebe
+  diferença.
+
+## 1.50 — 2026-09-25
+
+- **`computed` passa a ser chave declarada do aggregate no `.model.json`** (`forger/endpoints/model.md`
+  §Atributos preenchidos pelo processor). Até aqui a publicação só **tolerava** a chave: o metamodelo não
+  a conhecia e não conferia nada. Agora ela é declarada, e a publicação recusa com `400` o comando ou o
+  atributo sem ponto que não existe no aggregate, a lista vazia e o valor que não é lista. **Em `develop`
+  do forger, ainda não em produção.** Modelo sem a chave não muda.
+
+## 1.49 — 2026-09-25
+
+- **`POST /session/command` recusa com `400` o valor fora do tipo declarado** (`bff/README.md` §Proxy de
+  domínio e §Erros). Antes o BFF **trocava** o valor em silêncio: em `Boolean`, tudo que não fosse `true`
+  virava `false` (`"sim"`, `"True"`, `"1"`); em `Integer`/`Long`, texto não numérico virava `null`
+  explícito (`"abc"`, `"1,5"`). Agora `Boolean` aceita `true`/`false` e `Integer`/`Long` aceitam número
+  inteiro, como valor ou como texto, e o resto é recusado nomeando o campo. **Quem manda o tipo certo
+  não percebe diferença**; quem mandava outra coisa passa a saber, em vez de gravar o valor errado.
+
+## 1.48 — 2026-09-25
+
+- **`computed`: a página deixa de descrever o motor anterior como se fosse o atual** (`bff/README.md`
+  §Atributo calculado pelo br). A tabela de por que o marcador nunca é `null` passa a ser **do motor
+  anterior**, e a página diz onde o conserto da 1.47 já está: **no ar em `/v3/persistence/t/`; em
+  `/v3/persistence/`, ainda não** (2026-09-25). Os marcadores não mudam: enquanto as duas instâncias não
+  rodarem o mesmo motor, só o valor explícito não nulo grava igual nas duas. A regra do processor também
+  fica: o `null` que ele **devolve** continua ignorado na mescla, no motor consertado inclusive.
+
+## 1.47 — 2026-09-25
+
+- **`null` explícito e `""` em data: o motor foi consertado, e a página diz as regras novas**
+  (`persistence-crs/endpoints/comando.md` §`null` explícito, chave omitida e o que o processor devolve).
+  O `null` explícito num atributo `nullable` grava `NULL` no agregado e na projeção, na criação e na
+  transição. Antes, em campo numérico a linha não materializava, e em texto gravava a palavra `"null"`.
+  Numa transição, `null` apaga e omitir a chave preserva. O `null` **devolvido pelo processor** continua
+  ignorado na mescla: é outra regra. `""` em `Date`/`Timestamp` vira `null` no opcional e dá `400` no
+  obrigatório; antes respondia `200` e a projeção falhava em silêncio. Vale para `/v3/persistence/` e
+  `/v3/persistence/t/`, que rodam o mesmo código. O que as 1.45 e 1.46 mediram no `computed` descrevia o
+  motor anterior.
+
+## 1.46 — 2026-09-25
+
+- **`computed`: três fatos medidos entram na página** (`bff/README.md` §Atributo calculado pelo br). O
+  `null` explícito na criação tem **dois** desfechos conforme o tipo — em campo numérico a linha não
+  materializa; em texto ela materializa com a palavra `"null"`, que parece dado. `""` numa `Date` ou
+  `Timestamp` responde `200` e a gravação da projeção falha em silêncio — daí o marcador das datas ser o
+  epoch também no opcional. E o processor **não deve validar o valor que chega** num campo `computed`:
+  uma regra de faixa recusa o marcador `0` e, com ele, o próprio comando. Nenhum marcador mudou.
+
+## 1.45 — 2026-09-25
+
+- **`computed` volta a nunca mandar `null` — e a 1.44 fica desdita.** A 1.44 fazia o campo que aceita nulo
+  receber `null` explícito. Medido depois por um sistema consumidor, direto no persistence-crs, o `null`
+  explícito **quebra a leitura**: na criação a projeção **não materializa a linha** (o agregado existe, a
+  consulta não o acha), e na transição o write model grava `NULL` enquanto a projeção **mantém o valor
+  anterior**. Só valor explícito não nulo deixa os dois lados iguais. O marcador passa a ser sempre não
+  nulo; no texto, `""` se o campo aceita nulo e `"computed"` se é obrigatório (`bff/README.md`
+  §Atributo calculado pelo br, com a tabela medida). **A 1.44 nunca chegou ao ar** — o deploy foi
+  segurado antes. A regra do processor fica uma só: nunca devolver `null`; para limpar, o vazio do tipo.
+
+## 1.44 — 2026-09-25
+
+- **`computed`: o campo que aceita nulo passa a receber `null` explícito, não um valor do tipo**
+  (`bff/README.md` §Atributo calculado pelo br). Até a 1.43, todo campo calculado recebia `"computed"`,
+  `0`, `1970-01-01`… — e, como o motor **ignora o `null`** que o processor devolve, um processor que anula
+  de propósito um bloco opcional gravaria o marcador em toda operação comum. Achado pelo `clubflow` ao
+  avaliar o impacto da 1.43, antes de qualquer declaração em produção. O `null` explícito sobrevive até
+  a mescla e é substituível (lido no motor pelo `interpreter`). O obrigatório segue com o valor do tipo.
+  A página passa também a dizer que **devolver `null` não limpa campo nenhum**, e que value object
+  ausente não é criado pelo marcador.
+
+## 1.43 — 2026-09-25
+
+- **Atributo calculado pelo br — `computed`** (`bff/README.md`, nova seção; `shell/contrato-miolo.md`).
+  O modelo passa a poder declarar, ao lado dos comandos do agregado, quais atributos o processor de
+  regra de negócio **preenche** — escalares e campos de value object. A capacidade os marca com o papel
+  novo `computed`, o miolo genérico não os desenha, e o BFF os envia **sempre** com um marcador do tipo,
+  que o processor sobrescreve. Antes, a chave calculada não chegava ao processor — a mescla dele só
+  substitui chave presente, e o BFF descarta `""`/`null` —, e a única saída era o cliente digitar um
+  placeholder. Declaração inválida, inclusive em comando sem `br.route`, recusa o comando com `500`.
+  ⚠️ **Não é a forma definitiva:** se o processor não devolver o campo, o marcador é gravado sem aviso.
+  Pedido do `conceptnatal`.
+
+> **Quem já integrou não precisa mexer em nada:** sem a declaração, nenhum atributo é `computed` e tudo
+> se comporta como antes. Consumidor que trate `role` como conjunto fechado de quatro valores precisa
+> aceitar o quinto.
+
+## 1.42 — 2026-09-23
+
+- **As chaves de cache internas saem da doc MASCARADAS** — por ordem do dono, hoje. Onde a página
+  precisava falar delas, o prefixo interno virou `<prefixo-interno>` e **o aviso de que o formato está
+  mascarado vem colado à apresentação da chave**, não em rodapé: quem lê não pode sair daqui achando que
+  copiou um literal. O **sentido** fica inteiro, porque o que a doc afirma nunca foi o valor — é a
+  **distinção** entre as duas chaves (uma termina em `:wm`, o write model que a capacidade lê; a outra
+  guarda a spec de entidades, que o motor usa) e o fato de que **o que apaga uma não apaga a outra**.
+  Atingidos: `bff/README.md` §Capacidade e `forger/endpoints/model.md`, no corpo do `201` — ali a nota diz
+  com todas as letras que **a resposta real traz a chave completa, e é de lá que se lê**, não da doc.
+
+- **Nome de classe e de método também saíram**, pela mesma razão e no mesmo lugar: `bff/README.md` passa
+  a dizer *"o controlador de modelo do forger manda o serviço de cache remover a entrada daquele tenant"*.
+  Implementação não é contrato; quem integra não precisa do nome, e quem mantém o serviço não lê esta doc
+  para descobri-lo.
+
+- **`orgid/endpoints/ua-papel.md`: o terceiro padrão de rota liberada também está mascarado.** A passagem
+  continua explicando o que precisava explicar — por que o orgid **sozinho** responde `401` num endpoint
+  documentado como público —, dizendo que além de `/open/**` e `/z/**` **existe** um terceiro padrão
+  interno, sem publicar qual. A config de segurança deixou de ser nomeada por classe.
+
+> **O que NÃO mudou:** nenhum comportamento, nenhum contrato, nenhum endpoint. É a mesma doc dizendo as
+> mesmas coisas com menos valor interno exposto. Quem já integrou não precisa mexer em nada.
+
+## 1.41 — 2026-09-23
+
+> As três correções abaixo viviam numa seção *"Histórico de correções"* dentro da página do BFF. A
+> página passa a dizer só **como é**; o que ela corrigiu, e quando, mora aqui. As datas são as das
+> correções, não a desta revisão.
+
+- **2026-09-13 · `valueObjects` passou a existir na capacidade.** Antes disso o comando aceitava o
+  campo no envio e a capacidade não o descrevia: quem montava tela a partir dela concluía que o campo
+  não existia, sem aviso, e o miolo genérico **não conseguia disparar comando com value object
+  obrigatório**, por montar o formulário só de `attributes`. Medido de fora, comparando o modelo
+  publicado com a capacidade devolvida.
+
+- **2026-09-10 · o modelo publicado nunca teve TTL** — e a doc afirmou o contrário por catorze dias.
+  A afirmação **era verdadeira quando foi escrita**: até 2026-08-31 o forger gravava com prazo de 24h
+  configurável. Naquele dia ele passou a gravar sem prazo e a propriedade sumiu; esta fatia não foi
+  atualizada junto. **O risco é estrutural e não se resolve conferindo melhor: doc de comportamento
+  alheio envelhece quando o dono do comportamento muda sem avisar quem documentou.** A primeira
+  correção ainda errou de chave, mandando investigar o bracket de um modelo cuja remoção não passa por
+  ali — são **dois serviços de cache distintos**: um grava o **write model** (o que o BFF lê), o outro
+  grava o **read model** (o que o bracket remove), e confundi-los é o que levou a investigar o lado errado. **Parágrafo cuja receita sempre dá certo — aqui, republicar —
+  não avisa quando a explicação está errada.**
+
+- **2026-09-13 · a regra do `readProjection` deixou de copiar a do `scope` de linha.** A regra antiga
+  era *"vários papéis, um deles fora da declaração → lê tudo"*, correta **quando o outro papel de fato
+  lê a entity** — e o BFF não tem como saber isso, porque quem concede leitura é o `accessControl.read`
+  do `_conf`, que ele não enxerga. Medido com conta real: um usuário `[VISITANTE, RECEPCIONISTA]`
+  recebia a ficha inteira **com CPF**, porque `VISITANTE` não estava na declaração, embora não tivesse
+  leitura nenhuma naquela entity. Como quase todo usuário acumula papéis, o controle era praticamente
+  inerte. A regra atual **falha fechando**.
+
+## 1.40 — 2026-09-23
+
+- **BFF — `serverStamp` é o `whenAttribute` do evento, e não mais o sufixo do nome.** Até esta revisão
+  a doc descrevia `serverStamp` só como "carimbo do servidor", e a implementação classificava por
+  `Timestamp` com nome terminado em `em` — o que retirava do comando atributos que o modelo declarava
+  como dados, inclusive `nullable:false`. Quem tinha contorno para isso (renomear o atributo, ou
+  declará-lo como `whenAttribute` de um evento só para o valor ser aceito) não precisa mais dele.
+  Páginas: [bff](bff/README.md), [contrato do miolo](shell/contrato-miolo.md).
+
+- **BFF — as quatro rotas de arquivo anexo de agregado passam a existir**: `/session/files/upload`,
+  `/download`, `/list` e `/delete`, proxy do [filer](filer/README.md) pelo cookie de sessão. Página:
+  [bff](bff/README.md#arquivos-anexos-de-agregado-sessionfiles).
+
+- **Teto de arquivo: a página do BFF diz 3 MiB; a do filer ainda anuncia "≈10 MB".** O valor que vale
+  para quem passa pelo BFF é 3 MiB — é o `max-file-size` do próprio serviço. A página do filer será
+  reconciliada por quem responde por ela.
+
+## 1.39 — 2026-09-23
+
+- **O recorte de leitura passa a ter DUAS dimensões, e elas são independentes.** `rows.by` responde
+  quais **linhas** são suas; `attributes`, quais **colunas** você vê. Vale nos dois lugares: no
+  `_conf.accessControl.scope.read` da **entity** ([entity](forger/endpoints/entity.md)) e no
+  `roles.scope.read` do **aggregate** ([model](forger/endpoints/model.md)). Declare uma, a outra, ou as
+  duas.
+
+- **`rows` deixou de ser obrigatório**, e é isso que destrava o caso real: uma **conta de integração**
+  não é titular de linha nenhuma — não existe `rows.by` possível para ela —, então, enquanto
+  `attributes` só valesse dentro de um bloco que exigia `rows`, o caso ficava de fora por construção.
+  O que essa conta precisa é ver **duas colunas de todas as linhas**, em vez das vinte e quatro.
+
+- **Papel sem nenhuma das duas dimensões passa a ser recusado com `400`.** Recorte que não corta nada
+  se lê como proteção e não é. É a única recusa nova.
+
+- **Os nomes em `attributes` NÃO são conferidos na publicação**, de propósito: nome desconhecido o motor
+  ignora com aviso, e lista inteira errada devolve resposta vazia. Recusar por typo transformaria erro
+  de modelagem em entity indisponível. O contraste com `rows.by` é deliberado — lá o nome **é**
+  conferido, porque um `by` errado não devolve menos, devolve **errado**.
+
+- **Vigência: EM PRODUÇÃO desde 2026-09-23T02:38Z**, em `yc-composer:amd64-9884832-74f6`
+  (`composer@9884832`, `forger@8b906dd`, `auth@537991a`, `orgid@697f402`). A outra metade — o motor que
+  **aplica** o corte — subiu às 02:28:11Z em `tinterpreter:amd64-538ea49-2eca`
+  (`ufrn.loco3@22fcb89`, `persistence-crs@40493a0`).
+
+  **As duas metades no ar é o que torna o recurso real:** a publicação aceitar `attributes` sem o motor
+  cortar seria proteção declarada e não aplicada. Medido dentro do contêiner em execução, e não no jar
+  da máquina de build: o `schema/aggregate-schema.json` que está rodando contém `write-model-v2` e
+  `attributes`.
+
+## 1.38 — 2026-09-21
+
+- **O histórico de um agregado tocado por coordenação volta a responder.** O `GET` de histórico desses
+  agregados devolvia erro permanente; agora responde `200`. **Os eventos gravados a partir desta imagem
+  trazem a autoria; os anteriores vêm sem ela** — a identidade não foi gravada quando eles aconteceram, e
+  não há de onde tirá-la. Histórico antigo aparece legível, com alguns eventos sem autor.
+
+- **Todo comando passa a carimbar quem o fez.** O dado do agregado ganha a chave `loguser` nas
+  respostas. Ela **não** desce para a projeção — o modelo de leitura segue com as colunas que você
+  declarou.
+
+- ⚠️ **A autoria passa a valer na materialização da projeção.** O autor do comando de origem agora
+  acompanha a coordenação até a escrita da projeção, e o `accessControl.write` da entity de destino é
+  conferido de verdade. **Se o papel do autor não estiver no `write` da entity alvo, a projeção não
+  materializa** — vale conferir as coordenações em que quem inicia tem papel diferente do que o destino
+  aceita.
+
+- **Campo declarado `nullable: false` passa a ser exigido pelo motor, e não só pelo BFF.** Comando que
+  não traga o campo, ou que o traga nulo, é **recusado**. Até aqui a declaração era lida pelo BFF do
+  Stager e nada mais: comando que entrasse por outro caminho — coordenação, despacho de comando-alvo,
+  chamada direta ao endpoint — era aceito com o campo ausente. ⚠️ Se o seu modelo declara
+  `nullable: false` num campo que **o processador de regra de negócio calcula**, esse comando passa a ser
+  recusado **antes** de a regra rodar.
+
+- **Falha de projeção por chave divergente deixa de ser silenciosa.** A notificação era descartada sem
+  log, sem métrica e sem fila de erro — indistinguível de "nada aconteceu". Agora sai registro com as
+  chaves que o modelo tem, contador e erro publicado; e identificador de agregado malformado passa a ser
+  descartado com motivo, em vez de derrubar o processamento do lote.
+
+- **Vigência:** em **teste** desde `yc-interpreter:amd64-260921` (campo obrigatório e descarte com
+  registro; `yc.cqrs-c@9e2ea51`, `yc.es@0b981db`) e `:amd64-260921b` (histórico, `loguser` e autoria na
+  coordenação; `yc.cqrs-c@0f600d3`, `persistence-crs@8ba070f`, `ufrn.loco3@b8a944b`), implantadas em
+  2026-09-21. **Produção ainda não** — o interpreter segue em `:amd64-260913c`. A validação do
+  metamodelo, que subiu em produção no mesmo dia, está na 1.37 e não se repete aqui.
+
+## 1.37 — 2026-09-21
+
+- **Produção passou a rodar `yc-composer:amd64-260921` (`sha256:fecea707b971`), implantado às
+  16:39:59Z.** Tudo o que as entradas 1.34, 1.35 e 1.36 descreviam como *"em `develop`, ainda não em
+  produção"* **vale agora em produção**, e é por isso que esta entrada existe. São três comportamentos,
+  todos na publicação de modelo (`POST .../model`):
+
+  - **o documento é validado contra o metamodelo**, e a publicação responde `400` listando todas as
+    violações de uma vez (1.34);
+  - **a chave do agregado tem de ser `<boundedContext.name>.<type>`** — antes, chave divergente fazia o
+    evento ser descartado sem log, sem métrica e sem DLQ (1.34);
+  - **`roles` no nível do agregado** é aceito na publicação, e o recorte **declarado** é conferido, com
+    cinco recusas em `400` (1.36).
+
+  ⚠️ **Conferir a declaração não é aplicar o recorte.** O que subiu em produção é a publicação passar a
+  aceitar e validar a chave. **Quem aplica o corte na leitura é o interpreter, e esse lado ainda não
+  está em produção** (ver 1.38 — segue em `:amd64-260913c`). Até ele subir, declarar `roles` publica e
+  **não recorta nada**: quem precisa do corte valendo espera a imagem do interpreter.
+
+- **O que continua valendo, e é o que evita susto:** modelo **já publicado não é revalidado** — a
+  checagem é na publicação. Quem publicou ontem e não publica hoje não muda de comportamento por causa
+  desta subida. Agregado sem `roles` publica e lê como antes.
+
+- **Como ler as datas de vigência daqui para trás:** as entradas 1.34, 1.35 e 1.36 dizem *"ainda não em
+  produção"* porque era verdade quando foram escritas. **Esta entrada é o corte.** As páginas de uso
+  descrevem o comportamento corrente e não carregam mais vigência; quem precisa saber *desde quando*
+  vem a este arquivo.
+
+## 1.36 — 2026-09-21
+
+- **O aggregate passa a aceitar `roles`, que declara o recorte de LEITURA.** Opcional: quem não a usa
+  publica e lê como antes. A forma é
+  `{ read: [...], author: [...], scope: { read: { <PAPEL>: { rows: { by: <atributo> } } } } }`, e a
+  publicação recusa com `400` o recorte incoerente — papel no `scope.read` fora de `roles.read`,
+  `MASTER` no `scope`, `rows` sem `by`, `by` em metadado da plataforma, `by` em atributo não declarado
+  em comando nenhum do aggregate. São as mesmas cinco recusas que o `accessControl.scope` da entity já
+  fazia: o recorte é o mesmo dos dois lados, e divergir publicaria aggregate que passa e entity que não.
+
+- **⚠️ `roles` agora existe em dois níveis, com formas diferentes.** No **comando** é **array** e
+  **obrigatório**, e diz quem pode **executar**. No **aggregate** é **objeto** e **opcional**, e diz
+  quem pode **ler**. O nível desambigua, e não há conversão entre os dois. Em
+  [forger · model](forger/endpoints/model.md#recorte-de-leitura-do-aggregate-roles).
+
+- Vigência: em `develop` do forger, **ainda não em produção**, como a 1.34 e a 1.35.
+
+## 1.35 — 2026-09-21
+
+- **Os exemplos de modelo deixaram de ensinar chave morta.** O introdutório
+  [`acme.vendas.model.json`](examples/acme.vendas.model.json) perdeu `schema` e `concurrency` — nenhuma
+  das duas é lida por serviço nenhum — e perdeu um `"length": 0` num atributo `Long`, onde `length` não
+  significa nada. É o arquivo que a doc indica como ponto de partida, então era ele que estava
+  ensinando o que não precisa existir. Os cinco "reais (sanitizados)" **continuam** com as duas chaves,
+  porque espelham modelos publicados antes disso ser medido; o
+  [README dos exemplos](examples/README.md) agora diz isso na cara, em vez de deixar quem copia
+  descobrir sozinho.
+
+- **`domainBus.triggerProjection` tem DUAS formas, e a doc só conhecia uma.** Item **string** é a
+  projeção same-tenant; item **objeto** é a cross-tenant/cross-BC, e nela `targetTenantId` é
+  **obrigatório** — sem ele o destino é descartado no despacho e a projeção não dispara. A publicação
+  passa a recusar o objeto sem `targetTenantId`, e a recusa está na tabela de
+  [forger · model](forger/endpoints/model.md).
+
+- **Correção de rota:** a 1.34 tratava `triggerProjection` como lista de strings apenas. Estava errado
+  desde que foi escrito, e quem denunciou foi o próprio metamodelo, ao reprovar um exemplo deste acervo
+  que o motor aceita. A validação de publicação continua **em `develop` do forger, ainda não em
+  produção** — vale a partir da imagem que a carregar.
+
+## 1.34 — 2026-09-16
+
+- **`POST .../model` passa a recusar com `400` modelo que o motor não executaria** — e a página
+  [forger · model](forger/endpoints/model.md) descreve as três recusas mais comuns. ⚠️ **Em `develop` do
+  forger, ainda NÃO em produção:** vale a partir da imagem que carregar essa mudança. Até lá a
+  publicação continua aceitando os três casos, que seguem falhando — ou silenciando — em runtime, que é
+  exatamente a razão da mudança.
+
+  A mais cara das três: **a chave do agregado tem de ser `<boundedContext.name>.<type>`**. Ela é o
+  endereço do agregado no despacho do evento *e* a chave que o cliente manda no comando; divergindo, o
+  evento é descartado **sem log, sem métrica e sem DLQ** — do lado de fora, indistinguível de "nada
+  aconteceu".
+
+- **Chaves que um modelo novo não precisa trazer**, na mesma página: `schema.forWriteModel.name`,
+  `schema.forReadModel.name`, `concurrency.*`, `readProjection` e `queue` **não são lidas por serviço
+  nenhum**. Continuam aceitas — modelo publicado não precisa ser reescrito —, mas quem **gera** modelo
+  novo não deve emiti-las. A página diz, para cada uma, quem decide de fato aquilo que ela aparenta
+  decidir.
+
+- **`boundedContext.name` documentado como o que ele é**: além de compor o endereço do agregado, ele
+  **nomeia o schema** onde o log de consumo do evento é gravado. Divergir do dataschema do tenant faz o
+  consumo gravar no schema de outro ambiente sem um único erro em log.
+
+## 1.33 — 2026-09-16
+
+- **Produção passou a rodar a mesma imagem do ambiente de teste: `yc-interpreter:amd64-260913c`.** Tudo
+  o que as entradas 1.30, 1.31 e 1.32 descreviam como *"em teste; produção ainda não"* **vale agora
+  também em produção**, e é por isso que esta entrada existe. São três comportamentos:
+
+  - **datas normalizadas na entrada do comando**, com o agregado e a projeção devolvendo a mesma string,
+    e o filtro de coluna `Timestamp` deixando de falhar (entradas 1.31 e 1.32);
+  - **`NAO-MATERIALIZOU` como termo único** na busca de log de projeção que não materializou (1.31);
+  - **consulta por campo dentro de atributo `Json`** valendo também quando o `valueObject` é *single*,
+    e coluna vazia deixando de casar com `neq` (1.30).
+
+- **Como ler as datas de vigência daqui para trás:** as entradas anteriores dizem *"produção ainda não"*
+  porque era verdade quando foram escritas. **Esta entrada é o corte**: a partir de 2026-09-16, produção
+  e teste rodam a mesma imagem para esses três itens. As páginas de uso descrevem o comportamento
+  corrente e não carregam mais vigência — quem precisa saber *desde quando* vem a este arquivo.
+
+- **Pré-requisito que acompanhou a promoção**, e que só interessa a quem opera banco: o event store de
+  produção ganhou a coluna `client.aggregate.natural_key` e o índice único parcial que a acompanha, sem
+  os quais essa imagem recusa a criação de agregado de modelo que declare `identity.fields`.
+
+- ⚠️ **Mudança de comportamento que vem junto, e é visível para quem usa a API:** com a chave natural
+  valendo, **o segundo agregado criado com a mesma combinação declarada em `identity.fields` é recusado
+  pelo banco** — antes, dois iguais eram aceitos em silêncio. Vale para os agregados criados **a partir
+  de agora**: os anteriores não foram verificados e podem conter repetições, como a entrada 1.28 já
+  advertia.
+
+## 1.32 — 2026-09-13
+
+- **Datas são normalizadas na entrada do comando, e os dois endpoints passam a devolver a mesma string.**
+  Antes, a data do cliente atravessava a plataforma crua: o endpoint de agregado a devolvia como veio — com
+  fuso, com fração, com espaço — e o de projeção devolvia a forma do banco. O mesmo instante em duas
+  grafias. Agora todo `Timestamp` sai como `2026-09-12T20:19:09` (UTC) e todo `Date` como `2026-09-13`, em
+  [persistence-crs/spec/model-format.md](persistence-crs/spec/model-format.md).
+
+- **Inclusive a data que a regra de negócio devolve.** A resposta do processador é mesclada depois de o
+  comando ser lido, e passa pela mesma normalização.
+
+- **`Date` não tem conversão de fuso:** vale o dia como escrito.
+
+- ⚠️ **Mudança visível:** o carimbo automático (`whenAttribute`) no endpoint de agregado passa de
+  `2026-09-12 20:19:09` para `2026-09-12T20:19:09` — igual ao que a projeção já devolvia.
+
+- **A documentação de datas foi para onde cada leitor procura, com exemplo:** a regra e a tabela de
+  formas aceitas em [spec/model-format.md](persistence-crs/spec/model-format.md); um corpo de comando com
+  data em [endpoints/comando.md](persistence-crs/endpoints/comando.md); o estado do agregado com datas em
+  [endpoints/agregado-leitura.md](persistence-crs/endpoints/agregado-leitura.md); e **como converter para
+  o horário de Brasília no front** em
+  [persistence-q/endpoints/consulta.md](persistence-q/endpoints/consulta.md#resposta) — com o erro de
+  esquecer o `Z`, que desloca 3 horas em silêncio.
+
+- **Vigência:** em teste desde `yc-interpreter:amd64-260913c` (`yc.cqrs-c@0a5c450`, `yc.dbr-driver@0334d08`).
+  Produção ainda não.
+
+- ⚠️ **A imagem anterior, `amd64-260913b`, trazia a normalização com um defeito:** a data com `T` era recusada
+  pelo driver do banco na **criação** de registro — o comando respondia `200` e a projeção nunca
+  aparecia. Transições funcionavam. Consertado em `amd64-260913c` e validado com dado real. Se você criou
+  registro com data nesse intervalo e a linha não apareceu, **não recrie**: a mensagem está guardada e é
+  reprocessável.
+
+## 1.31 — 2026-09-13
+
+- **Carimbos de tempo são gravados e devolvidos em UTC, sem fuso — agora escrito.** A conversão para o fuso
+  de quem lê (`-03:00`, no Brasil) é do front. Não é convenção escolhida: é o que está gravado, medido nos
+  serviços e nos bancos. Um `2026-09-12T20:19:09` devolvido significa 20:19 UTC, 17:19 em Brasília. Em
+  [persistence-q/query-controls.md](persistence-q/query-controls.md#filtrar-por-data-e-hora-date-timestamp).
+
+- **Filtrar por coluna `Timestamp` passa a funcionar.** Respondia `510` para praticamente qualquer valor:
+  só um formato era aceito — com espaço **e fração obrigatória** —, e nem o valor que a própria consulta
+  devolve podia ser mandado de volta. Passam a valer sem fuso (lido como UTC), só data, com `Z` ou
+  `-03:00` (convertido para UTC) e epoch em milissegundos. Formato irreconhecível vira `400` com a lista
+  do que vale.
+
+- ⚠️ **O erro mais fácil de cometer está em destaque:** mandar hora local sem fuso. `"2026-09-13
+  00:00:00"` é meia-noite **UTC** — 21:00 do dia anterior em Brasília. A seção traz o filtro de um dia
+  inteiro em Brasília com o fuso junto.
+
+- **Vigência:** em teste desde `yc-interpreter:amd64-260913b` (`ufrn.loco3@66652cf`) — o filtro funcionava nessa
+  imagem; a criação com data, só a partir de `amd64-260913c`. Produção ainda não.
+  Onde a imagem for anterior, só `"2026-09-13 00:00:00.000"`, com a fração e já em UTC.
+
+## 1.30 — 2026-09-12
+
+- **Dá para filtrar pelos campos de dentro de um atributo `Json`, e agora isso está escrito.** A
+  capacidade existia e não constava em lugar nenhum da documentação: o critério aceita um nível a mais,
+  com os campos internos do valueObject. Em
+  [persistence-q/query-controls.md](persistence-q/query-controls.md#filtrar-por-campo-dentro-de-um-atributo-json).
+
+- **As duas formas do valueObject passam a funcionar.** A escrita sempre aceitou objeto (`single`) e
+  lista de objetos (`multiple`), e a leitura devolve as duas — mas o filtro só sabia lidar com lista, e
+  **falhava** quando a coluna guardava um objeto. Quem modelou um valueObject `single` não conseguia
+  consultar por dentro dele.
+
+- **Passam a valer `neq`, `gt`, `gte`, `lt`, `lte` e `in`**, além de `eq`, `like` e `ilike`. Operador
+  fora da lista continua sendo `400` que nomeia o operador — a lista cresceu, o silêncio não voltou.
+
+- ⚠️ **O tipo do valor que você envia decide a comparação.** `{"gt": 10}` compara como número; `{"gt":
+  "10"}` compara como texto, e aí `"9"` é maior que `"10"`. É a única informação de tipo disponível — o
+  modelo declara a coluna como `Json` e não descreve o que existe dentro. **As aspas mudam o resultado.**
+
+- **Coluna vazia não casa com nada, nem com `neq`** — e isso teve de ser consertado antes de sair.
+  Ausência de valor respondia **duas coisas diferentes** conforme estivesse gravada como lista vazia ou
+  como nula: a nula aparecia num filtro "diferente de". Agora as duas ficam de fora, igual.
+
+- **Vigência:** em teste desde `yc-interpreter:amd64-260913` (`ufrn.loco3@6152345`). Produção ainda não.
+
+## 1.29 — 2026-09-12
+
+- **Passar `unique` de `false` para `true` deixou de ser recusado pelo forger — quem julga duplicata é
+  o banco.** A recusa anterior dizia "requires all existing values to be unique" e **nunca consultava a
+  tabela**: recusava também com a tabela **vazia**, que é o caso mais comum de quem está modelando. Pior,
+  trancava o sistema contra si mesmo, porque a conferência de chave manda marcar o atributo como
+  `unique` quando o agregado declara `identity.fields` de um campo — a instrução da recusa era proibida
+  pela validação seguinte, e quem a seguisse não tinha saída. Vale para atributo e para associação.
+
+- **A recusa da conferência de projeção passa a dizer COMO SAIR, e não só a causa.** O dataschema fica
+  em `MODELING` de propósito, mas **fechar de novo dá a mesma recusa**: a única saída é retirar a
+  declaração (`_conf.projectionOf: []`) e fechar. É o oposto do que quem está corrigindo tenta fazer,
+  então ninguém descobre por tentativa — e até descobrir, o contexto fica inoperante. Em
+  [forger/erros.md](forger/erros.md#projeção-que-não-confere-com-o-modelo-de-escrita--400-na-volta-a-running).
+
+- **Vigência:** `forger@7e32720`, em teste desde `yc-composer:amd64-260912e`.
+
+## 1.28 — 2026-09-12
+
+- **A conferência de chave passou a olhar os DOIS lugares também quando `identity.fields` está vazio.**
+  A versão anterior recusava `unique` num atributo sem lastro, mas deixava passar `_conf.uniqueKey` — é a
+  mesma unicidade sem respaldo no modelo de escrita, só declarada no outro lugar, e é justamente a forma
+  que uma chave composta usa. Bastaria um agregado esvaziar o `identity.fields` para a projeção seguir
+  impondo a chave composta em silêncio, que é a classe de defeito que esta conferência existe para pegar.
+  Quadro atualizado em
+  [forger/endpoints/entity.md](forger/endpoints/entity.md#a-chave-identityfields-do-agregado-contra-a-da-projeção).
+  **Vigência:** `forger@e95f65c`, em teste desde `yc-composer:amd64-260912d`.
+
+## 1.27 — 2026-09-12
+
+- **A conferência da projeção passa a cobrir também a CHAVE, e ela mora em dois lugares conforme a
+  cardinalidade.** O `identity.fields` do agregado é o espaço de chave do modelo de escrita; na projeção,
+  chave de **um** campo se declara no atributo (`unique: true`) e chave de **dois ou mais** em
+  `_conf.uniqueKey`, que é o lugar da composta e exige 2+ atributos. A conferência segue essa divisão em
+  vez de olhar sempre para o mesmo campo. Em
+  [forger/endpoints/entity.md](forger/endpoints/entity.md#a-chave-identityfields-do-agregado-contra-a-da-projeção).
+
+- **O caso que motivou:** um agregado deixou de exigir chave natural — `identity.fields` virou vazio —
+  e a coluna continuou única na projeção. O segundo registro legítimo nunca materializava, sem erro
+  visível a quem chamou. Agora `unique` sem lastro no `identity.fields` é recusado no fechamento da
+  edição.
+
+- **Dois limites ditos com todas as letras, porque calar seria pior:** com **dois ou mais** agregados em
+  `projectionOf` a conferência de chave é **pulada** — cada agregado tem o seu `identity.fields`, e
+  uni-los inventaria uma chave que nenhum declarou; e a conferência compara **definição com definição**,
+  então **índice único já existente no banco** que tenha saído da definição **não é alcançado** — mudar
+  o modelo não derruba índice criado antes.
+
+- **Vigência:** `forger@eb82d28`, em teste desde `yc-composer:amd64-260912c`.
+
+## 1.26 — 2026-09-12
+
+- **A entity passa a poder declarar de que agregados ela é projeção — `_conf.projectionOf` — e o
+  fechamento da edição confere as duas coisas contra o modelo de escrita.** Até aqui a tabela de leitura
+  e a definição de escrita descreviam a mesma coisa, eram publicadas por caminhos diferentes, e **nada
+  as confrontava**: a divergência só aparecia quando um evento tentava gravar, e aí não havia conserto —
+  o comando já respondera `200`, a projeção falhava depois, e reemitir o comando falha com o agregado em
+  outro estado. Em [forger/endpoints/entity.md](forger/endpoints/entity.md#declarar-que-a-entity-é-projeção--_confprojectionof-regra),
+  com as recusas em [forger/erros.md](forger/erros.md#projeção-que-não-confere-com-o-modelo-de-escrita--400-na-volta-a-running).
+
+- **São dois sentidos, e faltar é muito pior que sobrar.** *Teto*: a projeção não pode declarar atributo
+  que agregado nenhum dos nomeados escreve — o efeito é coluna órfã, sempre vazia. *Piso*: a projeção
+  tem de declarar **tudo** o que eles escrevem, carimbo de evento incluído — sem a coluna, o motor
+  recusa a gravação **inteira** e a linha nunca materializa. Por isso **a projeção não pode ser mais
+  estreita que o agregado**: não é escolha de desenho, é que uma chave ausente derruba a gravação toda,
+  não só aquele campo.
+
+- **A conferência roda no fechamento da edição, e não na publicação de cada artefato.** A entity e o
+  `.model.json` são publicados por caminhos diferentes e em **qualquer ordem**; conferir um contra o
+  outro no ato de publicar recusaria sequência legítima, porque o segundo artefato ainda não existe. Na
+  transição `MODELING → RUNNING` os dois estão na mesa. A recusa é `400`, **nada é gravado**, e o
+  dataschema **continua em `MODELING`**.
+
+- **O item de `projectionOf` é o `type` do agregado, não a chave do mapa `aggregate`.** No `.model.json`
+  o agregado aparece sob chave composta (`"ensino.aula"`) e tem um campo `"type": "aula"`; o roteamento
+  da projeção usa o `type` cru. A recusa lista os **dois** vocabulários, porque o erro provável é copiar
+  o que se vê no arquivo.
+
+- **É opt-in, e isso é o que protege quem já existe:** entity sem `projectionOf` não é conferida, e
+  nenhum dataschema publicado hoje passa a ser recusado. **Vigência:** a partir da imagem que carregar
+  `forger@04ee971` — em teste desde `yc-composer:amd64-260912`.
+
+- **Corrigido: recurso inexistente respondia `510 "Falha inesperada, solicite suporte."` em vez de
+  `404`.** Valia para entity, dataschema, atributo e associação não encontrados — oito lançamentos do
+  mesmo controller, todos sem o prefixo de status que o tradutor de erro usa para decidir o código. Quem
+  integra não conseguia distinguir "não existe" de "o serviço quebrou", e `510` manda procurar suporte
+  por uma condição perfeitamente normal. O catálogo já documentava `404`; era o comportamento que estava
+  errado. **Vigência:** `forger@5c13391`, em teste desde
+  `yc-composer:amd64-260912b`.
+
+## 1.25 — 2026-09-10
+
+- **O que separa teste de produção são dois critérios, não um** — e o documento não dizia nenhum dos
+  dois. [Arquitetura](01-arquitetura.md) ganha a seção *Teste e produção — o que separa um do outro*, na
+  Fase 3: a **escrita** se separa pela **superfície** (o prefixo `/t/` entra numa instância de teste do
+  motor, que escreve no event store de teste); a **leitura** se separa pelo **tenant**, e não por nome
+  ou instância de banco — dois tenants podem ter o mesmo modelo de leitura, um de teste e outro de
+  produção, materializados até no mesmo banco.
+
+- **Por que a lacuna importava:** sem esse critério escrito, é natural inferir o ambiente do lugar onde
+  o dado está — "esta linha está no banco X, logo é produção". A inferência é inválida, e leva a tratar
+  como delicado um dado de teste, ou o contrário. A pergunta que classifica é **de que tenant é a
+  linha**; o tenant de teste existe desde o começo, o de produção só quando o sistema vai ao ar.
+
+## 1.25 — 2026-09-12
+
+- **"O comando respondeu `200` e a linha não apareceu" ganhou seção própria, com a receita para achar a
+  causa.** É o sintoma mais caro da plataforma, e o mal-entendido está no `200`: ele responde pela
+  **escrita**. A projeção é aplicada depois, a partir de uma fila, e quando falha não há para quem
+  responder — quem chamou já foi embora. A seção diz o que fazer nessa ordem: conferir a projeção depois
+  de qualquer transição nova, procurar o rastro no log de serviço, e ler o que voltou. Em
+  [persistence-crs/erros.md](persistence-crs/erros.md#o-comando-respondeu-200-e-a-linha-não-apareceu),
+  com ponteiro do [persistence-q](persistence-q/README.md).
+
+- **A busca virou uma palavra só: `NAO-MATERIALIZOU`.** A mesma classe de falha saía sob três termos
+  diferentes, conforme o caminho — projeção do tenant, projeção entre contextos, saga —, e o endpoint de
+  logs recebe o termo **na própria rota**. Quem errava a palavra recebia `204`, que é indistinguível de
+  "não houve falha": foi assim que um cliente concluiu que a falha era silenciosa quando ela estava
+  registrada sob outro nome. **Vigência:** em teste desde `yc-interpreter:amd64-260913`
+  (`persistence-crs@9bc1b28`); em produção, os três termos antigos continuam sendo o caminho.
+
+- **Registrado também que `204` na busca de log significa "não achei esse termo"** — nunca "não houve
+  falha". A distinção não era óbvia e custou uma investigação inteira.
+
+## 1.24 — 2026-09-10
+
+- **Pare de invalidar cache à mão: a plataforma já repõe o modelo sozinha.** Até esta versão, a
+  documentação do [persistence-crs](persistence-crs/README.md#depois-de-alterar-o-modelo) e do
+  [persistence-q](persistence-q/README.md) mandava, depois de alterar um modelo, **apagar duas chaves de
+  cache** antes de republicar. Era **trabalho desnecessário**: fechar a edição do dataschema
+  (`MODELING` → `RUNNING`) já republica o modelo de leitura, e republicar o `.model.json` já sobrescreve
+  o de escrita. Quem seguia aquele texto fazia uma operação delicada, à mão, sem precisar. **Se é o seu
+  caso, pode parar.**
+
+- **E são dois modelos, não duas cópias do mesmo** — o que a redação anterior escondia. O **de escrita**
+  (agregados e comandos) e o **de leitura** (projeções) têm gatilhos diferentes e não se atualizam
+  juntos. A seção agora diz, numa tabela, o que repõe cada um.
+
+- **O que morde não é editar entities: é deixar a edição aberta.** Enquanto o dataschema está em
+  `MODELING` o modelo de leitura não existe, e a consulta falha com `510`. Ele volta ao fechar. Isso não
+  estava dito em lugar nenhum, e a ausência fazia o `510` parecer defeito.
+
+- **A edição de um schema passa a fechar o tenant inteiro.** Até aqui, entrar em edição fazia a consulta
+  falhar e **o comando continuar sendo aceito** sobre um modelo em remodelagem. Agora a janela recusa os
+  dois. O mecanismo, o roteiro e o pré-requisito para voltar a `RUNNING` estão em
+  [forger/dataschema](forger/endpoints/dataschema.md#o-que-a-transição-faz-com-o-modelo-no-cache), que é
+  a fatia de quem publica e remove os modelos.
+
+- **A cópia em memória de cada instância deixou de existir na instância de teste.** Até 2026-09-10 cada
+  instância guardava o modelo por até uma hora, e uma alteração podia "pegar" numa e não noutra. No
+  `tinterpreter`, desde a imagem `amd64-260910`, essas cópias estão **desligadas**: o modelo é relido a
+  cada requisição e **republicar passa a valer na requisição seguinte**. Onde continuarem ligadas, a
+  defasagem de até uma hora ainda vale.
+
+## 1.23 — 2026-09-09
+
+- **Uma entity pode declarar que um papel lê apenas as linhas de que o usuário é titular.** Até aqui o
+  controle de acesso só sabia dizer *"este papel lê esta tabela"* ou *"não lê"* — não havia como dizer
+  *"lê só o que é dele"*, e a consequência era que qualquer usuário final autenticado lia a tabela
+  inteira de dados pessoais dos demais. A declaração é `accessControl.scope`, e as duas metades estão
+  documentadas onde cada uma acontece: **como declarar** em [forger — entity](forger/endpoints/entity.md)
+  e **o efeito na consulta** em [persistence-q](persistence-q/README.md#recorte-de-leitura-por-titular).
+
+- **A seção do recorte deixou de ser lista de consequências e virou percurso.** Ela respondia *"o que
+  acontece se…"* sete vezes e nunca *"como eu faço"*. Agora vai do modelo declarado à resposta, com a
+  requisição no meio — e ganhou o que faltava para modelar sem errar: **o que torna uma linha "sua"**, a
+  tabela-verdade de `read` × `scope`, e **como o processador deve ser escrito**.
+
+- **`scope` nunca concede acesso, só estreita o que o `read` já permitiu.** Era a regra que amarrava
+  tudo e não estava escrita em lugar nenhum: papel fora do `read` não lê e portanto nunca chega ao
+  recorte; papel no `read` e fora do `scope` lê a tabela inteira. Sem ela, *"acumular papéis amplia"*
+  soava arbitrário em vez de decorrer da regra.
+
+- **⚠️ Atributo de titular vazio torna a ficha invisível para o próprio dono** — com `200` e lista
+  vazia, indistinguível de *"não existe"*. É a armadilha de modelagem mais provável do recurso, e ela
+  vale especialmente quando a ficha é cadastrada por outra pessoa. Está em
+  [o que torna uma linha "sua"](persistence-q/README.md#o-que-torna-uma-linha-sua).
+
+- **Usar o token do usuário num processador que precisa ver dado de terceiro devolve lista vazia com
+  `200`** — não um erro. Quando a entity é recortada, aquele token restringe a leitura ao próprio
+  usuário. Para ver além, o caminho é o endpoint interno de cluster.
+
+- **Errata em `identity.fields`: a garantia prometida não existia, e agora existe.** O texto afirmava
+  que a combinação declarada era única e que *"não pode haver dois registros com a mesma combinação"* —
+  **nada no processamento do comando lia esse campo**, e dois agregados iguais eram aceitos. A partir de
+  `amd64-260909c` a combinação **é imposta na criação**. Consequência para quem já tem dados: **os
+  registros criados antes não foram verificados** e podem conter repetições. Ver
+  [identidade e unicidade](persistence-crs/spec/model-format.md#identidade-e-unicidade-identity).
+
+- **E como escolher os `fields`, que faltava.** A pergunta não é *"quais campos são obrigatórios"*, é
+  **"o que faz dois destes serem o mesmo?"**. Com a armadilha por extenso: **recriar depois de encerrar
+  costuma ser legítimo** — o aluno que sai da turma e volta no semestre seguinte é matrícula nova, e uma
+  chave que não os distingue passaria a recusar operação correta.
+
+- **Toda afirmação sensível a versão passou a ser datada por versão, e não por expectativa.** Duas vezes
+  no mesmo dia um texto envelheceu em horas: uma ressalva de indisponibilidade que a implantação
+  desmentiu, e uma errata que a implementação desmentiu. Doc ausente faz perguntar; **doc errada faz
+  agir**.
 
 ## 1.22 — 2026-09-09
 

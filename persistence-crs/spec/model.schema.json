@@ -19,7 +19,24 @@
           "type": "object",
           "minProperties": 1,
           "additionalProperties": { "$ref": "#/$defs/aggregate" }
+        },
+        "subscriptions": {
+          "type": "object",
+          "description": "Opcional. Assinaturas externas de eventos deste bounded context: nome -> declaracao. Quem le e o servico de eventos (feed por cursor); o motor de comandos nao le. Ver spec/model-format.md § Assinaturas externas.",
+          "propertyNames": { "pattern": "^[a-z][a-z0-9-]{0,62}$" },
+          "additionalProperties": { "$ref": "#/$defs/subscription" }
         }
+      }
+    },
+    "subscription": {
+      "type": "object",
+      "required": ["reader", "aggregateTypes"],
+      "additionalProperties": false,
+      "properties": {
+        "reader": { "type": "string", "minLength": 1, "description": "username da unica conta que pode ler o feed desta assinatura" },
+        "aggregateTypes": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9_]+\\.[a-z0-9_]+$" }, "description": "<bc>.<tipo> de agregados deste modelo" },
+        "events": { "type": "array", "minItems": 1, "uniqueItems": true, "items": { "type": "string", "pattern": "^[a-z0-9_]+\\.[a-z0-9_]+\\.[a-z0-9_]+$" }, "description": "<bc>.<tipo>.<evento>; ausente = todos os eventos dos tipos" },
+        "from": { "type": "string", "enum": ["now", "beginning"], "description": "onde a leitura comeca na primeira vez; padrao now" }
       }
     },
     "aggregate": {
@@ -125,8 +142,53 @@
           "type": "object",
           "minProperties": 1,
           "additionalProperties": { "$ref": "#/$defs/event" }
+        },
+        "computed": {
+          "type": "object",
+          "description": "Opcional. Por comando, os atributos que o processor br preenche. Chave = nome de comando do agregado; nome sem ponto = atributo de data.attribute daquele comando; '<vo>.<campo>' = campo de value object de grupo. O motor nao le; quem le e o BFF. Ver spec/model-format.md § computed.",
+          "additionalProperties": {
+            "type": "array",
+            "minItems": 1,
+            "uniqueItems": true,
+            "items": { "type": "string", "pattern": "^[a-z]+(\\.[a-z]+)?$" }
+          }
+        },
+        "readProjection": {
+          "type": "object",
+          "description": "Opcional. Por papel, as colunas que ele ve nas leituras pelo BFF; '*' = a linha inteira. Exaustiva por agregado. O motor nao le; quem le e o BFF. Ver spec/model-format.md § readProjection.",
+          "additionalProperties": {
+            "oneOf": [
+              { "const": "*" },
+              { "type": "array", "minItems": 1, "items": { "type": "string" } }
+            ]
+          }
+        },
+        "references": {
+          "type": "object",
+          "minProperties": 1,
+          "description": "Opcional. Atributo (ou '<grupo>.<campo>' de value object de grupo) -> agregado alvo. Forma curta = o endereco; longa = { aggregate: <endereco>, valueKey? }; valueKey padrao = aggregateid. O motor nao le. Ver spec/model-format.md § references.",
+          "propertyNames": { "pattern": "^[a-z]+(\\.[a-z]+)?$" },
+          "additionalProperties": {
+            "oneOf": [
+              { "$ref": "#/$defs/referenceAddress" },
+              {
+                "type": "object",
+                "required": ["aggregate"],
+                "additionalProperties": false,
+                "properties": {
+                  "aggregate": { "$ref": "#/$defs/referenceAddress" },
+                  "valueKey": { "type": "string", "pattern": "^[a-z]+$", "description": "Atributo do alvo que este campo guarda. Padrao: aggregateid." }
+                }
+              }
+            ]
+          }
         }
       }
+    },
+    "referenceAddress": {
+      "type": "string",
+      "pattern": "^([a-z][a-z0-9]*\\.)?[a-z][a-z0-9_]*\\.[a-z][a-z0-9_]*$",
+      "description": "Endereco do alvo de references. '<bc>.<tipo>' = agregado do PROPRIO modelo; '<projeto>.<bc>.<tipo>' = agregado de outro projeto do mesmo org, publicado em exatamente um tenant dele."
     },
     "command": {
       "type": "object",

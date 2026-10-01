@@ -20,14 +20,17 @@
 - [Capacidade](#capacidade)
 - [Miolo](#miolo)
 - [Proxy de domínio](#proxy-de-domínio)
+- [Referência entre agregados (`/session/refs/*`)](#referência-entre-agregados-sessionrefs)
 - [Arquivos anexos de agregado (`/session/files/*`)](#arquivos-anexos-de-agregado-sessionfiles)
 - [Quem autoriza a leitura](#quem-autoriza-a-leitura)
 - [Limitar os campos que um papel lê — `readProjection`](#limitar-os-campos-que-um-papel-lê-readprojection)
 - [Atributo calculado pelo br — `computed`](#atributo-calculado-pelo-br--computed)
 - [`predicates` é a forma do persistence-q — não há dialeto do BFF](#predicates-é-a-forma-do-persistence-q-não-há-dialeto-do-bff)
 - [Autocadastro (`/ua/*`)](#autocadastro-ua)
+- [Relatos de suporte (`/session/suporte/*`)](#relatos-de-suporte-sessionsuporte)
 - [Preferências da organização (org-scoped)](#preferências-da-organização-org-scoped)
 - [Cabeçalhos que o BFF injeta (contrato de saída)](#cabeçalhos-que-o-bff-injeta-contrato-de-saída)
+- [Id de requisição (`x-request-id`)](#id-de-requisição-x-request-id)
 - [Operação](#operação)
 - [Erros](#erros)
 - [Checklist do agente](#checklist-do-agente)
@@ -113,7 +116,7 @@ forger é quem **grava** ali ao publicar o `.model.json`) — e cruza com os **p
 
 | Chave | O que traz |
 |---|---|
-| `attributes` | os atributos escalares, com `type`, `nullable` e o papel de apresentação (`input`, `status`, `serverStamp`, `lookup`, `computed`) |
+| `attributes` | os atributos escalares, com `type`, `nullable`, o papel de apresentação (`input`, `status`, `serverStamp`, `lookup`, `computed`) e, quando o modelo declara em `references`, `ref: { aggregate, valueKey }`, o agregado que o atributo aponta (também nos campos de value object) |
 | `valueObjects` | os **value objects** do comando, com `name`, `cardinality` (`single` · `multiple`) e `fields`. **Ausente** quando o comando não declara nenhum |
 
 **`serverStamp` é o `whenAttribute` do evento, e só ele.** O BFF **não envia** esse atributo no comando,
@@ -195,9 +198,16 @@ Quando o modelo declara `alias` em `command.<cmd>` ou em `event.<evt>`
 
 | Operação | Método · Path | Resposta |
 |---|---|---|
-| Manifesto do miolo | `GET /tenant/{tenantId}/miolo-manifest` | `{ "tenantId": "...", "manifestUrl": "..." }` |
+| Manifesto do miolo | `GET /tenant/{tenantId}/miolo-manifest?aggregate={agregado}` | `{ "tenantId": "...", "aggregate": "...", "manifestUrl": "..." }` |
 
-Resolve `tenant → URL` do miolo (ver [injecao](../shell/injecao.md)). Só para tenant do usuário.
+Resolve `tenant → URL` do miolo (ver [injecao](../shell/injecao.md)). Só para tenant do usuário (`404` fora
+dele, e `404` quando nada cobre o tenant).
+
+- **`aggregate`** — o agregado escolhido no menu (o valor de `capability.aggregates[].aggregate`).
+  Opcional: sem ele, vale só o miolo que cobre o tenant inteiro, e o `aggregate` sai da resposta.
+- **O registro cobre o tenant inteiro ou só alguns agregados dele.** Ordem: o miolo registrado **para o
+  agregado** → o miolo registrado para o **resto do tenant** (`*`) → o **miolo GEN**. Um miolo CUSTOM
+  que trata só um agregado não esconde os outros: eles abrem no GEN.
 
 > **Única operação exclusiva de quem usa a casca.** Consumidor **sem UI** (app móvel, integração,
 > serviço) **não** chama este endpoint — não há miolo a injetar. Sessão, capacidade e proxy valem
@@ -267,6 +277,106 @@ O consumidor **não** compõe esses cabeçalhos nem conhece o token.
   persistence-q os ignoraria em silêncio. Resposta em forma desconhecida vira `502`, nunca um zero.
 - `/session/aggregate` existe porque a **projeção é assíncrona**: para carregar o estado autoritativo de
   um agregado (ex.: preencher um form de transição) não se deve ler o read model.
+
+## Referência entre agregados (`/session/refs/*`)
+
+Quando um atributo aponta outro agregado (a aula aponta o professor), quem mostra ou preenche o campo
+precisa do **nome** do registro apontado, não do id. As duas rotas resolvem isso **uma vez, no BFF**,
+para qualquer consumidor: a casca (GEN e CUSTOM, via `api.refs`) e o cliente sem UI.
+
+| Operação | Método · Path | Corpo | Resposta |
+|---|---|---|---|
+| Rótulos em lote | `POST /session/refs/labels` | `{ tenantId, aggregate, ids: { "<atributo>": ["<id>", …] } }` | `{ refs: { "<atributo>": { alvo, rotulos: { "<id>": Parte[] }, faltam: ["<id>"] } \| { alvo?, estado, status? } } }` |
+| Busca para seletor | `POST /session/refs/search` | `{ tenantId, aggregate, attr, texto?, paging }` | `{ alvo, itens: [{ valor, rotulo: Parte[] }], truncated?, semBusca? }` |
+
+`Parte = { valor, tipo, fmt? }`. O rótulo vem **cru e em partes**, e quem mostra formata cada uma (tipo e
+`fmt`), porque só a tela conhece o fuso de quem lê. `valor` é a **chave que o comando grava**, nunca o
+rótulo.
+
+- **A chamada é endereçada pela origem** (`tenantId`, `aggregate`, atributo): o BFF acha a declaração e o
+  alvo. O consumidor **não escolhe** o agregado apontado nem o tenant dele.
+- **A declaração** é o `options` por referência do manifesto
+  (`{ aggregate, valueKey, labelKey }`, ver [shell — apresentacao](../shell/apresentacao.md)). Atributo
+  sem essa declaração: `sem-declaracao` nos rótulos, `404` na busca.
+- **O rótulo vem do alvo**, nesta ordem: `labelKey` declarado → `titleKey` do alvo no manifesto →
+  `identity.fields` do alvo no modelo → o primeiro atributo de texto que ele declara. A **busca** usa os
+  atributos do rótulo mais `identity.fields`, só os de texto e de primeiro nível, por `ilike` e com `OR`
+  entre eles. Sem nenhum atributo desses, a busca lista sem filtro e responde `semBusca: true`.
+- **Quem lê é o usuário**: a consulta ao alvo vai com o token da sessão, e o persistence-q decide. O
+  recorte de coluna ([`readProjection`](#limitar-os-campos-que-um-papel-lê-readprojection)) vale: se a
+  coluna do rótulo está cortada, o rótulo desce para o nível seguinte da ordem, e nunca vaza.
+- **Estados, nunca silêncio.** Nos rótulos: id pedido e não achado vai em `faltam`; `403` do
+  persistence-q → `estado: "sem-acesso"`; outro erro → `estado: "erro"` com o `status`; nada legível que
+  identifique o registro → `sem-acesso`. Na busca, o erro do persistence-q **passa inteiro**.
+- **Limites:** até 20 atributos e 500 ids por atributo nos rótulos (ids em lotes de 200 por consulta, um
+  lote por alvo e chave); até 50 itens por página na busca (`paging` obrigatório).
+- **Só o mesmo tenant, por ora.** O alvo tem de estar no modelo do tenant de origem: é o único que a
+  publicação do manifesto aceita. Fora dele: `estado: "sem-tenant"` nos rótulos e `422` na busca.
+  **Referência dentro de um valor `Json` não se resolve**: só atributo ou `grupo.campo`.
+
+### Declarada no modelo: `references`, pedida e ainda não em vigor
+
+> **Estado em 2026-09-29:** a **forma** está no
+> [formato do modelo](../persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado)
+> (1.87), e é ela que vale se esta seção divergir. O forger já confere a chave em `develop`
+> (`forger@2ab9b8d`, [recusas](../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references)),
+> **mas ainda não em produção**. **O BFF lê a chave no ar em stager desde 2026-09-29T19:04Z** (yc.app
+> `56f3cd9`); sem a declaração no modelo, vale o `options` por referência do manifesto, só no mesmo tenant.
+> Enquanto o forger de produção não confere a chave, declará-la é **por conta de quem publica**: um
+> endereço errado só aparece na tela, como `sem-tenant`, `sem-acesso` ou `erro`. Esta seção diz **o que o
+> BFF faz** com ela.
+
+A referência é **fato do domínio**: declara-se no `.model.json`, no nível do agregado, irmã de `command` e
+`event`, e vale para qualquer consumidor, com tela ou sem.
+
+```jsonc
+"agenda.aula": {
+  "command": { … },
+  "event": { … },
+  "references": {
+    "regraid":   "agenda.regra",                                               // alvo no PRÓPRIO modelo
+    "teacherid": "cadastro.cadastro.professor",                                // alvo em outro projeto do org
+    "serviceid": { "aggregate": "cadastro.cadastro.modalidade" },              // forma longa, mesma coisa
+    "alunocpf":  { "aggregate": "cadastro.cadastro.aluno", "valueKey": "cpf" } // guarda outra chave do alvo
+  }
+}
+```
+
+> Ilustrativo: nomes de agregado e de atributo são exemplos, não JSON literal a copiar.
+
+**Sintaxe.**
+- **Chave:** atributo declarado em `data.attribute` de algum comando do agregado, ou `grupo.campo` de value
+  object de grupo. Nunca uma chave da plataforma (`id`, `aggregateid`, `status`, `version`, auditoria), nem um
+  campo dentro de valor `Json`.
+- **Valor:** o **endereço** do alvo, em texto, ou o objeto `{ "aggregate": "<endereço>", "valueKey"?:
+  "<atributo do alvo>" }`. `valueKey` é o atributo do alvo que este campo guarda, com padrão
+  `aggregateid`; outra chave no objeto é recusada.
+- **O endereço diz onde está o alvo, sem busca:**
+
+  | Endereço | Onde está o alvo |
+  |---|---|
+  | `"<bc>.<tipo>"` | **só no próprio modelo**, no mesmo tenant. Nunca em outro modelo |
+  | `"<projeto>.<bc>.<tipo>"` | no projeto `<projeto>` do **mesmo org**, publicado em **exatamente um** tenant dele. É a forma do FQN `<org>.<projeto>.<bc>.<tipo>`, sem o org |
+
+- `references` vazio é recusado. As demais recusas (tipo do atributo, `valueKey`, alvo inexistente ou
+  ambíguo) são do forger: [forger — `references`](../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references).
+
+**Semântica.**
+- **Afirma** que todo valor não vazio do atributo é o `valueKey` de um registro do alvo. É declaração de
+  **leitura**: o motor não a lê e não confere, no comando, se o alvo existe.
+- **O alvo** está onde o endereço diz. Com `"<bc>.<tipo>"`, no próprio tenant. Com
+  `"<projeto>.<bc>.<tipo>"`, o BFF pega na sessão o tenant do **mesmo org** com aquele projeto e aquele
+  bounded context; se ele não está no token do usuário, o estado é `sem-acesso`. **Sem `tenantId`** na
+  declaração: o mesmo modelo vale em qualquer ambiente.
+- **Quem lê** é o usuário, com o próprio token, no tenant do alvo. Sem esse tenant no token, ou sem papel
+  de leitura nele, o estado é `sem-acesso`: **a referência não amplia leitura**.
+- **Nome e busca** não se declaram aqui: vêm do alvo, na mesma ordem desta seção (`titleKey` →
+  `identity.fields` → primeiro texto). A referência diz só **para onde** aponta e **por qual chave**.
+- **Precedência:** para o mesmo atributo, a declaração no modelo vale sobre o `options` por referência do
+  manifesto. A capacidade passa a levar a referência no atributo, e GEN, CUSTOM e cliente sem UI sabem
+  dela sem ler o manifesto.
+- **Cópia local** (ex.: `teachername` gravado junto) é "o nome na época"; a referência dá "o nome hoje".
+  Uma não substitui a outra.
 
 ## Arquivos anexos de agregado (`/session/files/*`)
 
@@ -634,6 +744,38 @@ Contrato de origem: [orgid/publico](../orgid/endpoints/publico.md) e [orgid/ua-p
 
 Monte a tela de cadastro a partir de `GET /ua/roles`: são exatamente os papéis que o servidor aceita.
 
+## Relatos de suporte (`/session/suporte/*`)
+
+O usuário relata uma falha, tira uma dúvida ou sugere, e acompanha a resposta da **equipe da plataforma**.
+Quem guarda é o **monitor** ([contrato](../monitor/endpoints/relatos.md)); o BFF repassa, e **o browser nunca
+fala com o monitor**. Todas exigem o cookie de sessão.
+
+| Operação | Método · Path | Resposta |
+|---|---|---|
+| Criar relato | `POST /session/suporte/relatos?tenant=<tenantId>` ou `?org=<org>` | `201 { id, estado, criadoEm }` |
+| Meus relatos | `GET /session/suporte/relatos?limit&offset` | `{ total, limit, offset, rows: [{ id, tipo, titulo, estado, criadoEm, atualizadoEm, fechadoEm, naoLido }] }` |
+| Um relato com a conversa | `GET /session/suporte/relatos/:id` | a linha, mais `contexto` e `mensagens: [{ id, autor: USUARIO \| EQUIPE, texto, em }]` |
+| Responder | `POST /session/suporte/relatos/:id/mensagens` · `{ texto }` | `201`; relato fechado → `409` |
+| Marcar como lido | `POST /session/suporte/relatos/:id/lido` (sem corpo) | `204` |
+| Quantos têm resposta nova | `GET /session/suporte/nao-lidos` | `{ total }` |
+
+- **Corpo do relato**: `{ tipo, titulo?, contexto?, mensagens: [{ texto }], diagnostico? }` — `tipo` é `Falha`,
+  `Dúvida` ou `Sugestão`, e volta como `FALHA`, `DUVIDA` ou `SUGESTAO`. O `diagnostico` é o da tela
+  ([o que leva](../shell/seguranca.md#diagnóstico-do-relato-de-suporte)). Até **256 KB** no todo; acima, `413`
+  no próprio BFF.
+- **Quem relata não se declara.** O BFF tira da **sessão** o usuário, e do parâmetro a org e o tenant — só se
+  forem do usuário (senão `404`). Com `tenant`, a org é a dele. Usuário, org e tenant que vierem no corpo são
+  ignorados pelo monitor.
+- **Só os relatos do próprio usuário**: relato de outro responde `404`, como se não existisse.
+- **Erro do monitor passa inteiro**, com status e corpo `{ error: "<código>", details: "<motivo>" }`
+  ([erros](../monitor/erros.md)): o texto para a tela é o `details`.
+- **Sem o serviço configurado** neste ambiente, as seis respondem `503`.
+- Por dentro (não é contrato de quem chama o BFF): o BFF fala com o monitor pela borda, com credencial de
+  serviço — não com o token do usuário — e manda o `x-request-id` da chamada, que fica gravado no relato.
+
+> **No ar em stager desde 2026-09-27T04:23Z** (yc.app `3dbf9d1`). Antes disso, o suporte do stager era um
+> mockup declarado, e nenhum relato saía da tela.
+
 ## Preferências da organização (org-scoped)
 
 Preferências de **apresentação por organização** — valem para **todos** os usuários da org, persistidas no
@@ -670,6 +812,19 @@ Tudo composto **no servidor**. Nenhum deles é montado — nem visto — pelo br
 > configuração: **sem ela, o login falha com `401` no gateway**, e não por credencial de usuário inválida.
 > É segredo: nunca vai ao browser, nunca em código, nunca em doc.
 
+## Id de requisição (`x-request-id`)
+
+**Toda resposta do BFF traz `x-request-id`**, e é o mesmo id que aparece na linha do log do BFF daquela
+requisição. Serve para ligar um relato de suporte ao que o servidor viu.
+
+- **Quem chama pode mandar o seu** no cabeçalho `x-request-id` — a casca manda um por chamada. O BFF o
+  adota se tiver **forma de id**: de 8 a 64 caracteres, só letras, dígitos e hífen. Fora disso (ou sem
+  cabeçalho), o BFF gera um UUID e devolve esse. Texto livre nunca chega ao log.
+- **No browser**, o CORS do BFF **expõe** o cabeçalho, e `fetch` o lê em `res.headers.get('x-request-id')`.
+- **Não é autenticação** nem chave de idempotência: não muda o que a rota faz, e repetir o id não repete
+  nem bloqueia nada.
+- Ausente numa versão anterior do BFF: quem lê trata a falta como "sem id".
+
 ## Operação
 
 | Operação | Método · Path | Resposta |
@@ -692,7 +847,7 @@ que o gateway, o cache ou o persistence respondem.
 | `500` | configuração ausente no servidor (ex.: o path do endpoint de cache não configurado) · **`readProjection` inválido no modelo do tenant** — a leitura é recusada em vez de recortada pela metade · **`computed` inválido no modelo do tenant** — o comando é recusado em vez de gravar marcador |
 | `413` | arquivo acima do teto do filer (3 MiB) em `POST /session/files/upload` |
 | `502` | falha ao falar com um serviço da plataforma |
-| `503` | serviço de arquivos (filer) não configurado neste ambiente |
+| `503` | serviço de arquivos (filer) ou de suporte (monitor) não configurado neste ambiente |
 
 ### `401` diz **por que** não há sessão
 
@@ -725,6 +880,8 @@ sem explicação — e ninguém consegue medir a frequência do problema.
 - [ ] Endereços de serviço = **config de deploy**, nunca hardcode nem em doc pública.
 - [ ] Em `/session/files/*`: `entityId` da chave = **`aggregateid`**; prefixo em `delete` é **lote**; e
       o anexo é protegido **por papel na entity**, nunca por titular — ver o aviso da seção.
+- [ ] Referência a outro agregado: peça o nome em `/session/refs/labels` e busque em `/session/refs/search`,
+  e grave o `valor` do item. Nunca o rótulo, e nunca peça ao usuário que cole um id.
 - [ ] Atributo que o processor preenche: declare-o em `computed`, e faça o processor **sempre**
       devolvê-lo não nulo — senão o marcador é gravado.
 

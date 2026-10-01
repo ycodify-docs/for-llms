@@ -10,6 +10,7 @@
 
 ## Contents
 - Estrutura de topo
+- Assinaturas externas
 - Nível do agregado
 - Atributos e tipos
 - Comandos
@@ -27,7 +28,8 @@
   "<org>.<project>": {              // chave = organização.projeto (um projeto é um bounded context)
     "aggregate": {
       "<bc>.<aggregateType>": { ... } // um ou mais agregados
-    }
+    },
+    "subscriptions": { ... }          // OPCIONAL — ver "Assinaturas externas"
   }
 }
 ```
@@ -47,6 +49,43 @@ validação e do JSON publicado) e o grid de interpretação (persistence-crs/es
 > **Escopo:** esta convenção `_` é do **`.model.json`**. A definição de **entity** (forger) tem contrato
 > próprio e usa **`_conf` obrigatório** (semântico) — lá `_` **não** é removido. Ver
 > [forger/entity](../../forger/endpoints/entity.md).
+
+### Assinaturas externas (`subscriptions`)
+
+Declara o que um sistema **de fora** da plataforma pode acompanhar deste tenant: ele lê, por cursor, **o que**
+aconteceu — tipo de agregado, id, evento, quando —, sem o conteúdo. Dizer o que um sistema de fora consome do
+domínio é decisão de **quem modela**: por isso a assinatura mora no modelo e é publicada com ele, e não se
+cadastra em execução. O feed está em [es-n — assinatura externa](../../es-n/endpoints/assinaturas.md).
+
+```jsonc
+"acme.vendas": {
+  "aggregate": { ... },
+  "subscriptions": {
+    "monitor-externo": {
+      "reader": "svc-monitor",                       // a ÚNICA conta que lê este feed
+      "aggregateTypes": ["vendas.pedido"],           // <bc>.<tipo> deste modelo
+      "events": ["vendas.pedido.cancelado"],         // opcional: ausente = todos os eventos dos tipos
+      "from": "now"                                  // opcional: "now" (padrão) ou "beginning"
+    }
+  }
+}
+```
+
+| Parte | Regra |
+|---|---|
+| **lugar** | **dentro** de `<org>.<projeto>`, irmã de `aggregate` — nunca na raiz do documento |
+| **nome** | `^[a-z][a-z0-9-]{0,62}$`; é o que vai no caminho do feed |
+| `reader` | o `username` da conta que lê; ela precisa do papel `SUBSCRIBER` no tenant. Outra conta, mesmo com o papel, recebe `403` |
+| `aggregateTypes` | ao menos um, sem repetição; `<bc>.<tipo>` de agregado deste modelo |
+| `events` | opcional; se presente, ao menos um e sem repetição — `<bc>.<tipo>.<evento>`, de um dos tipos acima. Para "todos os eventos", omita a chave: lista vazia é recusada |
+| **outras chaves** | recusadas na publicação |
+| `from` | onde a leitura começa na **primeira** leitura: `now` = só o que acontecer depois; `beginning` = desde o primeiro evento |
+
+**O motor de comandos não lê esta chave.** Mudar o filtro é republicar o modelo: a próxima leitura já usa a
+declaração nova, e o cursor de quem lê não se perde. Remover a assinatura do modelo faz o feed responder `404`.
+
+> **Estado em 2026-10-01:** a **validação na publicação** vale desde 04:23:36Z — declaração fora da forma é
+> recusada com `400`. O feed está no ar na instância de teste; na de produção, ainda não.
 
 ## Nível do agregado
 
@@ -71,7 +110,12 @@ validação e do JSON publicado) e o grid de interpretação (persistence-crs/es
   "roles": { ... },   // OPCIONAL — quem pode LER este agregado. Ver "Quem pode ler"
 
   "command": { ... },
-  "event":   { ... }
+  "event":   { ... },
+
+  // OPCIONAIS — o motor não as lê. Ver "Chaves que só quem lê usa"
+  "computed":       { ... },   // atributos que o processor br preenche
+  "readProjection": { ... },   // colunas que cada papel vê, pelo BFF
+  "references":     { ... }    // atributo que aponta outro agregado
 }
 ```
 
@@ -258,6 +302,127 @@ agregado (ver [regra do `status`](../README.md#estados-transições-e-concorrên
 > - **Identidade:** `projecao.aggregateid == aggregate.id` (o `aggregateid` da projeção é o mesmo UUID).
 > - **Falha:** enviar o `id` (Long) da projeção onde a persistence-crs espera o UUID → `510`
 >   "Invalid UUID string". Ex.: `GET /a/vendas/pedido/1` falha; `GET /a/vendas/pedido/<uuid>` funciona.
+
+### Chaves que só quem lê usa: `computed`, `readProjection`, `references`
+
+Três chaves **opcionais** do nível do agregado, irmãs de `command` e `event`. **O motor (yc.cqrs-c,
+persistence-crs, es-n) não as lê:** ele busca cada parte do agregado pelo nome (`command`, `event`,
+`identity`, `tenantId`, …) e só percorre o **mapa de agregados**, nunca as chaves de dentro de um. Nenhuma
+das três muda o que o comando valida ou grava, o evento, a projeção ou a rota. Agregado sem elas publica e
+opera como antes.
+
+| Chave | Forma | Quem lê | Para quê |
+|---|---|---|---|
+| `computed` | `{ "<comando>": ["<atributo>", "<vo>.<campo>", …] }` | BFF | o atributo que o processor br preenche sai do formulário e é enviado com um marcador |
+| `readProjection` | `{ "<PAPEL>": ["<coluna>", …] }` ou `{ "<PAPEL>": "*" }` | BFF | limita as colunas que cada papel vê nas leituras que passam pelo BFF |
+| `references` | `{ "<atributo>": "<endereço>" }` ou `{ "<atributo>": { "aggregate": "<endereço>", "valueKey"?: … } }` — endereço `"<bc>.<tipo>"` ou `"<projeto>.<bc>.<tipo>"` | BFF — **pedido, ainda não lê** | declara que o atributo aponta um registro de outro agregado |
+
+> **Nunca prefixe estas chaves com `_`.** A publicação remove as chaves `_`-prefixadas em silêncio
+> ([Chaves de metadado](#chaves-de-metadado-_-prefixadas)) — a declaração sumiria sem aviso.
+
+#### `computed` — atributo que o processor preenche
+
+```jsonc
+"cadastro.aluno": {
+  "command": { "criar": { … } },
+  "computed": { "criar": ["username", "matriculas.iscurrent"] }
+}
+```
+
+- **Chave:** nome de um comando do agregado.
+- **Valor:** lista **não vazia e sem repetição**. Nome sem ponto é atributo de `data.attribute` **daquele
+  comando**; `"<vo>.<campo>"` é campo de value object declarado como grupo.
+- `computed` **não cria atributo**: marca um que o comando já declara.
+
+Recusas na publicação e o que ainda não é conferido: [forger — `computed`](../../forger/endpoints/model.md#atributos-preenchidos-pelo-processor-computed).
+O que o BFF faz com ela (marcadores por tipo, o que o processor devolve):
+[bff — atributo calculado pelo br](../../bff/README.md#atributo-calculado-pelo-br--computed).
+
+#### `readProjection` — as colunas que cada papel vê
+
+```jsonc
+"pessoal.aluno": {
+  "command": { … },
+  "readProjection": {
+    "RECEPCIONISTA": ["nome", "email", "telefone", "genero"],
+    "ADMINISTRADOR": "*"
+  }
+}
+```
+
+- **Chave:** papel. **Valor:** lista de colunas, ou `"*"` para a linha inteira.
+- **A declaração é exaustiva por agregado:** papel do usuário fora dela **não** alarga o recorte. Quem deve ver
+  tudo é declarado com `"*"`.
+- `id`, `aggregateid` e `status` nunca se recortam.
+
+> ⚠️ **`readProjection` tira o campo da tela, não do banco.** Só vale para quem lê pelo BFF; o forger aceita
+> a chave sem conferir o conteúdo, e é o BFF que recusa a leitura quando a declaração não se sustenta.
+> Tabela de efeito e limites: [bff — limitar os campos que um papel lê](../../bff/README.md#limitar-os-campos-que-um-papel-lê--readprojection).
+
+#### `references` — o atributo que aponta outro agregado
+
+> **Estado em 2026-09-29:** a forma e o significado estão definidos aqui, e esta é a referência
+> autoritativa. A **validação na publicação** está no forger em `develop`, **ainda não em produção**
+> ([forger — `references`](../../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references));
+> o **BFF ainda não lê** a chave
+> ([bff — declarada no modelo](../../bff/README.md#declarada-no-modelo-references-pedida-e-ainda-não-em-vigor)).
+> Até valer, a referência exibida pela tela vem só do `options` por referência do manifesto.
+
+```jsonc
+"agenda.aula": {
+  "command": { … },
+  "event": { … },
+  "references": {
+    "teacherid": "cadastro.professor",                                 // alvo no PRÓPRIO modelo
+    "serviceid": { "aggregate": "cadastro.modalidade" },               // forma longa, mesma coisa
+    "alunocpf":  { "aggregate": "cadastro.aluno", "valueKey": "cpf" }, // guarda outra chave do alvo
+    "matriculas.planoid": "cadastro.plano",                            // campo de value object de grupo
+    "cobrancaid": "financeiro.cobranca.fatura"                         // alvo no projeto 'financeiro' do org
+  }
+}
+```
+
+> Ilustrativo: nomes de projeto, agregado e atributo são exemplos.
+
+**Sintaxe.**
+
+| Parte | Regra |
+|---|---|
+| **chave** | atributo declarado em `data.attribute` de algum comando do agregado, ou `"<grupo>.<campo>"` de value object **de grupo** declarado nele. **Não valem** as chaves da plataforma (`id`, `aggregateid`, `status`, `version` e os metadados de auditoria) nem campo **dentro de um valor `Json`** |
+| **endereço** | `"<bc>.<tipo>"` — a [chave de agregado](#a-chave-do-agregado--bctype-e-ela-vale-em-três-lugares) de um agregado **do próprio modelo**; ou `"<projeto>.<bc>.<tipo>"` — agregado de **outro projeto do mesmo org**, a forma do nome completo `<org>.<projeto>.<bc>.<tipo>` sem o org. Nada além dessas duas formas |
+| **valor, forma curta** | o endereço, como texto. Equivale a `{ "aggregate": "<endereço>" }` |
+| **valor, forma longa** | `{ "aggregate": "<endereço>", "valueKey"?: "<atributo do alvo>" }`. `valueKey` é o atributo **do alvo** que este campo guarda; o padrão é `aggregateid`. **Chave desconhecida no objeto é recusada** — é o que deixa a forma aberta a extensões futuras declaradas |
+| **vazio** | `"references": {}` é recusado, como a lista vazia do `computed` |
+
+**Semântica.**
+
+1. **O que afirma.** Todo valor **não vazio** do atributo é o `valueKey` de um registro do agregado alvo. É
+   declaração **de leitura**: o motor não confere, no comando, se o alvo existe. Integridade, quando o negócio
+   a exigir, é regra do processor br.
+2. **Onde está o alvo — o endereço diz, não há busca.** `"<bc>.<tipo>"` é **só o próprio modelo**: não se
+   procura em outro. `"<projeto>.<bc>.<tipo>"` é o modelo publicado daquele projeto, no **mesmo org** de quem
+   declara, e o alvo tem de estar publicado em **exatamente um** tenant desse projeto. O motivo: cada tenant
+   publica o seu modelo, e nada impede dois tenants do org de declararem a mesma chave de agregado — procurar
+   `"<bc>.<tipo>"` no org seria ambíguo por construção. **Não há `tenantId` na declaração:** o mesmo
+   `.model.json` vale em qualquer ambiente. Decisão do dono em 2026-09-29.
+3. **Quem lê.** Nome e busca vêm com o **token de quem usa a tela**, no tenant do alvo. Sem esse tenant no
+   token, ou sem papel de leitura nele, o campo diz "sem acesso". **A referência não amplia leitura.**
+4. **Rótulo e busca não se declaram aqui.** Vêm do agregado alvo: o `titleKey` do manifesto dele, depois o
+   [`identity.fields`](#identidade-e-unicidade-identity) do modelo dele, por fim o primeiro atributo de texto.
+   A referência diz só **para onde aponta** e **por qual chave**.
+5. **Value object `multiple`.** Cada item aponta um registro.
+6. **Precedência.** Declarada no modelo, a referência vale sobre o `options` por referência do manifesto para o
+   mesmo atributo. O `options` por referência fica como a forma antiga, só do mesmo tenant.
+7. **Cópia local não é referência.** `teachername` gravado junto com `teacherid` é outro dado — *"o nome na
+   época"*; a referência dá *"o nome hoje"*, e uma não substitui a outra.
+
+**Validação na publicação.** As recusas, todas `400`, estão no
+[forger — `references`](../../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references): a forma
+acima; `"<bc>.<tipo>"` que não é agregado do próprio modelo; `"<projeto>.<bc>.<tipo>"` que nenhum modelo
+publicado do projeto declara, ou que está em mais de um tenant dele (a mensagem nomeia os tenants); `valueKey`
+que o alvo não declara; tipo do atributo incompatível com o do `valueKey`. **Sem revalidação retroativa**, como
+no `computed`: se o modelo alvo for republicado sem o agregado, ou removido, a tela mostra o estado ("não
+encontrado" / "sem acesso"), e a próxima publicação da origem recusa.
 
 ## Atributos e tipos
 

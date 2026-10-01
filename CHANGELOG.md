@@ -2,6 +2,199 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.98 — 2026-10-01
+
+- **Feed de assinatura externa no ar na instância de teste** (`es-n/endpoints/assinaturas.md`,
+  `persistence-crs/spec/model-format.md`): o estado dizia "ainda não está no ar". Teste desde 04:19:19Z;
+  validação na publicação desde 04:23:36Z; produção ainda não.
+
+## 1.97 — 2026-10-01
+
+- **`subscriptions` em produção desde 2026-10-01T04:23:36Z** (`forger/endpoints/model.md` §Assinatura externa de
+  eventos). A conferência na publicação (1.95) está no ar no forger `fb3201c`. Fonte: encerramento do pedido de
+  deploy pela infra (`infra/hostinger/issues/deploy.pedido.composer-com-subscriptions-no-model-json.20261001`).
+
+## 1.96 — 2026-10-01
+
+- **`subscriptions` no formato do modelo segue o que o forger valida** (`persistence-crs/spec/model-format.md`
+  §Assinaturas externas; `model.schema.json`): `events`, se presente, tem ao menos um item; listas sem repetição;
+  chave desconhecida na declaração é recusada. Para "todos os eventos", omite-se `events`.
+
+## 1.95 — 2026-10-01
+
+- **`subscriptions`: o forger aceita e valida na publicação** (`forger/endpoints/model.md` §Assinatura externa de
+  eventos). A assinatura externa é declarada no modelo, dentro de `<org>.<projeto>` ao lado de `aggregate`, como ato
+  de modelagem — decisão do dono; o es-n já a lê. Recusas `400` tabeladas: forma (a mesma que o es-n exige
+  ao ler, mais `events` vazio e chave desconhecida) e coerência com o próprio modelo (tipo e evento existem nele).
+  O `reader` não é conferido contra os usuários do cliente, por decisão do dono. Em `develop` desde
+  `forger@fb3201c`; **ainda não em produção**. Issue composer `forger.pedido.subscriptions-no-model-json.20261001`.
+
+## 1.94 — 2026-10-01
+
+- **Assinatura externa de eventos passa a ser declarada no modelo** (`persistence-crs/spec/model-format.md`
+  §Assinaturas externas; `model.schema.json` `subscriptions`; `es-n/endpoints/assinaturas.md`, reescrito).
+  Corrige a 1.93: não há mais cadastro por API. A assinatura é a chave `subscriptions` dentro de
+  `<org>.<projeto>` no `.model.json`, publicada com o modelo, e nomeia a única conta que lê (`reader`). O feed
+  fica em `GET /subscriptions/{name}/events` e o atraso em `GET /subscriptions/{name}`. Decisão do dono:
+  declarar o que um sistema de fora consome é ato de modelagem. **Ainda não está no ar nesta forma:** faltam a
+  implantação, a validação na publicação (pedida à gestão de modelos) e o papel de assinante.
+
+## 1.93 — 2026-10-01
+
+- **Assinatura externa de eventos** (`es-n/endpoints/assinaturas.md`, novo; `es-n/README.md` §Assinatura
+  externa de eventos). Quem está fora da plataforma lê, por cursor opaco, o que aconteceu num tenant, sem o
+  conteúdo do evento e sem autoria. Cadastro por administrador do tenant, leitura pelo papel de assinante, intervalo mínimo entre leituras (`429`), atraso visível
+  por assinatura. `/v3/es/…` é a instância de produção; `/v3/es/t/…` é a de teste. **Ainda não está no ar:** faltam a implantação, a rota na
+  porta de entrada e o papel de assinante. Pedido do da-agents, autorizado pelo dono.
+
+## 1.92 — 2026-09-29
+
+- **`references` em produção desde 2026-09-29T19:11:32Z** (`forger/endpoints/model.md` §Atributo que aponta
+  outro agregado). A conferência na publicação (1.86) está no ar no forger `2ab9b8d`; a frase "ainda não em
+  produção" deixou de valer nesse instante e ficou até aqui por falta de atualização. Fonte: encerramento do
+  pedido de deploy pela infra (`infra/hostinger/issues/deploy.pedido.composer-com-references-no-model-json.20260929`).
+
+## 1.91 — 2026-09-29
+
+- **`references`: o BFF que a lê está no ar em stager** (`bff/README.md` §Declarada no modelo), desde
+  2026-09-29T19:04Z (yc.app `56f3cd9`). A validação do forger segue só em `develop`, então em produção a
+  publicação aceita a chave sem conferir. Até o forger subir, declará-la é por conta de quem publica.
+
+## 1.90 — 2026-09-29
+
+- **A capacidade leva `ref` no atributo declarado em `references`** (`shell/contrato-miolo.md` `attributes[].ref`;
+  `bff/README.md` §Capacidade e §Declarada no modelo). `ref: { aggregate, valueKey }` traz o endereço
+  (`<bc>.<tipo>` ou `<projeto>.<bc>.<tipo>`) e a chave do alvo, também em campo de value object, e vale sobre
+  o `options` por referência do manifesto. O BFF passa a ler `references` e a achar o tenant do alvo em
+  outro projeto pela sessão (em `develop` do yc.app, `abc83c8`; ainda não no ar). Corrige a descrição de
+  `lookup`: é heurística de nome, não referência declarada.
+
+## 1.89 — 2026-09-29
+
+- **`references`: a fatia do BFF segue o endereço qualificado** (`bff/README.md` §Declarada no modelo;
+  `shell/apresentacao.md`). `"<bc>.<tipo>"` é só o próprio modelo; o alvo em outro projeto do org se escreve
+  `"<projeto>.<bc>.<tipo>"`, e o BFF acha o tenant dele na sessão pelo projeto e pelo bounded context, sem
+  busca. Decisão do dono de 2026-09-29, já no forger (`develop`) e no formato do modelo (1.87). O BFF ainda
+  não lê a chave.
+
+## 1.88 — 2026-09-29
+
+- **`references`: sai a nota de divergência da seção do forger** (`forger/endpoints/model.md` §Atributo que
+  aponta outro agregado). O formato do modelo (1.87) passou a dizer o mesmo que o forger valida: `"<bc>.<tipo>"`
+  é só o próprio modelo, e `"<projeto>.<bc>.<tipo>"`, outro projeto do org.
+
+## 1.87 — 2026-09-29
+
+- **`references`: o endereço diz onde está o alvo** (`persistence-crs/spec/model-format.md` §`references`;
+  `model.schema.json` `$defs/referenceAddress`). Corrige a 1.84, que dizia que `"<bc>.<tipo>"` alcançava outro
+  modelo do org. Agora `"<bc>.<tipo>"` é **só o próprio modelo**, e o alvo em outro projeto do mesmo org se
+  escreve `"<projeto>.<bc>.<tipo>"`, publicado em exatamente um tenant desse projeto. O schema aceita as duas
+  formas, com o mesmo padrão do forger. Decisão do dono de 2026-09-29; fecha a divergência registrada na 1.86
+  (`forger/endpoints/model.md`). Pedido do composer (`modelo.pedido.references-endereco-qualificado.20260929`).
+
+## 1.86 — 2026-09-29
+
+- **`references`: o forger aceita e valida na publicação, e o endereço decide onde está o alvo**
+  (`forger/endpoints/model.md` §Atributo que aponta outro agregado). `"<bc>.<tipo>"` é **só o próprio
+  modelo**; alvo em outro projeto do mesmo org se escreve `"<projeto>.<bc>.<tipo>"` e tem de estar em
+  exatamente um tenant do projeto — decisão do dono, porque procurar `"<bc>.<tipo>"` no org seria ambíguo por
+  construção. **Diverge do formato do modelo (1.84)**, que diz que a forma curta alcança outro modelo do org;
+  a correção foi pedida ao guardião do formato. Recusas `400` tabeladas. Aceita em `develop` desde `forger@2ab9b8d`;
+  **ainda não em produção**. Issue composer `forger.pedido.references-no-model-json.20260929`.
+
+## 1.85 — 2026-09-29
+
+- **`references`: a fatia do BFF aponta a forma autoritativa** (`bff/README.md` §Declarada no modelo;
+  `shell/apresentacao.md`). A forma passa a ser a do
+  [model-format](persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado) (1.84),
+  que vale se as duas divergirem. Continuam faltando a validação na publicação (forger) e a leitura no BFF.
+
+## 1.84 — 2026-09-29
+
+- **`computed`, `readProjection` e `references` entram no formato do modelo** (`persistence-crs/spec/model-format.md`
+  §Chaves que só quem lê usa; `model.schema.json` `$defs/aggregate`). As três são chaves opcionais do nível do
+  agregado que **o motor não lê** — o BFF lê. `computed` e `readProjection` já eram aceitas pelo forger e lidas
+  pelo BFF, mas faltavam no formato e no schema. `references` tem aqui a **forma autoritativa**: sintaxe (forma
+  curta `"<bc>.<tipo>"`, longa `{ aggregate, valueKey? }`, vazio recusado) e semântica (alvo no mesmo org, sem
+  `tenantId`, leitura com o token do usuário). **Ainda não está em vigor:** a validação na publicação foi pedida
+  ao forger, e o BFF ainda não lê a chave. Pedido do yc.app, a mando do dono
+  (`modelo.pedido.references-no-model-format.20260929`).
+
+## 1.83 — 2026-09-29
+
+- **`references` no `.model.json`: sintaxe e semântica, do lado de quem lê** (`bff/README.md` §Declarada no
+  modelo; `shell/apresentacao.md` §Referência a outro agregado). A referência entre agregados passa a ser
+  declarada no **modelo**, no nível do agregado: `"<atributo>": "<bc>.<tipo>"` ou
+  `{ aggregate, valueKey? }`. Ela alcança outro bounded context do mesmo org, sem `tenantId`, lê com o token
+  do usuário (não amplia leitura) e vale sobre o `options` por referência do manifesto. **Ainda não está em
+  vigor:** pedida ao forger (validação na publicação) e ao interpreter (formato do modelo), a mando do dono;
+  o BFF ainda não a lê.
+
+## 1.82 — 2026-09-29
+
+- **Referência entre agregados legível** (`bff/README.md` §Referência entre agregados;
+  `shell/contrato-miolo.md` `api.refs`; `shell/apresentacao.md` §Referência a outro agregado). O campo
+  declarado como `options` por referência passa a mostrar o **nome** do registro apontado em toda a tela
+  (tabela, Dados, histórico, título, filtro, cópia, e na exportação ao lado do id), e se preenche por
+  **busca** sem teto de registros. O nome vem do agregado apontado: `labelKey` → `titleKey` →
+  `identity.fields` → primeiro texto. Todo estado é dito (não encontrado, sem acesso, rótulo indisponível).
+  BFF: `POST /session/refs/labels` e `POST /session/refs/search`, com o token do usuário e o recorte de
+  coluna; só o mesmo tenant por ora. Decisão do dono de 2026-09-29, a pedido do `conceptnatal`; em
+  `develop` do yc.app (`c3e57bd`), no ar quando a infra implantar.
+
+## 1.81 — 2026-09-28
+
+- **Miolo CUSTOM cobrindo só parte do tenant** (`shell/injecao.md` §De onde vem o build; `bff/README.md`
+  §Miolo). O mapa do BFF passa a aceitar um miolo **por agregado**, além do miolo do tenant inteiro; o
+  agregado que o mapa não cobre abre no **miolo GEN**. A casca manda o agregado escolhido em
+  `GET /tenant/{tenantId}/miolo-manifest?aggregate=`. Decisão do dono de 2026-09-28, a pedido do
+  `conceptnatal`; em `develop` do yc.app (`2cf1a87`), no ar quando a infra implantar.
+
+## 1.80 — 2026-09-27
+
+- **`llms-full.txt`: o bloco do CHANGELOG volta a acompanhar o `CHANGELOG.md`.** Ele estava parado na 1.22,
+  e o agente de contexto pequeno não via as revisões 1.23 a 1.79. Só esse bloco foi regenerado, a partir do
+  `CHANGELOG.md`; nenhum outro documento mudou. Decisão do dono de 2026-09-27.
+
+## 1.79 — 2026-09-27
+
+- **monitor: relatos publicados na borda** (`monitor/README.md`). Sai o aviso de que a rota
+  `/v3/monitor/suporte/**` não estava publicada: a infra mediu, às 04:13Z, a chamada pela borda chegando ao
+  monitor.
+
+## 1.78 — 2026-09-27
+
+- **Relatos de suporte no ar** (`bff/README.md` §Relatos de suporte): as rotas `/session/suporte/*` estão em
+  stager desde 2026-09-27T04:23Z (yc.app `3dbf9d1`); sai o aviso de que dependiam da rota da borda.
+
+## 1.77 — 2026-09-27
+
+- **BFF: relatos de suporte** (`bff/README.md` §Relatos de suporte; `shell/contrato-miolo.md` §hostContext,
+  `openSupport`). Seis rotas de sessão em `/session/suporte/*` — criar, listar os meus, ler com a conversa,
+  responder, marcar lido, contar não lidos — que repassam ao monitor (contrato na 1.76). O BFF tira da sessão
+  quem relata e confere org e tenant; o erro do monitor passa inteiro. O `openSupport` deixa de dizer que o
+  suporte é mockup. Decisões do dono de 2026-09-27; em `develop` do yc.app (`7e8dc7a`), no ar quando a rota da
+  borda for publicada.
+
+## 1.76 — 2026-09-27
+
+- **Fatia nova: monitor — relatos de suporte** (`monitor/README.md`, `monitor/endpoints/relatos.md`,
+  `monitor/erros.md`, `monitor/exemplos.md`). O BFF grava e lê, em nome do usuário, os relatos que a casca
+  monta: credencial de serviço, e o relator vem em cabeçalhos, nunca do corpo. A equipe atende pela tela do
+  monitor, e cada organização vê os seus. A fatia cobre estados, não lido, redação de credenciais no texto
+  livre e retenção contada do fechamento. Pedido do yc.app, a mando do dono. Implantado em 2026-09-27
+  (monitor `76a072f`); a rota na borda foi pedida e ainda não está publicada.
+
+## 1.75 — 2026-09-27
+
+- **O relato de suporte leva o diagnóstico da tela** (`shell/contrato-miolo.md` §hostContext,
+  `shell/seguranca.md` §Diagnóstico do relato de suporte, `bff/README.md` §Id de requisição). O
+  `hostContext` ganha `diagnostico` (`erro` e `trilha`, para o miolo registrar o que só ele sabe) e
+  `openSupport` aceita o erro em foco; a página de segurança diz o que o diagnóstico leva e o que nunca leva;
+  o BFF adota o `x-request-id` de quem chama (ou gera um) e o devolve em toda resposta, ligando o relato à
+  linha do log. Nada sai sem o usuário relatar. Pedido do dono de 2026-09-26; em `develop` do yc.app
+  (`5242624`), deploy em stager pedido.
+
 ## 1.74 — 2026-09-27
 
 - **Manifesto: `genero` em produção** (`forger/endpoints/presentation.md`) — sai o aviso de que a publicação

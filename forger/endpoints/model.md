@@ -42,6 +42,8 @@ Erros: `400` (arquivo vazio, extensão diferente de `.json`, documento inválido
 > | `roles` do aggregate com recorte incoerente | ver [recorte de leitura do aggregate](#recorte-de-leitura-do-aggregate-roles) |
 > | `computed` que nomeia comando ou atributo inexistente | ver [atributos preenchidos pelo processor](#atributos-preenchidos-pelo-processor-computed) |
 > | `alias` vazio, só de espaços ou que não é texto, em comando ou evento | ver [nome de exibição](#nome-de-exibicao) |
+> | `references` com atributo, alvo, `valueKey` ou tipo que não se sustenta | ver [atributo que aponta outro agregado](#atributo-que-aponta-outro-agregado-references) |
+> | `subscriptions` fora da forma, ou com tipo ou evento que não é do modelo | ver [assinatura externa de eventos](#assinatura-externa-de-eventos-subscriptions) |
 
 ### Recorte de leitura do aggregate: `roles`
 
@@ -126,6 +128,121 @@ BFF, que o leva na capacidade do tenant: ver [bff — nome de exibição](../../
 
 > **Em produção desde 2026-09-26** (ver [CHANGELOG 1.58](../../CHANGELOG.md)). Modelo publicado antes
 > disso não é revalidado: um `alias` vazio que já estava no cache continua lá até a próxima publicação.
+
+### Atributo que aponta outro agregado: `references`
+
+**Opcional**, no nível do aggregate. Declara que o atributo guarda a chave de um registro de **outro
+aggregate**, para que a tela mostre e busque pelo nome em vez do id. **Aggregate sem a chave publica como
+antes.**
+
+```jsonc
+"agenda.aula": {
+  "command": { … },
+  "event": { … },
+  "references": {
+    "teacherid": "cadastro.professor",                                 // alvo no PRÓPRIO modelo
+    "serviceid": { "aggregate": "cadastro.modalidade" },               // forma longa, mesma coisa
+    "alunocpf":  { "aggregate": "cadastro.aluno", "valueKey": "cpf" }, // guarda outra chave do alvo
+    "planoid":   "financeiro.cobranca.plano"                           // alvo no projeto 'financeiro' do org
+  }
+}
+```
+
+> Ilustrativo: `…` é placeholder, e os nomes são exemplos.
+
+**O endereço diz onde está o alvo — não há busca.**
+
+| Endereço | Onde o forger procura o alvo |
+|---|---|
+| `"<bc>.<tipo>"` | **só no próprio modelo** que está sendo publicado. Não procura em outro modelo |
+| `"<projeto>.<bc>.<tipo>"` | nos modelos **publicados** do projeto `<projeto>` do **mesmo org**. O alvo tem de estar em **exatamente um** tenant desse projeto |
+
+Procurar `"<bc>.<tipo>"` no org inteiro seria ambíguo por construção: cada tenant publica o seu modelo, e
+nada impede dois deles de declararem a mesma chave de aggregate. Por isso o endereço carrega o projeto
+quando o alvo está fora do modelo — a mesma forma do FQN `<org>.<projeto>.<bc>.<tipo>`, sem o org, que é
+sempre o de quem publica. **Não há `tenantId` na declaração:** o mesmo `.model.json` vale em qualquer
+ambiente. Decisão do dono em 2026-09-29.
+
+**Sintaxe.** A chave é um atributo declarado em `data.attribute` de algum comando do aggregate, ou
+`"<valueObject>.<campo>"`. O valor é o endereço (forma curta) ou `{ "aggregate": "<endereço>",
+"valueKey"?: "<atributo do alvo>" }` (forma longa); `valueKey` ausente é `aggregateid`.
+
+Recusas na publicação, todas `400`:
+
+| Recusa | Por quê |
+|---|---|
+| `references: {}`, valor que não é texto nem objeto, chave desconhecida no objeto, endereço fora das duas formas | forma — metamodelo |
+| chave da plataforma (`id`, `aggregateid`, `status`, `version`, `loguser`, `logrole`, `logversion`, `logdate`) | o modelo não declara esse dado, então não declara para onde ele aponta |
+| atributo não declarado em comando nenhum do aggregate | a tela procuraria um campo que não existe |
+| `<valueObject>.<campo>` com value object não declarado em `data.valueObject.single`/`multiple` de comando nenhum | inclui campo **dentro** de um valor `Json`, que não é alvo de referência |
+| atributo `Json` ou `Jsonb` | um valor Json não guarda **uma** chave de outro registro |
+| `"<bc>.<tipo>"` que não é aggregate do próprio modelo | a mensagem indica a forma `"<projeto>.<bc>.<tipo>"` |
+| `"<projeto>.<bc>.<tipo>"` que nenhum modelo publicado do projeto declara | o alvo não existe onde o endereço aponta |
+| `"<projeto>.<bc>.<tipo>"` publicado em **mais de um** tenant do projeto | ambíguo — a mensagem nomeia os tenants |
+| `valueKey` que não está em `data.attribute` de comando nenhum do alvo | o alvo não tem esse dado |
+| `valueKey` ausente (`aggregateid`) e atributo que não é `Text` nem `String` com `length` ≥ 36 | o `aggregateid` é UUID em texto, 36 caracteres |
+| tipo do atributo de outra família que o do `valueKey` | famílias: texto (`String`, `Text`), inteiro (`Integer`, `Long`), decimal (`Double`, `Float`); as demais, só o mesmo tipo |
+
+**O que não é conferido:** o **campo** de `<valueObject>.<campo>` e o tipo dele — a forma interna do value
+object não foi medida no motor; confere-se só que o value object existe.
+
+**O motor não lê esta chave** e **não confere**, no comando, se o alvo existe: é declaração de leitura.
+Integridade, quando o negócio exigir, é regra do processor br. Quem lê é o BFF; a semântica de leitura
+(token do usuário, rótulo, precedência sobre o `options` do manifesto) está no
+[formato do modelo](../../persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado).
+
+> **Em produção desde 2026-09-29T19:11:32Z** (`forger@2ab9b8d`; ver [CHANGELOG 1.92](../../CHANGELOG.md)).
+> Modelo publicado antes disso não é revalidado: uma declaração que não se sustenta e já estava no cache
+> continua lá até a próxima publicação. Idem se o alvo for republicado sem o aggregate: a origem só é
+> recusada na próxima publicação dela.
+
+### Assinatura externa de eventos: `subscriptions`
+
+**Opcional.** Declara quem, fora da plataforma, lê os eventos dos aggregates deste modelo. Assinatura é ato de
+**modelagem**: existe porque o modelo a declara e é publicada com ele; **não há cadastro por API**. Decisão do
+dono em 2026-10-01. **Modelo sem a chave publica como antes.**
+
+Fica **dentro** de `<org>.<projeto>`, ao lado de `aggregate` — nunca na raiz do arquivo:
+
+```jsonc
+{
+  "acme.agenda": {
+    "aggregate": { "agenda.aula": { … } },
+    "subscriptions": {
+      "korc-aulas": {
+        "reader": "korc.acme",                                         // usuário que lê o feed
+        "aggregateTypes": ["agenda.aula"],                             // <bc>.<tipo> deste modelo
+        "events": ["agenda.aula.agendada", "agenda.aula.cancelada"],   // opcional: ausente = todos
+        "from": "beginning"                                            // opcional: "now" (padrão) ou "beginning"
+      }
+    }
+  }
+}
+```
+
+> Ilustrativo: `…` é placeholder, e os nomes são exemplos.
+
+Recusas na publicação, todas `400`:
+
+| Recusa | Por quê |
+|---|---|
+| `subscriptions: {}`; nome fora de `^[a-z][a-z0-9-]{0,62}$`; chave desconhecida na declaração | forma |
+| `reader` ausente ou só de espaços | sem leitor, ninguém lê o feed |
+| `aggregateTypes` ausente, vazio, repetido ou fora de `<bc>.<tipo>` | forma |
+| `events` vazio, repetido ou fora de `<bc>.<tipo>.<evento>` | ausente quer dizer **todos**; vazio confundiria com nenhum |
+| `from` diferente de `now` e `beginning` | forma |
+| tipo em `aggregateTypes` que não é aggregate **deste** modelo | o feed lê só o modelo do tenant: serviria vazio |
+| evento de tipo fora de `aggregateTypes`, ou que o aggregate não declara em `event` | o evento nunca chegaria |
+
+**O `reader` não é conferido** contra os usuários do cliente: o modelo pode ser publicado antes de o usuário
+existir, e até ele existir ninguém lê o feed. Decisão do dono em 2026-10-01.
+
+Quem lê a declaração é o es-n, que serve o feed: ver
+[es-n — assinatura externa de eventos](../../es-n/endpoints/assinaturas.md).
+
+> **Em produção desde 2026-10-01T04:23:36Z** (`forger@fb3201c`; ver [CHANGELOG 1.97](../../CHANGELOG.md)).
+> Modelo publicado antes disso não é revalidado: uma declaração que não se sustenta e já estava no cache
+> continua lá até a próxima publicação.
 
 ### Chaves que um modelo novo não precisa trazer
 

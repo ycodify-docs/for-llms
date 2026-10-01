@@ -58,6 +58,7 @@
 ## es-n (despacho de eventos)
 - [Guia](es-n/README.md): pipeline, três despachos, ordenação, topologia de filas (fixa).
 - [acionar processamento](es-n/endpoints/processar-eventos.md) · [Erros](es-n/erros.md) · [Exemplos](es-n/exemplos.md)
+- [Assinatura externa de eventos](es-n/endpoints/assinaturas.md): feed por cursor para quem está fora da plataforma — declarada no modelo; leitura, cursor, erros.
 
 ## br-service (regras e coordenação)
 - [Guia](br-service/README.md): porta de entrada por pergunta, posição no fluxo, forma canônica da rota, índice de endpoints.
@@ -90,6 +91,10 @@
 - [Guia da borda](gateway/README.md): o que a borda decide antes de o serviço ser chamado; a regra de **um só** cabeçalho de identificação (`X-Tenant-Id` **ou** `X-Forger-Credential`, nunca os dois); forma dos caminhos.
 - [Erros da borda](gateway/erros.md): **quem produziu a resposta** — borda ou serviço. Como distinguir o `404` da borda do `404` do serviço pelos cabeçalhos `X-Blocked-By`/`X-Blocked-Reason`; `401`/`400` de cabeçalho; `413` por serviço; `429`; `503`; CORS duplicado.
 - [Exemplos](gateway/exemplos.md): requisição bem formada, o erro comum de mandar os dois cabeçalhos, e como inspecionar a resposta para saber a origem do erro.
+
+## monitor (relatos de suporte) — atendimento aos usuários da aplicação
+- [Guia](monitor/README.md): quem grava (o BFF, com credencial de serviço) e quem atende (a equipe, pela tela do monitor); estados do relato, não lido, o que o servidor faz com o texto e o diagnóstico, retenção contada do fechamento, e como a organização do relator decide quem o vê.
+- [endpoints de relato](monitor/endpoints/relatos.md) · [Erros](monitor/erros.md) · [Exemplos](monitor/exemplos.md)
 
 ## Exemplos
 - [Modelos de domínio](examples/README.md): 6 modelos `.model.json` (1 curado + 5 reais sanitizados), com fluxo ponta a ponta.
