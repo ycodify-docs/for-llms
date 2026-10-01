@@ -12,6 +12,7 @@
 - Os três tipos de despacho
 - Ordenação e idempotência
 - Endpoint (operacional)
+- Assinatura externa de eventos
 - Pontos de coordenação
 - Pitfalls (ao modelar eventos)
 
@@ -127,6 +128,12 @@ Ponto importante para quem modela domínios cross-contexto:
 O es-n expõe **uma** operação de serviço para **acionar o processamento** dos eventos de um tenant
 (uso operacional/interno, não é uma API de cliente): ver
 [endpoints/processar-eventos.md](endpoints/processar-eventos.md).
+
+## Assinatura externa de eventos
+
+Quem está **fora** da plataforma lê, por cursor, **o que** aconteceu num tenant — tipo de agregado, id,
+evento, quando —, sem o conteúdo e sem receber chamada nenhuma. É leitura: não muda o pipeline, o checkpoint
+nem o despacho. Ver [endpoints/assinaturas.md](endpoints/assinaturas.md).
 
 ## Pontos de coordenação
 - **CP-3** — recebe a notificação de mudança de estado do persistence-crs.
