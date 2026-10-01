@@ -3832,6 +3832,23 @@ Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`.
 - `200` — estado atual do agregado (JSON), reconstituído a partir dos seus eventos.
 - `204` — agregado não encontrado.
 
+**Datas no estado:** `Timestamp` vem como `"2026-09-15T09:00:00"` — **UTC, sem fuso** — e `Date` como
+`"1990-04-02"`. Inclusive o carimbo automático de cada evento (o `whenAttribute`, como `criadaem`):
+
+```json
+{ "id": "<uuid>", "status": "cadastrada",
+  "datahorainicio": "2026-09-15T09:00:00",
+  "cadastradaem":   "2026-09-13T20:19:09" }
+```
+
+**É a mesma string que a projeção devolve** para o mesmo campo — pode comparar sem converter. Para mostrar
+no horário de Brasília, a conversão é do front (exemplo em
+[persistence-q § Resposta](../../persistence-q/endpoints/consulta.md#resposta)).
+
+> Antes de `yc-interpreter:amd64-260913c` — em teste desde essa imagem, **produção ainda não** —, este
+> endpoint devolvia a data **como o cliente a
+> mandou** — com fuso, fração ou espaço — e o carimbo automático com espaço (`2026-09-13 20:19:09`).
+
 ## Histórico de eventos
 
 `GET /a/{boundedContext}/{aggregateType}/{id}/history`
@@ -3839,8 +3856,58 @@ Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`.
 - `200` — lista (array) dos eventos do agregado, em ordem.
 - `204` — sem eventos.
 
+Cada evento traz **quem o executou**. Evento sem identidade registrada — o caso de um agregado escrito por
+um caminho que não a carrega — vem **sem** o bloco de autoria, e o restante do histórico não muda.
+
 > **`{id}` = UUID do agregado** (o `aggregateid` da projeção; `projecao.aggregateid == aggregate.id`).
 > **Não** use a PK `id` (Long) da projeção — enviar o Long → `510` "Invalid UUID string".
+
+## Quem pode ler
+
+Por padrão, **qualquer usuário autenticado do tenant** lê qualquer agregado dele: os dois endpoints
+conferem o tenant, e nada mais.
+
+Quando o modelo do agregado declara **`roles`**
+([model-format](../spec/model-format.md#quem-pode-ler-o-agregado-roles)), os dois recortam:
+
+| Situação | Resposta |
+|---|---|
+| papel do solicitante fora de `roles.read` | **`403`**, com corpo `{status, message}` — decidido pelo tipo, antes de olhar o registro |
+| recorte por proprietário, e o agregado é de outra pessoa | **`204`** |
+| passa no recorte | `200` normal — e o `/history` vem **inteiro** |
+| passa, mas o papel não está em `roles.author` | `200`, com os eventos **sem o bloco de autoria** |
+| há recorte por coluna | `200`, com o estado e cada evento **só com os atributos da lista** |
+| o recorte por coluna não deixa nenhum atributo de negócio | **`204`** |
+
+A ordem em que a leitura é decidida:
+
+```
+GET /a/{bc}/{type}/{id}   ou   GET .../{id}/history
+  │
+  ├─ pertence ao tenant?                    não ──▶ 403
+  │
+  ├─ o modelo declara `roles`?              não ──▶ 200   (sem recorte: qualquer usuário do tenant lê)
+  │
+  ├─ tem papel em `roles.read`?             não ──▶ 403   (decidido pelo tipo: igual para id que existe ou não)
+  │
+  ├─ algum papel casado sem `scope`?        sim ──▶ 200   (o menos restritivo vence)
+  │
+  ├─ o atributo de proprietário do
+  │  agregado é o `username` do token?      não ──▶ 204
+  │                                         sim ──▶ 200
+  │
+  └─ no /history, tem papel
+     em `roles.author`?                     não ──▶ 200, e cada evento vem sem o autor
+```
+
+> **`403` é "seu papel não lê este tipo"; `204` é "não existe" ou "não é seu".** O `403` sai antes de olhar o
+> registro, então responde igual para um `{id}` que existe e um que não existe — não revela existência. Já
+> o recorte por proprietário responde `204`, de propósito: ali um `403` entregaria a existência do agregado
+> a quem não é o titular. Ao depurar um `204` inesperado, verifique o recorte do modelo antes de procurar o
+> dado. *(Até 2026-10-01 o papel fora de `roles.read` também respondia `204`.)*
+
+**`loguser` aparece nas duas respostas** — no estado e em cada evento — com o `username` de quem executou
+aquele comando: [model-format — `loguser`](../spec/model-format.md#loguser-quem-executou-cada-comando).
 
 ## Quando usar
 
@@ -3850,7 +3917,7 @@ Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`.
   [persistence-q](../../persistence-q/README.md).
 
 ## Erros
-`403` (tenant não autorizado), `510` (falha de processamento). Catálogo: [../erros.md](../erros.md).
+`403` (tenant não autorizado, ou papel fora de `roles.read` — corpo `{status, message}`), `510` (falha de processamento). Catálogo: [../erros.md](../erros.md).
 
 <!-- ===== persistence-crs/endpoints/entidade.md ===== -->
 
@@ -7018,8 +7085,7 @@ e o histórico dele, com o mesmo token — e com o recorte de leitura que esse t
 
 > ⚠️ **`SUBSCRIBER` lê o feed, não o detalhe.** Para ler o agregado e o histórico, a conta leitora precisa
 > também de um papel de **leitura** naquele agregado (`roles.read` do modelo). Sem ele, o detalhe responde
-> `204` sem corpo — a mesma resposta de um id que não existe, de propósito: dizer "existe e você não pode"
-> entregaria a existência do registro.
+> `403` — ver [leitura de agregado — quem pode ler](../../persistence-crs/endpoints/agregado-leitura.md#quem-pode-ler).
 
 ## Acompanhar o atraso
 
@@ -11273,6 +11339,13 @@ O usuário abre um relato novo.
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.100 — 2026-10-01
+
+- **Leitura de agregado: papel fora de `roles.read` responde `403`, não `204`** (`persistence-crs/endpoints/agregado-leitura.md`
+  §Quem pode ler e §Erros; `es-n/endpoints/assinaturas.md`). O `403` traz `{status, message}` e é decidido pelo tipo,
+  antes de olhar o registro — igual para id que existe ou não. O recorte por proprietário segue em `204`. Decisão do
+  dono; vale na instância de teste quando a infra implantar (persistence-crs b9ed1e0).
 
 ## 1.99 — 2026-10-01
 
