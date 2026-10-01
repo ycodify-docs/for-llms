@@ -2,6 +2,13 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.100 — 2026-10-01
+
+- **Leitura de agregado: papel fora de `roles.read` responde `403`, não `204`** (`persistence-crs/endpoints/agregado-leitura.md`
+  §Quem pode ler e §Erros; `es-n/endpoints/assinaturas.md`). O `403` traz `{status, message}` e é decidido pelo tipo,
+  antes de olhar o registro — igual para id que existe ou não. O recorte por proprietário segue em `204`. Decisão do
+  dono; vale na instância de teste quando a infra implantar (persistence-crs b9ed1e0).
+
 ## 1.99 — 2026-10-01
 
 - **Feed de assinatura externa: dois desvios do teste ponta a ponta viram doc** (`es-n/endpoints/assinaturas.md`).
