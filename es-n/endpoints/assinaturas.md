@@ -5,8 +5,9 @@
 > **onde**, nunca o conteúdo — o detalhe se lê pelas consultas normais, com o recorte de leitura de quem
 > consulta. Guia: [../README.md](../README.md).
 
-> **Estado em 2026-10-01: ainda não está no ar nesta forma.** Faltam a implantação, a validação da declaração
-> na publicação do modelo e o papel de assinante na gestão de contas.
+> **Estado em 2026-10-01:** **no ar na instância de teste** (`/v3/es/t/…`) desde 04:19:19Z, com a validação da
+> declaração na publicação do modelo em produção desde 04:23:36Z. **Na instância de produção (`/v3/es/…`), ainda
+> não.** Falta o papel de assinante na gestão de contas para a primeira leitura com conta real.
 
 ## Contents
 - A assinatura é declarada no modelo

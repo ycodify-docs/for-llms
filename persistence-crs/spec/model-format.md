@@ -84,8 +84,8 @@ cadastra em execução. O feed está em [es-n — assinatura externa](../../es-n
 **O motor de comandos não lê esta chave.** Mudar o filtro é republicar o modelo: a próxima leitura já usa a
 declaração nova, e o cursor de quem lê não se perde. Remover a assinatura do modelo faz o feed responder `404`.
 
-> **Estado em 2026-10-01:** a leitura já existe no serviço de eventos; a **validação na publicação** foi
-> pedida à gestão de modelos e ainda não vale. Até lá, declaração fora da forma faz o feed responder `500`.
+> **Estado em 2026-10-01:** a **validação na publicação** vale desde 04:23:36Z — declaração fora da forma é
+> recusada com `400`. O feed está no ar na instância de teste; na de produção, ainda não.
 
 ## Nível do agregado
 
