@@ -85,8 +85,9 @@ cadastra em execução. O feed está em [es-n — assinatura externa](../../es-n
 | **lugar** | **dentro** de `<org>.<projeto>`, irmã de `aggregate` — nunca na raiz do documento |
 | **nome** | `^[a-z][a-z0-9-]{0,62}$`; é o que vai no caminho do feed |
 | `reader` | o `username` da conta que lê; ela precisa do papel `SUBSCRIBER` no tenant. Outra conta, mesmo com o papel, recebe `403` |
-| `aggregateTypes` | ao menos um; `<bc>.<tipo>` de agregado deste modelo |
-| `events` | `<bc>.<tipo>.<evento>`, de um dos tipos acima |
+| `aggregateTypes` | ao menos um, sem repetição; `<bc>.<tipo>` de agregado deste modelo |
+| `events` | opcional; se presente, ao menos um e sem repetição — `<bc>.<tipo>.<evento>`, de um dos tipos acima. Para "todos os eventos", omita a chave: lista vazia é recusada |
+| **outras chaves** | recusadas na publicação |
 | `from` | onde a leitura começa na **primeira** leitura: `now` = só o que acontecer depois; `beginning` = desde o primeiro evento |
 
 **O motor de comandos não lê esta chave.** Mudar o filtro é republicar o modelo: a próxima leitura já usa a
@@ -11263,6 +11264,12 @@ O usuário abre um relato novo.
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.96 — 2026-10-01
+
+- **`subscriptions` no formato do modelo segue o que o forger valida** (`persistence-crs/spec/model-format.md`
+  §Assinaturas externas; `model.schema.json`): `events`, se presente, tem ao menos um item; listas sem repetição;
+  chave desconhecida na declaração é recusada. Para "todos os eventos", omite-se `events`.
 
 ## 1.95 — 2026-10-01
 
