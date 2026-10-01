@@ -240,8 +240,9 @@ existir, e até ele existir ninguém lê o feed. Decisão do dono em 2026-10-01.
 Quem lê a declaração é o es-n, que serve o feed: ver
 [es-n — assinatura externa de eventos](../../es-n/endpoints/assinaturas.md).
 
-> **Estado:** aceita pelo forger em `develop` desde `forger@fb3201c`; **ainda não em produção**. Até lá a
-> chave publica sem conferência.
+> **Em produção desde 2026-10-01T04:23:36Z** (`forger@fb3201c`; ver [CHANGELOG 1.97](../../CHANGELOG.md)).
+> Modelo publicado antes disso não é revalidado: uma declaração que não se sustenta e já estava no cache
+> continua lá até a próxima publicação.
 
 ### Chaves que um modelo novo não precisa trazer
 
