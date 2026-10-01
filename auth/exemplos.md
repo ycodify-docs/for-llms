@@ -15,14 +15,15 @@ Headers: X-Forger-Credential: <credencial>
   "name": "Alice", "email": "alice@acme.com", "roles": ["API_MASTER"], "mcpSessionId": "<uuid>" }
 ```
 
-Use o `accessToken` nas chamadas seguintes: `Authorization: Bearer <token>`. Pela borda, o login leva **um**
-cabeçalho de identificação, `X-Tenant-Id` ou `X-Forger-Credential` ([gateway](../gateway/README.md)).
+Use o `accessToken` nas chamadas seguintes: `Authorization: Bearer <token>`. Pela borda, o login leva
+**`X-Forger-Credential`**, a única credencial da rota de auth; com `X-Tenant-Id` no lugar dele, `401`
+([gateway](../gateway/README.md)).
 
 ## 2. Login externo
 
 ```
 POST /ua/sign-in
-Headers: X-Tenant-Id: <tenant-id>
+Headers: X-Forger-Credential: <credencial>        // X-Tenant-Id aqui dá 401
 { "username": "cliente1", "password": "•••" }
 → 200  { "accessToken": "<token>", "tokenType": "Bearer", ... }   // token inclui os tenants do usuário
 ```
