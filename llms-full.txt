@@ -10783,9 +10783,13 @@ Qual dos dois depende da rota:
 
 | Rota | Exige |
 |---|---|
-| rotas de autenticação (`/auth/`) | **um dos dois**, à sua escolha |
-| rotas de execução — persistência, coordenação, arquivos | **`X-Tenant-Id`** |
+| rotas de autenticação (`/auth/`) | **`X-Forger-Credential`**, e só ele |
+| rotas de execução — persistência, coordenação, arquivos, assinatura de eventos | **`X-Tenant-Id`** |
 | demais rotas | **`X-Forger-Credential`** |
+
+> **`X-Tenant-Id` numa rota de autenticação é recusado com `401` de corpo vazio.** A credencial que a
+> borda confere em `/auth/` é a do `X-Forger-Credential`; o tenant, ali, não a substitui. Até a revisão
+> 1.101 este guia dizia "um dos dois, à sua escolha" — estava errado. Ver [erros.md](erros.md#401--falta-o-cabeçalho-de-identificação).
 
 > **O erro mais comum é mandar os dois.** A intuição de "mando os dois e deixo o servidor escolher"
 > falha aqui: a borda recusa com `400`. Ver [erros.md](erros.md#400).
@@ -10877,9 +10881,15 @@ foi a borda. Nenhum serviço os emite.
 
 | Situação | Correção |
 |---|---|
-| não veio nem `X-Tenant-Id` nem `X-Forger-Credential` | mande **um** dos dois |
-| rota de execução sem `X-Tenant-Id` | rotas de persistência, coordenação e arquivos exigem `X-Tenant-Id` |
+| não veio nem `X-Tenant-Id` nem `X-Forger-Credential` | mande **o** que a rota exige |
+| rota de execução sem `X-Tenant-Id` | rotas de persistência, coordenação, arquivos e assinatura de eventos exigem `X-Tenant-Id` |
 | rota administrativa sem `X-Forger-Credential` | as demais rotas exigem `X-Forger-Credential` |
+| **rota de autenticação (`/auth/`) com `X-Tenant-Id`** no lugar de `X-Forger-Credential` | `/auth/` exige `X-Forger-Credential`; troque o cabeçalho |
+| `X-Forger-Credential` com valor que **não é** o da credencial | conferir o valor: ter a forma certa não basta |
+
+> **As duas últimas linhas chegam de corpo vazio e sem `X-Blocked-*`** — medido em 2026-10-01. Não leia
+> a ausência desses cabeçalhos como "o serviço respondeu": o serviço de destino **não foi chamado**.
+> Já o `401` de nenhum cabeçalho traz o motivo no corpo e em `X-Blocked-Reason`.
 
 Ver a tabela de qual rota exige qual em [README.md](README.md#cabeçalhos-de-identificação--exatamente-um-nunca-dois).
 
@@ -11017,6 +11027,18 @@ Rota administrativa → `X-Forger-Credential`:
 curl "$BORDA/v3/forger/..." \
   -H "X-Forger-Credential: <credencial>"
 ```
+
+Rota de autenticação → **também** `X-Forger-Credential`, nunca `X-Tenant-Id`:
+
+```bash
+curl -X POST "$BORDA/v3/auth/..." \
+  -H "Content-Type: application/json" \
+  -H "X-Forger-Credential: <credencial>" \
+  -d '{ }'
+```
+
+Com `X-Tenant-Id` no lugar, a borda devolve **`401` de corpo vazio**, sem `X-Blocked-*`, e o serviço de
+autenticação não é chamado.
 
 ## Os dois cabeçalhos juntos — recusado
 
@@ -11341,6 +11363,16 @@ O usuário abre um relato novo.
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.102 — 2026-10-01
+
+- **Borda: rota de autenticação exige só `X-Forger-Credential`; assinatura de eventos entra nas rotas de execução**
+  (`gateway/README.md` §Cabeçalhos de identificação; `gateway/erros.md` §401; `gateway/exemplos.md`). O guia da
+  borda dizia que `/auth/` aceitava "um dos dois, à sua escolha"; com `X-Tenant-Id` a borda responde `401` de
+  corpo vazio, sem `X-Blocked-*`, e o serviço de autenticação não é chamado — o mesmo vale para
+  `X-Forger-Credential` com valor que não é o da credencial. Medido na borda em 2026-10-01. Completa, do lado da
+  borda, a correção da 1.101. A assinatura de eventos (`/v3/es/…`) passa a constar entre as rotas que exigem
+  `X-Tenant-Id`.
 
 ## 1.101 — 2026-10-01
 

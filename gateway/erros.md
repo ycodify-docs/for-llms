@@ -37,9 +37,15 @@ foi a borda. Nenhum serviço os emite.
 
 | Situação | Correção |
 |---|---|
-| não veio nem `X-Tenant-Id` nem `X-Forger-Credential` | mande **um** dos dois |
-| rota de execução sem `X-Tenant-Id` | rotas de persistência, coordenação e arquivos exigem `X-Tenant-Id` |
+| não veio nem `X-Tenant-Id` nem `X-Forger-Credential` | mande **o** que a rota exige |
+| rota de execução sem `X-Tenant-Id` | rotas de persistência, coordenação, arquivos e assinatura de eventos exigem `X-Tenant-Id` |
 | rota administrativa sem `X-Forger-Credential` | as demais rotas exigem `X-Forger-Credential` |
+| **rota de autenticação (`/auth/`) com `X-Tenant-Id`** no lugar de `X-Forger-Credential` | `/auth/` exige `X-Forger-Credential`; troque o cabeçalho |
+| `X-Forger-Credential` com valor que **não é** o da credencial | conferir o valor: ter a forma certa não basta |
+
+> **As duas últimas linhas chegam de corpo vazio e sem `X-Blocked-*`** — medido em 2026-10-01. Não leia
+> a ausência desses cabeçalhos como "o serviço respondeu": o serviço de destino **não foi chamado**.
+> Já o `401` de nenhum cabeçalho traz o motivo no corpo e em `X-Blocked-Reason`.
 
 Ver a tabela de qual rota exige qual em [README.md](README.md#cabeçalhos-de-identificação--exatamente-um-nunca-dois).
 
