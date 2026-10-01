@@ -2,6 +2,12 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.97 — 2026-10-01
+
+- **`subscriptions` em produção desde 2026-10-01T04:23:36Z** (`forger/endpoints/model.md` §Assinatura externa de
+  eventos). A conferência na publicação (1.95) está no ar no forger `fb3201c`. Fonte: encerramento do pedido de
+  deploy pela infra (`infra/hostinger/issues/deploy.pedido.composer-com-subscriptions-no-model-json.20261001`).
+
 ## 1.96 — 2026-10-01
 
 - **`subscriptions` no formato do modelo segue o que o forger valida** (`persistence-crs/spec/model-format.md`
