@@ -53,7 +53,7 @@ Quando o modelo do agregado declara **`roles`**
 
 | Situação | Resposta |
 |---|---|
-| papel do solicitante fora de `roles.read` | **`204`** — a mesma resposta de um `{id}` que não existe |
+| papel do solicitante fora de `roles.read` | **`403`**, com corpo `{status, message}` — decidido pelo tipo, antes de olhar o registro |
 | recorte por proprietário, e o agregado é de outra pessoa | **`204`** |
 | passa no recorte | `200` normal — e o `/history` vem **inteiro** |
 | passa, mas o papel não está em `roles.author` | `200`, com os eventos **sem o bloco de autoria** |
@@ -69,7 +69,7 @@ GET /a/{bc}/{type}/{id}   ou   GET .../{id}/history
   │
   ├─ o modelo declara `roles`?              não ──▶ 200   (sem recorte: qualquer usuário do tenant lê)
   │
-  ├─ tem papel em `roles.read`?             não ──▶ 204   (a resposta de um id inexistente)
+  ├─ tem papel em `roles.read`?             não ──▶ 403   (decidido pelo tipo: igual para id que existe ou não)
   │
   ├─ algum papel casado sem `scope`?        sim ──▶ 200   (o menos restritivo vence)
   │
@@ -81,9 +81,11 @@ GET /a/{bc}/{type}/{id}   ou   GET .../{id}/history
      em `roles.author`?                     não ──▶ 200, e cada evento vem sem o autor
 ```
 
-> **`204` aqui não distingue "não existe" de "não é seu", e é de propósito:** um `403` entregaria a
-> existência do agregado a quem não pode vê-lo. Ao depurar um `204` inesperado, verifique o recorte do
-> modelo antes de procurar o dado.
+> **`403` é "seu papel não lê este tipo"; `204` é "não existe" ou "não é seu".** O `403` sai antes de olhar o
+> registro, então responde igual para um `{id}` que existe e um que não existe — não revela existência. Já
+> o recorte por proprietário responde `204`, de propósito: ali um `403` entregaria a existência do agregado
+> a quem não é o titular. Ao depurar um `204` inesperado, verifique o recorte do modelo antes de procurar o
+> dado. *(Até 2026-10-01 o papel fora de `roles.read` também respondia `204`.)*
 
 **`loguser` aparece nas duas respostas** — no estado e em cada evento — com o `username` de quem executou
 aquele comando: [model-format — `loguser`](../spec/model-format.md#loguser-quem-executou-cada-comando).
@@ -96,4 +98,4 @@ aquele comando: [model-format — `loguser`](../spec/model-format.md#loguser-que
   [persistence-q](../../persistence-q/README.md).
 
 ## Erros
-`403` (tenant não autorizado), `510` (falha de processamento). Catálogo: [../erros.md](../erros.md).
+`403` (tenant não autorizado, ou papel fora de `roles.read` — corpo `{status, message}`), `510` (falha de processamento). Catálogo: [../erros.md](../erros.md).

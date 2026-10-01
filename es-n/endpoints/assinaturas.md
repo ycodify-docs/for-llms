@@ -88,8 +88,7 @@ e o histórico dele, com o mesmo token — e com o recorte de leitura que esse t
 
 > ⚠️ **`SUBSCRIBER` lê o feed, não o detalhe.** Para ler o agregado e o histórico, a conta leitora precisa
 > também de um papel de **leitura** naquele agregado (`roles.read` do modelo). Sem ele, o detalhe responde
-> `204` sem corpo — a mesma resposta de um id que não existe, de propósito: dizer "existe e você não pode"
-> entregaria a existência do registro.
+> `403` — ver [leitura de agregado — quem pode ler](../../persistence-crs/endpoints/agregado-leitura.md#quem-pode-ler).
 
 ## Acompanhar o atraso
 
