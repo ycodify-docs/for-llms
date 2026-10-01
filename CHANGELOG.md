@@ -2,6 +2,16 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.102 — 2026-10-01
+
+- **Borda: rota de autenticação exige só `X-Forger-Credential`; assinatura de eventos entra nas rotas de execução**
+  (`gateway/README.md` §Cabeçalhos de identificação; `gateway/erros.md` §401; `gateway/exemplos.md`). O guia da
+  borda dizia que `/auth/` aceitava "um dos dois, à sua escolha"; com `X-Tenant-Id` a borda responde `401` de
+  corpo vazio, sem `X-Blocked-*`, e o serviço de autenticação não é chamado — o mesmo vale para
+  `X-Forger-Credential` com valor que não é o da credencial. Medido na borda em 2026-10-01. Completa, do lado da
+  borda, a correção da 1.101. A assinatura de eventos (`/v3/es/…`) passa a constar entre as rotas que exigem
+  `X-Tenant-Id`.
+
 ## 1.101 — 2026-10-01
 
 - **Login: só `X-Forger-Credential`** (`auth/endpoints/sign-in.md` §Cabeçalhos; `auth/exemplos.md` §1 e §2). A

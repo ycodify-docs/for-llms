@@ -57,9 +57,13 @@ Qual dos dois depende da rota:
 
 | Rota | Exige |
 |---|---|
-| rotas de autenticação (`/auth/`) | **um dos dois**, à sua escolha |
-| rotas de execução — persistência, coordenação, arquivos | **`X-Tenant-Id`** |
+| rotas de autenticação (`/auth/`) | **`X-Forger-Credential`**, e só ele |
+| rotas de execução — persistência, coordenação, arquivos, assinatura de eventos | **`X-Tenant-Id`** |
 | demais rotas | **`X-Forger-Credential`** |
+
+> **`X-Tenant-Id` numa rota de autenticação é recusado com `401` de corpo vazio.** A credencial que a
+> borda confere em `/auth/` é a do `X-Forger-Credential`; o tenant, ali, não a substitui. Até a revisão
+> 1.101 este guia dizia "um dos dois, à sua escolha" — estava errado. Ver [erros.md](erros.md#401--falta-o-cabeçalho-de-identificação).
 
 > **O erro mais comum é mandar os dois.** A intuição de "mando os dois e deixo o servidor escolher"
 > falha aqui: a borda recusa com `400`. Ver [erros.md](erros.md#400).
