@@ -41,7 +41,7 @@ paths:
   /up/org/by/owner/{orgOwner}:
     get: { tags: [organizacao], summary: Listar orgs do dono, security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/orgOwner' }], responses: { '200': { description: Lista }, '204': { description: Vazio } } }
   /up/org/by/org/{orgName}/org-owner/{orgOwner}:
-    delete: { tags: [organizacao], summary: Remover org (administrador na org), security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/orgName' }, { $ref: '#/components/parameters/orgOwner' }], responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Forbidden' } } }
+    delete: { tags: [organizacao], summary: Remover org e os vínculos de todos os membros (administrador na org; recusada se a org tem projeto ou conexão de banco no forger), security: [{ bearerAuth: [] }], parameters: [{ $ref: '#/components/parameters/orgName' }, { $ref: '#/components/parameters/orgOwner' }], responses: { '200': { description: OK }, '400': { $ref: '#/components/responses/BadRequest' }, '403': { $ref: '#/components/responses/Forbidden' } } }
 
   # ---- conta (/up/account, /ua/account) ----
   /up/account/by/jwt:
