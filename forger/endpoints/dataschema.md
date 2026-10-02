@@ -124,10 +124,7 @@ modelos expira por tempo — o que os tira do cache é remoção, nunca prazo.
 caso ele tenha sido republicado em `MODELING`. Se o cache falhar, a resposta é `500`, **o registro não é
 apagado** e a operação pode ser repetida.
 
-> **⚠️ Estado em 2026-10-02: ainda não está em produção** (código do forger `7f24982`, a implantar). Na
-> versão no ar hoje, este `DELETE` tira do cache **só a spec de entidades**: um `.model.json`
-> republicado em `MODELING` fica no cache, e depois de apagado o registro não há rota que o remova. Até
-> a implantação, remova-o antes, com `DELETE .../tenant/{tenantId}/model` ([model.md](model.md)).
+> Em produção desde 2026-10-02T22:11Z; até então este `DELETE` tirava do cache só a spec de entidades.
 
 ## Ciclo de vida
 Metadados + efeito físico (criação de esquema) + geração do `tenant-id`. A partir daqui o sistema tem

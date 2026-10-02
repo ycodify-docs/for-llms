@@ -2686,10 +2686,8 @@ conexão. **Remover a organização é o último passo.**
 `403` se não for administrador. Se não existir organização com esse nome **para esse dono**, a resposta
 também é `200` e nada é removido — confira `orgOwner`.
 
-> **⚠️ Estado em 2026-10-02: ainda não está em produção.** Na versão no ar esta rota responde `403` a
-> **qualquer** chamada, inclusive do administrador da organização (medido em produção em 2026-10-02):
-> nenhuma organização é removida. A correção está no código (`orgid 70e84f5`, `forger 75935c2`) e vale
-> quando for implantada.
+> Em produção desde 2026-10-02T22:11Z. Até então esta rota respondia `403` a **qualquer** chamada,
+> inclusive do administrador da organização, e nenhuma organização era removida.
 
 <!-- ===== orgid/endpoints/up-conta.md ===== -->
 
@@ -4918,10 +4916,7 @@ modelos expira por tempo — o que os tira do cache é remoção, nunca prazo.
 caso ele tenha sido republicado em `MODELING`. Se o cache falhar, a resposta é `500`, **o registro não é
 apagado** e a operação pode ser repetida.
 
-> **⚠️ Estado em 2026-10-02: ainda não está em produção** (código do forger `7f24982`, a implantar). Na
-> versão no ar hoje, este `DELETE` tira do cache **só a spec de entidades**: um `.model.json`
-> republicado em `MODELING` fica no cache, e depois de apagado o registro não há rota que o remova. Até
-> a implantação, remova-o antes, com `DELETE .../tenant/{tenantId}/model` ([model.md](model.md)).
+> Em produção desde 2026-10-02T22:11Z; até então este `DELETE` tirava do cache só a spec de entidades.
 
 ## Ciclo de vida
 Metadados + efeito físico (criação de esquema) + geração do `tenant-id`. A partir daqui o sistema tem
@@ -5162,10 +5157,8 @@ legítima em que o segundo artefato ainda não existe.
 > 400: DataSchema 'pedidos' está com status 'RUNNING'. Criação/atualização/remoção de entidades, atributos e associações só é permitida com status 'MODELING'.
 > ```
 >
-> **⚠️ Estado em 2026-10-02: a recusa ainda não está em produção.** Ela existe no código do forger
-> (`7f24982`) e passa a valer quando essa versão for implantada. **Na versão no ar hoje o esquema é
-> apagado em qualquer estado**, inclusive com o tenant operando. Não conte com a recusa: transite para
-> `MODELING` **antes**, sempre. A ordem completa está em [dataschema — remover](dataschema.md#remover).
+> Em produção desde 2026-10-02T22:11Z; até então o esquema era apagado em qualquer estado. A ordem
+> completa para desmontar está em [dataschema — remover](dataschema.md#remover).
 
 ## Ciclo de vida (criar/atualizar)
 
@@ -11408,6 +11401,15 @@ O usuário abre um relato novo.
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.105 — 2026-10-02
+
+- **Forger e orgid: remover esquema e remover organização em produção desde 2026-10-02T22:11Z**
+  (`forger/endpoints/entity.md`, `forger/endpoints/dataschema.md`, `orgid/endpoints/up-organizacao.md`).
+  As mudanças da 1.103 e da 1.104 foram implantadas (`forger 75935c2`, `orgid 70e84f5`). Saem os três
+  avisos de "ainda não está em produção"; fica a data a partir da qual cada regra vale. Na implantação
+  foi conferido que subiram as classes alteradas; a remoção de uma organização e a recusa `400` do
+  esquema fora de `MODELING` ainda não foram exercitadas em produção.
 
 ## 1.104 — 2026-10-02
 

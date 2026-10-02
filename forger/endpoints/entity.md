@@ -226,10 +226,8 @@ legítima em que o segundo artefato ainda não existe.
 > 400: DataSchema 'pedidos' está com status 'RUNNING'. Criação/atualização/remoção de entidades, atributos e associações só é permitida com status 'MODELING'.
 > ```
 >
-> **⚠️ Estado em 2026-10-02: a recusa ainda não está em produção.** Ela existe no código do forger
-> (`7f24982`) e passa a valer quando essa versão for implantada. **Na versão no ar hoje o esquema é
-> apagado em qualquer estado**, inclusive com o tenant operando. Não conte com a recusa: transite para
-> `MODELING` **antes**, sempre. A ordem completa está em [dataschema — remover](dataschema.md#remover).
+> Em produção desde 2026-10-02T22:11Z; até então o esquema era apagado em qualquer estado. A ordem
+> completa para desmontar está em [dataschema — remover](dataschema.md#remover).
 
 ## Ciclo de vida (criar/atualizar)
 
