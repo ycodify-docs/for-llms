@@ -2,6 +2,17 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.103 — 2026-10-02
+
+- **Forger: remover o esquema exige `MODELING`, e apagar o registro leva os dois modelos do cache**
+  (`forger/endpoints/entity.md` §Pré-condição e §Endpoints; `forger/endpoints/dataschema.md` §Remover;
+  `forger/erros.md` §400). `DELETE /org/{org}/project/{project}/dataschema/{dataSchema}` era a única
+  alteração de schema aceita fora de `MODELING`; passa a responder `400` em `RUNNING` e `SUSPENDED`, sem
+  apagar nada. O `DELETE` do registro passa a tirar do cache também o `.model.json`, não só a spec de
+  entidades. Entra a ordem para desmontar um dataschema. Rotas e corpos não mudam. **Ainda não está em
+  produção**: código em `forger 7f24982`, vale quando a infra implantar; as duas páginas dizem o que a
+  versão no ar faz até lá.
+
 ## 1.102 — 2026-10-01
 
 - **Borda: rota de autenticação exige só `X-Forger-Credential`; assinatura de eventos entra nas rotas de execução**
