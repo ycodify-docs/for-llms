@@ -2,6 +2,16 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.104 — 2026-10-02
+
+- **Orgid: remover organização — o que é removido, a recusa `400` e o estado em produção**
+  (`orgid/endpoints/up-organizacao.md` §DELETE; `orgid/openapi.yaml`). A página só dizia "remove a org".
+  Passa a dizer que saem a organização e os vínculos de todos os membros, que papéis e contas de aplicação
+  não saem, e que a organização com projeto ou conexão de banco no forger é recusada com `400`. A rota
+  nunca funcionou: respondia `403` a qualquer chamada, medido em produção em 2026-10-02. **Ainda não está
+  em produção**: correção em `orgid 70e84f5` e `forger 75935c2`, vale quando a infra implantar; a página
+  diz, com data, o que a versão no ar faz até lá.
+
 ## 1.103 — 2026-10-02
 
 - **Forger: remover o esquema exige `MODELING`, e apagar o registro leva os dois modelos do cache**

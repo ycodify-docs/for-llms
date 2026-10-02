@@ -2673,7 +2673,23 @@ Remove a org. **Papel:** administrador **na org**.
 | `orgName` | nome da org a remover |
 | `orgOwner` | dono da org |
 
-**Resposta:** `200` (sem corpo). `403` se não for administrador.
+**O que é removido:** a organização e os vínculos conta-papel-organização de **todos** os membros, em
+todos os papéis. Não tem volta. **Não** são removidos: as contas dos membros, e os papéis e contas de
+aplicação (`/ua`) cujo dono é a organização — remova-os pelas rotas de `/ua`, vínculo antes do papel.
+
+**Pré-condição: a organização não pode ter recurso no forger** — nenhum projeto e nenhuma conexão de
+banco. Havendo qualquer um dos dois, a resposta é `400` e **nada é removido**. Desmonte antes, na ordem
+de [forger — dataschema, remover](../../forger/endpoints/dataschema.md#remover), depois o projeto e a
+conexão. **Remover a organização é o último passo.**
+
+**Resposta:** `200` (sem corpo). `400` se a organização ainda tem projeto ou conexão de banco no forger.
+`403` se não for administrador. Se não existir organização com esse nome **para esse dono**, a resposta
+também é `200` e nada é removido — confira `orgOwner`.
+
+> **⚠️ Estado em 2026-10-02: ainda não está em produção.** Na versão no ar esta rota responde `403` a
+> **qualquer** chamada, inclusive do administrador da organização (medido em produção em 2026-10-02):
+> nenhuma organização é removida. A correção está no código (`orgid 70e84f5`, `forger 75935c2`) e vale
+> quando for implantada.
 
 <!-- ===== orgid/endpoints/up-conta.md ===== -->
 
@@ -11392,6 +11408,16 @@ O usuário abre um relato novo.
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.104 — 2026-10-02
+
+- **Orgid: remover organização — o que é removido, a recusa `400` e o estado em produção**
+  (`orgid/endpoints/up-organizacao.md` §DELETE; `orgid/openapi.yaml`). A página só dizia "remove a org".
+  Passa a dizer que saem a organização e os vínculos de todos os membros, que papéis e contas de aplicação
+  não saem, e que a organização com projeto ou conexão de banco no forger é recusada com `400`. A rota
+  nunca funcionou: respondia `403` a qualquer chamada, medido em produção em 2026-10-02. **Ainda não está
+  em produção**: correção em `orgid 70e84f5` e `forger 75935c2`, vale quando a infra implantar; a página
+  diz, com data, o que a versão no ar faz até lá.
 
 ## 1.103 — 2026-10-02
 
