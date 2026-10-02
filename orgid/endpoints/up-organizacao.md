@@ -105,7 +105,5 @@ conexão. **Remover a organização é o último passo.**
 `403` se não for administrador. Se não existir organização com esse nome **para esse dono**, a resposta
 também é `200` e nada é removido — confira `orgOwner`.
 
-> **⚠️ Estado em 2026-10-02: ainda não está em produção.** Na versão no ar esta rota responde `403` a
-> **qualquer** chamada, inclusive do administrador da organização (medido em produção em 2026-10-02):
-> nenhuma organização é removida. A correção está no código (`orgid 70e84f5`, `forger 75935c2`) e vale
-> quando for implantada.
+> Em produção desde 2026-10-02T22:11Z. Até então esta rota respondia `403` a **qualquer** chamada,
+> inclusive do administrador da organização, e nenhuma organização era removida.

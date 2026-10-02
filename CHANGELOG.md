@@ -2,6 +2,15 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.105 — 2026-10-02
+
+- **Forger e orgid: remover esquema e remover organização em produção desde 2026-10-02T22:11Z**
+  (`forger/endpoints/entity.md`, `forger/endpoints/dataschema.md`, `orgid/endpoints/up-organizacao.md`).
+  As mudanças da 1.103 e da 1.104 foram implantadas (`forger 75935c2`, `orgid 70e84f5`). Saem os três
+  avisos de "ainda não está em produção"; fica a data a partir da qual cada regra vale. Na implantação
+  foi conferido que subiram as classes alteradas; a remoção de uma organização e a recusa `400` do
+  esquema fora de `MODELING` ainda não foram exercitadas em produção.
+
 ## 1.104 — 2026-10-02
 
 - **Orgid: remover organização — o que é removido, a recusa `400` e o estado em produção**
