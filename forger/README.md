@@ -115,6 +115,12 @@ dbconn      (servidor, porta e usuário de conexão)
 | **email** | `POST/GET/PUT/DELETE /org/{org}/project/{project}/email[/{id}]` | [endpoints/email.md](endpoints/email.md) |
 | **presentation** | `POST/GET/DELETE .../tenant/{tenantId}/presentation` | [endpoints/presentation.md](endpoints/presentation.md) |
 
+> **Publicou o modelo? Falta o manifesto.** Depois do `model`, publica-se o
+> [manifesto de apresentação](endpoints/presentation.md) do mesmo tenant: é ele que dá rótulo e formato à
+> tela, e o motor de execução não o lê. Para um atributo que guarda o id de outro agregado aparecer como
+> **nome**, siga [shell — do id ao nome](../shell/apresentacao.md#receita-do-id-ao-nome) (`references` no
+> modelo, `titleKey` no manifesto do apontado, ordem de publicação).
+
 Catálogo de erros: [erros.md](erros.md). Exemplos anotados: [exemplos.md](exemplos.md).
 
 > **Gramáticas BNF dos payloads:** [`bnfs/`](bnfs/README.md) traz gramáticas **BNF** que descrevem

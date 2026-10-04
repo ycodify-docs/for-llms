@@ -45,6 +45,13 @@ Erros: `400` (arquivo vazio, extensão diferente de `.json`, documento inválido
 > | `references` com atributo, alvo, `valueKey` ou tipo que não se sustenta | ver [atributo que aponta outro agregado](#atributo-que-aponta-outro-agregado-references) |
 > | `subscriptions` fora da forma, ou com tipo ou evento que não é do modelo | ver [assinatura externa de eventos](#assinatura-externa-de-eventos-subscriptions) |
 
+**Depois do modelo, o manifesto de apresentação.** Publicar o modelo não basta para a tela ficar legível:
+rótulos, formatos e nome de exibição de quem é referenciado vêm do
+[manifesto de apresentação](presentation.md), que se publica **depois** do modelo do mesmo tenant. Para um
+atributo que guarda o id de outro agregado aparecer como nome, siga a receita em
+[shell — do id ao nome](../../shell/apresentacao.md#receita-do-id-ao-nome): ela diz o que vai no modelo
+(`references`, abaixo) e o que vai no manifesto, e em que ordem publicar.
+
 ### Recorte de leitura do aggregate: `roles`
 
 **Opcional.** Declara quem lê o aggregate e quais linhas cada papel lê; quem aplica o recorte é o
@@ -133,7 +140,8 @@ BFF, que o leva na capacidade do tenant: ver [bff — nome de exibição](../../
 
 **Opcional**, no nível do aggregate. Declara que o atributo guarda a chave de um registro de **outro
 aggregate**, para que a tela mostre e busque pelo nome em vez do id. **Aggregate sem a chave publica como
-antes.**
+antes.** Esta chave é só metade da receita: o nome do alvo sai do manifesto de apresentação, e o passo a
+passo completo está em [shell — do id ao nome](../../shell/apresentacao.md#receita-do-id-ao-nome).
 
 ```jsonc
 "agenda.aula": {

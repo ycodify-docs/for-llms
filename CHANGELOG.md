@@ -2,6 +2,15 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.107 — 2026-10-04
+
+- **Forger: do modelo ao manifesto, e do id ao nome, com o caminho até a receita**
+  (`forger/README.md` após o índice de endpoints; `forger/endpoints/model.md` após a tabela de recusas da
+  publicação e na seção `references`). Quem publica o modelo passa a ler que o manifesto de apresentação
+  se publica depois dele, e que, para um id de outro agregado aparecer como nome, o passo a passo está em
+  `shell/apresentacao.md#receita-do-id-ao-nome`. Só o ponteiro: o texto da receita continua na fatia do
+  yc.app, e não se repete aqui.
+
 ## 1.106 — 2026-10-04
 
 - **Do id ao nome: receita única, e `references` deixa de constar como "ainda não em vigor"**
