@@ -6,6 +6,28 @@
 > [forger — manifesto de apresentação](../forger/endpoints/presentation.md); o que a casca entrega ao
 > miolo, em [contrato-miolo](contrato-miolo.md). Pré: [README](README.md).
 
+## Receita: do id ao nome
+
+Para a tela mostrar **nome** onde o registro guarda o **id** de outro agregado, e pedir **busca** em vez de
+id colado, são três declarações e duas publicações:
+
+1. **No `.model.json` de quem aponta**, diga para onde o atributo aponta, com `references` no nível do
+   agregado:
+   `"references": { "teacherid": "cadastro.professor" }` quando o alvo está no **mesmo modelo**, ou
+   `"references": { "teacherid": "cadastro.cadastro.professor" }` (`<projeto>.<bc>.<tipo>`) quando está em
+   **outro projeto do mesmo org**. Forma e recusas:
+   [forger — `references`](../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references).
+2. **No manifesto do agregado APONTADO**, diga qual atributo é o nome dele: `"titleKey": "fullname"`. Sem
+   isso a tela usa o `identity.fields` do modelo dele e, por fim, o primeiro texto que ele declara.
+3. **No manifesto de quem aponta**, dê o rótulo do campo: `"labels": { "teacherid": "Professor" }`. Sem
+   isso o campo aparece como "Teacherid".
+4. **Publique o modelo, depois o manifesto** ([Como publicar e conferir](#como-publicar-e-conferir)) e abra
+   o agregado de novo no menu.
+
+O que muda na tela está em [Referência a outro agregado](#referência-a-outro-agregado). Se aparecer "sem
+acesso", o usuário não tem o tenant do alvo no token ou não tem papel de leitura nele; "não encontrado", o
+id não está na projeção do alvo.
+
 ## Por que escrever um
 
 Sem manifesto a tela funciona, mas fala a língua do modelo: o rótulo é o nome técnico humanizado
@@ -69,9 +91,10 @@ monoespaçada. `fmt` serve sobretudo para **dinheiro** e **telefone**, que o tip
 
 ### Referência a outro agregado
 
-`options` na forma `{ aggregate, valueKey, labelKey }` declara que o campo **aponta outro agregado**: a aula
-aponta o professor; o aluno, nas matrículas, aponta o plano. É a **única** declaração, e a tela deriva o
-resto:
+O campo **aponta outro agregado** quando o modelo o declara em `references` (a forma recomendada, ver a
+[receita](#receita-do-id-ao-nome)) ou quando o manifesto traz `options` na forma
+`{ aggregate, valueKey, labelKey }`. A aula aponta o professor; o aluno, nas matrículas, aponta o plano. A
+tela deriva o resto:
 
 - **onde se vê** — tabela, cartão, aba Dados, histórico (antes → depois), título, cópia e filtro mostram o
   **nome** do registro apontado, e não o id. A exportação leva as duas coisas: a coluna do id e, ao lado,
@@ -85,19 +108,17 @@ resto:
   acesso" (o papel não lê o agregado apontado) ou "rótulo indisponível" (falha, registrada no diagnóstico).
   **O seletor não aceita texto livre**: se a lista não vem, o erro aparece no campo.
 
-**A declaração vai para o modelo.** Referência é fato do domínio: a chave `references` do `.model.json`
-(**ainda não em vigor**; a forma em
-[model-format — `references`](../persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado),
-o que o BFF faz com ela em
-[bff — declarada no modelo](../bff/README.md#declarada-no-modelo-references-pedida-e-ainda-não-em-vigor)) passa a
-valer sobre este `options` e alcança **outro projeto** do mesmo org pelo endereço `"<projeto>.<bc>.<tipo>"`,
-como a aula da agenda apontando o professor do cadastro. `"<bc>.<tipo>"` fica no próprio modelo. Até lá, o
-`options` por referência é a forma que vale, e só no mesmo modelo.
+**Duas formas de declarar, e qual usar.**
 
-Quem resolve é o BFF ([bff — referência entre agregados](../bff/README.md#referência-entre-agregados-sessionrefs)),
-com o token de quem usa a tela. Duas regras de forma: o agregado apontado tem de estar **no mesmo modelo**
-(é o que a publicação confere), e a referência vive em **atributo ou `grupo.campo`**, nunca dentro de um
-valor `Json`, onde a tela não tem o que interpretar.
+| Forma | Onde | Alcança | Quando usar |
+|---|---|---|---|
+| `references` | `.model.json`, nível do agregado | o próprio modelo (`<bc>.<tipo>`) e outro projeto do org (`<projeto>.<bc>.<tipo>`) | **sempre que puder**: é fato do domínio e vale também para cliente sem tela |
+| `options` por referência | manifesto | só o mesmo modelo | quando não se pode republicar o modelo, ou para fixar um `labelKey` diferente do `titleKey` do alvo |
+
+Para o mesmo atributo, `references` vale sobre o `options`. Quem resolve é o BFF
+([bff — referência entre agregados](../bff/README.md#referência-entre-agregados-sessionrefs)), com o token de
+quem usa a tela. A referência vive em **atributo ou `grupo.campo`**, nunca dentro de um valor `Json`, onde a
+tela não tem o que interpretar.
 
 ## Exemplo
 
@@ -143,7 +164,8 @@ valor `Json`, onde a tela não tem o que interpretar.
 - [ ] A chave do agregado é a do `.model.json`, e todo atributo citado existe no modelo publicado.
 - [ ] `singular` em minúsculas; `plural` com inicial maiúscula; `genero: "feminino"` quando o nome é feminino.
 - [ ] `titleKey` é um atributo que identifica o registro para uma pessoa — é também o nome dele onde outro agregado o aponta.
-- [ ] Todo campo que guarda o id de outro agregado tem `options` por referência: sem ela, a tela mostra e pede o id.
+- [ ] Todo campo que guarda o id de outro agregado está em `references` no modelo (ou tem `options` por referência): sem isso, a tela mostra e pede o id.
+- [ ] Todo agregado que é apontado por outro tem `titleKey`.
 - [ ] Todo atributo que aparece na tela tem `labels`; todo estado tem `stateLabels`.
 - [ ] Dinheiro em centavos usa `money:2`; telefone usa `phone`.
 - [ ] `cols` tem de 4 a 6 atributos, sem `status` e sem campo técnico.

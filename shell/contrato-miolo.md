@@ -195,7 +195,7 @@ não diz **como se vê** (isso é o miolo).
   org), e `valueKey` é a chave do alvo que o atributo guarda. Vem também em `valueObjects[].fields`.
   **Ausente** quando o modelo não declara. Nome e busca se pedem a `api.refs`, e o `options` por referência
   do manifesto vale só onde não há `ref`. Ver
-  [bff — declarada no modelo](../bff/README.md#declarada-no-modelo-references-pedida-e-ainda-não-em-vigor).
+  [bff — declarada no modelo](../bff/README.md#declarada-no-modelo-references).
 - **`attributes[].role`** — classificação que guia a apresentação:
   - `input` — campo editável comum.
   - `status` — campo de transição/concorrência (não é entrada do usuário).
