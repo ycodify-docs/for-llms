@@ -314,17 +314,16 @@ rótulo.
   publicação do manifesto aceita. Fora dele: `estado: "sem-tenant"` nos rótulos e `422` na busca.
   **Referência dentro de um valor `Json` não se resolve**: só atributo ou `grupo.campo`.
 
-### Declarada no modelo: `references`, pedida e ainda não em vigor
+<a id="declarada-no-modelo-references-pedida-e-ainda-não-em-vigor"></a>
+### Declarada no modelo: `references`
 
-> **Estado em 2026-09-29:** a **forma** está no
-> [formato do modelo](../persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado)
-> (1.87), e é ela que vale se esta seção divergir. O forger já confere a chave em `develop`
-> (`forger@2ab9b8d`, [recusas](../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references)),
-> **mas ainda não em produção**. **O BFF lê a chave no ar em stager desde 2026-09-29T19:04Z** (yc.app
-> `56f3cd9`); sem a declaração no modelo, vale o `options` por referência do manifesto, só no mesmo tenant.
-> Enquanto o forger de produção não confere a chave, declará-la é **por conta de quem publica**: um
-> endereço errado só aparece na tela, como `sem-tenant`, `sem-acesso` ou `erro`. Esta seção diz **o que o
-> BFF faz** com ela.
+> **Em vigor.** O BFF lê a chave desde 2026-09-29T19:04Z (yc.app `56f3cd9`), e a publicação a confere
+> ([forger — `references`](../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references)). A
+> **forma** autoritativa é a do
+> [formato do modelo](../persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado);
+> esta seção diz **o que o BFF faz** com ela. Sem a declaração no modelo, vale o `options` por referência
+> do manifesto, só no mesmo tenant. Passo a passo de quem modela:
+> [shell — do id ao nome](../shell/apresentacao.md#receita-do-id-ao-nome).
 
 A referência é **fato do domínio**: declara-se no `.model.json`, no nível do agregado, irmã de `command` e
 `event`, e vale para qualquer consumidor, com tela ou sem.

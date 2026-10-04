@@ -2,6 +2,16 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.106 — 2026-10-04
+
+- **Do id ao nome: receita única, e `references` deixa de constar como "ainda não em vigor"**
+  (`shell/apresentacao.md` §Receita: do id ao nome e §Referência a outro agregado; `bff/README.md` §Declarada
+  no modelo). A fatia do BFF e a de apresentação ainda diziam que a chave não valia, embora o BFF a leia e o
+  forger a confira desde 2026-09-29. Entra o passo a passo de quem modela: `references` no modelo de quem
+  aponta, `titleKey` no manifesto do apontado, `labels` no de quem aponta, e a ordem de publicação. Entra
+  também a tabela de quando usar `references` e quando usar o `options` por referência. A âncora antiga da
+  seção do BFF continua valendo.
+
 ## 1.105 — 2026-10-02
 
 - **Forger e orgid: remover esquema e remover organização em produção desde 2026-10-02T22:11Z**
