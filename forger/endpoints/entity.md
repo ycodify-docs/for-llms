@@ -14,9 +14,10 @@ Exigem `Authorization` e papel de administrador/engenheiro em `{org}`.
 Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
 
 > **⚠️ Pré-condição de estado — o dataschema precisa estar em `MODELING`.** Criar/alterar/remover entity
-> (e atributos/associações) só é permitido com o dataschema em `MODELING`. Em `RUNNING` o **forger
-> rejeita** alterações de schema. Para editar um sistema já em operação: transite `RUNNING → MODELING`,
-> edite, volte a `RUNNING`. Ver [dataschema — gate de status](dataschema.md#atualizar).
+> (e atributos/associações), **e remover o esquema inteiro**, só é permitido com o dataschema em
+> `MODELING`. Em `RUNNING` o **forger rejeita** alterações de schema. Para editar um sistema já em
+> operação: transite `RUNNING → MODELING`, edite, volte a `RUNNING`. Ver
+> [dataschema — gate de status](dataschema.md#atualizar).
 
 ## Contents
 - Regras de nome (entity, atributo, associação)
@@ -216,8 +217,17 @@ legítima em que o segundo artefato ainda não existe.
 | **− Atributo** | `DELETE .../entity/{entity}/attribute/{attribute}` | Remove coluna. | `200` |
 | **− Associação** | `DELETE .../entity/{entity}/association/{association}` | Remove associação. | `200` |
 | **Remover entity** | `DELETE .../entity/{entity}` | `DROP` da tabela de projeção. | `200` |
-| **Remover esquema (projeções)** | `DELETE /org/{org}/project/{project}/dataschema/{dataSchema}` | Remove o conteúdo de projeção do esquema no banco de leitura. | `200` |
+| **Remover esquema (projeções)** | `DELETE /org/{org}/project/{project}/dataschema/{dataSchema}` | Apaga o esquema físico do banco de leitura, com **todas** as tabelas de projeção e os dados delas. Não tem volta. **Exige `MODELING`.** | `200` |
 | **Analisar** | `POST .../entity/{entity}/analyze` | Relatório de impacto de uma mudança (sem aplicar). | `200` |
+
+> **Remover esquema fora de `MODELING` → `400`, e nada é apagado** (vale para `RUNNING` e `SUSPENDED`):
+>
+> ```json
+> 400: DataSchema 'pedidos' está com status 'RUNNING'. Criação/atualização/remoção de entidades, atributos e associações só é permitida com status 'MODELING'.
+> ```
+>
+> Em produção desde 2026-10-02T22:11Z; até então o esquema era apagado em qualquer estado. A ordem
+> completa para desmontar está em [dataschema — remover](dataschema.md#remover).
 
 ## Ciclo de vida (criar/atualizar)
 

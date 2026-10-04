@@ -22,6 +22,18 @@ curl "$BORDA/v3/forger/..." \
   -H "X-Forger-Credential: <credencial>"
 ```
 
+Rota de autenticação → **também** `X-Forger-Credential`, nunca `X-Tenant-Id`:
+
+```bash
+curl -X POST "$BORDA/v3/auth/..." \
+  -H "Content-Type: application/json" \
+  -H "X-Forger-Credential: <credencial>" \
+  -d '{ }'
+```
+
+Com `X-Tenant-Id` no lugar, a borda devolve **`401` de corpo vazio**, sem `X-Blocked-*`, e o serviço de
+autenticação não é chamado.
+
 ## Os dois cabeçalhos juntos — recusado
 
 ```bash

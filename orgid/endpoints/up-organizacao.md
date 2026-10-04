@@ -92,4 +92,18 @@ Remove a org. **Papel:** administrador **na org**.
 | `orgName` | nome da org a remover |
 | `orgOwner` | dono da org |
 
-**Resposta:** `200` (sem corpo). `403` se não for administrador.
+**O que é removido:** a organização e os vínculos conta-papel-organização de **todos** os membros, em
+todos os papéis. Não tem volta. **Não** são removidos: as contas dos membros, e os papéis e contas de
+aplicação (`/ua`) cujo dono é a organização — remova-os pelas rotas de `/ua`, vínculo antes do papel.
+
+**Pré-condição: a organização não pode ter recurso no forger** — nenhum projeto e nenhuma conexão de
+banco. Havendo qualquer um dos dois, a resposta é `400` e **nada é removido**. Desmonte antes, na ordem
+de [forger — dataschema, remover](../../forger/endpoints/dataschema.md#remover), depois o projeto e a
+conexão. **Remover a organização é o último passo.**
+
+**Resposta:** `200` (sem corpo). `400` se a organização ainda tem projeto ou conexão de banco no forger.
+`403` se não for administrador. Se não existir organização com esse nome **para esse dono**, a resposta
+também é `200` e nada é removido — confira `orgOwner`.
+
+> Em produção desde 2026-10-02T22:11Z. Até então esta rota respondia `403` a **qualquer** chamada,
+> inclusive do administrador da organização, e nenhuma organização era removida.

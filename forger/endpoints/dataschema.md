@@ -112,6 +112,20 @@ modelos expira por tempo — o que os tira do cache é remoção, nunca prazo.
 `DELETE .../dataschema/{dataSchema}` → `200`/`204`. **Bloqueado** enquanto o esquema físico existir
 (há projeções/conteúdo). Ver também a remoção em nível de projeção em [entity.md](entity.md).
 
+**Ordem para desmontar um dataschema:**
+
+1. **`MODELING`** (o `PUT` de [Atualizar](#atualizar)) — o tenant para de operar e os dois modelos saem
+   do cache.
+2. **Remover o esquema físico** — `DELETE /org/{org}/project/{project}/dataschema/{dataSchema}`, em
+   [entity.md](entity.md#endpoints-exaustivo). Exige `MODELING`.
+3. **Este `DELETE`**, que apaga o registro.
+
+**Junto com o registro saem do cache os dois modelos do tenant**: a spec de entidades e o `.model.json`,
+caso ele tenha sido republicado em `MODELING`. Se o cache falhar, a resposta é `500`, **o registro não é
+apagado** e a operação pode ser repetida.
+
+> Em produção desde 2026-10-02T22:11Z; até então este `DELETE` tirava do cache só a spec de entidades.
+
 ## Ciclo de vida
 Metadados + efeito físico (criação de esquema) + geração do `tenant-id`. A partir daqui o sistema tem
 identidade de tenant para comandos/eventos/consultas.

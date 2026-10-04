@@ -2291,8 +2291,9 @@ Corpo (JSON):
 | `password` | string | sim | Senha. |
 
 Cabeçalhos: `Content-Type: application/json`. **Não** exige `Authorization` (é o login). Pela borda, exige
-**um** cabeçalho de identificação — `X-Tenant-Id` **ou** `X-Forger-Credential`, nunca os dois; sem nenhum,
-`401` `missing_headers`. Ver [gateway](../../gateway/README.md).
+**`X-Forger-Credential`** — é a **única** credencial da rota de auth, e não há alternativa. Com `X-Tenant-Id` no
+lugar dele, o login responde `401` de corpo vazio; sem nenhum dos dois, `401` `missing_headers`. Ver
+[gateway](../../gateway/README.md).
 
 ## Resposta
 
@@ -2398,14 +2399,15 @@ Headers: X-Forger-Credential: <credencial>
   "name": "Alice", "email": "alice@acme.com", "roles": ["API_MASTER"], "mcpSessionId": "<uuid>" }
 ```
 
-Use o `accessToken` nas chamadas seguintes: `Authorization: Bearer <token>`. Pela borda, o login leva **um**
-cabeçalho de identificação, `X-Tenant-Id` ou `X-Forger-Credential` ([gateway](../gateway/README.md)).
+Use o `accessToken` nas chamadas seguintes: `Authorization: Bearer <token>`. Pela borda, o login leva
+**`X-Forger-Credential`**, a única credencial da rota de auth; com `X-Tenant-Id` no lugar dele, `401`
+([gateway](../gateway/README.md)).
 
 ## 2. Login externo
 
 ```
 POST /ua/sign-in
-Headers: X-Tenant-Id: <tenant-id>
+Headers: X-Forger-Credential: <credencial>        // X-Tenant-Id aqui dá 401
 { "username": "cliente1", "password": "•••" }
 → 200  { "accessToken": "<token>", "tokenType": "Bearer", ... }   // token inclui os tenants do usuário
 ```
@@ -2671,7 +2673,21 @@ Remove a org. **Papel:** administrador **na org**.
 | `orgName` | nome da org a remover |
 | `orgOwner` | dono da org |
 
-**Resposta:** `200` (sem corpo). `403` se não for administrador.
+**O que é removido:** a organização e os vínculos conta-papel-organização de **todos** os membros, em
+todos os papéis. Não tem volta. **Não** são removidos: as contas dos membros, e os papéis e contas de
+aplicação (`/ua`) cujo dono é a organização — remova-os pelas rotas de `/ua`, vínculo antes do papel.
+
+**Pré-condição: a organização não pode ter recurso no forger** — nenhum projeto e nenhuma conexão de
+banco. Havendo qualquer um dos dois, a resposta é `400` e **nada é removido**. Desmonte antes, na ordem
+de [forger — dataschema, remover](../../forger/endpoints/dataschema.md#remover), depois o projeto e a
+conexão. **Remover a organização é o último passo.**
+
+**Resposta:** `200` (sem corpo). `400` se a organização ainda tem projeto ou conexão de banco no forger.
+`403` se não for administrador. Se não existir organização com esse nome **para esse dono**, a resposta
+também é `200` e nada é removido — confira `orgOwner`.
+
+> Em produção desde 2026-10-02T22:11Z. Até então esta rota respondia `403` a **qualquer** chamada,
+> inclusive do administrador da organização, e nenhuma organização era removida.
 
 <!-- ===== orgid/endpoints/up-conta.md ===== -->
 
@@ -4888,6 +4904,20 @@ modelos expira por tempo — o que os tira do cache é remoção, nunca prazo.
 `DELETE .../dataschema/{dataSchema}` → `200`/`204`. **Bloqueado** enquanto o esquema físico existir
 (há projeções/conteúdo). Ver também a remoção em nível de projeção em [entity.md](entity.md).
 
+**Ordem para desmontar um dataschema:**
+
+1. **`MODELING`** (o `PUT` de [Atualizar](#atualizar)) — o tenant para de operar e os dois modelos saem
+   do cache.
+2. **Remover o esquema físico** — `DELETE /org/{org}/project/{project}/dataschema/{dataSchema}`, em
+   [entity.md](entity.md#endpoints-exaustivo). Exige `MODELING`.
+3. **Este `DELETE`**, que apaga o registro.
+
+**Junto com o registro saem do cache os dois modelos do tenant**: a spec de entidades e o `.model.json`,
+caso ele tenha sido republicado em `MODELING`. Se o cache falhar, a resposta é `500`, **o registro não é
+apagado** e a operação pode ser repetida.
+
+> Em produção desde 2026-10-02T22:11Z; até então este `DELETE` tirava do cache só a spec de entidades.
+
 ## Ciclo de vida
 Metadados + efeito físico (criação de esquema) + geração do `tenant-id`. A partir daqui o sistema tem
 identidade de tenant para comandos/eventos/consultas.
@@ -4915,9 +4945,10 @@ Exigem `Authorization` e papel de administrador/engenheiro em `{org}`.
 Caminho base: `/org/{org}/project/{project}/dataschema/{dataSchema}/entity`.
 
 > **⚠️ Pré-condição de estado — o dataschema precisa estar em `MODELING`.** Criar/alterar/remover entity
-> (e atributos/associações) só é permitido com o dataschema em `MODELING`. Em `RUNNING` o **forger
-> rejeita** alterações de schema. Para editar um sistema já em operação: transite `RUNNING → MODELING`,
-> edite, volte a `RUNNING`. Ver [dataschema — gate de status](dataschema.md#atualizar).
+> (e atributos/associações), **e remover o esquema inteiro**, só é permitido com o dataschema em
+> `MODELING`. Em `RUNNING` o **forger rejeita** alterações de schema. Para editar um sistema já em
+> operação: transite `RUNNING → MODELING`, edite, volte a `RUNNING`. Ver
+> [dataschema — gate de status](dataschema.md#atualizar).
 
 ## Contents
 - Regras de nome (entity, atributo, associação)
@@ -5117,8 +5148,17 @@ legítima em que o segundo artefato ainda não existe.
 | **− Atributo** | `DELETE .../entity/{entity}/attribute/{attribute}` | Remove coluna. | `200` |
 | **− Associação** | `DELETE .../entity/{entity}/association/{association}` | Remove associação. | `200` |
 | **Remover entity** | `DELETE .../entity/{entity}` | `DROP` da tabela de projeção. | `200` |
-| **Remover esquema (projeções)** | `DELETE /org/{org}/project/{project}/dataschema/{dataSchema}` | Remove o conteúdo de projeção do esquema no banco de leitura. | `200` |
+| **Remover esquema (projeções)** | `DELETE /org/{org}/project/{project}/dataschema/{dataSchema}` | Apaga o esquema físico do banco de leitura, com **todas** as tabelas de projeção e os dados delas. Não tem volta. **Exige `MODELING`.** | `200` |
 | **Analisar** | `POST .../entity/{entity}/analyze` | Relatório de impacto de uma mudança (sem aplicar). | `200` |
+
+> **Remover esquema fora de `MODELING` → `400`, e nada é apagado** (vale para `RUNNING` e `SUSPENDED`):
+>
+> ```json
+> 400: DataSchema 'pedidos' está com status 'RUNNING'. Criação/atualização/remoção de entidades, atributos e associações só é permitida com status 'MODELING'.
+> ```
+>
+> Em produção desde 2026-10-02T22:11Z; até então o esquema era apagado em qualquer estado. A ordem
+> completa para desmontar está em [dataschema — remover](dataschema.md#remover).
 
 ## Ciclo de vida (criar/atualizar)
 
@@ -5968,7 +6008,7 @@ críticos retorna também o relatório de análise.)
 
 | HTTP | Significado | Causas típicas | Correção |
 |---|---|---|---|
-| `400` | Requisição inválida | Campo obrigatório ausente (`_conf`, `logversion`); `type` de atributo fora da lista fechada ou em minúsculas; valor fora do formato (nome em minúsculas, comprimento, porta > 0); documento de modelo sem seção de agregado; **volta a `RUNNING` sem o `.model.json` publicado**; **projeção que não confere com o modelo de escrita** (ver abaixo). | Corrigir o corpo conforme o contrato do endpoint. No caso da transição, republicar o modelo — ver [dataschema](endpoints/dataschema.md#alterar-o-schema-de-um-sistema-em-operação). |
+| `400` | Requisição inválida | Campo obrigatório ausente (`_conf`, `logversion`); `type` de atributo fora da lista fechada ou em minúsculas; valor fora do formato (nome em minúsculas, comprimento, porta > 0); documento de modelo sem seção de agregado; **volta a `RUNNING` sem o `.model.json` publicado**; **projeção que não confere com o modelo de escrita** (ver abaixo); **remover o esquema com o dataschema fora de `MODELING`**. | Corrigir o corpo conforme o contrato do endpoint. No caso da transição, republicar o modelo — ver [dataschema](endpoints/dataschema.md#alterar-o-schema-de-um-sistema-em-operação). Para remover o esquema, transitar para `MODELING` antes — ver [dataschema — remover](endpoints/dataschema.md#remover). |
 | `403` | Acesso negado | Sem papel de administrador/engenheiro na organização; inconsistência de propriedade (`org`/`project`/`tenant`). | Usar credencial autorizada; conferir que o tenant pertence ao contexto. |
 | `404` | Não encontrado | Recurso inexistente; `tenant` não referencia dataschema do contexto. | Verificar a ordem de deploy e os identificadores. |
 | `409` | Conflito de versão | `logversion` divergente do atual (alguém atualizou antes); ou remoção bloqueada por dependentes. | Reler o recurso, reenviar com o `logversion` atual; remover dependentes antes. |
@@ -9271,7 +9311,7 @@ não diz **como se vê** (isso é o miolo).
   org), e `valueKey` é a chave do alvo que o atributo guarda. Vem também em `valueObjects[].fields`.
   **Ausente** quando o modelo não declara. Nome e busca se pedem a `api.refs`, e o `options` por referência
   do manifesto vale só onde não há `ref`. Ver
-  [bff — declarada no modelo](../bff/README.md#declarada-no-modelo-references-pedida-e-ainda-não-em-vigor).
+  [bff — declarada no modelo](../bff/README.md#declarada-no-modelo-references).
 - **`attributes[].role`** — classificação que guia a apresentação:
   - `input` — campo editável comum.
   - `status` — campo de transição/concorrência (não é entrada do usuário).
@@ -9320,6 +9360,28 @@ não diz **como se vê** (isso é o miolo).
 > e conferir. A **forma** do arquivo e o que a publicação recusa estão em
 > [forger — manifesto de apresentação](../forger/endpoints/presentation.md); o que a casca entrega ao
 > miolo, em [contrato-miolo](contrato-miolo.md). Pré: [README](README.md).
+
+## Receita: do id ao nome
+
+Para a tela mostrar **nome** onde o registro guarda o **id** de outro agregado, e pedir **busca** em vez de
+id colado, são três declarações e duas publicações:
+
+1. **No `.model.json` de quem aponta**, diga para onde o atributo aponta, com `references` no nível do
+   agregado:
+   `"references": { "teacherid": "cadastro.professor" }` quando o alvo está no **mesmo modelo**, ou
+   `"references": { "teacherid": "cadastro.cadastro.professor" }` (`<projeto>.<bc>.<tipo>`) quando está em
+   **outro projeto do mesmo org**. Forma e recusas:
+   [forger — `references`](../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references).
+2. **No manifesto do agregado APONTADO**, diga qual atributo é o nome dele: `"titleKey": "fullname"`. Sem
+   isso a tela usa o `identity.fields` do modelo dele e, por fim, o primeiro texto que ele declara.
+3. **No manifesto de quem aponta**, dê o rótulo do campo: `"labels": { "teacherid": "Professor" }`. Sem
+   isso o campo aparece como "Teacherid".
+4. **Publique o modelo, depois o manifesto** ([Como publicar e conferir](#como-publicar-e-conferir)) e abra
+   o agregado de novo no menu.
+
+O que muda na tela está em [Referência a outro agregado](#referência-a-outro-agregado). Se aparecer "sem
+acesso", o usuário não tem o tenant do alvo no token ou não tem papel de leitura nele; "não encontrado", o
+id não está na projeção do alvo.
 
 ## Por que escrever um
 
@@ -9384,9 +9446,10 @@ monoespaçada. `fmt` serve sobretudo para **dinheiro** e **telefone**, que o tip
 
 ### Referência a outro agregado
 
-`options` na forma `{ aggregate, valueKey, labelKey }` declara que o campo **aponta outro agregado**: a aula
-aponta o professor; o aluno, nas matrículas, aponta o plano. É a **única** declaração, e a tela deriva o
-resto:
+O campo **aponta outro agregado** quando o modelo o declara em `references` (a forma recomendada, ver a
+[receita](#receita-do-id-ao-nome)) ou quando o manifesto traz `options` na forma
+`{ aggregate, valueKey, labelKey }`. A aula aponta o professor; o aluno, nas matrículas, aponta o plano. A
+tela deriva o resto:
 
 - **onde se vê** — tabela, cartão, aba Dados, histórico (antes → depois), título, cópia e filtro mostram o
   **nome** do registro apontado, e não o id. A exportação leva as duas coisas: a coluna do id e, ao lado,
@@ -9400,19 +9463,17 @@ resto:
   acesso" (o papel não lê o agregado apontado) ou "rótulo indisponível" (falha, registrada no diagnóstico).
   **O seletor não aceita texto livre**: se a lista não vem, o erro aparece no campo.
 
-**A declaração vai para o modelo.** Referência é fato do domínio: a chave `references` do `.model.json`
-(**ainda não em vigor**; a forma em
-[model-format — `references`](../persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado),
-o que o BFF faz com ela em
-[bff — declarada no modelo](../bff/README.md#declarada-no-modelo-references-pedida-e-ainda-não-em-vigor)) passa a
-valer sobre este `options` e alcança **outro projeto** do mesmo org pelo endereço `"<projeto>.<bc>.<tipo>"`,
-como a aula da agenda apontando o professor do cadastro. `"<bc>.<tipo>"` fica no próprio modelo. Até lá, o
-`options` por referência é a forma que vale, e só no mesmo modelo.
+**Duas formas de declarar, e qual usar.**
 
-Quem resolve é o BFF ([bff — referência entre agregados](../bff/README.md#referência-entre-agregados-sessionrefs)),
-com o token de quem usa a tela. Duas regras de forma: o agregado apontado tem de estar **no mesmo modelo**
-(é o que a publicação confere), e a referência vive em **atributo ou `grupo.campo`**, nunca dentro de um
-valor `Json`, onde a tela não tem o que interpretar.
+| Forma | Onde | Alcança | Quando usar |
+|---|---|---|---|
+| `references` | `.model.json`, nível do agregado | o próprio modelo (`<bc>.<tipo>`) e outro projeto do org (`<projeto>.<bc>.<tipo>`) | **sempre que puder**: é fato do domínio e vale também para cliente sem tela |
+| `options` por referência | manifesto | só o mesmo modelo | quando não se pode republicar o modelo, ou para fixar um `labelKey` diferente do `titleKey` do alvo |
+
+Para o mesmo atributo, `references` vale sobre o `options`. Quem resolve é o BFF
+([bff — referência entre agregados](../bff/README.md#referência-entre-agregados-sessionrefs)), com o token de
+quem usa a tela. A referência vive em **atributo ou `grupo.campo`**, nunca dentro de um valor `Json`, onde a
+tela não tem o que interpretar.
 
 ## Exemplo
 
@@ -9458,7 +9519,8 @@ valor `Json`, onde a tela não tem o que interpretar.
 - [ ] A chave do agregado é a do `.model.json`, e todo atributo citado existe no modelo publicado.
 - [ ] `singular` em minúsculas; `plural` com inicial maiúscula; `genero: "feminino"` quando o nome é feminino.
 - [ ] `titleKey` é um atributo que identifica o registro para uma pessoa — é também o nome dele onde outro agregado o aponta.
-- [ ] Todo campo que guarda o id de outro agregado tem `options` por referência: sem ela, a tela mostra e pede o id.
+- [ ] Todo campo que guarda o id de outro agregado está em `references` no modelo (ou tem `options` por referência): sem isso, a tela mostra e pede o id.
+- [ ] Todo agregado que é apontado por outro tem `titleKey`.
 - [ ] Todo atributo que aparece na tela tem `labels`; todo estado tem `stateLabels`.
 - [ ] Dinheiro em centavos usa `money:2`; telefone usa `phone`.
 - [ ] `cols` tem de 4 a 6 atributos, sem `status` e sem campo técnico.
@@ -10147,17 +10209,16 @@ rótulo.
   publicação do manifesto aceita. Fora dele: `estado: "sem-tenant"` nos rótulos e `422` na busca.
   **Referência dentro de um valor `Json` não se resolve**: só atributo ou `grupo.campo`.
 
-### Declarada no modelo: `references`, pedida e ainda não em vigor
+<a id="declarada-no-modelo-references-pedida-e-ainda-não-em-vigor"></a>
+### Declarada no modelo: `references`
 
-> **Estado em 2026-09-29:** a **forma** está no
-> [formato do modelo](../persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado)
-> (1.87), e é ela que vale se esta seção divergir. O forger já confere a chave em `develop`
-> (`forger@2ab9b8d`, [recusas](../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references)),
-> **mas ainda não em produção**. **O BFF lê a chave no ar em stager desde 2026-09-29T19:04Z** (yc.app
-> `56f3cd9`); sem a declaração no modelo, vale o `options` por referência do manifesto, só no mesmo tenant.
-> Enquanto o forger de produção não confere a chave, declará-la é **por conta de quem publica**: um
-> endereço errado só aparece na tela, como `sem-tenant`, `sem-acesso` ou `erro`. Esta seção diz **o que o
-> BFF faz** com ela.
+> **Em vigor.** O BFF lê a chave desde 2026-09-29T19:04Z (yc.app `56f3cd9`), e a publicação a confere
+> ([forger — `references`](../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references)). A
+> **forma** autoritativa é a do
+> [formato do modelo](../persistence-crs/spec/model-format.md#references--o-atributo-que-aponta-outro-agregado);
+> esta seção diz **o que o BFF faz** com ela. Sem a declaração no modelo, vale o `options` por referência
+> do manifesto, só no mesmo tenant. Passo a passo de quem modela:
+> [shell — do id ao nome](../shell/apresentacao.md#receita-do-id-ao-nome).
 
 A referência é **fato do domínio**: declara-se no `.model.json`, no nível do agregado, irmã de `command` e
 `event`, e vale para qualquer consumidor, com tela ou sem.
@@ -10781,9 +10842,13 @@ Qual dos dois depende da rota:
 
 | Rota | Exige |
 |---|---|
-| rotas de autenticação (`/auth/`) | **um dos dois**, à sua escolha |
-| rotas de execução — persistência, coordenação, arquivos | **`X-Tenant-Id`** |
+| rotas de autenticação (`/auth/`) | **`X-Forger-Credential`**, e só ele |
+| rotas de execução — persistência, coordenação, arquivos, assinatura de eventos | **`X-Tenant-Id`** |
 | demais rotas | **`X-Forger-Credential`** |
+
+> **`X-Tenant-Id` numa rota de autenticação é recusado com `401` de corpo vazio.** A credencial que a
+> borda confere em `/auth/` é a do `X-Forger-Credential`; o tenant, ali, não a substitui. Até a revisão
+> 1.101 este guia dizia "um dos dois, à sua escolha" — estava errado. Ver [erros.md](erros.md#401--falta-o-cabeçalho-de-identificação).
 
 > **O erro mais comum é mandar os dois.** A intuição de "mando os dois e deixo o servidor escolher"
 > falha aqui: a borda recusa com `400`. Ver [erros.md](erros.md#400).
@@ -10875,9 +10940,15 @@ foi a borda. Nenhum serviço os emite.
 
 | Situação | Correção |
 |---|---|
-| não veio nem `X-Tenant-Id` nem `X-Forger-Credential` | mande **um** dos dois |
-| rota de execução sem `X-Tenant-Id` | rotas de persistência, coordenação e arquivos exigem `X-Tenant-Id` |
+| não veio nem `X-Tenant-Id` nem `X-Forger-Credential` | mande **o** que a rota exige |
+| rota de execução sem `X-Tenant-Id` | rotas de persistência, coordenação, arquivos e assinatura de eventos exigem `X-Tenant-Id` |
 | rota administrativa sem `X-Forger-Credential` | as demais rotas exigem `X-Forger-Credential` |
+| **rota de autenticação (`/auth/`) com `X-Tenant-Id`** no lugar de `X-Forger-Credential` | `/auth/` exige `X-Forger-Credential`; troque o cabeçalho |
+| `X-Forger-Credential` com valor que **não é** o da credencial | conferir o valor: ter a forma certa não basta |
+
+> **As duas últimas linhas chegam de corpo vazio e sem `X-Blocked-*`** — medido em 2026-10-01. Não leia
+> a ausência desses cabeçalhos como "o serviço respondeu": o serviço de destino **não foi chamado**.
+> Já o `401` de nenhum cabeçalho traz o motivo no corpo e em `X-Blocked-Reason`.
 
 Ver a tabela de qual rota exige qual em [README.md](README.md#cabeçalhos-de-identificação--exatamente-um-nunca-dois).
 
@@ -11015,6 +11086,18 @@ Rota administrativa → `X-Forger-Credential`:
 curl "$BORDA/v3/forger/..." \
   -H "X-Forger-Credential: <credencial>"
 ```
+
+Rota de autenticação → **também** `X-Forger-Credential`, nunca `X-Tenant-Id`:
+
+```bash
+curl -X POST "$BORDA/v3/auth/..." \
+  -H "Content-Type: application/json" \
+  -H "X-Forger-Credential: <credencial>" \
+  -d '{ }'
+```
+
+Com `X-Tenant-Id` no lugar, a borda devolve **`401` de corpo vazio**, sem `X-Blocked-*`, e o serviço de
+autenticação não é chamado.
 
 ## Os dois cabeçalhos juntos — recusado
 
@@ -11339,6 +11422,63 @@ O usuário abre um relato novo.
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.106 — 2026-10-04
+
+- **Do id ao nome: receita única, e `references` deixa de constar como "ainda não em vigor"**
+  (`shell/apresentacao.md` §Receita: do id ao nome e §Referência a outro agregado; `bff/README.md` §Declarada
+  no modelo). A fatia do BFF e a de apresentação ainda diziam que a chave não valia, embora o BFF a leia e o
+  forger a confira desde 2026-09-29. Entra o passo a passo de quem modela: `references` no modelo de quem
+  aponta, `titleKey` no manifesto do apontado, `labels` no de quem aponta, e a ordem de publicação. Entra
+  também a tabela de quando usar `references` e quando usar o `options` por referência. A âncora antiga da
+  seção do BFF continua valendo.
+
+## 1.105 — 2026-10-02
+
+- **Forger e orgid: remover esquema e remover organização em produção desde 2026-10-02T22:11Z**
+  (`forger/endpoints/entity.md`, `forger/endpoints/dataschema.md`, `orgid/endpoints/up-organizacao.md`).
+  As mudanças da 1.103 e da 1.104 foram implantadas (`forger 75935c2`, `orgid 70e84f5`). Saem os três
+  avisos de "ainda não está em produção"; fica a data a partir da qual cada regra vale. Na implantação
+  foi conferido que subiram as classes alteradas; a remoção de uma organização e a recusa `400` do
+  esquema fora de `MODELING` ainda não foram exercitadas em produção.
+
+## 1.104 — 2026-10-02
+
+- **Orgid: remover organização — o que é removido, a recusa `400` e o estado em produção**
+  (`orgid/endpoints/up-organizacao.md` §DELETE; `orgid/openapi.yaml`). A página só dizia "remove a org".
+  Passa a dizer que saem a organização e os vínculos de todos os membros, que papéis e contas de aplicação
+  não saem, e que a organização com projeto ou conexão de banco no forger é recusada com `400`. A rota
+  nunca funcionou: respondia `403` a qualquer chamada, medido em produção em 2026-10-02. **Ainda não está
+  em produção**: correção em `orgid 70e84f5` e `forger 75935c2`, vale quando a infra implantar; a página
+  diz, com data, o que a versão no ar faz até lá.
+
+## 1.103 — 2026-10-02
+
+- **Forger: remover o esquema exige `MODELING`, e apagar o registro leva os dois modelos do cache**
+  (`forger/endpoints/entity.md` §Pré-condição e §Endpoints; `forger/endpoints/dataschema.md` §Remover;
+  `forger/erros.md` §400). `DELETE /org/{org}/project/{project}/dataschema/{dataSchema}` era a única
+  alteração de schema aceita fora de `MODELING`; passa a responder `400` em `RUNNING` e `SUSPENDED`, sem
+  apagar nada. O `DELETE` do registro passa a tirar do cache também o `.model.json`, não só a spec de
+  entidades. Entra a ordem para desmontar um dataschema. Rotas e corpos não mudam. **Ainda não está em
+  produção**: código em `forger 7f24982`, vale quando a infra implantar; as duas páginas dizem o que a
+  versão no ar faz até lá.
+
+## 1.102 — 2026-10-01
+
+- **Borda: rota de autenticação exige só `X-Forger-Credential`; assinatura de eventos entra nas rotas de execução**
+  (`gateway/README.md` §Cabeçalhos de identificação; `gateway/erros.md` §401; `gateway/exemplos.md`). O guia da
+  borda dizia que `/auth/` aceitava "um dos dois, à sua escolha"; com `X-Tenant-Id` a borda responde `401` de
+  corpo vazio, sem `X-Blocked-*`, e o serviço de autenticação não é chamado — o mesmo vale para
+  `X-Forger-Credential` com valor que não é o da credencial. Medido na borda em 2026-10-01. Completa, do lado da
+  borda, a correção da 1.101. A assinatura de eventos (`/v3/es/…`) passa a constar entre as rotas que exigem
+  `X-Tenant-Id`.
+
+## 1.101 — 2026-10-01
+
+- **Login: só `X-Forger-Credential`** (`auth/endpoints/sign-in.md` §Cabeçalhos; `auth/exemplos.md` §1 e §2). A
+  doc dizia que o login aceitava `X-Tenant-Id` **ou** `X-Forger-Credential`, e o exemplo do login externo usava
+  `X-Tenant-Id` — que responde `401`. A rota de auth exige `X-Forger-Credential` como única credencial; decisão
+  do dono em 2026-10-01. Erro relatado pelo conceptnatal, medido em produção por ele.
 
 ## 1.100 — 2026-10-01
 

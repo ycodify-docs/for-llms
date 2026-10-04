@@ -2,6 +2,72 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.107 — 2026-10-04
+
+- **Forger: do modelo ao manifesto, e do id ao nome, com o caminho até a receita**
+  (`forger/README.md` após o índice de endpoints; `forger/endpoints/model.md` após a tabela de recusas da
+  publicação e na seção `references`). Quem publica o modelo passa a ler que o manifesto de apresentação
+  se publica depois dele, e que, para um id de outro agregado aparecer como nome, o passo a passo está em
+  `shell/apresentacao.md#receita-do-id-ao-nome`. Só o ponteiro: o texto da receita continua na fatia do
+  yc.app, e não se repete aqui.
+
+## 1.106 — 2026-10-04
+
+- **Do id ao nome: receita única, e `references` deixa de constar como "ainda não em vigor"**
+  (`shell/apresentacao.md` §Receita: do id ao nome e §Referência a outro agregado; `bff/README.md` §Declarada
+  no modelo). A fatia do BFF e a de apresentação ainda diziam que a chave não valia, embora o BFF a leia e o
+  forger a confira desde 2026-09-29. Entra o passo a passo de quem modela: `references` no modelo de quem
+  aponta, `titleKey` no manifesto do apontado, `labels` no de quem aponta, e a ordem de publicação. Entra
+  também a tabela de quando usar `references` e quando usar o `options` por referência. A âncora antiga da
+  seção do BFF continua valendo.
+
+## 1.105 — 2026-10-02
+
+- **Forger e orgid: remover esquema e remover organização em produção desde 2026-10-02T22:11Z**
+  (`forger/endpoints/entity.md`, `forger/endpoints/dataschema.md`, `orgid/endpoints/up-organizacao.md`).
+  As mudanças da 1.103 e da 1.104 foram implantadas (`forger 75935c2`, `orgid 70e84f5`). Saem os três
+  avisos de "ainda não está em produção"; fica a data a partir da qual cada regra vale. Na implantação
+  foi conferido que subiram as classes alteradas; a remoção de uma organização e a recusa `400` do
+  esquema fora de `MODELING` ainda não foram exercitadas em produção.
+
+## 1.104 — 2026-10-02
+
+- **Orgid: remover organização — o que é removido, a recusa `400` e o estado em produção**
+  (`orgid/endpoints/up-organizacao.md` §DELETE; `orgid/openapi.yaml`). A página só dizia "remove a org".
+  Passa a dizer que saem a organização e os vínculos de todos os membros, que papéis e contas de aplicação
+  não saem, e que a organização com projeto ou conexão de banco no forger é recusada com `400`. A rota
+  nunca funcionou: respondia `403` a qualquer chamada, medido em produção em 2026-10-02. **Ainda não está
+  em produção**: correção em `orgid 70e84f5` e `forger 75935c2`, vale quando a infra implantar; a página
+  diz, com data, o que a versão no ar faz até lá.
+
+## 1.103 — 2026-10-02
+
+- **Forger: remover o esquema exige `MODELING`, e apagar o registro leva os dois modelos do cache**
+  (`forger/endpoints/entity.md` §Pré-condição e §Endpoints; `forger/endpoints/dataschema.md` §Remover;
+  `forger/erros.md` §400). `DELETE /org/{org}/project/{project}/dataschema/{dataSchema}` era a única
+  alteração de schema aceita fora de `MODELING`; passa a responder `400` em `RUNNING` e `SUSPENDED`, sem
+  apagar nada. O `DELETE` do registro passa a tirar do cache também o `.model.json`, não só a spec de
+  entidades. Entra a ordem para desmontar um dataschema. Rotas e corpos não mudam. **Ainda não está em
+  produção**: código em `forger 7f24982`, vale quando a infra implantar; as duas páginas dizem o que a
+  versão no ar faz até lá.
+
+## 1.102 — 2026-10-01
+
+- **Borda: rota de autenticação exige só `X-Forger-Credential`; assinatura de eventos entra nas rotas de execução**
+  (`gateway/README.md` §Cabeçalhos de identificação; `gateway/erros.md` §401; `gateway/exemplos.md`). O guia da
+  borda dizia que `/auth/` aceitava "um dos dois, à sua escolha"; com `X-Tenant-Id` a borda responde `401` de
+  corpo vazio, sem `X-Blocked-*`, e o serviço de autenticação não é chamado — o mesmo vale para
+  `X-Forger-Credential` com valor que não é o da credencial. Medido na borda em 2026-10-01. Completa, do lado da
+  borda, a correção da 1.101. A assinatura de eventos (`/v3/es/…`) passa a constar entre as rotas que exigem
+  `X-Tenant-Id`.
+
+## 1.101 — 2026-10-01
+
+- **Login: só `X-Forger-Credential`** (`auth/endpoints/sign-in.md` §Cabeçalhos; `auth/exemplos.md` §1 e §2). A
+  doc dizia que o login aceitava `X-Tenant-Id` **ou** `X-Forger-Credential`, e o exemplo do login externo usava
+  `X-Tenant-Id` — que responde `401`. A rota de auth exige `X-Forger-Credential` como única credencial; decisão
+  do dono em 2026-10-01. Erro relatado pelo conceptnatal, medido em produção por ele.
+
 ## 1.100 — 2026-10-01
 
 - **Leitura de agregado: papel fora de `roles.read` responde `403`, não `204`** (`persistence-crs/endpoints/agregado-leitura.md`

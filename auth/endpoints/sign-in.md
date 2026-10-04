@@ -15,8 +15,9 @@ Corpo (JSON):
 | `password` | string | sim | Senha. |
 
 Cabeçalhos: `Content-Type: application/json`. **Não** exige `Authorization` (é o login). Pela borda, exige
-**um** cabeçalho de identificação — `X-Tenant-Id` **ou** `X-Forger-Credential`, nunca os dois; sem nenhum,
-`401` `missing_headers`. Ver [gateway](../../gateway/README.md).
+**`X-Forger-Credential`** — é a **única** credencial da rota de auth, e não há alternativa. Com `X-Tenant-Id` no
+lugar dele, o login responde `401` de corpo vazio; sem nenhum dos dois, `401` `missing_headers`. Ver
+[gateway](../../gateway/README.md).
 
 ## Resposta
 
