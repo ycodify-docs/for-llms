@@ -59,7 +59,7 @@ verificam para autorizar. Ver [fluxo de deploy](../03-fluxo-de-deploy.md) e [coo
 
 | Prefixo | Domínio | Para quê |
 |---|---|---|
-| `/up` | **plataforma** | organizações, contas e contratos dos **clientes/parceiros** que operam a plataforma (papéis `API_*`). |
+| `/up` | **plataforma** | organizações, contas e contratos dos **clientes/parceiros** que operam a plataforma (papéis `API_*` e `SKOS_*`). |
 | `/ua` | **externo** | contas e papéis dos **usuários finais** dos sistemas construídos sobre a plataforma (papéis com **espaço de nomes** por dono). |
 | `/open` | **público** | endpoints **sem autenticação por design** (registro, recuperação de senha, verificação de existência). |
 
@@ -70,6 +70,12 @@ verificam para autorizar. Ver [fluxo de deploy](../03-fluxo-de-deploy.md) e [coo
 - **Autorização (RBAC):** papéis da plataforma — **administrador** (`API_MASTER`), **engenheiro**
   (`API_ENGINEER`), **analista** (`API_ANALYST`), **financeiro** (`API_FINANCIAL`). A autorização é
   **escopada por organização**: o portador precisa do papel **naquela** organização. Falta de papel → `403`.
+- **Papéis `SKOS_MASTER` e `SKOS_ANALYST`:** também são papéis de conta de plataforma numa organização,
+  comuns a mais de um módulo que roda sobre a plataforma (a base de conhecimento, `yc.kb`, e o KORC). O
+  orgid os atribui e o token os carrega; o que permitem é definido por quem os lê. No orgid, abrem só a
+  leitura da própria conta e a suspensão do próprio vínculo e, para `SKOS_MASTER`, a listagem das contas
+  da organização e a gestão de `SKOS_ANALYST`. Quem atribui cada um:
+  [endpoints/up-associacao.md](endpoints/up-associacao.md).
 - **Sem `X-Tenant-Id`:** orgid identifica pelo **token** e pelos parâmetros de caminho
   (`{orgName}`/`{orgOwner}`); não usa o cabeçalho de tenant dos serviços de dados.
 
@@ -79,7 +85,7 @@ verificam para autorizar. Ver [fluxo de deploy](../03-fluxo-de-deploy.md) e [coo
 |---|---|
 | **organização (org)** | Unidade de propriedade/escopo. Tem `name` (único), **`client`** (nome da empresa cliente, obrigatório na criação, ≤12), `alias`, `owner`, `status`. O `name` é o `{org}` usado nos caminhos do forger. |
 | **conta (account)** | Usuário. Domínio `/up` (plataforma) ou `/ua` (externo). Tem `username`, `email`, `status`. |
-| **papel (role)** | Permissão nomeada. Em `/up` são papéis fixos `API_*`; em `/ua` são papéis com **dono** (`owner`) e visibilidade (`ispublic`). |
+| **papel (role)** | Permissão nomeada. Em `/up` são papéis fixos (`API_*` e `SKOS_*`); em `/ua` são papéis com **dono** (`owner`) e visibilidade (`ispublic`). |
 | **associação conta-papel-org** | Vínculo tripla (conta × papel × organização) — base do multi-tenant/autorização no domínio `/up`. Em `/ua`, vínculo **conta-papel**. |
 | **contrato** | Assinatura/plano de uma organização (`status`, validade, plano). |
 
@@ -130,6 +136,6 @@ Ver [coordenação](../coordenacao.md).
 - [ ] Criar **organização + conta dona** (orgid) **antes** de usar o forger sob aquela org.
 - [ ] Enviar `Authorization` em `/up`/`/ua`; `/open/*` é público (não enviar token não é erro lá).
 - [ ] Autorização é **por organização** — ter o papel numa org não dá poder em outra.
-- [ ] Distinguir domínios: `/up` (plataforma, papéis `API_*`) vs `/ua` (externo, papéis com dono).
+- [ ] Distinguir domínios: `/up` (plataforma, papéis `API_*` e `SKOS_*`) vs `/ua` (externo, papéis com dono).
 - [ ] Senha nunca volta nas respostas; recuperação é via fluxo de **hash** (`/open/*`).
 - [ ] `name` da organização é o `{org}` dos caminhos do forger — escolha-o cedo e mantenha.

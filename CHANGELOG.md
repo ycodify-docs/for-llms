@@ -2,6 +2,21 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.108 — 2026-10-07
+
+- **Orgid: papéis `SKOS_MASTER` e `SKOS_ANALYST` de conta de plataforma, e o corpo real das rotas de status**
+  (`orgid/README.md`; `orgid/endpoints/up-associacao.md`; `orgid/endpoints/up-conta.md`;
+  `orgid/endpoints/publico.md` §POST /open/up/account; `orgid/exemplos.md` §8; `orgid/openapi.yaml`).
+  Entram os dois papéis, comuns a mais de um módulo que roda sobre a plataforma: quem atribui cada um (o
+  dono da organização atribui `SKOS_MASTER`; quem tem `SKOS_MASTER` ativo nela atribui e suspende
+  `SKOS_ANALYST`, informando `org.owner`), o que abrem no orgid (a leitura da própria conta e, para
+  `SKOS_MASTER`, a listagem das contas da organização) e o campo opcional `role` do registro, que soma ao
+  papel de administradora. **Ainda não está em produção**: `orgid 9e58fd9`, vale quando a infra implantar;
+  cada trecho leva o aviso. Duas correções do que a página de associação já dizia, conferidas contra o
+  código (`orgid 70e84f5`): a lista de papéis de `POST /up/account-role-org` citava `API_MASTER`, que a
+  rota recusa, e omitia `API_GUEST`, que ela aceita; e as duas rotas de status pediam `status`, quando o
+  corpo exige `accountStatus` (e `orgStatus` no `by-master`) e `org.owner`.
+
 ## 1.107 — 2026-10-04
 
 - **Forger: do modelo ao manifesto, e do id ao nome, com o caminho até a receita**
