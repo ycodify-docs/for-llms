@@ -1,12 +1,14 @@
 # monitor — exemplos de relato
 
-Chamadas do BFF pela borda. `<chave>` é a credencial de serviço do BFF, que nunca é escrita em código.
-Todas as chamadas levam os mesmos cabeçalhos do relator ([endpoints](endpoints/relatos.md#cabeçalhos)).
+Chamadas de um serviço chamador pela borda; aqui, o BFF. `<chave>` é a credencial de serviço dele, e
+`<credencial da borda>` é a que a borda exige. Nenhuma das duas é escrita em código.
+Todas as chamadas levam os mesmos cabeçalhos ([endpoints](endpoints/relatos.md#cabeçalhos)).
 
 ## Criar um relato
 
 ```http
 POST /v3/monitor/suporte/v1/relatos
+X-Forger-Credential: <credencial da borda>
 X-Monitor-Client-Key: <chave>
 X-Relator-Username: maria
 X-Relator-Org: acme

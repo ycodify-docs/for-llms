@@ -1,28 +1,33 @@
 # monitor — endpoints de relato
 
-> Base pela borda: **`/v3/monitor/suporte/v1`**. Quem chama é **o BFF**, nunca o browser. Corpo e respostas
-> em JSON (UTF-8). Todas as rotas exigem os cabeçalhos abaixo. Guia: [monitor](../README.md).
+> Base pela borda: **`/v3/monitor/suporte/v1`**. Quem chama é **um serviço com credencial própria**
+> ([quais](../README.md#mais-de-um-chamador)), nunca o browser. Corpo e respostas em JSON (UTF-8). Todas as
+> rotas exigem os cabeçalhos abaixo. Guia: [monitor](../README.md).
 
 ## Cabeçalhos
 
 | Cabeçalho | Obrigatório | O que é |
 |---|---|---|
-| `X-Monitor-Client-Key` | sim | credencial de serviço do chamador. A infra entrega o valor à configuração do BFF, e ele **nunca** passa por código, documento ou mensagem. O monitor guarda só um resumo criptográfico dela. |
-| `X-Relator-Username` | sim | o usuário da sessão. É por ele que cada rota alcança **só os relatos daquele usuário**. |
+| `X-Monitor-Client-Key` | sim | credencial de serviço do chamador, uma para cada chamador. A infra entrega o valor à configuração do chamador, e ele **nunca** passa por código, documento ou mensagem. O monitor guarda só um resumo criptográfico dela. |
+| `X-Relator-Username` | sim | o usuário da sessão do chamador. É por ele que cada rota alcança **só os relatos daquele usuário**. |
 | `X-Relator-Org` | não | o nome da organização do relator ([quem enxerga](../README.md#quem-na-equipe-enxerga-o-relato)) |
 | `X-Relator-Tenant` | não | o tenant do relator |
-| `X-Request-Id` | não | o id da chamada no BFF; fica gravado no relato e nas mensagens do usuário |
+| `X-Request-Id` | não | o id da chamada no chamador; fica gravado no relato e nas mensagens do usuário |
 
 - credencial ausente ou inválida → `401`;
 - `X-Relator-Username` ausente → `400`;
 - corpo acima de **256 KB** → `413`, antes de qualquer leitura.
 
-A borda aplica também um teto próprio por serviço
+Pela borda, a chamada leva também o **cabeçalho de identificação da borda**, que nesta rota é
+`X-Forger-Credential` ([borda](../../gateway/README.md#cabeçalhos-de-identificação--exatamente-um-nunca-dois)).
+Sem ele a borda responde `401`, e a chamada não chega ao monitor
+([gateway/erros.md](../../gateway/erros.md#401--falta-o-cabeçalho-de-identificação)). A borda aplica também um
+teto próprio de corpo por serviço
 ([gateway/erros.md](../../gateway/erros.md#413--corpo-ou-cabeçalhos-grandes-demais)).
 
 ## POST /relatos — criar
 
-A carga é a que a casca monta:
+A carga tem a mesma forma para qualquer chamador. Esta é a que a casca monta:
 
 ```jsonc
 {
@@ -33,6 +38,9 @@ A carga é a que a casca monta:
   "diagnostico": { "formato": 1 }            // opcional; objeto de até 64 KB (forma: shell/seguranca.md)
 }
 ```
+
+O `formato` 1 é o diagnóstico da casca. Outro chamador manda outro inteiro em `formato`, com a carga que
+quiser dentro do teto ([o que o monitor faz com ela](../README.md#o-que-o-monitor-faz-com-o-conteúdo)).
 
 Resposta `201`:
 
@@ -85,7 +93,7 @@ consulta à organização escolhida, como no resto da tela do monitor.
 | Rota | O que faz |
 |---|---|
 | `GET /relatos?estado=` | a fila, com `username`, `org`, `tenantId` e o `naoLido` da equipe |
-| `GET /relatos/{id}` | o relato completo, com o diagnóstico |
+| `GET /relatos/{id}` | o relato completo, com o diagnóstico e o chamador que o gravou (`cliente`) |
 | `POST /relatos/{id}/mensagens` | resposta da equipe → `RESPONDIDO` |
 | `POST /relatos/{id}/fechar` | `FECHADO`; fechar de novo → `409` |
 | `POST /relatos/{id}/lido` | marca como lido pela equipe |
