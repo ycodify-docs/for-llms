@@ -93,7 +93,7 @@
 - [Exemplos](gateway/exemplos.md): requisição bem formada, o erro comum de mandar os dois cabeçalhos, e como inspecionar a resposta para saber a origem do erro.
 
 ## monitor (relatos de suporte) — atendimento aos usuários da aplicação
-- [Guia](monitor/README.md): quem grava (o BFF, com credencial de serviço) e quem atende (a equipe, pela tela do monitor); estados do relato, não lido, o que o servidor faz com o texto e o diagnóstico, retenção contada do fechamento, e como a organização do relator decide quem o vê.
+- [Guia](monitor/README.md): quem grava (um serviço chamador com credencial própria: o BFF, o KORC) e quem atende (a equipe, pela tela do monitor); o que muda com mais de um chamador; estados do relato, não lido, o que o servidor faz com o texto e o diagnóstico, retenção contada do fechamento, e como a organização do relator decide quem o vê.
 - [endpoints de relato](monitor/endpoints/relatos.md) · [Erros](monitor/erros.md) · [Exemplos](monitor/exemplos.md)
 
 ## Exemplos

@@ -2,6 +2,20 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.110 — 2026-10-07
+
+- **monitor: mais de um chamador, e a rota alcançável de fora pela borda** (`monitor/README.md` §Mais de um
+  chamador; `monitor/endpoints/relatos.md` §Cabeçalhos; `monitor/erros.md`; `monitor/exemplos.md`; `llms.txt`).
+  A fatia dizia que só o BFF chamava. Desde 2026-10-07T21:21:47Z o monitor aceita um segundo chamador, o
+  KORC, com credencial de serviço própria, e desde 21:20:13Z `/v3/monitor/suporte/**` é alcançável de fora da
+  rede da plataforma, pela borda. São medições da infra (`infra 66ee1a6`): pela borda, com o cabeçalho de
+  identificação dela e credencial válida, `200`; sem a credencial de serviço, `401` do monitor; sem o
+  cabeçalho da borda, `401` da borda. Entra o que isso muda para quem chama: cada chamador tem a sua
+  credencial, e o relato guarda qual gravou; a credencial não é limitada por usuário, então é o chamador
+  quem garante o relator; o alcance é por usuário e atravessa chamadores; e `formato` 1 é o diagnóstico da
+  casca, com outro número para outro chamador. Conferido contra o código (`monitor 9fac4b6`), que não mudou.
+  Pedido da infra, a mando do dono.
+
 ## 1.109 — 2026-10-07
 
 - **Orgid: papéis `SKOS_MASTER` e `SKOS_ANALYST` em produção desde 2026-10-07T17:06Z**

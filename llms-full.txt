@@ -11285,22 +11285,40 @@ responde, chame um endpoint dele.
 
 # monitor — relatos de suporte (guia)
 
-> **Papel:** guarda os **relatos de suporte** que os usuários da aplicação (casca + BFF) enviam e a
-> **conversa** entre o usuário e a equipe da plataforma sobre cada relato. Quem grava e lê em nome do usuário
-> é o **BFF**, com **credencial de serviço**. Quem atende é a **equipe** (`API_MASTER`/`API_ENGINEER`), pela
-> tela do monitor. O relato **não** vira ticket em outro sistema.
+> **Papel:** guarda os **relatos de suporte** que os usuários enviam e a **conversa** entre o usuário e a
+> equipe da plataforma sobre cada relato. Quem grava e lê em nome do usuário é um **serviço chamador**, com
+> **credencial de serviço** própria: o BFF da aplicação (casca + BFF) e, desde 2026-10-07, o KORC. Quem atende
+> é a **equipe** (`API_MASTER`/`API_ENGINEER`), pela tela do monitor. O relato **não** vira ticket em outro
+> sistema.
 > Pré-requisitos: [conceitos](../02-conceitos.md), [borda](../gateway/README.md), [BFF](../bff/README.md).
 
 ## Quem chama o quê
 
 | Quem | Por onde | Como se identifica | O que alcança |
 |---|---|---|---|
-| **BFF**, em nome do usuário | `/v3/monitor/suporte/v1/…`, pela borda | credencial de serviço + cabeçalhos do relator | só os relatos **daquele usuário** |
+| **Serviço chamador** (o BFF, o KORC), em nome do usuário | `/v3/monitor/suporte/v1/…`, pela borda | credencial de serviço própria + cabeçalhos do relator | só os relatos **daquele usuário** |
 | **Equipe da plataforma** | tela do monitor | token de acesso com `API_MASTER` ou `API_ENGINEER` | os relatos **da própria organização**; o operador vê todos |
 
-**O browser nunca fala com o monitor.** O relator não se declara: o BFF tira da sessão, no servidor, o
-usuário, a organização e o tenant, e os manda em cabeçalhos
+**O browser nunca fala com o monitor.** O relator não se declara: o serviço chamador tira da própria sessão,
+no servidor, o usuário, a organização e o tenant, e os manda em cabeçalhos
 ([endpoints](endpoints/relatos.md#cabeçalhos)). **Campos com esses nomes no corpo são ignorados.**
+
+## Mais de um chamador
+
+Desde 2026-10-07 o monitor tem dois chamadores, o BFF e o KORC, e pode ter outros. O que isso muda:
+
+- **Cada chamador tem a própria credencial de serviço.** O relato guarda qual delas o gravou, e a equipe vê
+  esse nome no relato (campo `cliente`). O usuário não o vê.
+- **A rota é alcançável de fora da rede da plataforma, pela borda**, desde 2026-10-07. O chamador não precisa
+  rodar dentro da plataforma. Pela borda, ele manda também o cabeçalho de identificação que ela exige
+  ([endpoints](endpoints/relatos.md#cabeçalhos)).
+- **A credencial não é limitada por usuário.** Quem a tem grava e lê em nome de qualquer usuário, porque o
+  monitor confia no que o chamador diz nos cabeçalhos. Por isso o chamador tira o relator da própria sessão,
+  no servidor, e nunca de dado que o cliente mande; e a credencial nunca chega ao browser.
+- **O alcance é por usuário, não por chamador.** "Os relatos do usuário" são todos os gravados com aquele
+  `X-Relator-Username`, por qualquer chamador: um relato aberto pelo KORC aparece na lista do mesmo usuário na
+  aplicação, e o inverso. A lista não diz por qual chamador cada relato entrou; o chamador que precisa separar
+  os seus guarda os `id` que criou.
 
 ## Ciclo de vida do relato
 
@@ -11319,8 +11337,10 @@ ele o marcou como lido. Para a equipe vale o simétrico. Quem escreve uma mensag
 
 ## O que o monitor faz com o conteúdo
 
-- **Diagnóstico da tela** (o `formato` versiona a carga): é guardado como veio, até 64 KB. O usuário **não o
-  recebe de volta**; só a equipe o vê.
+- **Diagnóstico** (o `formato` versiona a carga): é guardado como veio, até 64 KB. O usuário **não o
+  recebe de volta**; só a equipe o vê. O `formato` 1 é o da tela da aplicação
+  ([o que leva](../shell/seguranca.md#diagnóstico-do-relato-de-suporte)), e a tela da equipe o interpreta.
+  Outro chamador usa outro inteiro em `formato`: a carga é guardada do mesmo jeito, e a equipe a vê como JSON.
 - **Texto livre** (título e mensagens): o servidor troca **credenciais** (`Bearer …` e tokens de acesso
   soltos) por `[credencial removida]`. E-mail e CPF ficam, porque o usuário pode querer ser contatado por eles.
 - **Instantes** são os do servidor. O `em` que a casca manda nas mensagens é ignorado.
@@ -11347,29 +11367,34 @@ nome vier noutro formato, **nenhum** membro da organização vê o relato, só o
 
 # monitor — endpoints de relato
 
-> Base pela borda: **`/v3/monitor/suporte/v1`**. Quem chama é **o BFF**, nunca o browser. Corpo e respostas
-> em JSON (UTF-8). Todas as rotas exigem os cabeçalhos abaixo. Guia: [monitor](../README.md).
+> Base pela borda: **`/v3/monitor/suporte/v1`**. Quem chama é **um serviço com credencial própria**
+> ([quais](../README.md#mais-de-um-chamador)), nunca o browser. Corpo e respostas em JSON (UTF-8). Todas as
+> rotas exigem os cabeçalhos abaixo. Guia: [monitor](../README.md).
 
 ## Cabeçalhos
 
 | Cabeçalho | Obrigatório | O que é |
 |---|---|---|
-| `X-Monitor-Client-Key` | sim | credencial de serviço do chamador. A infra entrega o valor à configuração do BFF, e ele **nunca** passa por código, documento ou mensagem. O monitor guarda só um resumo criptográfico dela. |
-| `X-Relator-Username` | sim | o usuário da sessão. É por ele que cada rota alcança **só os relatos daquele usuário**. |
+| `X-Monitor-Client-Key` | sim | credencial de serviço do chamador, uma para cada chamador. A infra entrega o valor à configuração do chamador, e ele **nunca** passa por código, documento ou mensagem. O monitor guarda só um resumo criptográfico dela. |
+| `X-Relator-Username` | sim | o usuário da sessão do chamador. É por ele que cada rota alcança **só os relatos daquele usuário**. |
 | `X-Relator-Org` | não | o nome da organização do relator ([quem enxerga](../README.md#quem-na-equipe-enxerga-o-relato)) |
 | `X-Relator-Tenant` | não | o tenant do relator |
-| `X-Request-Id` | não | o id da chamada no BFF; fica gravado no relato e nas mensagens do usuário |
+| `X-Request-Id` | não | o id da chamada no chamador; fica gravado no relato e nas mensagens do usuário |
 
 - credencial ausente ou inválida → `401`;
 - `X-Relator-Username` ausente → `400`;
 - corpo acima de **256 KB** → `413`, antes de qualquer leitura.
 
-A borda aplica também um teto próprio por serviço
+Pela borda, a chamada leva também o **cabeçalho de identificação da borda**, que nesta rota é
+`X-Forger-Credential` ([borda](../../gateway/README.md#cabeçalhos-de-identificação--exatamente-um-nunca-dois)).
+Sem ele a borda responde `401`, e a chamada não chega ao monitor
+([gateway/erros.md](../../gateway/erros.md#401--falta-o-cabeçalho-de-identificação)). A borda aplica também um
+teto próprio de corpo por serviço
 ([gateway/erros.md](../../gateway/erros.md#413--corpo-ou-cabeçalhos-grandes-demais)).
 
 ## POST /relatos — criar
 
-A carga é a que a casca monta:
+A carga tem a mesma forma para qualquer chamador. Esta é a que a casca monta:
 
 ```jsonc
 {
@@ -11380,6 +11405,9 @@ A carga é a que a casca monta:
   "diagnostico": { "formato": 1 }            // opcional; objeto de até 64 KB (forma: shell/seguranca.md)
 }
 ```
+
+O `formato` 1 é o diagnóstico da casca. Outro chamador manda outro inteiro em `formato`, com a carga que
+quiser dentro do teto ([o que o monitor faz com ela](../README.md#o-que-o-monitor-faz-com-o-conteúdo)).
 
 Resposta `201`:
 
@@ -11432,7 +11460,7 @@ consulta à organização escolhida, como no resto da tela do monitor.
 | Rota | O que faz |
 |---|---|
 | `GET /relatos?estado=` | a fila, com `username`, `org`, `tenantId` e o `naoLido` da equipe |
-| `GET /relatos/{id}` | o relato completo, com o diagnóstico |
+| `GET /relatos/{id}` | o relato completo, com o diagnóstico e o chamador que o gravou (`cliente`) |
 | `POST /relatos/{id}/mensagens` | resposta da equipe → `RESPONDIDO` |
 | `POST /relatos/{id}/fechar` | `FECHADO`; fechar de novo → `409` |
 | `POST /relatos/{id}/lido` | marca como lido pela equipe |
@@ -11450,7 +11478,7 @@ O campo `details` diz qual regra foi violada.
 | HTTP | `error` | Quando acontece | O que fazer |
 |---|---|---|---|
 | 400 | `bad_request` | falta `X-Relator-Username`; cabeçalho do relator longo demais; JSON ilegível; `tipo` fora de Falha, Dúvida e Sugestão; nenhuma mensagem, mais de 20, texto vazio ou texto acima de 10.000 caracteres; `contexto` ou `diagnostico` que não são objeto; `estado` inválido no filtro da equipe | corrigir a requisição |
-| 401 | `unauthorized` | lado do BFF: credencial de serviço ausente, errada ou não configurada no monitor. Lado da equipe: token ausente, inválido ou expirado | conferir a configuração do BFF com a infra; não repetir a chamada em laço |
+| 401 | `unauthorized` | lado do chamador: credencial de serviço ausente, errada ou não configurada no monitor. Lado da equipe: token ausente, inválido ou expirado | conferir a configuração do chamador com a infra; não repetir a chamada em laço |
 | 403 | `forbidden` | só no lado da equipe: token sem `API_MASTER`/`API_ENGINEER` em organização ativa, ou `?org=` fora das organizações do portador | — |
 | 404 | `not_found` | relato inexistente **ou** de outro usuário ou organização. Os dois casos são indistinguíveis de propósito | conferir o id e o usuário do cabeçalho |
 | 409 | `conflict` | mensagem em relato fechado, ou fechamento de relato já fechado | o usuário abre um relato novo |
@@ -11458,19 +11486,22 @@ O campo `details` diz qual regra foi violada.
 
 > **Nem todo erro destas rotas vem do monitor.** Um `404` sem esse corpo e com cabeçalhos da borda vem da
 > **borda**, que não tem a rota ([gateway/erros.md](../gateway/erros.md#404--a-borda-não-reconheceu-a-rota)).
-> O mesmo vale para o `413` do teto da borda.
+> O mesmo vale para o `413` do teto da borda e para o `401` de quem chama sem o cabeçalho de identificação
+> dela ([gateway/erros.md](../gateway/erros.md#401--falta-o-cabeçalho-de-identificação)).
 
 <!-- ===== monitor/exemplos.md ===== -->
 
 # monitor — exemplos de relato
 
-Chamadas do BFF pela borda. `<chave>` é a credencial de serviço do BFF, que nunca é escrita em código.
-Todas as chamadas levam os mesmos cabeçalhos do relator ([endpoints](endpoints/relatos.md#cabeçalhos)).
+Chamadas de um serviço chamador pela borda; aqui, o BFF. `<chave>` é a credencial de serviço dele, e
+`<credencial da borda>` é a que a borda exige. Nenhuma das duas é escrita em código.
+Todas as chamadas levam os mesmos cabeçalhos ([endpoints](endpoints/relatos.md#cabeçalhos)).
 
 ## Criar um relato
 
 ```http
 POST /v3/monitor/suporte/v1/relatos
+X-Forger-Credential: <credencial da borda>
 X-Monitor-Client-Key: <chave>
 X-Relator-Username: maria
 X-Relator-Org: acme
@@ -11536,6 +11567,20 @@ O usuário abre um relato novo.
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.110 — 2026-10-07
+
+- **monitor: mais de um chamador, e a rota alcançável de fora pela borda** (`monitor/README.md` §Mais de um
+  chamador; `monitor/endpoints/relatos.md` §Cabeçalhos; `monitor/erros.md`; `monitor/exemplos.md`; `llms.txt`).
+  A fatia dizia que só o BFF chamava. Desde 2026-10-07T21:21:47Z o monitor aceita um segundo chamador, o
+  KORC, com credencial de serviço própria, e desde 21:20:13Z `/v3/monitor/suporte/**` é alcançável de fora da
+  rede da plataforma, pela borda. São medições da infra (`infra 66ee1a6`): pela borda, com o cabeçalho de
+  identificação dela e credencial válida, `200`; sem a credencial de serviço, `401` do monitor; sem o
+  cabeçalho da borda, `401` da borda. Entra o que isso muda para quem chama: cada chamador tem a sua
+  credencial, e o relato guarda qual gravou; a credencial não é limitada por usuário, então é o chamador
+  quem garante o relator; o alcance é por usuário e atravessa chamadores; e `formato` 1 é o diagnóstico da
+  casca, com outro número para outro chamador. Conferido contra o código (`monitor 9fac4b6`), que não mudou.
+  Pedido da infra, a mando do dono.
 
 ## 1.109 — 2026-10-07
 
