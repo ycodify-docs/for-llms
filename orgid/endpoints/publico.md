@@ -68,8 +68,8 @@ Cria a **conta** (estado inicial **pendente**) **e** a **organização**, vincul
 `400` — `"Papel desconhecido ou não autorizado."` se `role` vier com outro nome (inclusive os `API_*`): **nada
 é criado**, nem a conta, nem a organização.
 
-> ⚠️ O campo `role` **ainda não está em produção** (`orgid 9e58fd9`, vale quando a infra implantar).
-> Até lá ele é ignorado: a conta é criada só como administradora, **sem** o papel pedido e sem erro.
+> O campo `role` está em produção desde 2026-10-07T17:06Z. Até então ele era ignorado: a conta era criada
+> só como administradora, **sem** o papel pedido e sem erro.
 
 ## POST /open/ua/account-role — registro (externo): conta + papel
 Cria uma conta **externa** e a associa a um **papel**.

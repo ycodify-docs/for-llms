@@ -42,13 +42,15 @@ Vale para **criar** o vínculo (`POST /up/account-role-org`) e para **mudar o st
 - "Ativo" é o vínculo `SKOS_MASTER` de quem chama com `accountStatus` e `orgStatus` em `ACTIVE`, lido do
   cadastro **no momento da chamada**, e não do token.
 - Quem tem `SKOS_MASTER` não gere outro `SKOS_MASTER`, nem os papéis `API_*`.
-- No token do login, o vínculo ativo aparece no claim `orgs` como `<org>/SKOS_MASTER` ou
-  `<org>/SKOS_ANALYST`, e em `authorities` como `ROLE_SKOS_MASTER` ou `ROLE_SKOS_ANALYST`, do mesmo modo
-  que os papéis `API_*`. Vínculo criado depois do login só entra no próximo token.
+- No token do login, o vínculo aparece no claim `orgs` como `<org>/SKOS_MASTER` ou `<org>/SKOS_ANALYST`, e
+  em `authorities` como `ROLE_SKOS_MASTER` ou `ROLE_SKOS_ANALYST`, do mesmo modo que os papéis `API_*`.
+  Vínculo criado depois do login só entra no próximo token.
+- O vínculo só entra no token com **quatro status em `ACTIVE`**: o do papel, o da organização e os dois do
+  vínculo (`accountStatus` e `orgStatus`). Com qualquer um diferente ele fica de fora, e o login não acusa
+  erro.
 
-> ⚠️ **Os papéis `SKOS_*` ainda não estão em produção** (`orgid 9e58fd9`, vale quando a infra
-> implantar). Até lá, `POST /up/account-role-org` e as duas rotas de status respondem `400` a `SKOS_MASTER`
-> e `SKOS_ANALYST`.
+> Em produção desde 2026-10-07T17:06Z. Até então, `POST /up/account-role-org` e as duas rotas de status
+> respondiam `400` a `SKOS_MASTER` e `SKOS_ANALYST`.
 
 ## POST /up/account-role-org
 Cria o vínculo conta-papel-org. **Quem chama:** token com papel `API_MASTER`, `API_ENGINEER`,
