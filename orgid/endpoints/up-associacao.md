@@ -6,10 +6,13 @@
 > **Comum:** `Authorization` obrigatório; POST/PUT enviam `Content-Type: application/json`. Autorização
 > **na organização** do vínculo. Erros: [../erros.md](../erros.md).
 >
-> **Forma do vínculo no corpo** (recorrente abaixo): `account` `{username}`, `role` `{name}` (papel
-> `API_MASTER`/`API_ENGINEER`/`API_ANALYST`/`API_FINANCIAL`), `org` `{name}`.
+> **Forma do vínculo no corpo** (recorrente abaixo): `account` `{username}`, `role` `{name}`, `org` `{name}`.
+> Papéis que se atribuem por aqui: `API_ENGINEER`, `API_ANALYST`, `API_FINANCIAL`, `API_GUEST`,
+> `SKOS_MASTER` e `SKOS_ANALYST`. O `API_MASTER` **não** se atribui por aqui: nasce com a organização, no
+> registro ([publico.md](publico.md)) ou no `POST /up/org`.
 
 ## Contents
+- Quem gere cada papel
 - POST /up/account-role-org — criar vínculo
 - PUT /up/account-role-org/account-status — alterar status do vínculo
 - PUT /up/account-role-org/status/by-master — alterar status (override)
@@ -20,32 +23,89 @@
 
 ---
 
+## Quem gere cada papel
+
+Vale para **criar** o vínculo (`POST /up/account-role-org`) e para **mudar o status** dele por terceiro
+(`PUT /up/account-role-org/status/by-master`).
+
+| Papel do vínculo | Quem gere | Como a organização é identificada |
+|---|---|---|
+| `API_ENGINEER`, `API_ANALYST`, `API_FINANCIAL`, `API_GUEST` | o **dono** da organização | `org.name`, entre as organizações de quem chama |
+| `SKOS_MASTER` | o **dono** da organização | `org.name`, entre as organizações de quem chama |
+| `SKOS_ANALYST` | quem tem `SKOS_MASTER` **ativo** naquela organização | `org.name` + `org.owner` |
+
+- **`SKOS_MASTER` e `SKOS_ANALYST`** são papéis comuns a mais de um módulo que roda sobre a plataforma (a
+  base de conhecimento, `yc.kb`, e o KORC). O orgid só os atribui; o que cada um permite é definido pelo
+  módulo que os lê do token.
+- O dono da organização **não** atribui `SKOS_ANALYST` só por ser dono: precisa ter também `SKOS_MASTER`
+  ativo nela, e pode atribuí-lo a si mesmo.
+- "Ativo" é o vínculo `SKOS_MASTER` de quem chama com `accountStatus` e `orgStatus` em `ACTIVE`, lido do
+  cadastro **no momento da chamada**, e não do token.
+- Quem tem `SKOS_MASTER` não gere outro `SKOS_MASTER`, nem os papéis `API_*`.
+- No token do login, o vínculo ativo aparece no claim `orgs` como `<org>/SKOS_MASTER` ou
+  `<org>/SKOS_ANALYST`, e em `authorities` como `ROLE_SKOS_MASTER` ou `ROLE_SKOS_ANALYST`, do mesmo modo
+  que os papéis `API_*`. Vínculo criado depois do login só entra no próximo token.
+
+> ⚠️ **Os papéis `SKOS_*` ainda não estão em produção** (`orgid 9e58fd9`, vale quando a infra
+> implantar). Até lá, `POST /up/account-role-org` e as duas rotas de status respondem `400` a `SKOS_MASTER`
+> e `SKOS_ANALYST`.
+
 ## POST /up/account-role-org
-Cria o vínculo conta-papel-org. **Papéis:** administrador / engenheiro / analista / financeiro.
+Cria o vínculo conta-papel-org. **Quem chama:** token com papel `API_MASTER`, `API_ENGINEER`,
+`API_ANALYST`, `API_FINANCIAL` ou `SKOS_MASTER`; e ainda tem de ser quem **gere** o papel pedido
+([Quem gere cada papel](#quem-gere-cada-papel)).
 
 **Corpo** (JSON):
 
 | Campo | Tipo | Obrig. | Significado |
 |---|---|---|---|
-| `account` | objeto | sim | `{ "username": "…" }` — conta a vincular. |
-| `role` | objeto | sim | `{ "name": "API_…" }` — papel atribuído. |
-| `org` | objeto | sim | `{ "name": "…" }` — organização do vínculo. |
+| `account` | objeto | sim | `{ "username": "…" }` — conta a vincular. Tem de existir. |
+| `role` | objeto | sim | `{ "name": "…" }` — `API_ENGINEER`, `API_ANALYST`, `API_FINANCIAL`, `API_GUEST`, `SKOS_MASTER` ou `SKOS_ANALYST`. |
+| `org.name` | string | sim | Organização do vínculo. |
+| `org.owner` | string | não | Dono da organização. Só é lido quando o papel é `SKOS_ANALYST`; sem ele, vale quem chama. |
+| `accountStatus`, `orgStatus` | string | não | Status inicial do vínculo. Padrão `ACTIVE`. |
 
-**Resposta:** `201` (sem corpo). `403` sem papel na org.
+**Resposta:** `201` (sem corpo) · `400` — `"Papel desconhecido ou não autorizado."` (nome fora da lista,
+inclusive `API_MASTER`) · `400` se a conta já tem esse papel nessa organização · `403` — quem chama não tem
+`SKOS_MASTER` ativo na organização e pediu `SKOS_ANALYST` · `404` — `"conta de usuário não existe: o vínculo
+não foi criado."` ou `"organização não existe para este dono: o vínculo não foi criado."`
 
 ## PUT /up/account-role-org/account-status
-Altera o **status** de um vínculo (o `account.username` é forçado ao do token).
+A **própria conta** suspende ou cancela o seu vínculo (o `account.username` é forçado ao do token).
+**Quem chama:** token com papel `API_MASTER`, `API_ENGINEER`, `API_ANALYST`, `API_FINANCIAL`,
+`SKOS_MASTER` ou `SKOS_ANALYST`.
 
-**Corpo** (JSON): `status` (string) + `account` `{username}` + `role` `{name}` + `org` `{name}`.
+**Corpo** (JSON):
 
-**Resposta:** `200` (sem corpo).
+| Campo | Tipo | Obrig. | Significado |
+|---|---|---|---|
+| `role` | objeto | sim | `{ "name": "…" }` — papel do vínculo: um dos seis de `POST /up/account-role-org`. |
+| `org.name` | string | sim | Organização do vínculo. |
+| `org.owner` | string | sim | Dono da organização. |
+| `accountStatus` | string | sim | `SUSPENDED` ou `CANCELED`. |
+
+**Resposta:** `200` (sem corpo) · `400` — campo ausente, papel ou `accountStatus` fora da lista, ou vínculo
+que já está `SUSPENDED` ou `CANCELED` (a própria conta não o reativa).
 
 ## PUT /up/account-role-org/status/by-master
-Altera o status do vínculo por um administrador (mesma forma de corpo do anterior; sem forçar o username).
+Muda o status do vínculo **de outra conta**. **Quem chama:** token com papel `API_MASTER`, `API_ENGINEER`,
+`API_ANALYST`, `API_FINANCIAL` ou `SKOS_MASTER`; e ainda tem de ser quem **gere** o papel do vínculo
+([Quem gere cada papel](#quem-gere-cada-papel)).
 
-**Corpo** (JSON): `status` + `account` `{username}` + `role` `{name}` + `org` `{name}`.
+**Corpo** (JSON):
 
-**Resposta:** `200`.
+| Campo | Tipo | Obrig. | Significado |
+|---|---|---|---|
+| `account` | objeto | sim | `{ "username": "…" }` — conta do vínculo. |
+| `role` | objeto | sim | `{ "name": "…" }` — papel do vínculo: um dos seis de `POST /up/account-role-org`. |
+| `org.name` | string | sim | Organização do vínculo. |
+| `org.owner` | string | sim | Dono da organização. Só é lido quando o papel é `SKOS_ANALYST`; nos demais a organização é procurada entre as de quem chama. |
+| `accountStatus` | string | sim | `ACTIVE`, `SUSPENDED` ou `CANCELED`. |
+| `orgStatus` | string | sim | `ACTIVE`, `SUSPENDED` ou `CANCELED`. |
+
+**Resposta:** `200` (sem corpo) · `400` — campo ausente, valor fora da lista, ou `"associação indicada não
+foi localizada."` · `403` — quem chama não tem `SKOS_MASTER` ativo na organização e o vínculo é
+`SKOS_ANALYST`.
 
 ## PUT /up/account-role-org/replace-account
 Substitui **a conta** de um vínculo existente. **Papel:** administrador na org.

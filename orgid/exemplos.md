@@ -72,5 +72,34 @@ Headers: Authorization: ...
 > associação → `510` (falha não tratada, não validação de campo). Ver [erros.md](erros.md) e
 > [endpoints/ua-associacao.md](endpoints/ua-associacao.md).
 
-> O `name` da org (`acme`) é o `{org}` dos caminhos do forger. Papéis `/up` são `API_*`; papéis `/ua`
-> têm `owner` (espaço de nomes). Ver [README](README.md) e [coordenação](../coordenacao.md).
+## 8. Papéis `SKOS_*` numa organização (`/up`)
+
+O dono da organização dá `SKOS_MASTER`; quem tem `SKOS_MASTER` ativo nela dá e suspende `SKOS_ANALYST`.
+Regra completa em [endpoints/up-associacao.md](endpoints/up-associacao.md). **Ainda não está em produção.**
+
+```
+// alice é a dona de "acme" e dá SKOS_MASTER a carla
+POST /up/account-role-org
+Headers: Authorization: ...            // token de alice
+{ "account": { "username": "carla" }, "role": { "name": "SKOS_MASTER" }, "org": { "name": "acme" } }
+→ 201
+
+// carla dá SKOS_ANALYST a bob: a organização não é dela, então o corpo leva o dono
+POST /up/account-role-org
+Headers: Authorization: ...            // token de carla
+{ "account": { "username": "bob" }, "role": { "name": "SKOS_ANALYST" },
+  "org": { "name": "acme", "owner": "alice" } }
+→ 201
+
+// carla suspende o vínculo de bob
+PUT /up/account-role-org/status/by-master
+Headers: Authorization: ...            // token de carla
+{ "account": { "username": "bob" }, "role": { "name": "SKOS_ANALYST" },
+  "org": { "name": "acme", "owner": "alice" }, "accountStatus": "SUSPENDED", "orgStatus": "ACTIVE" }
+→ 200
+```
+
+No próximo login de bob, o token traz `acme/SKOS_ANALYST` no claim `orgs` enquanto o vínculo estiver ativo.
+
+> O `name` da org (`acme`) é o `{org}` dos caminhos do forger. Papéis `/up` são `API_*` e `SKOS_*`; papéis
+> `/ua` têm `owner` (espaço de nomes). Ver [README](README.md) e [coordenação](../coordenacao.md).

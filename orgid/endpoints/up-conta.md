@@ -5,6 +5,10 @@
 >
 > **Comum:** `Authorization` obrigatório; POST/PUT enviam `Content-Type: application/json`.
 > Papéis aceitos (salvo indicação): administrador / engenheiro / analista / financeiro. Erros: [../erros.md](../erros.md).
+>
+> **Conta que só tem `SKOS_MASTER` ou `SKOS_ANALYST`** (ver [up-associacao.md](up-associacao.md)) lê a
+> própria conta em `GET /up/account/by/jwt`; nas rotas de perfil, senha e remoção desta página continua
+> recebendo `403`.
 
 ## Contents
 - GET /up/account/by/jwt — conta autenticada
@@ -18,10 +22,14 @@
 ---
 
 ## GET /up/account/by/jwt
-Retorna a conta do **portador do token** (resolvida pelo token, sem parâmetros).
+Retorna a conta do **portador do token** (resolvida pelo token, sem parâmetros). **Papéis:** administrador /
+engenheiro / analista / financeiro, e também `SKOS_MASTER` / `SKOS_ANALYST`.
 
 **Resposta:** `200` — conta (`id`, `username`, `name`, `email`, `status`, endereço, `accountRoleOrgs`;
 `password` = nulo); `204` se não encontrada.
+
+> ⚠️ A leitura por quem só tem `SKOS_*` **ainda não está em produção** (`orgid 9e58fd9`, vale quando
+> a infra implantar). Até lá essa conta recebe `403` aqui.
 
 ## PUT /up/account
 Atualiza o **perfil** da própria conta (o `username` é forçado ao do token).
@@ -65,7 +73,11 @@ Lista as contas de uma org. **Papéis:** administrador / engenheiro / analista (
 **Resposta:** `200` array de contas (senha nula); `204` se vazio.
 
 ## GET /up/account/by/org/{orgName}/org-owner/{orgOwner}
-Igual ao anterior, qualificando o dono.
+Igual ao anterior, qualificando o dono. **Papéis:** administrador / engenheiro / analista (na org), e também
+`SKOS_MASTER` (na org). `SKOS_ANALYST` não lista.
+
+> ⚠️ A listagem por `SKOS_MASTER` **ainda não está em produção** (`orgid 9e58fd9`, vale quando a
+> infra implantar).
 
 | Path-var | Significado |
 |---|---|
