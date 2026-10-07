@@ -28,8 +28,8 @@ engenheiro / analista / financeiro, e também `SKOS_MASTER` / `SKOS_ANALYST`.
 **Resposta:** `200` — conta (`id`, `username`, `name`, `email`, `status`, endereço, `accountRoleOrgs`;
 `password` = nulo); `204` se não encontrada.
 
-> ⚠️ A leitura por quem só tem `SKOS_*` **ainda não está em produção** (`orgid 9e58fd9`, vale quando
-> a infra implantar). Até lá essa conta recebe `403` aqui.
+> A leitura por quem só tem `SKOS_*` está em produção desde 2026-10-07T17:06Z. Até então essa conta
+> recebia `403` aqui.
 
 ## PUT /up/account
 Atualiza o **perfil** da própria conta (o `username` é forçado ao do token).
@@ -76,8 +76,7 @@ Lista as contas de uma org. **Papéis:** administrador / engenheiro / analista (
 Igual ao anterior, qualificando o dono. **Papéis:** administrador / engenheiro / analista (na org), e também
 `SKOS_MASTER` (na org). `SKOS_ANALYST` não lista.
 
-> ⚠️ A listagem por `SKOS_MASTER` **ainda não está em produção** (`orgid 9e58fd9`, vale quando a
-> infra implantar).
+> A listagem por `SKOS_MASTER` está em produção desde 2026-10-07T17:06Z.
 
 | Path-var | Significado |
 |---|---|

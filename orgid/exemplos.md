@@ -75,7 +75,7 @@ Headers: Authorization: ...
 ## 8. Papéis `SKOS_*` numa organização (`/up`)
 
 O dono da organização dá `SKOS_MASTER`; quem tem `SKOS_MASTER` ativo nela dá e suspende `SKOS_ANALYST`.
-Regra completa em [endpoints/up-associacao.md](endpoints/up-associacao.md). **Ainda não está em produção.**
+Regra completa em [endpoints/up-associacao.md](endpoints/up-associacao.md). Em produção desde 2026-10-07.
 
 ```
 // alice é a dona de "acme" e dá SKOS_MASTER a carla

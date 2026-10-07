@@ -2,6 +2,17 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.109 — 2026-10-07
+
+- **Orgid: papéis `SKOS_MASTER` e `SKOS_ANALYST` em produção desde 2026-10-07T17:06Z**
+  (`orgid/endpoints/up-associacao.md`, `orgid/endpoints/up-conta.md`, `orgid/endpoints/publico.md`,
+  `orgid/exemplos.md` §8). A mudança da 1.108 foi implantada (`orgid 9e58fd9`). Saem os cinco avisos de
+  "ainda não está em produção"; fica a data a partir da qual cada regra vale. Na implantação foi conferido
+  que subiram as classes alteradas e que as rotas sem credencial respondem como antes; a atribuição dos
+  dois papéis ainda não foi exercitada em produção. Entra, na página de associação, a condição para o
+  vínculo sair no token: papel, organização e os dois status do vínculo em `ACTIVE`; com qualquer um
+  diferente o vínculo fica de fora e o login não acusa erro.
+
 ## 1.108 — 2026-10-07
 
 - **Orgid: papéis `SKOS_MASTER` e `SKOS_ANALYST` de conta de plataforma, e o corpo real das rotas de status**
