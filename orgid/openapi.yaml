@@ -110,7 +110,7 @@ paths:
   /open/up/account/{username}/{action}/hash/{hash}:
     put: { tags: [publico], summary: Executar ação por hash (público), parameters: [{ $ref: '#/components/parameters/username' }, { name: action, in: path, required: true, schema: { type: string } }, { name: hash, in: path, required: true, schema: { type: string } }], requestBody: { content: { application/json: { schema: { type: object, properties: { password: { type: string } } } } } }, responses: { '200': { description: OK } } }
 
-  # ---- manifesto da aplicação (endpoints/aplicacao.md) — em develop, ainda não em produção ----
+  # ---- manifesto da aplicação (endpoints/aplicacao.md) — em produção desde 2026-10-16 ----
   /up/application/{org}:
     parameters: [{ $ref: '#/components/parameters/org' }]
     post: { tags: [aplicacao], summary: "Publicar manifesto (API_MASTER na org); sobe a versão", security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Manifesto' } } } }, responses: { '201': { description: "{versao}" }, '400': { $ref: '#/components/responses/BadRequest' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { description: Org inexistente }, '413': { description: Ícone acima de 32 KiB } } }
