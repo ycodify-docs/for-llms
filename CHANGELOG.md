@@ -2,6 +2,61 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.118 — 2026-10-16
+
+- **auth e orgid: o captcha e o aceite da 1.115 estão em vigor desde 2026-10-16T21:06:53Z** (`auth/endpoints/sign-in.md`,
+  `orgid/endpoints/publico.md`, `orgid/endpoints/aplicacao.md`). Sai o aviso "atrás de um interruptor desligado" da
+  1.115 e da 1.116: o interruptor foi ligado junto com o do BFF. Medido pela borda às 21:29:18Z: conta de org com
+  manifesto, sem captcha → `428 captcha_ausente`.
+
+## 1.117 — 2026-10-16
+
+- **BFF e casca: identidade da aplicação, captcha e aceite no login, autocadastro e o menu sem contexto vazio**
+  (fatia do yc.app; no ar no Stager, com a 2ª etapa ligada desde 2026-10-16T21:07Z).
+  - `bff/README.md`: seção nova, **Identidade da aplicação** (`GET /app/identidade?host=`, pública;
+    `GET /session/app/identidade?org=`, com `aceitePendente`; `POST /session/app/aceite`). O login aceita `host`,
+    `captcha` e `aceite`, e recusa com `428`; `GET /captcha/desafio`. No autocadastro: `aceite` e `captcha` no
+    registro, `host` no hash (e-mail com link `/ativar`) e o `429` de um e-mail a cada 5 min. O `colorScheme` sai
+    das preferências da org (`PUT` com ele → `400`). A `manifestUrl` do miolo pode vir relativa.
+  - `shell/README.md`: a identidade antes do login, o captcha e o aceite, e o menu que tira o contexto sem
+    agregado depois de pedir a capacidade de todos.
+  - `shell/estilo.md`: o esquema vem do manifesto da aplicação, sem seletor na casca; o esquema `marinho` e o
+    token `dominante`; as telas públicas. Corrigida a frase que dizia que o tenant sobrescreve `--yc-brand` por
+    configuração: nada alimenta essa sobrescrita.
+  - `shell/injecao.md`: a URL do miolo relativa, resolvida contra a origem da casca.
+
+## 1.116 — 2026-10-16
+
+- **O esquema `marinho` e o captcha e aceite da 1.115 estão no ar desde 2026-10-16T18:47:51Z.** O `marinho` já vale
+  (`orgid/endpoints/aplicacao.md`). O captcha e o aceite (`auth/endpoints/sign-in.md`, `orgid/endpoints/publico.md`,
+  `orgid/endpoints/aplicacao.md`) seguem atrás de um interruptor **desligado**: até ele ser ligado, login e cadastro
+  são os de antes. O desafio `GET /ua/sign-in/challenge` já responde `200`.
+
+## 1.115 — 2026-10-16
+
+- **auth e orgid: captcha e aceite de termos no login e no autocadastro** (`auth/endpoints/sign-in.md` §Só em
+  `/ua`; `orgid/endpoints/publico.md` §Captcha e aceite no autocadastro; `orgid/endpoints/aplicacao.md`
+  `aceitePendente` e `POST /ua/application/{org}/acceptance`). Desafio ALTCHA em `GET /ua/sign-in/challenge`;
+  recusas `428` por `codigo` (`captcha_ausente`, `captcha_invalido`, `aceite_pendente`). Em `develop`, ainda não
+  em produção, atrás de um interruptor desligado.
+- **orgid: esquema `marinho`** na lista do manifesto (`orgid/endpoints/aplicacao.md`, `orgid/openapi.yaml`). Em
+  `develop` do orgid (`a9700c9`), ainda não em produção.
+
+## 1.114 — 2026-10-16
+
+- **orgid: o e-mail do hash da 1.113 está em produção** (`orgid/endpoints/publico.md` §Só em `/ua`). Sai o aviso
+  "em develop": o link no domínio verificado, o nome da empresa e o `429` a cada 5 min estão no ar desde
+  2026-10-16T17:21:35Z. Ainda não foi medido o envio real do e-mail com o link.
+
+## 1.113 — 2026-10-16
+
+- **orgid: o e-mail do hash em `/ua` ganha o link no domínio da empresa e um limite de envio**
+  (`orgid/endpoints/publico.md` §Só em `/ua`; `orgid/erros.md` ganha `429`). `GET /open/ua/hash/for/{R|PR}/by/{username}`
+  aceita `?domain=`: domínio verificado de org da conta → link `https://<host>/ativar?username=&hash=` (`&acao=PR`
+  na troca de senha) e nome da empresa no remetente e no assunto; senão `400`. Sem `domain`, o e-mail de sempre.
+  Um e-mail a cada 5 min por conta → `429` com `Retry-After`. Em `develop` do orgid (`6e6aefc`), ainda não em
+  produção.
+
 ## 1.112 — 2026-10-16
 
 - **orgid: o manifesto da aplicação está em produção** (`orgid/endpoints/aplicacao.md`, cabeçalho;

@@ -15,7 +15,8 @@ Adicionar um tenant **não** exige rebuild da casca.
 
 1. A casca pede ao BFF a URL do miolo do tenant **para o agregado escolhido**:
    `GET /tenant/{tenantId}/miolo-manifest?aggregate={agregado}` → devolve a **URL do ponto de entrada** do
-   remoto. Em paralelo,
+   remoto. **A URL pode vir relativa** (ex.: `/miolo/mf-manifest.json`), e a casca a resolve contra a
+   **própria origem**: cada host que serve a casca carrega o miolo publicado nele mesmo. Em paralelo,
    pede a **capacidade** e o **manifesto de apresentação** do tenant, que vão no `hostContext`
    ([bff](../bff/README.md)).
 2. A casca **registra o remoto** daquele tenant e **carrega** o módulo `mount`.

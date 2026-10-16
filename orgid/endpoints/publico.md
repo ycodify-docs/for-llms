@@ -94,6 +94,22 @@ Cria uma conta **externa** e a associa a um **papel**.
 > conta nova já com esse papel. Papel que o próprio usuário não pode escolher se associa pelo caminho
 > autenticado, `POST /ua/account-role/using/authority` ([ua-associacao.md](ua-associacao.md)).
 
+### Captcha e aceite no autocadastro
+
+> **Em vigor desde 2026-10-16T21:06:53Z.**
+
+| Campo novo | Tipo | Quando |
+|---|---|---|
+| `captcha` | string | exigido quando a org do papel (`role.owner`) publicou o [manifesto](aplicacao.md): a solução do desafio de `GET /ua/sign-in/challenge`, em base64 |
+| `aceite` | objeto | exigido quando a org tem termos ou privacidade vigentes: `{"termos": <versão>, "privacidade": <versão>}` |
+
+- Captcha ausente → `428 {"codigo":"captcha_ausente"}`; inválido, vencido ou já usado → `428
+  {"codigo":"captcha_invalido"}`. **A conta não é criada.**
+- Aceite ausente, de versão que não é a vigente, ou de texto que a org não publicou → `400` com as versões
+  vigentes. **A conta não é criada.**
+- O desafio se consome no cadastro. Quem chega ao cadastro pela tela de login usa a solução que o login preparou;
+  depois do cadastro, o login pede desafio novo.
+
 ## GET /open/up/hash/for/{action}/by/{username}
 ## GET /open/ua/hash/for/{action}/by/{username}
 Solicita um **hash** de vida curta (enviado ao usuário por e-mail) para `{action}` (`R` ativação / `PR` recuperação).
@@ -105,6 +121,25 @@ Solicita um **hash** de vida curta (enviado ao usuário por e-mail) para `{actio
 
 **Resposta:** `200` — `{}` (efeito: envio do hash) · `404` — `"account not found: no hash was generated
 and no e-mail was sent."`
+
+### Só em `/ua`: link no domínio da empresa e um e-mail a cada 5 min
+
+> **Em produção desde 2026-10-16T17:21:35Z.** Ainda não foi medido em produção o envio real do e-mail com o link.
+
+| Query | Significado |
+|---|---|
+| `domain` | opcional — o host por onde a pessoa chegou (`location.hostname`), sem porta |
+
+- **Sem `domain`**, o e-mail é o de sempre: remetente e assunto da Ycodify, só o hash para copiar.
+- **Com `domain`**, o host tem de casar um domínio **verificado** de uma organização em que a conta tem papel
+  (a regra do [manifesto da aplicação](aplicacao.md)). Então o e-mail leva o link
+  `https://<host>/ativar?username=<u>&hash=<h>` (com `&acao=PR` na troca de senha) e o **nome da empresa** no
+  remetente exibido e no assunto; o endereço continua o da plataforma. Host que não casa, ou de org que não é
+  da conta → `400`, sem gerar hash. Com `domain`, `{action}` só aceita `R` ou `PR` (`400`).
+- **No máximo um e-mail a cada 5 min por conta**, somando `R` e `PR`, com ou sem `domain`: antes disso,
+  `429` com o cabeçalho `Retry-After` (segundos) e o corpo `{"error": "…", "retryAfterSeconds": <n>}`, sem gerar
+  hash nem mandar nada.
+- O hash vale **10 minutos**.
 
 ## PUT /open/up/account/{username}/{action}/hash/{hash}
 ## PUT /open/ua/account/{username}/{action}/hash/{hash}

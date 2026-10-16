@@ -17,6 +17,7 @@
 
 - [Como alcançar o BFF](#como-alcançar-o-bff)
 - [Sessão](#sessão)
+- [Identidade da aplicação (`/app/identidade`)](#identidade-da-aplicação-appidentidade)
 - [Capacidade](#capacidade)
 - [Miolo](#miolo)
 - [Proxy de domínio](#proxy-de-domínio)
@@ -77,7 +78,8 @@ login responde `401`.
 
 | Operação | Método · Path | Corpo / Query | Resposta |
 |---|---|---|---|
-| Login | `POST /session/login` | `{ username, password }` | identidade + **árvore de tenants** + papéis; **cookie httpOnly** (token). **Sem token no corpo.** |
+| Login | `POST /session/login` | `{ username, password, host?, captcha?, aceite? }` | identidade + **árvore de tenants** + papéis; **cookie httpOnly** (token). **Sem token no corpo.** · `428` captcha ou aceite (abaixo) |
+| Desafio do captcha | `GET /captcha/desafio` | — | `{ algorithm, challenge, maxnumber, salt, signature }` — **público**, sem cookie · `404` se a instalação não ligou a 2ª etapa |
 | Sessão atual | `GET /session/me` | — | mesma projeção segura, ou `401` sem sessão |
 | Papel ativo | `PUT /session/active-role` | `{ org, role }` | mesma projeção segura, com `activeRole` · `403` se o papel não for do usuário naquela org |
 | Encerrar | `POST /session/logout` | — | limpa o cookie |
@@ -101,6 +103,65 @@ papel na org e entra por um portal específico. É **filtro de apresentação, n
 aceita apenas um papel que o portador de fato tenha **ativo naquela org**, e comando/consulta seguem
 revalidando o conjunto **completo** de papéis a cada chamada. Guardá-lo não restringe o que o usuário
 pode fazer.
+
+### Captcha e aceite no login
+
+Para conta de org que **publicou o manifesto da aplicação**, o auth exige no login um **captcha** e o
+**aceite** da versão vigente dos termos e da política de privacidade. Conta de org sem manifesto entra
+como antes. No Stager, ligado desde **2026-10-16T21:07Z**. Contrato de origem:
+[auth — sign-in](../auth/endpoints/sign-in.md).
+
+- **`host`** — o host por onde o usuário chegou. O BFF o repassa ao auth como `domain`, e é por ele que o
+  auth sabe **de qual org** pedir o aceite.
+- **`captcha`** — a solução do desafio de `GET /captcha/desafio`, uma prova de trabalho SHA-256 (ALTCHA)
+  que o cliente resolve sem interação. **Cada solução vale uma vez**: peça um desafio novo a cada envio.
+  Como o auth decide pelas orgs da conta, que o cliente não conhece antes de entrar, mande sempre.
+- **`aceite`** — `[{ org, termos?, privacidade? }]`, as versões que o usuário aceitou. Vai no reenvio
+  depois de um `428 aceite_pendente`.
+
+| Recusa | O que fazer |
+|---|---|
+| `428 { "codigo": "captcha_ausente" }` ou `captcha_invalido` | pedir outro desafio e repetir |
+| `428 { "codigo": "aceite_pendente", "pendentes": [{ org, termos, privacidade }] }` | mostrar os textos vigentes de `pendentes` e reenviar com `aceite` |
+
+O aceite é **uma vez por versão**: versão nova publicada pela org volta a pedi-lo no login seguinte.
+
+## Identidade da aplicação (`/app/identidade`)
+
+O **nome, o ícone, o esquema de cor, os termos e a política de privacidade** que a tela mostra são da
+**empresa**, achados pelo domínio por onde o usuário chegou. O dado é o manifesto da aplicação da org, no
+[orgid](../orgid/endpoints/aplicacao.md); o BFF o lê e o devolve já normalizado.
+
+| Operação | Método · Path | Corpo / Query | Resposta |
+|---|---|---|---|
+| Pelo domínio (antes do login) | `GET /app/identidade?host={hostname}` | — | a identidade · **pública** · `400` sem host com forma de nome de host |
+| Pela org (com sessão) | `GET /session/app/identidade?org={org}` | — | a identidade, com `aceitePendente` · `403` fora da org |
+| Aceitar ao trocar de org | `POST /session/app/aceite` | `{ org, termos?, privacidade? }` | repassa o orgid · `400` versão que não é a vigente · `403` fora da org |
+
+```jsonc
+{
+  "origem": "org" | "comum",
+  "org": "...",                     // só com origem "org"
+  "nome": "...", "subtitulo": "...",
+  "icone": "data:image/svg+xml;base64,…",   // só data URI svg, png ou webp; mostrar por <img>
+  "esquema": "verde" | "azul" | "ambar" | "roxo" | "cinza" | "marinho",
+  "autocadastro": true,             // a org oferece "Criar conta" (ver Autocadastro)
+  "termos":      { "versao": "...", "vigenteDesde": 0, "texto": "..." },  // texto simples
+  "privacidade": { "versao": "...", "vigenteDesde": 0, "texto": "..." },
+  "aceitePendente": { "termos": null, "privacidade": "2" }   // só na leitura POR ORG; null = nada a aceitar
+}
+```
+
+- **Sempre `200` com uma identidade.** Sem manifesto para aquele domínio, ou com erro do orgid, vale o
+  **manifesto comum** da instalação (`origem: "comum"`, sem `org` e com `autocadastro: false`).
+- **Só domínio verificado casa**, por prova DNS TXT; `*.x` casa os subdomínios de `x`
+  ([como o domínio casa](../orgid/endpoints/aplicacao.md#como-o-domínio-casa)).
+- **O BFF guarda a leitura por 5 min**, inclusive o "não há manifesto": um manifesto republicado aparece em
+  até 5 min.
+- **Conta com várias orgs:** o aceite do login é o da org do domínio. Ao trocar para outra org com
+  `aceitePendente`, o cliente mostra os textos e chama `POST /session/app/aceite` **antes** de entrar nela.
+- **O catálogo de esquemas é contrato**, espelhado na casca, no BFF e na lista fechada do orgid
+  ([estilo](../shell/estilo.md#esquemas-de-cor-nomeados-paleta-completa-por-organização)).
 
 ## Capacidade
 
@@ -202,6 +263,10 @@ Quando o modelo declara `alias` em `command.<cmd>` ou em `event.<evt>`
 
 Resolve `tenant → URL` do miolo (ver [injecao](../shell/injecao.md)). Só para tenant do usuário (`404` fora
 dele, e `404` quando nada cobre o tenant).
+
+- **`manifestUrl` pode vir relativa** (ex.: `/miolo/mf-manifest.json`): resolva-a contra a **origem da
+  casca**. É o que permite a um mesmo BFF servir cascas em hosts diferentes, cada uma com o miolo do
+  próprio host.
 
 - **`aggregate`** — o agregado escolhido no menu (o valor de `capability.aggregates[].aggregate`).
   Opcional: sem ele, vale só o miolo que cobre o tenant inteiro, e o `aggregate` sai da resposta.
@@ -725,8 +790,8 @@ Contrato de origem: [orgid/publico](../orgid/endpoints/publico.md) e [orgid/ua-p
 |---|---|---|---|
 | Papéis oferecíveis | `GET /ua/roles?owner={org}` | — | `{ roles: [{ name, label }] }` — só `ispublic=true` |
 | Conta já existe? | `GET /ua/exists?username={u}` | — | `{ exists: true\|false }` |
-| Registrar | `POST /ua/register` | `{ account: {username,password,email,name?}, role: {name,owner} }` | `200` criado · `403` papel fora do cardápio · `409` papel inexistente |
-| Pedir hash (e-mail) | `GET /ua/hash?action={R\|PR}&username={u}` | — | repassa o orgid |
+| Registrar | `POST /ua/register` | `{ account: {username,password,email,name?}, role: {name,owner}, aceite?: {termos,privacidade}, captcha? }` | `200` criado · `403` papel fora do cardápio · `409` papel inexistente · `428 { codigo }` captcha (como no login) |
+| Pedir hash (e-mail) | `GET /ua/hash?action={R\|PR}&username={u}&host={hostname}` | — | repassa o orgid · `429` (limite abaixo) |
 | Ativar / recuperar | `PUT /ua/activate` | `{ username, action: R\|PR, hash, password? }` | repassa o orgid |
 
 > **Duas travas no autocadastro — uma nos dois lados, outra só no BFF.**
@@ -742,6 +807,17 @@ Contrato de origem: [orgid/publico](../orgid/endpoints/publico.md) e [orgid/ua-p
 > o BFF o converte em `409` para não ser lido como ok.
 
 Monte a tela de cadastro a partir de `GET /ua/roles`: são exatamente os papéis que o servidor aceita.
+
+- **Quando oferecer:** só quando a identidade do domínio tem `autocadastro: true`
+  ([Identidade da aplicação](#identidade-da-aplicação-appidentidade)).
+- **Aceite e captcha no cadastro:** com a org do papel exigindo aceite, mande em `aceite` as versões
+  vigentes que o usuário marcou; versão que não é a vigente dá `400`. O `captcha` é o mesmo do login.
+- **`host` no hash:** com `host` de um domínio verificado da org, o e-mail traz o link
+  `https://<host>/ativar?username=<u>&hash=<h>`, mais `&acao=PR` na troca de senha. Domínio sem manifesto
+  não vai ao orgid. Se a conta não tem papel na org dona do domínio, o BFF repete sem `host`, e o e-mail sai
+  só com o código.
+- **Um e-mail por conta a cada 5 min**, somando `R` e `PR`, com ou sem `host`: o segundo pedido no prazo
+  recebe `429`, com `Retry-After` e `{ error, retryAfterSeconds }`, e nenhum e-mail sai.
 
 ## Relatos de suporte (`/session/suporte/*`)
 
@@ -783,18 +859,18 @@ BFF. Leitura por qualquer membro **ativo**; escrita **só por MASTER-na-org** (r
 | Operação | Método · Path | Corpo / Query | Resposta |
 |---|---|---|---|
 | Ler prefs | `GET /session/org-preferences?org={org}` | — | `{ org, prefs, canConfigure }` |
-| Alterar prefs | `PUT /session/org-preferences` | `{ org, formMode?, colorScheme? }` (**patch parcial**) | `{ org, prefs, canConfigure: true }` |
+| Alterar prefs | `PUT /session/org-preferences` | `{ org, formMode? }` (**patch parcial**) | `{ org, prefs, canConfigure: true }` |
 
 ```jsonc
 // prefs
-{ "formMode": "inline" | "modal",           // layout do form de comando no miolo
-  "colorScheme": "verde" | "azul" | "ambar" | "roxo" | "cinza" }  // esquema de cor da casca (ver ../shell/estilo.md)
+{ "formMode": "inline" | "modal" }          // layout do form de comando no miolo
 ```
 
-- **Patch parcial**: o `PUT` aceita `formMode` e/ou `colorScheme`; campos ausentes mantêm o valor atual.
-  Valores fora do catálogo → `400`. `canConfigure` = o portador é MASTER **naquela** org.
-- O catálogo de `colorScheme` é **contrato** — espelhado no shell (catálogo/UI) e no BFF (validação).
-  Ver [estilo](../shell/estilo.md#esquemas-de-cor-nomeados-paleta-completa-por-organização).
+- **Patch parcial**: campo ausente mantém o valor atual; valor fora do catálogo → `400`. `canConfigure` =
+  o portador é MASTER **naquela** org.
+- **O esquema de cor não é mais preferência da org** (desde 2026-10-16): vem do manifesto da aplicação
+  ([Identidade da aplicação](#identidade-da-aplicação-appidentidade)). `PUT` com `colorScheme` → `400`, e o
+  valor antigo guardado é ignorado.
 
 ## Cabeçalhos que o BFF injeta (contrato de saída)
 
@@ -841,10 +917,12 @@ que o gateway, o cache ou o persistence respondem.
 | `400` | falta parâmetro (ex.: `username`/`password`, `tenant`), ou campo obrigatório do comando ausente · **valor fora do tipo declarado** no comando (`Boolean` que não é true/false, `Integer`/`Long` que não é inteiro) |
 | `401` | sem sessão / sessão inválida / credencial inválida — ver `reason` abaixo |
 | `403` | comando não autorizado ao papel · papel fora do cardápio público no autocadastro · papel que não é do usuário na org (`active-role`) |
-| `404` | tenant não pertence ao usuário / miolo não registrado / **modelo do tenant ausente do cache** (removido ou nunca publicado — ele **não expira**) |
+| `404` | tenant não pertence ao usuário / miolo não registrado / **modelo do tenant ausente do cache** (removido ou nunca publicado — ele **não expira**) · `/captcha/desafio` e `/session/app/aceite` numa instalação sem a 2ª etapa ligada |
 | `409` | autocadastro: papel inexistente — nada foi criado (o `204` do orgid, traduzido) |
 | `500` | configuração ausente no servidor (ex.: o path do endpoint de cache não configurado) · **`readProjection` inválido no modelo do tenant** — a leitura é recusada em vez de recortada pela metade · **`computed` inválido no modelo do tenant** — o comando é recusado em vez de gravar marcador |
 | `413` | arquivo acima do teto do filer (3 MiB) em `POST /session/files/upload` |
+| `428` | login ou cadastro: falta captcha, captcha inválido ou aceite pendente — ver [Captcha e aceite no login](#captcha-e-aceite-no-login) |
+| `429` | `GET /ua/hash`: já saiu um e-mail para a conta nos últimos 5 min (`Retry-After`) |
 | `502` | falha ao falar com um serviço da plataforma |
 | `503` | serviço de arquivos (filer) ou de suporte (monitor) não configurado neste ambiente |
 

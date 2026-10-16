@@ -60,7 +60,7 @@ Cria ou substitui o manifesto. Cada publicação sobe a **versão** e fica regis
 | `nome` | string | sim | até 120 caracteres |
 | `subtitulo` | string | não | até 240 caracteres |
 | `icone` | string | não | data URI `data:image/svg+xml`, `data:image/png;base64` ou `data:image/webp;base64`; até **32 KiB** (`413`). SVG com script, atributo de evento (`on…=`), `javascript:` ou referência externa é recusado; referência interna (`url(#id)`, `href="#id"`) é aceita. PNG e WEBP têm a assinatura conferida |
-| `esquema` | string | sim | `verde`, `azul`, `ambar`, `roxo` ou `cinza` |
+| `esquema` | string | sim | `verde`, `azul`, `ambar`, `roxo`, `cinza` ou `marinho` |
 | `autocadastro` | boolean | sim | a tela de login oferece "criar conta" |
 
 **Resposta:** `201 {"versao": <n>}` · `400` forma · `403` sem administrador · `404` org inexistente · `413` ícone grande.
@@ -147,6 +147,18 @@ publicou manifesto · `400` sem `domain` ou com host inválido.
 
 Mesmo corpo da leitura por domínio, para o usuário já logado (troca de org). `403` se `{org}` não está
 entre as orgs do token · `404` sem manifesto.
+
+> **O que segue está em vigor desde 2026-10-16T21:06:53Z.**
+
+O corpo ganha `aceitePendente: {"termos": <versão>|null, "privacidade": <versão>|null}` — a versão vigente que a
+conta do token **ainda não aceitou** nesta org (`null` = nada pendente). A casca mostra o texto e só entra na org
+depois do aceite.
+
+## POST /ua/application/{org}/acceptance — aceitar na troca de org
+
+Token de aplicação com `{org}` entre as orgs do token. **Corpo:** `{"termos": <versão>, "privacidade": <versão>}`,
+cada um opcional. **Resposta:** `201 {"org", "gravado": {…}}` · `400` se a versão não for a vigente, ou se o
+texto não foi publicado · `403` fora da org. Aceitar de novo a mesma versão não duplica.
 
 ## Pitfalls
 
