@@ -163,7 +163,7 @@ components:
         nome: { type: string, maxLength: 120 }
         subtitulo: { type: string, maxLength: 240 }
         icone: { type: string, description: "data:image/svg+xml | data:image/png;base64 | data:image/webp;base64, até 32 KiB" }
-        esquema: { type: string, enum: [verde, azul, ambar, roxo, cinza] }
+        esquema: { type: string, enum: [verde, azul, ambar, roxo, cinza, marinho] }
         autocadastro: { type: boolean }
     Texto:
       type: [object, "null"]

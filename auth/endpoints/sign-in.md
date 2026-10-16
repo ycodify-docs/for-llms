@@ -46,6 +46,34 @@ organizações e tenants. Ver [README — claims](../README.md#o-que-o-login-ret
 
 Catálogo: [../erros.md](../erros.md).
 
+## Só em `/ua`: captcha e aceite de termos
+
+> ⚠️ **Em `develop` (auth `315a942`, orgid `a9700c9`), ainda não em produção, e atrás de um interruptor
+> desligado.** Até ele ser ligado, o login é o descrito acima.
+
+Para conta que tem papel em organização que publicou o [manifesto da aplicação](../../orgid/endpoints/aplicacao.md):
+
+| Campo novo | Tipo | Significado |
+|---|---|---|
+| `captcha` | string | a solução do desafio ALTCHA, em base64: `{algorithm, challenge, number, salt, signature}` |
+| `domain` | string | o host por onde a pessoa chegou (`location.hostname`) |
+| `aceite` | array | `[{"org": "<org>", "termos": <versão>, "privacidade": <versão>}]` — as versões aceitas |
+
+- **Desafio:** `GET /ua/sign-in/challenge`, público → `200 {algorithm:"SHA-256", challenge, maxnumber, salt,
+  signature}`. Vale 5 minutos e serve **uma vez** (no login ou no autocadastro).
+- **Ordem:** o captcha é conferido **antes** da senha; a senha; o aceite **depois** da senha.
+- **Org exigida:** a do `domain`, se ele for domínio verificado de uma org da conta; senão, **todas** as orgs da
+  conta que publicaram termos.
+
+| Situação | Resposta |
+|---|---|
+| captcha exigido e ausente | `428 {"codigo":"captcha_ausente"}` |
+| captcha inválido, vencido ou já usado | `428 {"codigo":"captcha_invalido"}` — peça outro desafio |
+| aceite faltando ou de versão que não é a vigente | `428 {"codigo":"aceite_pendente","pendentes":[{org, termos:{versao, vigenteDesde, texto}\|null, privacidade:{…}\|null}]}` — mostre os textos e reenvie com `aceite` |
+| tudo certo | `200`, a resposta de sempre; o aceite fica gravado |
+
+O aceite é **uma vez por versão**: quem já aceitou a versão vigente não vê `aceite_pendente`.
+
 ## Comportamento
 Segue o [fluxo de login](../README.md#fluxo-de-login-ciclo-de-vida): valida (via identidade) → descobre
 contexto/tenants → emite token → registra sessão (login novo **invalida** sessões anteriores do usuário).

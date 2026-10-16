@@ -2,6 +2,16 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.115 — 2026-10-16
+
+- **auth e orgid: captcha e aceite de termos no login e no autocadastro** (`auth/endpoints/sign-in.md` §Só em
+  `/ua`; `orgid/endpoints/publico.md` §Captcha e aceite no autocadastro; `orgid/endpoints/aplicacao.md`
+  `aceitePendente` e `POST /ua/application/{org}/acceptance`). Desafio ALTCHA em `GET /ua/sign-in/challenge`;
+  recusas `428` por `codigo` (`captcha_ausente`, `captcha_invalido`, `aceite_pendente`). Em `develop`, ainda não
+  em produção, atrás de um interruptor desligado.
+- **orgid: esquema `marinho`** na lista do manifesto (`orgid/endpoints/aplicacao.md`, `orgid/openapi.yaml`). Em
+  `develop` do orgid (`a9700c9`), ainda não em produção.
+
 ## 1.114 — 2026-10-16
 
 - **orgid: o e-mail do hash da 1.113 está em produção** (`orgid/endpoints/publico.md` §Só em `/ua`). Sai o aviso
