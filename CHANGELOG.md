@@ -2,6 +2,13 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.118 — 2026-10-16
+
+- **auth e orgid: o captcha e o aceite da 1.115 estão em vigor desde 2026-10-16T21:06:53Z** (`auth/endpoints/sign-in.md`,
+  `orgid/endpoints/publico.md`, `orgid/endpoints/aplicacao.md`). Sai o aviso "atrás de um interruptor desligado" da
+  1.115 e da 1.116: o interruptor foi ligado junto com o do BFF. Medido pela borda às 21:29:18Z: conta de org com
+  manifesto, sem captcha → `428 captcha_ausente`.
+
 ## 1.117 — 2026-10-16
 
 - **BFF e casca: identidade da aplicação, captcha e aceite no login, autocadastro e o menu sem contexto vazio**

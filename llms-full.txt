@@ -2324,8 +2324,8 @@ Catálogo: [../erros.md](../erros.md).
 
 ## Só em `/ua`: captcha e aceite de termos
 
-> ⚠️ **No ar desde 2026-10-16T18:47:51Z, mas atrás de um interruptor ainda desligado.** Até ele ser ligado, o
-> login é o descrito acima. O desafio já responde.
+> **Em vigor desde 2026-10-16T21:06:53Z.** Medido pela borda às 21:29:18Z: conta de org com manifesto, sem
+> captcha → `428 {"codigo":"captcha_ausente"}`.
 
 Para conta que tem papel em organização que publicou o [manifesto da aplicação](../../orgid/endpoints/aplicacao.md):
 
@@ -3455,8 +3455,7 @@ Cria uma conta **externa** e a associa a um **papel**.
 
 ### Captcha e aceite no autocadastro
 
-> ⚠️ **No ar desde 2026-10-16T18:47:51Z, mas atrás de um interruptor ainda desligado.** Até ele ser ligado, o
-> cadastro é o descrito acima.
+> **Em vigor desde 2026-10-16T21:06:53Z.**
 
 | Campo novo | Tipo | Quando |
 |---|---|---|
@@ -3694,7 +3693,7 @@ publicou manifesto · `400` sem `domain` ou com host inválido.
 Mesmo corpo da leitura por domínio, para o usuário já logado (troca de org). `403` se `{org}` não está
 entre as orgs do token · `404` sem manifesto.
 
-> ⚠️ **O que segue está no ar desde 2026-10-16T18:47:51Z, mas atrás de um interruptor ainda desligado.**
+> **O que segue está em vigor desde 2026-10-16T21:06:53Z.**
 
 O corpo ganha `aceitePendente: {"termos": <versão>|null, "privacidade": <versão>|null}` — a versão vigente que a
 conta do token **ainda não aceitou** nesta org (`null` = nada pendente). A casca mostra o texto e só entra na org
@@ -11909,6 +11908,29 @@ O usuário abre um relato novo.
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.118 — 2026-10-16
+
+- **auth e orgid: o captcha e o aceite da 1.115 estão em vigor desde 2026-10-16T21:06:53Z** (`auth/endpoints/sign-in.md`,
+  `orgid/endpoints/publico.md`, `orgid/endpoints/aplicacao.md`). Sai o aviso "atrás de um interruptor desligado" da
+  1.115 e da 1.116: o interruptor foi ligado junto com o do BFF. Medido pela borda às 21:29:18Z: conta de org com
+  manifesto, sem captcha → `428 captcha_ausente`.
+
+## 1.117 — 2026-10-16
+
+- **BFF e casca: identidade da aplicação, captcha e aceite no login, autocadastro e o menu sem contexto vazio**
+  (fatia do yc.app; no ar no Stager, com a 2ª etapa ligada desde 2026-10-16T21:07Z).
+  - `bff/README.md`: seção nova, **Identidade da aplicação** (`GET /app/identidade?host=`, pública;
+    `GET /session/app/identidade?org=`, com `aceitePendente`; `POST /session/app/aceite`). O login aceita `host`,
+    `captcha` e `aceite`, e recusa com `428`; `GET /captcha/desafio`. No autocadastro: `aceite` e `captcha` no
+    registro, `host` no hash (e-mail com link `/ativar`) e o `429` de um e-mail a cada 5 min. O `colorScheme` sai
+    das preferências da org (`PUT` com ele → `400`). A `manifestUrl` do miolo pode vir relativa.
+  - `shell/README.md`: a identidade antes do login, o captcha e o aceite, e o menu que tira o contexto sem
+    agregado depois de pedir a capacidade de todos.
+  - `shell/estilo.md`: o esquema vem do manifesto da aplicação, sem seletor na casca; o esquema `marinho` e o
+    token `dominante`; as telas públicas. Corrigida a frase que dizia que o tenant sobrescreve `--yc-brand` por
+    configuração: nada alimenta essa sobrescrita.
+  - `shell/injecao.md`: a URL do miolo relativa, resolvida contra a origem da casca.
 
 ## 1.116 — 2026-10-16
 

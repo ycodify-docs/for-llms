@@ -148,7 +148,7 @@ publicou manifesto · `400` sem `domain` ou com host inválido.
 Mesmo corpo da leitura por domínio, para o usuário já logado (troca de org). `403` se `{org}` não está
 entre as orgs do token · `404` sem manifesto.
 
-> ⚠️ **O que segue está no ar desde 2026-10-16T18:47:51Z, mas atrás de um interruptor ainda desligado.**
+> **O que segue está em vigor desde 2026-10-16T21:06:53Z.**
 
 O corpo ganha `aceitePendente: {"termos": <versão>|null, "privacidade": <versão>|null}` — a versão vigente que a
 conta do token **ainda não aceitou** nesta org (`null` = nada pendente). A casca mostra o texto e só entra na org

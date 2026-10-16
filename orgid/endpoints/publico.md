@@ -96,8 +96,7 @@ Cria uma conta **externa** e a associa a um **papel**.
 
 ### Captcha e aceite no autocadastro
 
-> ⚠️ **No ar desde 2026-10-16T18:47:51Z, mas atrás de um interruptor ainda desligado.** Até ele ser ligado, o
-> cadastro é o descrito acima.
+> **Em vigor desde 2026-10-16T21:06:53Z.**
 
 | Campo novo | Tipo | Quando |
 |---|---|---|
