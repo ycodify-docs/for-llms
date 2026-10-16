@@ -94,6 +94,23 @@ Cria uma conta **externa** e a associa a um **papel**.
 > conta nova já com esse papel. Papel que o próprio usuário não pode escolher se associa pelo caminho
 > autenticado, `POST /ua/account-role/using/authority` ([ua-associacao.md](ua-associacao.md)).
 
+### Captcha e aceite no autocadastro
+
+> ⚠️ **Em `develop` do orgid (`a9700c9`), ainda não em produção, e atrás de um interruptor desligado.** Até ele
+> ser ligado, o cadastro é o descrito acima.
+
+| Campo novo | Tipo | Quando |
+|---|---|---|
+| `captcha` | string | exigido quando a org do papel (`role.owner`) publicou o [manifesto](aplicacao.md): a solução do desafio de `GET /ua/sign-in/challenge`, em base64 |
+| `aceite` | objeto | exigido quando a org tem termos ou privacidade vigentes: `{"termos": <versão>, "privacidade": <versão>}` |
+
+- Captcha ausente → `428 {"codigo":"captcha_ausente"}`; inválido, vencido ou já usado → `428
+  {"codigo":"captcha_invalido"}`. **A conta não é criada.**
+- Aceite ausente, de versão que não é a vigente, ou de texto que a org não publicou → `400` com as versões
+  vigentes. **A conta não é criada.**
+- O desafio se consome no cadastro. Quem chega ao cadastro pela tela de login usa a solução que o login preparou;
+  depois do cadastro, o login pede desafio novo.
+
 ## GET /open/up/hash/for/{action}/by/{username}
 ## GET /open/ua/hash/for/{action}/by/{username}
 Solicita um **hash** de vida curta (enviado ao usuário por e-mail) para `{action}` (`R` ativação / `PR` recuperação).

@@ -2322,6 +2322,34 @@ organizações e tenants. Ver [README — claims](../README.md#o-que-o-login-ret
 
 Catálogo: [../erros.md](../erros.md).
 
+## Só em `/ua`: captcha e aceite de termos
+
+> ⚠️ **Em `develop` (auth `315a942`, orgid `a9700c9`), ainda não em produção, e atrás de um interruptor
+> desligado.** Até ele ser ligado, o login é o descrito acima.
+
+Para conta que tem papel em organização que publicou o [manifesto da aplicação](../../orgid/endpoints/aplicacao.md):
+
+| Campo novo | Tipo | Significado |
+|---|---|---|
+| `captcha` | string | a solução do desafio ALTCHA, em base64: `{algorithm, challenge, number, salt, signature}` |
+| `domain` | string | o host por onde a pessoa chegou (`location.hostname`) |
+| `aceite` | array | `[{"org": "<org>", "termos": <versão>, "privacidade": <versão>}]` — as versões aceitas |
+
+- **Desafio:** `GET /ua/sign-in/challenge`, público → `200 {algorithm:"SHA-256", challenge, maxnumber, salt,
+  signature}`. Vale 5 minutos e serve **uma vez** (no login ou no autocadastro).
+- **Ordem:** o captcha é conferido **antes** da senha; a senha; o aceite **depois** da senha.
+- **Org exigida:** a do `domain`, se ele for domínio verificado de uma org da conta; senão, **todas** as orgs da
+  conta que publicaram termos.
+
+| Situação | Resposta |
+|---|---|
+| captcha exigido e ausente | `428 {"codigo":"captcha_ausente"}` |
+| captcha inválido, vencido ou já usado | `428 {"codigo":"captcha_invalido"}` — peça outro desafio |
+| aceite faltando ou de versão que não é a vigente | `428 {"codigo":"aceite_pendente","pendentes":[{org, termos:{versao, vigenteDesde, texto}\|null, privacidade:{…}\|null}]}` — mostre os textos e reenvie com `aceite` |
+| tudo certo | `200`, a resposta de sempre; o aceite fica gravado |
+
+O aceite é **uma vez por versão**: quem já aceitou a versão vigente não vê `aceite_pendente`.
+
 ## Comportamento
 Segue o [fluxo de login](../README.md#fluxo-de-login-ciclo-de-vida): valida (via identidade) → descobre
 contexto/tenants → emite token → registra sessão (login novo **invalida** sessões anteriores do usuário).
@@ -3425,6 +3453,23 @@ Cria uma conta **externa** e a associa a um **papel**.
 > conta nova já com esse papel. Papel que o próprio usuário não pode escolher se associa pelo caminho
 > autenticado, `POST /ua/account-role/using/authority` ([ua-associacao.md](ua-associacao.md)).
 
+### Captcha e aceite no autocadastro
+
+> ⚠️ **Em `develop` do orgid (`a9700c9`), ainda não em produção, e atrás de um interruptor desligado.** Até ele
+> ser ligado, o cadastro é o descrito acima.
+
+| Campo novo | Tipo | Quando |
+|---|---|---|
+| `captcha` | string | exigido quando a org do papel (`role.owner`) publicou o [manifesto](aplicacao.md): a solução do desafio de `GET /ua/sign-in/challenge`, em base64 |
+| `aceite` | objeto | exigido quando a org tem termos ou privacidade vigentes: `{"termos": <versão>, "privacidade": <versão>}` |
+
+- Captcha ausente → `428 {"codigo":"captcha_ausente"}`; inválido, vencido ou já usado → `428
+  {"codigo":"captcha_invalido"}`. **A conta não é criada.**
+- Aceite ausente, de versão que não é a vigente, ou de texto que a org não publicou → `400` com as versões
+  vigentes. **A conta não é criada.**
+- O desafio se consome no cadastro. Quem chega ao cadastro pela tela de login usa a solução que o login preparou;
+  depois do cadastro, o login pede desafio novo.
+
 ## GET /open/up/hash/for/{action}/by/{username}
 ## GET /open/ua/hash/for/{action}/by/{username}
 Solicita um **hash** de vida curta (enviado ao usuário por e-mail) para `{action}` (`R` ativação / `PR` recuperação).
@@ -3561,7 +3606,7 @@ Cria ou substitui o manifesto. Cada publicação sobe a **versão** e fica regis
 | `nome` | string | sim | até 120 caracteres |
 | `subtitulo` | string | não | até 240 caracteres |
 | `icone` | string | não | data URI `data:image/svg+xml`, `data:image/png;base64` ou `data:image/webp;base64`; até **32 KiB** (`413`). SVG com script, atributo de evento (`on…=`), `javascript:` ou referência externa é recusado; referência interna (`url(#id)`, `href="#id"`) é aceita. PNG e WEBP têm a assinatura conferida |
-| `esquema` | string | sim | `verde`, `azul`, `ambar`, `roxo` ou `cinza` |
+| `esquema` | string | sim | `verde`, `azul`, `ambar`, `roxo`, `cinza` ou `marinho` |
 | `autocadastro` | boolean | sim | a tela de login oferece "criar conta" |
 
 **Resposta:** `201 {"versao": <n>}` · `400` forma · `403` sem administrador · `404` org inexistente · `413` ícone grande.
@@ -3648,6 +3693,19 @@ publicou manifesto · `400` sem `domain` ou com host inválido.
 
 Mesmo corpo da leitura por domínio, para o usuário já logado (troca de org). `403` se `{org}` não está
 entre as orgs do token · `404` sem manifesto.
+
+> ⚠️ **O que segue está em `develop` do orgid (`a9700c9`), ainda não em produção, e atrás de um interruptor
+> desligado.**
+
+O corpo ganha `aceitePendente: {"termos": <versão>|null, "privacidade": <versão>|null}` — a versão vigente que a
+conta do token **ainda não aceitou** nesta org (`null` = nada pendente). A casca mostra o texto e só entra na org
+depois do aceite.
+
+## POST /ua/application/{org}/acceptance — aceitar na troca de org
+
+Token de aplicação com `{org}` entre as orgs do token. **Corpo:** `{"termos": <versão>, "privacidade": <versão>}`,
+cada um opcional. **Resposta:** `201 {"org", "gravado": {…}}` · `400` se a versão não for a vigente, ou se o
+texto não foi publicado · `403` fora da org. Aceitar de novo a mesma versão não duplica.
 
 ## Pitfalls
 
@@ -11750,6 +11808,16 @@ O usuário abre um relato novo.
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.115 — 2026-10-16
+
+- **auth e orgid: captcha e aceite de termos no login e no autocadastro** (`auth/endpoints/sign-in.md` §Só em
+  `/ua`; `orgid/endpoints/publico.md` §Captcha e aceite no autocadastro; `orgid/endpoints/aplicacao.md`
+  `aceitePendente` e `POST /ua/application/{org}/acceptance`). Desafio ALTCHA em `GET /ua/sign-in/challenge`;
+  recusas `428` por `codigo` (`captcha_ausente`, `captcha_invalido`, `aceite_pendente`). Em `develop`, ainda não
+  em produção, atrás de um interruptor desligado.
+- **orgid: esquema `marinho`** na lista do manifesto (`orgid/endpoints/aplicacao.md`, `orgid/openapi.yaml`). Em
+  `develop` do orgid (`a9700c9`), ainda não em produção.
 
 ## 1.114 — 2026-10-16
 
