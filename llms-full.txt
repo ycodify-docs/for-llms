@@ -2324,8 +2324,8 @@ Catálogo: [../erros.md](../erros.md).
 
 ## Só em `/ua`: captcha e aceite de termos
 
-> ⚠️ **Em `develop` (auth `315a942`, orgid `a9700c9`), ainda não em produção, e atrás de um interruptor
-> desligado.** Até ele ser ligado, o login é o descrito acima.
+> ⚠️ **No ar desde 2026-10-16T18:47:51Z, mas atrás de um interruptor ainda desligado.** Até ele ser ligado, o
+> login é o descrito acima. O desafio já responde.
 
 Para conta que tem papel em organização que publicou o [manifesto da aplicação](../../orgid/endpoints/aplicacao.md):
 
@@ -3455,8 +3455,8 @@ Cria uma conta **externa** e a associa a um **papel**.
 
 ### Captcha e aceite no autocadastro
 
-> ⚠️ **Em `develop` do orgid (`a9700c9`), ainda não em produção, e atrás de um interruptor desligado.** Até ele
-> ser ligado, o cadastro é o descrito acima.
+> ⚠️ **No ar desde 2026-10-16T18:47:51Z, mas atrás de um interruptor ainda desligado.** Até ele ser ligado, o
+> cadastro é o descrito acima.
 
 | Campo novo | Tipo | Quando |
 |---|---|---|
@@ -3694,8 +3694,7 @@ publicou manifesto · `400` sem `domain` ou com host inválido.
 Mesmo corpo da leitura por domínio, para o usuário já logado (troca de org). `403` se `{org}` não está
 entre as orgs do token · `404` sem manifesto.
 
-> ⚠️ **O que segue está em `develop` do orgid (`a9700c9`), ainda não em produção, e atrás de um interruptor
-> desligado.**
+> ⚠️ **O que segue está no ar desde 2026-10-16T18:47:51Z, mas atrás de um interruptor ainda desligado.**
 
 O corpo ganha `aceitePendente: {"termos": <versão>|null, "privacidade": <versão>|null}` — a versão vigente que a
 conta do token **ainda não aceitou** nesta org (`null` = nada pendente). A casca mostra o texto e só entra na org
@@ -11808,6 +11807,13 @@ O usuário abre um relato novo.
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.116 — 2026-10-16
+
+- **O esquema `marinho` e o captcha e aceite da 1.115 estão no ar desde 2026-10-16T18:47:51Z.** O `marinho` já vale
+  (`orgid/endpoints/aplicacao.md`). O captcha e o aceite (`auth/endpoints/sign-in.md`, `orgid/endpoints/publico.md`,
+  `orgid/endpoints/aplicacao.md`) seguem atrás de um interruptor **desligado**: até ele ser ligado, login e cadastro
+  são os de antes. O desafio `GET /ua/sign-in/challenge` já responde `200`.
 
 ## 1.115 — 2026-10-16
 

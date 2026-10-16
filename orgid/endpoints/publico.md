@@ -96,8 +96,8 @@ Cria uma conta **externa** e a associa a um **papel**.
 
 ### Captcha e aceite no autocadastro
 
-> ⚠️ **Em `develop` do orgid (`a9700c9`), ainda não em produção, e atrás de um interruptor desligado.** Até ele
-> ser ligado, o cadastro é o descrito acima.
+> ⚠️ **No ar desde 2026-10-16T18:47:51Z, mas atrás de um interruptor ainda desligado.** Até ele ser ligado, o
+> cadastro é o descrito acima.
 
 | Campo novo | Tipo | Quando |
 |---|---|---|
