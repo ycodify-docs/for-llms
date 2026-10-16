@@ -62,8 +62,14 @@ Cria a **conta** (estado inicial **pendente**) **e** a **organização**, vincul
 | `org.name` | string | sim | Nome da organização (vira o `{org}`). |
 | `org.client` | string | sim | **Nome da empresa cliente** que contratou a plataforma (toda org sinaliza o seu). Máx. 12 caracteres. |
 | `org.alias` | string | sim | Apelido da org. |
+| `role.name` | string | não | `SKOS_MASTER` ou `SKOS_ANALYST`. A conta nasce **também** com esse papel na organização nova: ele **soma** ao de administradora, não o substitui. Sem `role`, o registro é o de sempre. |
 
 **Resposta:** `201` — conta criada (com `id`; senha omitida). Depois: **ativar** (fluxo de hash) e seguir para o forger.
+`400` — `"Papel desconhecido ou não autorizado."` se `role` vier com outro nome (inclusive os `API_*`): **nada
+é criado**, nem a conta, nem a organização.
+
+> O campo `role` está em produção desde 2026-10-07T17:06Z. Até então ele era ignorado: a conta era criada
+> só como administradora, **sem** o papel pedido e sem erro.
 
 ## POST /open/ua/account-role — registro (externo): conta + papel
 Cria uma conta **externa** e a associa a um **papel**.

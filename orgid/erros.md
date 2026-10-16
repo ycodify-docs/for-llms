@@ -16,6 +16,8 @@ Em erro, a resposta tem o status HTTP e uma mensagem. (Internamente as mensagens
 | `400` | Requisição inválida | Campo obrigatório ausente; formato inválido. | Corrigir o corpo/parâmetros. |
 | `404` | Não encontrado | **Em escrita:** a entidade alvo (ou uma referenciada) não existe, e **nada foi gravado**. | Conferir o alvo e as referências; a mensagem diz o que não aconteceu. |
 | `403` | Acesso negado | Sem o **papel** exigido **na organização**; violação de posse. | Usar credencial com o papel correto na org. |
+| `409` | Conflito | O recurso já pertence a outro dono — ex.: domínio registrado por outra organização ([manifesto da aplicação](endpoints/aplicacao.md)). | Usar outro domínio, ou removê-lo na org que o tem. |
+| `413` | Grande demais | Campo acima do teto — ex.: ícone > 32 KiB, texto > 100 KiB ([manifesto da aplicação](endpoints/aplicacao.md)). | Reduzir o conteúdo. |
 | `500` | Erro interno | Falha inesperada. | Retentar; se persistir, escalar. |
 | `510` | Falha **não tratada** (catch-all) | Exceção não mapeada ao executar a operação — **não** é validação de campo (essas dão `400`/`204`). Ex.: corpo incompleto que não casa a forma exata; contexto que impede montar o objeto; falha em operação dependente (ex.: envio de e-mail). | Conferir o **corpo exato** e os **pré-requisitos** do endpoint; garantir que entidades referenciadas existem; então retentar. |
 

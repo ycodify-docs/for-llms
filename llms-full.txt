@@ -2502,7 +2502,7 @@ verificam para autorizar. Ver [fluxo de deploy](../03-fluxo-de-deploy.md) e [coo
 
 | Prefixo | Domínio | Para quê |
 |---|---|---|
-| `/up` | **plataforma** | organizações, contas e contratos dos **clientes/parceiros** que operam a plataforma (papéis `API_*`). |
+| `/up` | **plataforma** | organizações, contas e contratos dos **clientes/parceiros** que operam a plataforma (papéis `API_*` e `SKOS_*`). |
 | `/ua` | **externo** | contas e papéis dos **usuários finais** dos sistemas construídos sobre a plataforma (papéis com **espaço de nomes** por dono). |
 | `/open` | **público** | endpoints **sem autenticação por design** (registro, recuperação de senha, verificação de existência). |
 
@@ -2513,6 +2513,12 @@ verificam para autorizar. Ver [fluxo de deploy](../03-fluxo-de-deploy.md) e [coo
 - **Autorização (RBAC):** papéis da plataforma — **administrador** (`API_MASTER`), **engenheiro**
   (`API_ENGINEER`), **analista** (`API_ANALYST`), **financeiro** (`API_FINANCIAL`). A autorização é
   **escopada por organização**: o portador precisa do papel **naquela** organização. Falta de papel → `403`.
+- **Papéis `SKOS_MASTER` e `SKOS_ANALYST`:** também são papéis de conta de plataforma numa organização,
+  comuns a mais de um módulo que roda sobre a plataforma (a base de conhecimento, `yc.kb`, e o KORC). O
+  orgid os atribui e o token os carrega; o que permitem é definido por quem os lê. No orgid, abrem só a
+  leitura da própria conta e a suspensão do próprio vínculo e, para `SKOS_MASTER`, a listagem das contas
+  da organização e a gestão de `SKOS_ANALYST`. Quem atribui cada um:
+  [endpoints/up-associacao.md](endpoints/up-associacao.md).
 - **Sem `X-Tenant-Id`:** orgid identifica pelo **token** e pelos parâmetros de caminho
   (`{orgName}`/`{orgOwner}`); não usa o cabeçalho de tenant dos serviços de dados.
 
@@ -2522,7 +2528,7 @@ verificam para autorizar. Ver [fluxo de deploy](../03-fluxo-de-deploy.md) e [coo
 |---|---|
 | **organização (org)** | Unidade de propriedade/escopo. Tem `name` (único), **`client`** (nome da empresa cliente, obrigatório na criação, ≤12), `alias`, `owner`, `status`. O `name` é o `{org}` usado nos caminhos do forger. |
 | **conta (account)** | Usuário. Domínio `/up` (plataforma) ou `/ua` (externo). Tem `username`, `email`, `status`. |
-| **papel (role)** | Permissão nomeada. Em `/up` são papéis fixos `API_*`; em `/ua` são papéis com **dono** (`owner`) e visibilidade (`ispublic`). |
+| **papel (role)** | Permissão nomeada. Em `/up` são papéis fixos (`API_*` e `SKOS_*`); em `/ua` são papéis com **dono** (`owner`) e visibilidade (`ispublic`). |
 | **associação conta-papel-org** | Vínculo tripla (conta × papel × organização) — base do multi-tenant/autorização no domínio `/up`. Em `/ua`, vínculo **conta-papel**. |
 | **contrato** | Assinatura/plano de uma organização (`status`, validade, plano). |
 
@@ -2544,6 +2550,7 @@ verificam para autorizar. Ver [fluxo de deploy](../03-fluxo-de-deploy.md) e [coo
 | `/ua` · Papel | [endpoints/ua-papel.md](endpoints/ua-papel.md) |
 | `/ua` · Associação conta-papel | [endpoints/ua-associacao.md](endpoints/ua-associacao.md) |
 | `/open` · Público (existência, registro, hash, e-mail) | [endpoints/publico.md](endpoints/publico.md) |
+| `/up` · `/open` · `/ua` · Manifesto da aplicação (marca, domínios, termos e privacidade) | [endpoints/aplicacao.md](endpoints/aplicacao.md) |
 
 Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md). Contrato de fio: [openapi.yaml](openapi.yaml).
 
@@ -2573,7 +2580,7 @@ Ver [coordenação](../coordenacao.md).
 - [ ] Criar **organização + conta dona** (orgid) **antes** de usar o forger sob aquela org.
 - [ ] Enviar `Authorization` em `/up`/`/ua`; `/open/*` é público (não enviar token não é erro lá).
 - [ ] Autorização é **por organização** — ter o papel numa org não dá poder em outra.
-- [ ] Distinguir domínios: `/up` (plataforma, papéis `API_*`) vs `/ua` (externo, papéis com dono).
+- [ ] Distinguir domínios: `/up` (plataforma, papéis `API_*` e `SKOS_*`) vs `/ua` (externo, papéis com dono).
 - [ ] Senha nunca volta nas respostas; recuperação é via fluxo de **hash** (`/open/*`).
 - [ ] `name` da organização é o `{org}` dos caminhos do forger — escolha-o cedo e mantenha.
 
@@ -2698,6 +2705,10 @@ também é `200` e nada é removido — confira `orgOwner`.
 >
 > **Comum:** `Authorization` obrigatório; POST/PUT enviam `Content-Type: application/json`.
 > Papéis aceitos (salvo indicação): administrador / engenheiro / analista / financeiro. Erros: [../erros.md](../erros.md).
+>
+> **Conta que só tem `SKOS_MASTER` ou `SKOS_ANALYST`** (ver [up-associacao.md](up-associacao.md)) lê a
+> própria conta em `GET /up/account/by/jwt`; nas rotas de perfil, senha e remoção desta página continua
+> recebendo `403`.
 
 ## Contents
 - GET /up/account/by/jwt — conta autenticada
@@ -2711,10 +2722,14 @@ também é `200` e nada é removido — confira `orgOwner`.
 ---
 
 ## GET /up/account/by/jwt
-Retorna a conta do **portador do token** (resolvida pelo token, sem parâmetros).
+Retorna a conta do **portador do token** (resolvida pelo token, sem parâmetros). **Papéis:** administrador /
+engenheiro / analista / financeiro, e também `SKOS_MASTER` / `SKOS_ANALYST`.
 
 **Resposta:** `200` — conta (`id`, `username`, `name`, `email`, `status`, endereço, `accountRoleOrgs`;
 `password` = nulo); `204` se não encontrada.
+
+> A leitura por quem só tem `SKOS_*` está em produção desde 2026-10-07T17:06Z. Até então essa conta
+> recebia `403` aqui.
 
 ## PUT /up/account
 Atualiza o **perfil** da própria conta (o `username` é forçado ao do token).
@@ -2758,7 +2773,10 @@ Lista as contas de uma org. **Papéis:** administrador / engenheiro / analista (
 **Resposta:** `200` array de contas (senha nula); `204` se vazio.
 
 ## GET /up/account/by/org/{orgName}/org-owner/{orgOwner}
-Igual ao anterior, qualificando o dono.
+Igual ao anterior, qualificando o dono. **Papéis:** administrador / engenheiro / analista (na org), e também
+`SKOS_MASTER` (na org). `SKOS_ANALYST` não lista.
+
+> A listagem por `SKOS_MASTER` está em produção desde 2026-10-07T17:06Z.
 
 | Path-var | Significado |
 |---|---|
@@ -2790,10 +2808,13 @@ Envia uma notificação por e-mail (usuário autenticado).
 > **Comum:** `Authorization` obrigatório; POST/PUT enviam `Content-Type: application/json`. Autorização
 > **na organização** do vínculo. Erros: [../erros.md](../erros.md).
 >
-> **Forma do vínculo no corpo** (recorrente abaixo): `account` `{username}`, `role` `{name}` (papel
-> `API_MASTER`/`API_ENGINEER`/`API_ANALYST`/`API_FINANCIAL`), `org` `{name}`.
+> **Forma do vínculo no corpo** (recorrente abaixo): `account` `{username}`, `role` `{name}`, `org` `{name}`.
+> Papéis que se atribuem por aqui: `API_ENGINEER`, `API_ANALYST`, `API_FINANCIAL`, `API_GUEST`,
+> `SKOS_MASTER` e `SKOS_ANALYST`. O `API_MASTER` **não** se atribui por aqui: nasce com a organização, no
+> registro ([publico.md](publico.md)) ou no `POST /up/org`.
 
 ## Contents
+- Quem gere cada papel
 - POST /up/account-role-org — criar vínculo
 - PUT /up/account-role-org/account-status — alterar status do vínculo
 - PUT /up/account-role-org/status/by-master — alterar status (override)
@@ -2804,32 +2825,91 @@ Envia uma notificação por e-mail (usuário autenticado).
 
 ---
 
+## Quem gere cada papel
+
+Vale para **criar** o vínculo (`POST /up/account-role-org`) e para **mudar o status** dele por terceiro
+(`PUT /up/account-role-org/status/by-master`).
+
+| Papel do vínculo | Quem gere | Como a organização é identificada |
+|---|---|---|
+| `API_ENGINEER`, `API_ANALYST`, `API_FINANCIAL`, `API_GUEST` | o **dono** da organização | `org.name`, entre as organizações de quem chama |
+| `SKOS_MASTER` | o **dono** da organização | `org.name`, entre as organizações de quem chama |
+| `SKOS_ANALYST` | quem tem `SKOS_MASTER` **ativo** naquela organização | `org.name` + `org.owner` |
+
+- **`SKOS_MASTER` e `SKOS_ANALYST`** são papéis comuns a mais de um módulo que roda sobre a plataforma (a
+  base de conhecimento, `yc.kb`, e o KORC). O orgid só os atribui; o que cada um permite é definido pelo
+  módulo que os lê do token.
+- O dono da organização **não** atribui `SKOS_ANALYST` só por ser dono: precisa ter também `SKOS_MASTER`
+  ativo nela, e pode atribuí-lo a si mesmo.
+- "Ativo" é o vínculo `SKOS_MASTER` de quem chama com `accountStatus` e `orgStatus` em `ACTIVE`, lido do
+  cadastro **no momento da chamada**, e não do token.
+- Quem tem `SKOS_MASTER` não gere outro `SKOS_MASTER`, nem os papéis `API_*`.
+- No token do login, o vínculo aparece no claim `orgs` como `<org>/SKOS_MASTER` ou `<org>/SKOS_ANALYST`, e
+  em `authorities` como `ROLE_SKOS_MASTER` ou `ROLE_SKOS_ANALYST`, do mesmo modo que os papéis `API_*`.
+  Vínculo criado depois do login só entra no próximo token.
+- O vínculo só entra no token com **quatro status em `ACTIVE`**: o do papel, o da organização e os dois do
+  vínculo (`accountStatus` e `orgStatus`). Com qualquer um diferente ele fica de fora, e o login não acusa
+  erro.
+
+> Em produção desde 2026-10-07T17:06Z. Até então, `POST /up/account-role-org` e as duas rotas de status
+> respondiam `400` a `SKOS_MASTER` e `SKOS_ANALYST`.
+
 ## POST /up/account-role-org
-Cria o vínculo conta-papel-org. **Papéis:** administrador / engenheiro / analista / financeiro.
+Cria o vínculo conta-papel-org. **Quem chama:** token com papel `API_MASTER`, `API_ENGINEER`,
+`API_ANALYST`, `API_FINANCIAL` ou `SKOS_MASTER`; e ainda tem de ser quem **gere** o papel pedido
+([Quem gere cada papel](#quem-gere-cada-papel)).
 
 **Corpo** (JSON):
 
 | Campo | Tipo | Obrig. | Significado |
 |---|---|---|---|
-| `account` | objeto | sim | `{ "username": "…" }` — conta a vincular. |
-| `role` | objeto | sim | `{ "name": "API_…" }` — papel atribuído. |
-| `org` | objeto | sim | `{ "name": "…" }` — organização do vínculo. |
+| `account` | objeto | sim | `{ "username": "…" }` — conta a vincular. Tem de existir. |
+| `role` | objeto | sim | `{ "name": "…" }` — `API_ENGINEER`, `API_ANALYST`, `API_FINANCIAL`, `API_GUEST`, `SKOS_MASTER` ou `SKOS_ANALYST`. |
+| `org.name` | string | sim | Organização do vínculo. |
+| `org.owner` | string | não | Dono da organização. Só é lido quando o papel é `SKOS_ANALYST`; sem ele, vale quem chama. |
+| `accountStatus`, `orgStatus` | string | não | Status inicial do vínculo. Padrão `ACTIVE`. |
 
-**Resposta:** `201` (sem corpo). `403` sem papel na org.
+**Resposta:** `201` (sem corpo) · `400` — `"Papel desconhecido ou não autorizado."` (nome fora da lista,
+inclusive `API_MASTER`) · `400` se a conta já tem esse papel nessa organização · `403` — quem chama não tem
+`SKOS_MASTER` ativo na organização e pediu `SKOS_ANALYST` · `404` — `"conta de usuário não existe: o vínculo
+não foi criado."` ou `"organização não existe para este dono: o vínculo não foi criado."`
 
 ## PUT /up/account-role-org/account-status
-Altera o **status** de um vínculo (o `account.username` é forçado ao do token).
+A **própria conta** suspende ou cancela o seu vínculo (o `account.username` é forçado ao do token).
+**Quem chama:** token com papel `API_MASTER`, `API_ENGINEER`, `API_ANALYST`, `API_FINANCIAL`,
+`SKOS_MASTER` ou `SKOS_ANALYST`.
 
-**Corpo** (JSON): `status` (string) + `account` `{username}` + `role` `{name}` + `org` `{name}`.
+**Corpo** (JSON):
 
-**Resposta:** `200` (sem corpo).
+| Campo | Tipo | Obrig. | Significado |
+|---|---|---|---|
+| `role` | objeto | sim | `{ "name": "…" }` — papel do vínculo: um dos seis de `POST /up/account-role-org`. |
+| `org.name` | string | sim | Organização do vínculo. |
+| `org.owner` | string | sim | Dono da organização. |
+| `accountStatus` | string | sim | `SUSPENDED` ou `CANCELED`. |
+
+**Resposta:** `200` (sem corpo) · `400` — campo ausente, papel ou `accountStatus` fora da lista, ou vínculo
+que já está `SUSPENDED` ou `CANCELED` (a própria conta não o reativa).
 
 ## PUT /up/account-role-org/status/by-master
-Altera o status do vínculo por um administrador (mesma forma de corpo do anterior; sem forçar o username).
+Muda o status do vínculo **de outra conta**. **Quem chama:** token com papel `API_MASTER`, `API_ENGINEER`,
+`API_ANALYST`, `API_FINANCIAL` ou `SKOS_MASTER`; e ainda tem de ser quem **gere** o papel do vínculo
+([Quem gere cada papel](#quem-gere-cada-papel)).
 
-**Corpo** (JSON): `status` + `account` `{username}` + `role` `{name}` + `org` `{name}`.
+**Corpo** (JSON):
 
-**Resposta:** `200`.
+| Campo | Tipo | Obrig. | Significado |
+|---|---|---|---|
+| `account` | objeto | sim | `{ "username": "…" }` — conta do vínculo. |
+| `role` | objeto | sim | `{ "name": "…" }` — papel do vínculo: um dos seis de `POST /up/account-role-org`. |
+| `org.name` | string | sim | Organização do vínculo. |
+| `org.owner` | string | sim | Dono da organização. Só é lido quando o papel é `SKOS_ANALYST`; nos demais a organização é procurada entre as de quem chama. |
+| `accountStatus` | string | sim | `ACTIVE`, `SUSPENDED` ou `CANCELED`. |
+| `orgStatus` | string | sim | `ACTIVE`, `SUSPENDED` ou `CANCELED`. |
+
+**Resposta:** `200` (sem corpo) · `400` — campo ausente, valor fora da lista, ou `"associação indicada não
+foi localizada."` · `403` — quem chama não tem `SKOS_MASTER` ativo na organização e o vínculo é
+`SKOS_ANALYST`.
 
 ## PUT /up/account-role-org/replace-account
 Substitui **a conta** de um vínculo existente. **Papel:** administrador na org.
@@ -3313,8 +3393,14 @@ Cria a **conta** (estado inicial **pendente**) **e** a **organização**, vincul
 | `org.name` | string | sim | Nome da organização (vira o `{org}`). |
 | `org.client` | string | sim | **Nome da empresa cliente** que contratou a plataforma (toda org sinaliza o seu). Máx. 12 caracteres. |
 | `org.alias` | string | sim | Apelido da org. |
+| `role.name` | string | não | `SKOS_MASTER` ou `SKOS_ANALYST`. A conta nasce **também** com esse papel na organização nova: ele **soma** ao de administradora, não o substitui. Sem `role`, o registro é o de sempre. |
 
 **Resposta:** `201` — conta criada (com `id`; senha omitida). Depois: **ativar** (fluxo de hash) e seguir para o forger.
+`400` — `"Papel desconhecido ou não autorizado."` se `role` vier com outro nome (inclusive os `API_*`): **nada
+é criado**, nem a conta, nem a organização.
+
+> O campo `role` está em produção desde 2026-10-07T17:06Z. Até então ele era ignorado: a conta era criada
+> só como administradora, **sem** o papel pedido e sem erro.
 
 ## POST /open/ua/account-role — registro (externo): conta + papel
 Cria uma conta **externa** e a associa a um **papel**.
@@ -3392,6 +3478,166 @@ Envia uma notificação por e-mail.
 
 **Resposta:** `200` — `{}`.
 
+<!-- ===== orgid/endpoints/aplicacao.md ===== -->
+
+# orgid · manifesto da aplicação (`/up/application`, `/open/application`, `/ua/application`)
+
+> A **identidade da aplicação** de uma organização: nome, subtítulo, ícone, esquema de cor, autocadastro,
+> termos de acesso e política de privacidade. A casca a acha pelo **domínio** por onde o navegador chegou,
+> antes do login. Guia: [../README.md](../README.md). Erros: [../erros.md](../erros.md).
+>
+> **Em produção desde 2026-10-16T14:34:24Z.** Pela borda, as rotas de leitura chegam ao orgid: `GET
+> /open/application` responde `404` a domínio não verificado, e `GET /ua/application/{org}` sem token responde
+> `401`. Ainda não foi medido em produção publicar um manifesto e provar um domínio pelo TXT.
+
+## Contents
+- Quem publica e quem lê
+- Como o domínio casa
+- POST /up/application/{org} — publicar o manifesto
+- GET /up/application/{org} — estado completo, para quem publica
+- POST /up/application/{org}/domain — registrar domínio
+- POST /up/application/{org}/domain/{dominio}/verify — provar a posse (TXT)
+- DELETE /up/application/{org}/domain/{dominio} — remover domínio
+- POST /up/application/{org}/text/{termos|privacidade} — publicar versão de texto
+- GET /open/application?domain={host} — ler pelo domínio (público)
+- GET /ua/application/{org} — ler pela org (com sessão)
+- Pitfalls
+
+---
+
+## Quem publica e quem lê
+
+| Rota | Credencial |
+|---|---|
+| `/up/application/{org}/**` | token de **plataforma** com **administrador** (`API_MASTER`) em `{org}`. Engenheiro não publica → `403` |
+| `GET /open/application?domain=` | **nenhum token**: é a leitura antes do login. Na borda vale o cabeçalho de identificação de sempre |
+| `GET /ua/application/{org}` | token de **aplicação** de um usuário que tem papel em `{org}`; fora dela → `403` |
+
+`{org}` é o nome da organização (o mesmo de `/org/{org}` no forger), em minúsculas.
+
+## Como o domínio casa
+
+- **`*.exemplo.com.br`** casa os **subdomínios** (`app.exemplo.com.br`, `a.b.exemplo.com.br`) e **não** casa
+  `exemplo.com.br`.
+- **Sem `*`**, casa **só** o host exato.
+- Vence o **mais específico**: o host exato, depois o curinga de sufixo mais longo.
+- O mesmo domínio **não** pode estar em duas organizações (`409` no registro).
+- **Só domínio com posse provada casa.** A prova é um registro **TXT** no DNS:
+
+| Domínio registrado | Nome do TXT | Valor |
+|---|---|---|
+| `app.exemplo.com.br` | `_yc-verificacao.app.exemplo.com.br` | `yc-verificacao=<token>` |
+| `*.exemplo.com.br` | `_yc-verificacao.exemplo.com.br` (no domínio-base) | `yc-verificacao=<token>` |
+
+O `<token>` vem na resposta do registro e não muda ao repetir o registro.
+
+## POST /up/application/{org} — publicar o manifesto
+
+Cria ou substitui o manifesto. Cada publicação sobe a **versão** e fica registrada (quem, versão, quando).
+
+**Corpo** (JSON) — chave fora desta lista é **recusada** (`400`), não ignorada:
+
+| Campo | Tipo | Obrig. | Regra |
+|---|---|---|---|
+| `nome` | string | sim | até 120 caracteres |
+| `subtitulo` | string | não | até 240 caracteres |
+| `icone` | string | não | data URI `data:image/svg+xml`, `data:image/png;base64` ou `data:image/webp;base64`; até **32 KiB** (`413`). SVG com script, atributo de evento (`on…=`), `javascript:` ou referência externa é recusado; referência interna (`url(#id)`, `href="#id"`) é aceita. PNG e WEBP têm a assinatura conferida |
+| `esquema` | string | sim | `verde`, `azul`, `ambar`, `roxo` ou `cinza` |
+| `autocadastro` | boolean | sim | a tela de login oferece "criar conta" |
+
+**Resposta:** `201 {"versao": <n>}` · `400` forma · `403` sem administrador · `404` org inexistente · `413` ícone grande.
+
+## GET /up/application/{org} — estado completo
+
+Para quem publica conferir. **Resposta** `200`:
+
+```json
+{
+  "org": "exemplo",
+  "manifesto": { "nome": "…", "subtitulo": null, "icone": null, "esquema": "verde", "autocadastro": false, "versao": 2 },
+  "dominios": [
+    { "dominio": "*.exemplo.com.br", "verificado": false, "verificadoEm": null,
+      "txt": { "nome": "_yc-verificacao.exemplo.com.br", "valor": "yc-verificacao=<token>" } }
+  ],
+  "termos": [ { "versao": 1, "vigenteDesde": 1760600000000 } ],
+  "privacidade": []
+}
+```
+
+`manifesto` é `null` enquanto nada foi publicado.
+
+## POST /up/application/{org}/domain — registrar domínio
+
+**Corpo:** `{"dominio": "app.exemplo.com.br"}` ou `{"dominio": "*.exemplo.com.br"}`. Maiúsculas e ponto final
+são normalizados. Recusados (`400`): porta, caminho, endereço IP, nome de um rótulo só, `*` fora do começo,
+curinga com um rótulo só depois do `*.`.
+
+**Resposta:** `201 {"dominio", "verificado": false, "txt": {"nome", "valor"}}` — crie o TXT e chame o verify.
+Repetir o mesmo domínio na mesma org devolve o mesmo token · `409` se outra organização já tem o domínio.
+
+## POST /up/application/{org}/domain/{dominio}/verify — provar a posse
+
+O orgid consulta o TXT agora. **Resposta** sempre `200`:
+
+| Corpo | Quando | Efeito |
+|---|---|---|
+| `{"verificado": true, "verificadoEm": <epoch ms>}` | o TXT tem o valor | o domínio passa a casar |
+| `{"verificado": false, "motivo": "…"}` | o TXT respondeu sem o valor | **a posse deixa de valer**, mesmo que valesse antes |
+| `{"verificado": false, "motivo": "DNS lookup … failed …"}` | a consulta falhou | nada muda |
+
+`404` se o domínio não está registrado nesta org. A propagação de DNS pode atrasar: repita depois.
+
+## DELETE /up/application/{org}/domain/{dominio} — remover domínio
+
+**Resposta:** `200 {"deleted": true}` — diz que **não resta** o domínio, tenha havido ou não o que remover
+(o gateway repete DELETE).
+
+## POST /up/application/{org}/text/{termos|privacidade} — publicar versão de texto
+
+Texto **simples** (não HTML). Toda publicação é uma **versão nova**; versão publicada **não muda** e não se
+remove — é a ela que o aceite do usuário vai apontar.
+
+**Corpo:** `{"texto": "…", "vigenteDesde": <epoch ms, opcional>}`. Sem `vigenteDesde`, vale a partir de agora;
+com data futura, a versão anterior segue vigente até lá. Texto até **100 KiB** (`413`).
+
+**Resposta:** `201 {"tipo", "versao", "vigenteDesde"}` · `400` tipo, chave ou texto vazio.
+
+## GET /open/application?domain={host} — ler pelo domínio
+
+`{host}` é o nome por onde o navegador chegou (`location.hostname`), sem porta. **Público.**
+
+**Resposta** `200`:
+
+```json
+{
+  "org": "exemplo",
+  "nome": "Exemplo",
+  "subtitulo": null,
+  "icone": "data:image/svg+xml;base64,…",
+  "esquema": "verde",
+  "autocadastro": true,
+  "termos": { "versao": 3, "vigenteDesde": 1760600000000, "texto": "…" },
+  "privacidade": null
+}
+```
+
+`termos`/`privacidade` trazem a **vigente** (a maior versão já em vigor) ou `null`. A lista de domínios
+**não** é devolvida. `404` quando nenhum domínio **verificado** casa, a org não existe mais, ou ela ainda não
+publicou manifesto · `400` sem `domain` ou com host inválido.
+
+## GET /ua/application/{org} — ler pela org
+
+Mesmo corpo da leitura por domínio, para o usuário já logado (troca de org). `403` se `{org}` não está
+entre as orgs do token · `404` sem manifesto.
+
+## Pitfalls
+
+- **Domínio registrado não é domínio que casa.** Sem o verify com o TXT certo, a leitura pública dá `404`.
+- **O TXT do curinga fica no domínio-base**, não em `*.…`.
+- **Remover o TXT e chamar o verify desfaz a posse**; não chamar o verify não desfaz.
+- **`/ua/open/…` é público** no orgid: a leitura por org, que exige token, é `/ua/application/{org}`.
+- **Os textos são simples**: exiba com quebra de linha preservada, nunca como HTML.
+
 <!-- ===== orgid/erros.md ===== -->
 
 # orgid · catálogo de erros
@@ -3412,6 +3658,8 @@ Em erro, a resposta tem o status HTTP e uma mensagem. (Internamente as mensagens
 | `400` | Requisição inválida | Campo obrigatório ausente; formato inválido. | Corrigir o corpo/parâmetros. |
 | `404` | Não encontrado | **Em escrita:** a entidade alvo (ou uma referenciada) não existe, e **nada foi gravado**. | Conferir o alvo e as referências; a mensagem diz o que não aconteceu. |
 | `403` | Acesso negado | Sem o **papel** exigido **na organização**; violação de posse. | Usar credencial com o papel correto na org. |
+| `409` | Conflito | O recurso já pertence a outro dono — ex.: domínio registrado por outra organização ([manifesto da aplicação](endpoints/aplicacao.md)). | Usar outro domínio, ou removê-lo na org que o tem. |
+| `413` | Grande demais | Campo acima do teto — ex.: ícone > 32 KiB, texto > 100 KiB ([manifesto da aplicação](endpoints/aplicacao.md)). | Reduzir o conteúdo. |
 | `500` | Erro interno | Falha inesperada. | Retentar; se persistir, escalar. |
 | `510` | Falha **não tratada** (catch-all) | Exceção não mapeada ao executar a operação — **não** é validação de campo (essas dão `400`/`204`). Ex.: corpo incompleto que não casa a forma exata; contexto que impede montar o objeto; falha em operação dependente (ex.: envio de e-mail). | Conferir o **corpo exato** e os **pré-requisitos** do endpoint; garantir que entidades referenciadas existem; então retentar. |
 
@@ -3539,8 +3787,37 @@ Headers: Authorization: ...
 > associação → `510` (falha não tratada, não validação de campo). Ver [erros.md](erros.md) e
 > [endpoints/ua-associacao.md](endpoints/ua-associacao.md).
 
-> O `name` da org (`acme`) é o `{org}` dos caminhos do forger. Papéis `/up` são `API_*`; papéis `/ua`
-> têm `owner` (espaço de nomes). Ver [README](README.md) e [coordenação](../coordenacao.md).
+## 8. Papéis `SKOS_*` numa organização (`/up`)
+
+O dono da organização dá `SKOS_MASTER`; quem tem `SKOS_MASTER` ativo nela dá e suspende `SKOS_ANALYST`.
+Regra completa em [endpoints/up-associacao.md](endpoints/up-associacao.md). Em produção desde 2026-10-07.
+
+```
+// alice é a dona de "acme" e dá SKOS_MASTER a carla
+POST /up/account-role-org
+Headers: Authorization: ...            // token de alice
+{ "account": { "username": "carla" }, "role": { "name": "SKOS_MASTER" }, "org": { "name": "acme" } }
+→ 201
+
+// carla dá SKOS_ANALYST a bob: a organização não é dela, então o corpo leva o dono
+POST /up/account-role-org
+Headers: Authorization: ...            // token de carla
+{ "account": { "username": "bob" }, "role": { "name": "SKOS_ANALYST" },
+  "org": { "name": "acme", "owner": "alice" } }
+→ 201
+
+// carla suspende o vínculo de bob
+PUT /up/account-role-org/status/by-master
+Headers: Authorization: ...            // token de carla
+{ "account": { "username": "bob" }, "role": { "name": "SKOS_ANALYST" },
+  "org": { "name": "acme", "owner": "alice" }, "accountStatus": "SUSPENDED", "orgStatus": "ACTIVE" }
+→ 200
+```
+
+No próximo login de bob, o token traz `acme/SKOS_ANALYST` no claim `orgs` enquanto o vínculo estiver ativo.
+
+> O `name` da org (`acme`) é o `{org}` dos caminhos do forger. Papéis `/up` são `API_*` e `SKOS_*`; papéis
+> `/ua` têm `owner` (espaço de nomes). Ver [README](README.md) e [coordenação](../coordenacao.md).
 
 <!-- ===== persistence-crs/README.md ===== -->
 
@@ -11171,22 +11448,40 @@ responde, chame um endpoint dele.
 
 # monitor — relatos de suporte (guia)
 
-> **Papel:** guarda os **relatos de suporte** que os usuários da aplicação (casca + BFF) enviam e a
-> **conversa** entre o usuário e a equipe da plataforma sobre cada relato. Quem grava e lê em nome do usuário
-> é o **BFF**, com **credencial de serviço**. Quem atende é a **equipe** (`API_MASTER`/`API_ENGINEER`), pela
-> tela do monitor. O relato **não** vira ticket em outro sistema.
+> **Papel:** guarda os **relatos de suporte** que os usuários enviam e a **conversa** entre o usuário e a
+> equipe da plataforma sobre cada relato. Quem grava e lê em nome do usuário é um **serviço chamador**, com
+> **credencial de serviço** própria: o BFF da aplicação (casca + BFF) e, desde 2026-10-07, o KORC. Quem atende
+> é a **equipe** (`API_MASTER`/`API_ENGINEER`), pela tela do monitor. O relato **não** vira ticket em outro
+> sistema.
 > Pré-requisitos: [conceitos](../02-conceitos.md), [borda](../gateway/README.md), [BFF](../bff/README.md).
 
 ## Quem chama o quê
 
 | Quem | Por onde | Como se identifica | O que alcança |
 |---|---|---|---|
-| **BFF**, em nome do usuário | `/v3/monitor/suporte/v1/…`, pela borda | credencial de serviço + cabeçalhos do relator | só os relatos **daquele usuário** |
+| **Serviço chamador** (o BFF, o KORC), em nome do usuário | `/v3/monitor/suporte/v1/…`, pela borda | credencial de serviço própria + cabeçalhos do relator | só os relatos **daquele usuário** |
 | **Equipe da plataforma** | tela do monitor | token de acesso com `API_MASTER` ou `API_ENGINEER` | os relatos **da própria organização**; o operador vê todos |
 
-**O browser nunca fala com o monitor.** O relator não se declara: o BFF tira da sessão, no servidor, o
-usuário, a organização e o tenant, e os manda em cabeçalhos
+**O browser nunca fala com o monitor.** O relator não se declara: o serviço chamador tira da própria sessão,
+no servidor, o usuário, a organização e o tenant, e os manda em cabeçalhos
 ([endpoints](endpoints/relatos.md#cabeçalhos)). **Campos com esses nomes no corpo são ignorados.**
+
+## Mais de um chamador
+
+Desde 2026-10-07 o monitor tem dois chamadores, o BFF e o KORC, e pode ter outros. O que isso muda:
+
+- **Cada chamador tem a própria credencial de serviço.** O relato guarda qual delas o gravou, e a equipe vê
+  esse nome no relato (campo `cliente`). O usuário não o vê.
+- **A rota é alcançável de fora da rede da plataforma, pela borda**, desde 2026-10-07. O chamador não precisa
+  rodar dentro da plataforma. Pela borda, ele manda também o cabeçalho de identificação que ela exige
+  ([endpoints](endpoints/relatos.md#cabeçalhos)).
+- **A credencial não é limitada por usuário.** Quem a tem grava e lê em nome de qualquer usuário, porque o
+  monitor confia no que o chamador diz nos cabeçalhos. Por isso o chamador tira o relator da própria sessão,
+  no servidor, e nunca de dado que o cliente mande; e a credencial nunca chega ao browser.
+- **O alcance é por usuário, não por chamador.** "Os relatos do usuário" são todos os gravados com aquele
+  `X-Relator-Username`, por qualquer chamador: um relato aberto pelo KORC aparece na lista do mesmo usuário na
+  aplicação, e o inverso. A lista não diz por qual chamador cada relato entrou; o chamador que precisa separar
+  os seus guarda os `id` que criou.
 
 ## Ciclo de vida do relato
 
@@ -11205,8 +11500,10 @@ ele o marcou como lido. Para a equipe vale o simétrico. Quem escreve uma mensag
 
 ## O que o monitor faz com o conteúdo
 
-- **Diagnóstico da tela** (o `formato` versiona a carga): é guardado como veio, até 64 KB. O usuário **não o
-  recebe de volta**; só a equipe o vê.
+- **Diagnóstico** (o `formato` versiona a carga): é guardado como veio, até 64 KB. O usuário **não o
+  recebe de volta**; só a equipe o vê. O `formato` 1 é o da tela da aplicação
+  ([o que leva](../shell/seguranca.md#diagnóstico-do-relato-de-suporte)), e a tela da equipe o interpreta.
+  Outro chamador usa outro inteiro em `formato`: a carga é guardada do mesmo jeito, e a equipe a vê como JSON.
 - **Texto livre** (título e mensagens): o servidor troca **credenciais** (`Bearer …` e tokens de acesso
   soltos) por `[credencial removida]`. E-mail e CPF ficam, porque o usuário pode querer ser contatado por eles.
 - **Instantes** são os do servidor. O `em` que a casca manda nas mensagens é ignorado.
@@ -11233,29 +11530,34 @@ nome vier noutro formato, **nenhum** membro da organização vê o relato, só o
 
 # monitor — endpoints de relato
 
-> Base pela borda: **`/v3/monitor/suporte/v1`**. Quem chama é **o BFF**, nunca o browser. Corpo e respostas
-> em JSON (UTF-8). Todas as rotas exigem os cabeçalhos abaixo. Guia: [monitor](../README.md).
+> Base pela borda: **`/v3/monitor/suporte/v1`**. Quem chama é **um serviço com credencial própria**
+> ([quais](../README.md#mais-de-um-chamador)), nunca o browser. Corpo e respostas em JSON (UTF-8). Todas as
+> rotas exigem os cabeçalhos abaixo. Guia: [monitor](../README.md).
 
 ## Cabeçalhos
 
 | Cabeçalho | Obrigatório | O que é |
 |---|---|---|
-| `X-Monitor-Client-Key` | sim | credencial de serviço do chamador. A infra entrega o valor à configuração do BFF, e ele **nunca** passa por código, documento ou mensagem. O monitor guarda só um resumo criptográfico dela. |
-| `X-Relator-Username` | sim | o usuário da sessão. É por ele que cada rota alcança **só os relatos daquele usuário**. |
+| `X-Monitor-Client-Key` | sim | credencial de serviço do chamador, uma para cada chamador. A infra entrega o valor à configuração do chamador, e ele **nunca** passa por código, documento ou mensagem. O monitor guarda só um resumo criptográfico dela. |
+| `X-Relator-Username` | sim | o usuário da sessão do chamador. É por ele que cada rota alcança **só os relatos daquele usuário**. |
 | `X-Relator-Org` | não | o nome da organização do relator ([quem enxerga](../README.md#quem-na-equipe-enxerga-o-relato)) |
 | `X-Relator-Tenant` | não | o tenant do relator |
-| `X-Request-Id` | não | o id da chamada no BFF; fica gravado no relato e nas mensagens do usuário |
+| `X-Request-Id` | não | o id da chamada no chamador; fica gravado no relato e nas mensagens do usuário |
 
 - credencial ausente ou inválida → `401`;
 - `X-Relator-Username` ausente → `400`;
 - corpo acima de **256 KB** → `413`, antes de qualquer leitura.
 
-A borda aplica também um teto próprio por serviço
+Pela borda, a chamada leva também o **cabeçalho de identificação da borda**, que nesta rota é
+`X-Forger-Credential` ([borda](../../gateway/README.md#cabeçalhos-de-identificação--exatamente-um-nunca-dois)).
+Sem ele a borda responde `401`, e a chamada não chega ao monitor
+([gateway/erros.md](../../gateway/erros.md#401--falta-o-cabeçalho-de-identificação)). A borda aplica também um
+teto próprio de corpo por serviço
 ([gateway/erros.md](../../gateway/erros.md#413--corpo-ou-cabeçalhos-grandes-demais)).
 
 ## POST /relatos — criar
 
-A carga é a que a casca monta:
+A carga tem a mesma forma para qualquer chamador. Esta é a que a casca monta:
 
 ```jsonc
 {
@@ -11266,6 +11568,9 @@ A carga é a que a casca monta:
   "diagnostico": { "formato": 1 }            // opcional; objeto de até 64 KB (forma: shell/seguranca.md)
 }
 ```
+
+O `formato` 1 é o diagnóstico da casca. Outro chamador manda outro inteiro em `formato`, com a carga que
+quiser dentro do teto ([o que o monitor faz com ela](../README.md#o-que-o-monitor-faz-com-o-conteúdo)).
 
 Resposta `201`:
 
@@ -11318,7 +11623,7 @@ consulta à organização escolhida, como no resto da tela do monitor.
 | Rota | O que faz |
 |---|---|
 | `GET /relatos?estado=` | a fila, com `username`, `org`, `tenantId` e o `naoLido` da equipe |
-| `GET /relatos/{id}` | o relato completo, com o diagnóstico |
+| `GET /relatos/{id}` | o relato completo, com o diagnóstico e o chamador que o gravou (`cliente`) |
 | `POST /relatos/{id}/mensagens` | resposta da equipe → `RESPONDIDO` |
 | `POST /relatos/{id}/fechar` | `FECHADO`; fechar de novo → `409` |
 | `POST /relatos/{id}/lido` | marca como lido pela equipe |
@@ -11336,7 +11641,7 @@ O campo `details` diz qual regra foi violada.
 | HTTP | `error` | Quando acontece | O que fazer |
 |---|---|---|---|
 | 400 | `bad_request` | falta `X-Relator-Username`; cabeçalho do relator longo demais; JSON ilegível; `tipo` fora de Falha, Dúvida e Sugestão; nenhuma mensagem, mais de 20, texto vazio ou texto acima de 10.000 caracteres; `contexto` ou `diagnostico` que não são objeto; `estado` inválido no filtro da equipe | corrigir a requisição |
-| 401 | `unauthorized` | lado do BFF: credencial de serviço ausente, errada ou não configurada no monitor. Lado da equipe: token ausente, inválido ou expirado | conferir a configuração do BFF com a infra; não repetir a chamada em laço |
+| 401 | `unauthorized` | lado do chamador: credencial de serviço ausente, errada ou não configurada no monitor. Lado da equipe: token ausente, inválido ou expirado | conferir a configuração do chamador com a infra; não repetir a chamada em laço |
 | 403 | `forbidden` | só no lado da equipe: token sem `API_MASTER`/`API_ENGINEER` em organização ativa, ou `?org=` fora das organizações do portador | — |
 | 404 | `not_found` | relato inexistente **ou** de outro usuário ou organização. Os dois casos são indistinguíveis de propósito | conferir o id e o usuário do cabeçalho |
 | 409 | `conflict` | mensagem em relato fechado, ou fechamento de relato já fechado | o usuário abre um relato novo |
@@ -11344,19 +11649,22 @@ O campo `details` diz qual regra foi violada.
 
 > **Nem todo erro destas rotas vem do monitor.** Um `404` sem esse corpo e com cabeçalhos da borda vem da
 > **borda**, que não tem a rota ([gateway/erros.md](../gateway/erros.md#404--a-borda-não-reconheceu-a-rota)).
-> O mesmo vale para o `413` do teto da borda.
+> O mesmo vale para o `413` do teto da borda e para o `401` de quem chama sem o cabeçalho de identificação
+> dela ([gateway/erros.md](../gateway/erros.md#401--falta-o-cabeçalho-de-identificação)).
 
 <!-- ===== monitor/exemplos.md ===== -->
 
 # monitor — exemplos de relato
 
-Chamadas do BFF pela borda. `<chave>` é a credencial de serviço do BFF, que nunca é escrita em código.
-Todas as chamadas levam os mesmos cabeçalhos do relator ([endpoints](endpoints/relatos.md#cabeçalhos)).
+Chamadas de um serviço chamador pela borda; aqui, o BFF. `<chave>` é a credencial de serviço dele, e
+`<credencial da borda>` é a que a borda exige. Nenhuma das duas é escrita em código.
+Todas as chamadas levam os mesmos cabeçalhos ([endpoints](endpoints/relatos.md#cabeçalhos)).
 
 ## Criar um relato
 
 ```http
 POST /v3/monitor/suporte/v1/relatos
+X-Forger-Credential: <credencial da borda>
 X-Monitor-Client-Key: <chave>
 X-Relator-Username: maria
 X-Relator-Org: acme
@@ -11422,6 +11730,74 @@ O usuário abre um relato novo.
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.112 — 2026-10-16
+
+- **orgid: o manifesto da aplicação está em produção** (`orgid/endpoints/aplicacao.md`, cabeçalho;
+  comentário do `orgid/openapi.yaml`). O aviso "em develop, ainda não em produção" da 1.111 sai: as rotas estão no
+  ar desde 2026-10-16T14:34:24Z, e pela borda `GET /open/application` responde `404` a domínio não verificado e
+  `GET /ua/application/{org}` sem token responde `401`, os dois do orgid. Ainda não foi medido publicar manifesto
+  nem provar domínio pelo TXT em produção.
+
+## 1.111 — 2026-10-16
+
+- **orgid: manifesto da aplicação por domínio** (`orgid/endpoints/aplicacao.md`, página nova). Quem publica
+  (`API_MASTER` na org) usa `/up/application/{org}`: manifesto versionado (nome, subtítulo, ícone em data URI,
+  esquema, autocadastro), domínios com prova de posse por TXT em `_yc-verificacao.<base>` e textos de termos e
+  privacidade em versões imutáveis. Quem lê usa `GET /open/application?domain=` (público, antes do login; exato
+  vence curinga, curinga mais longo vence o mais curto, só domínio verificado casa) ou `GET /ua/application/{org}`
+  (com sessão). Códigos novos no catálogo: `409` (domínio de outra org) e `413` (ícone > 32 KiB, texto > 100 KiB).
+  Índices: `orgid/README.md`, `orgid/erros.md`, `orgid/openapi.yaml`, `llms.txt`. Em `develop` do orgid
+  (`c67b548`), ainda não em produção.
+
+## 1.110 — 2026-10-07
+
+- **monitor: mais de um chamador, e a rota alcançável de fora pela borda** (`monitor/README.md` §Mais de um
+  chamador; `monitor/endpoints/relatos.md` §Cabeçalhos; `monitor/erros.md`; `monitor/exemplos.md`; `llms.txt`).
+  A fatia dizia que só o BFF chamava. Desde 2026-10-07T21:21:47Z o monitor aceita um segundo chamador, o
+  KORC, com credencial de serviço própria, e desde 21:20:13Z `/v3/monitor/suporte/**` é alcançável de fora da
+  rede da plataforma, pela borda. São medições da infra (`infra 66ee1a6`): pela borda, com o cabeçalho de
+  identificação dela e credencial válida, `200`; sem a credencial de serviço, `401` do monitor; sem o
+  cabeçalho da borda, `401` da borda. Entra o que isso muda para quem chama: cada chamador tem a sua
+  credencial, e o relato guarda qual gravou; a credencial não é limitada por usuário, então é o chamador
+  quem garante o relator; o alcance é por usuário e atravessa chamadores; e `formato` 1 é o diagnóstico da
+  casca, com outro número para outro chamador. Conferido contra o código (`monitor 9fac4b6`), que não mudou.
+  Pedido da infra, a mando do dono.
+
+## 1.109 — 2026-10-07
+
+- **Orgid: papéis `SKOS_MASTER` e `SKOS_ANALYST` em produção desde 2026-10-07T17:06Z**
+  (`orgid/endpoints/up-associacao.md`, `orgid/endpoints/up-conta.md`, `orgid/endpoints/publico.md`,
+  `orgid/exemplos.md` §8). A mudança da 1.108 foi implantada (`orgid 9e58fd9`). Saem os cinco avisos de
+  "ainda não está em produção"; fica a data a partir da qual cada regra vale. Na implantação foi conferido
+  que subiram as classes alteradas e que as rotas sem credencial respondem como antes; a atribuição dos
+  dois papéis ainda não foi exercitada em produção. Entra, na página de associação, a condição para o
+  vínculo sair no token: papel, organização e os dois status do vínculo em `ACTIVE`; com qualquer um
+  diferente o vínculo fica de fora e o login não acusa erro.
+
+## 1.108 — 2026-10-07
+
+- **Orgid: papéis `SKOS_MASTER` e `SKOS_ANALYST` de conta de plataforma, e o corpo real das rotas de status**
+  (`orgid/README.md`; `orgid/endpoints/up-associacao.md`; `orgid/endpoints/up-conta.md`;
+  `orgid/endpoints/publico.md` §POST /open/up/account; `orgid/exemplos.md` §8; `orgid/openapi.yaml`).
+  Entram os dois papéis, comuns a mais de um módulo que roda sobre a plataforma: quem atribui cada um (o
+  dono da organização atribui `SKOS_MASTER`; quem tem `SKOS_MASTER` ativo nela atribui e suspende
+  `SKOS_ANALYST`, informando `org.owner`), o que abrem no orgid (a leitura da própria conta e, para
+  `SKOS_MASTER`, a listagem das contas da organização) e o campo opcional `role` do registro, que soma ao
+  papel de administradora. **Ainda não está em produção**: `orgid 9e58fd9`, vale quando a infra implantar;
+  cada trecho leva o aviso. Duas correções do que a página de associação já dizia, conferidas contra o
+  código (`orgid 70e84f5`): a lista de papéis de `POST /up/account-role-org` citava `API_MASTER`, que a
+  rota recusa, e omitia `API_GUEST`, que ela aceita; e as duas rotas de status pediam `status`, quando o
+  corpo exige `accountStatus` (e `orgStatus` no `by-master`) e `org.owner`.
+
+## 1.107 — 2026-10-04
+
+- **Forger: do modelo ao manifesto, e do id ao nome, com o caminho até a receita**
+  (`forger/README.md` após o índice de endpoints; `forger/endpoints/model.md` após a tabela de recusas da
+  publicação e na seção `references`). Quem publica o modelo passa a ler que o manifesto de apresentação
+  se publica depois dele, e que, para um id de outro agregado aparecer como nome, o passo a passo está em
+  `shell/apresentacao.md#receita-do-id-ao-nome`. Só o ponteiro: o texto da receita continua na fatia do
+  yc.app, e não se repete aqui.
 
 ## 1.106 — 2026-10-04
 

@@ -2,6 +2,65 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.112 — 2026-10-16
+
+- **orgid: o manifesto da aplicação está em produção** (`orgid/endpoints/aplicacao.md`, cabeçalho;
+  comentário do `orgid/openapi.yaml`). O aviso "em develop, ainda não em produção" da 1.111 sai: as rotas estão no
+  ar desde 2026-10-16T14:34:24Z, e pela borda `GET /open/application` responde `404` a domínio não verificado e
+  `GET /ua/application/{org}` sem token responde `401`, os dois do orgid. Ainda não foi medido publicar manifesto
+  nem provar domínio pelo TXT em produção.
+
+## 1.111 — 2026-10-16
+
+- **orgid: manifesto da aplicação por domínio** (`orgid/endpoints/aplicacao.md`, página nova). Quem publica
+  (`API_MASTER` na org) usa `/up/application/{org}`: manifesto versionado (nome, subtítulo, ícone em data URI,
+  esquema, autocadastro), domínios com prova de posse por TXT em `_yc-verificacao.<base>` e textos de termos e
+  privacidade em versões imutáveis. Quem lê usa `GET /open/application?domain=` (público, antes do login; exato
+  vence curinga, curinga mais longo vence o mais curto, só domínio verificado casa) ou `GET /ua/application/{org}`
+  (com sessão). Códigos novos no catálogo: `409` (domínio de outra org) e `413` (ícone > 32 KiB, texto > 100 KiB).
+  Índices: `orgid/README.md`, `orgid/erros.md`, `orgid/openapi.yaml`, `llms.txt`. Em `develop` do orgid
+  (`c67b548`), ainda não em produção.
+
+## 1.110 — 2026-10-07
+
+- **monitor: mais de um chamador, e a rota alcançável de fora pela borda** (`monitor/README.md` §Mais de um
+  chamador; `monitor/endpoints/relatos.md` §Cabeçalhos; `monitor/erros.md`; `monitor/exemplos.md`; `llms.txt`).
+  A fatia dizia que só o BFF chamava. Desde 2026-10-07T21:21:47Z o monitor aceita um segundo chamador, o
+  KORC, com credencial de serviço própria, e desde 21:20:13Z `/v3/monitor/suporte/**` é alcançável de fora da
+  rede da plataforma, pela borda. São medições da infra (`infra 66ee1a6`): pela borda, com o cabeçalho de
+  identificação dela e credencial válida, `200`; sem a credencial de serviço, `401` do monitor; sem o
+  cabeçalho da borda, `401` da borda. Entra o que isso muda para quem chama: cada chamador tem a sua
+  credencial, e o relato guarda qual gravou; a credencial não é limitada por usuário, então é o chamador
+  quem garante o relator; o alcance é por usuário e atravessa chamadores; e `formato` 1 é o diagnóstico da
+  casca, com outro número para outro chamador. Conferido contra o código (`monitor 9fac4b6`), que não mudou.
+  Pedido da infra, a mando do dono.
+
+## 1.109 — 2026-10-07
+
+- **Orgid: papéis `SKOS_MASTER` e `SKOS_ANALYST` em produção desde 2026-10-07T17:06Z**
+  (`orgid/endpoints/up-associacao.md`, `orgid/endpoints/up-conta.md`, `orgid/endpoints/publico.md`,
+  `orgid/exemplos.md` §8). A mudança da 1.108 foi implantada (`orgid 9e58fd9`). Saem os cinco avisos de
+  "ainda não está em produção"; fica a data a partir da qual cada regra vale. Na implantação foi conferido
+  que subiram as classes alteradas e que as rotas sem credencial respondem como antes; a atribuição dos
+  dois papéis ainda não foi exercitada em produção. Entra, na página de associação, a condição para o
+  vínculo sair no token: papel, organização e os dois status do vínculo em `ACTIVE`; com qualquer um
+  diferente o vínculo fica de fora e o login não acusa erro.
+
+## 1.108 — 2026-10-07
+
+- **Orgid: papéis `SKOS_MASTER` e `SKOS_ANALYST` de conta de plataforma, e o corpo real das rotas de status**
+  (`orgid/README.md`; `orgid/endpoints/up-associacao.md`; `orgid/endpoints/up-conta.md`;
+  `orgid/endpoints/publico.md` §POST /open/up/account; `orgid/exemplos.md` §8; `orgid/openapi.yaml`).
+  Entram os dois papéis, comuns a mais de um módulo que roda sobre a plataforma: quem atribui cada um (o
+  dono da organização atribui `SKOS_MASTER`; quem tem `SKOS_MASTER` ativo nela atribui e suspende
+  `SKOS_ANALYST`, informando `org.owner`), o que abrem no orgid (a leitura da própria conta e, para
+  `SKOS_MASTER`, a listagem das contas da organização) e o campo opcional `role` do registro, que soma ao
+  papel de administradora. **Ainda não está em produção**: `orgid 9e58fd9`, vale quando a infra implantar;
+  cada trecho leva o aviso. Duas correções do que a página de associação já dizia, conferidas contra o
+  código (`orgid 70e84f5`): a lista de papéis de `POST /up/account-role-org` citava `API_MASTER`, que a
+  rota recusa, e omitia `API_GUEST`, que ela aceita; e as duas rotas de status pediam `status`, quando o
+  corpo exige `accountStatus` (e `orgStatus` no `by-master`) e `org.owner`.
+
 ## 1.107 — 2026-10-04
 
 - **Forger: do modelo ao manifesto, e do id ao nome, com o caminho até a receita**
