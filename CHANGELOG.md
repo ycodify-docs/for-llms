@@ -2,6 +2,14 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.112 — 2026-10-16
+
+- **orgid: o manifesto da aplicação está em produção** (`orgid/endpoints/aplicacao.md`, cabeçalho;
+  comentário do `orgid/openapi.yaml`). O aviso "em develop, ainda não em produção" da 1.111 sai: as rotas estão no
+  ar desde 2026-10-16T14:34:24Z, e pela borda `GET /open/application` responde `404` a domínio não verificado e
+  `GET /ua/application/{org}` sem token responde `401`, os dois do orgid. Ainda não foi medido publicar manifesto
+  nem provar domínio pelo TXT em produção.
+
 ## 1.111 — 2026-10-16
 
 - **orgid: manifesto da aplicação por domínio** (`orgid/endpoints/aplicacao.md`, página nova). Quem publica

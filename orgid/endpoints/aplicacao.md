@@ -4,8 +4,9 @@
 > termos de acesso e política de privacidade. A casca a acha pelo **domínio** por onde o navegador chegou,
 > antes do login. Guia: [../README.md](../README.md). Erros: [../erros.md](../erros.md).
 >
-> ⚠️ **Em `develop` do orgid, ainda não em produção.** Até o deploy, estas rotas não existem no serviço no
-> ar. As tabelas dependem de DDL que a infra aplica no banco.
+> **Em produção desde 2026-10-16T14:34:24Z.** Pela borda, as rotas de leitura chegam ao orgid: `GET
+> /open/application` responde `404` a domínio não verificado, e `GET /ua/application/{org}` sem token responde
+> `401`. Ainda não foi medido em produção publicar um manifesto e provar um domínio pelo TXT.
 
 ## Contents
 - Quem publica e quem lê
