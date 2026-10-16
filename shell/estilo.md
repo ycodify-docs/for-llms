@@ -17,24 +17,31 @@
 
 ## Marca sobrescrevível (rebranding por tenant)
 
-- Existe **um** primitivo: `--yc-brand` (o verde da Ycodify). Os tokens de **acento** derivam dele.
-- Ao entrar num tenant, o cliente pode **sobrescrever** `--yc-brand` (cor vinda da configuração do tenant)
-  e **toda a casca recolore** — sem recompilar, sem trocar componentes.
-- Voltar ao padrão = remover a sobrescrita.
+- Existe **um** primitivo: `--yc-brand` (o verde da Ycodify, no esquema padrão). Os tokens de **acento**
+  derivam dele.
+- A cor de cada empresa vem do **esquema** do manifesto da aplicação (abaixo): o esquema redefine
+  `--yc-brand` e os tokens que dependem dela, e **toda a casca recolore** — sem recompilar, sem trocar
+  componentes. Não há outra fonte de cor por cliente: a sobrescrita avulsa de `--yc-brand` existe no código
+  da casca, mas nada a alimenta.
+- Voltar ao padrão = esquema `verde` (sem atributo).
 
 ## Esquemas de cor nomeados (paleta completa, por organização)
 
 - Além do primitivo de marca, a casca oferece **esquemas de cor nomeados** — paletas completas
-  (marca + superfícies + texto + acento) empacotadas sob um **id** (ex.: `verde` (padrão), `azul`,
-  `ambar`, `roxo`, `cinza`). O catálogo é a **fonte única** no shell; o BFF **valida** contra o mesmo conjunto.
+  (marca + superfícies + texto + acento) empacotadas sob um **id**: `verde` (padrão), `azul`, `ambar`,
+  `roxo`, `cinza` e `marinho`. O catálogo é **contrato** entre a casca, o BFF e a lista fechada do orgid:
+  mudar um é mudar os três.
+- **`marinho`** é de **duas cores**: azul-marinho dominante e acento verde-lima (criado em 2026-10-16). Nele o
+  texto sobre o acento é o próprio marinho.
 - Aplicação em runtime: um **atributo no elemento raiz** (`data-scheme` no `<html>`), no mesmo espírito
   da classe de tema — o CSS resolve, **sem re-render**; o **miolo herda** e recolore junto. Padrão
   (`verde`) = **sem atributo** (tokens base).
 - Cada esquema define os tokens para **claro e escuro** (blocos mutuamente exclusivos). Os tokens de
   **estado** (`ok/warn/info/danger`) permanecem semânticos — **não** mudam por esquema.
-- **Escopo = organização**: o esquema é uma preferência **org-scoped**, persistida via o canal de
-  preferências da org (ver [bff](bff.md)) e aplicada a **todos** os usuários da org. Só **MASTER-na-org**
-  altera (revalidado no servidor).
+- **Quem escolhe é a empresa, no manifesto da aplicação** da org ([orgid](../orgid/endpoints/aplicacao.md)),
+  e vale para todos os usuários dela. Antes do login, vem do **domínio**; depois, da **org ativa**
+  ([bff — identidade](../bff/README.md#identidade-da-aplicação-appidentidade)). **Não há seletor de cor na
+  casca** e o esquema não é mais preferência da org (desde 2026-10-16).
 
 ## Grupos de token (papéis)
 
@@ -44,6 +51,7 @@
 | bordas | `border`, `border-2` | separadores, contornos |
 | texto | `text`, `text-2`, `text-3` | primário / secundário / terciário |
 | acento (deriva da marca) | `accent`, `accent-fg`, `accent-weak`, `accent-ink` | ação primária, realce, texto legível sobre claro |
+| dominante | `dominante` | a cor que identifica a empresa em área grande (ex.: a metade colorida do cartão de login). É o próprio `accent`, salvo em esquema de duas cores, como o `marinho` |
 | tinta | `ink`, `ink-fg` | botão escuro de ação secundária forte (ex.: relatar ao suporte); inverte no escuro |
 | estados | `ok`, `warn`, `info`, `danger` (+ `-weak`; `danger-line` para borda) | status, alertas, campo com erro |
 | pílula de estado | `pill-bg-l`, `pill-fg-l` | só a **luminosidade** por tema; ver abaixo |
@@ -59,7 +67,12 @@
 
 ## Chrome da casca (o que é fixo)
 
-- **Barra superior** (64px): marca, **seletor de organização** (organizações do token), busca/paleta de
+- **Telas públicas** (login, criar conta, esqueci a senha, código do e-mail): um cartão dividido, com a
+  metade esquerda inteira na cor `dominante` e o formulário à direita, encabeçado pelo **ícone e pelo nome
+  da empresa**; em tela estreita, só o formulário. No rodapé, os links de **termos** e **política de
+  privacidade** (texto simples, em modal); "Criar conta" só quando a identidade tem `autocadastro`, com
+  aceite obrigatório por caixa marcada.
+- **Barra superior** (64px): **ícone e nome da empresa** (da identidade da aplicação), **seletor de organização** (organizações do token), busca/paleta de
   comando, agente, **tema** (claro/escuro), **suporte**, notificações e o **menu da conta** — é nele, e só
   nele, que fica **encerrar sessão**.
 - **Menu lateral**: **Projeto → Contexto → Agregados** da organização ativa. Continua sendo **1 entrada
