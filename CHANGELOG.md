@@ -2,6 +2,13 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.116 — 2026-10-16
+
+- **O esquema `marinho` e o captcha e aceite da 1.115 estão no ar desde 2026-10-16T18:47:51Z.** O `marinho` já vale
+  (`orgid/endpoints/aplicacao.md`). O captcha e o aceite (`auth/endpoints/sign-in.md`, `orgid/endpoints/publico.md`,
+  `orgid/endpoints/aplicacao.md`) seguem atrás de um interruptor **desligado**: até ele ser ligado, login e cadastro
+  são os de antes. O desafio `GET /ua/sign-in/challenge` já responde `200`.
+
 ## 1.115 — 2026-10-16
 
 - **auth e orgid: captcha e aceite de termos no login e no autocadastro** (`auth/endpoints/sign-in.md` §Só em

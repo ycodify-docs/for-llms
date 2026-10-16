@@ -48,8 +48,8 @@ Catálogo: [../erros.md](../erros.md).
 
 ## Só em `/ua`: captcha e aceite de termos
 
-> ⚠️ **Em `develop` (auth `315a942`, orgid `a9700c9`), ainda não em produção, e atrás de um interruptor
-> desligado.** Até ele ser ligado, o login é o descrito acima.
+> ⚠️ **No ar desde 2026-10-16T18:47:51Z, mas atrás de um interruptor ainda desligado.** Até ele ser ligado, o
+> login é o descrito acima. O desafio já responde.
 
 Para conta que tem papel em organização que publicou o [manifesto da aplicação](../../orgid/endpoints/aplicacao.md):
 
