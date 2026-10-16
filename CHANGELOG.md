@@ -2,6 +2,12 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.114 — 2026-10-16
+
+- **orgid: o e-mail do hash da 1.113 está em produção** (`orgid/endpoints/publico.md` §Só em `/ua`). Sai o aviso
+  "em develop": o link no domínio verificado, o nome da empresa e o `429` a cada 5 min estão no ar desde
+  2026-10-16T17:21:35Z. Ainda não foi medido o envio real do e-mail com o link.
+
 ## 1.113 — 2026-10-16
 
 - **orgid: o e-mail do hash em `/ua` ganha o link no domínio da empresa e um limite de envio**

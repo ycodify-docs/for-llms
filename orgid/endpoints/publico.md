@@ -108,7 +108,7 @@ and no e-mail was sent."`
 
 ### Só em `/ua`: link no domínio da empresa e um e-mail a cada 5 min
 
-> ⚠️ **Em `develop` do orgid (`6e6aefc`), ainda não em produção.** Até o deploy, vale o parágrafo acima.
+> **Em produção desde 2026-10-16T17:21:35Z.** Ainda não foi medido em produção o envio real do e-mail com o link.
 
 | Query | Significado |
 |---|---|
