@@ -37,6 +37,7 @@
 - `/up`: [organização](orgid/endpoints/up-organizacao.md) · [conta](orgid/endpoints/up-conta.md) · [associação conta-papel-org](orgid/endpoints/up-associacao.md) · [contrato ⚠️ ignorar por ora](orgid/endpoints/up-contrato.md)
 - `/ua`: [conta](orgid/endpoints/ua-conta.md) · [papel](orgid/endpoints/ua-papel.md) · [associação conta-papel](orgid/endpoints/ua-associacao.md)
 - `/open`: [público (existência, registro, hash, e-mail)](orgid/endpoints/publico.md)
+- [Manifesto da aplicação](orgid/endpoints/aplicacao.md): marca, domínios com prova TXT, termos e privacidade; leitura pública pelo domínio.
 - [Erros](orgid/erros.md) · [Exemplos](orgid/exemplos.md) · [OpenAPI](orgid/openapi.yaml)
 
 ## persistence-crs (comandos, CQRS-ES) — núcleo da modelagem

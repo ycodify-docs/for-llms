@@ -17,6 +17,7 @@ tags:
   - { name: associacao }
   - { name: contrato }
   - { name: publico }
+  - { name: aplicacao }
 paths:
   # ---- organização (/up/org) ----
   /up/org:
@@ -108,10 +109,34 @@ paths:
     get: { tags: [publico], summary: Solicitar hash (ativação/recuperação) (público), parameters: [{ name: action, in: path, required: true, schema: { type: string } }, { $ref: '#/components/parameters/username' }], responses: { '200': { description: "{}" } } }
   /open/up/account/{username}/{action}/hash/{hash}:
     put: { tags: [publico], summary: Executar ação por hash (público), parameters: [{ $ref: '#/components/parameters/username' }, { name: action, in: path, required: true, schema: { type: string } }, { name: hash, in: path, required: true, schema: { type: string } }], requestBody: { content: { application/json: { schema: { type: object, properties: { password: { type: string } } } } } }, responses: { '200': { description: OK } } }
+
+  # ---- manifesto da aplicação (endpoints/aplicacao.md) — em develop, ainda não em produção ----
+  /up/application/{org}:
+    parameters: [{ $ref: '#/components/parameters/org' }]
+    post: { tags: [aplicacao], summary: "Publicar manifesto (API_MASTER na org); sobe a versão", security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Manifesto' } } } }, responses: { '201': { description: "{versao}" }, '400': { $ref: '#/components/responses/BadRequest' }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { description: Org inexistente }, '413': { description: Ícone acima de 32 KiB } } }
+    get: { tags: [aplicacao], summary: "Estado completo: manifesto, domínios com TXT, versões dos textos (API_MASTER)", security: [{ bearerAuth: [] }], responses: { '200': { description: OK }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { description: Org inexistente } } }
+  /up/application/{org}/domain:
+    parameters: [{ $ref: '#/components/parameters/org' }]
+    post: { tags: [aplicacao], summary: "Registrar domínio (exato ou *.base); devolve o TXT a criar", security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { type: object, required: [dominio], properties: { dominio: { type: string } } } } } }, responses: { '201': { description: "{dominio, verificado, txt:{nome, valor}}" }, '400': { $ref: '#/components/responses/BadRequest' }, '403': { $ref: '#/components/responses/Forbidden' }, '409': { description: Domínio de outra organização } } }
+  /up/application/{org}/domain/{dominio}/verify:
+    parameters: [{ $ref: '#/components/parameters/org' }, { name: dominio, in: path, required: true, schema: { type: string } }]
+    post: { tags: [aplicacao], summary: "Consultar o TXT agora; sem o valor, a posse deixa de valer", security: [{ bearerAuth: [] }], responses: { '200': { description: "{verificado, verificadoEm} ou {verificado:false, motivo}" }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { description: Domínio não registrado nesta org } } }
+  /up/application/{org}/domain/{dominio}:
+    parameters: [{ $ref: '#/components/parameters/org' }, { name: dominio, in: path, required: true, schema: { type: string } }]
+    delete: { tags: [aplicacao], summary: Remover domínio, security: [{ bearerAuth: [] }], responses: { '200': { description: "{deleted:true}" }, '403': { $ref: '#/components/responses/Forbidden' } } }
+  /up/application/{org}/text/{tipo}:
+    parameters: [{ $ref: '#/components/parameters/org' }, { name: tipo, in: path, required: true, schema: { type: string, enum: [termos, privacidade] } }]
+    post: { tags: [aplicacao], summary: "Publicar versão nova de texto simples (imutável)", security: [{ bearerAuth: [] }], requestBody: { required: true, content: { application/json: { schema: { type: object, required: [texto], properties: { texto: { type: string }, vigenteDesde: { type: integer, format: int64, description: epoch ms } } } } } }, responses: { '201': { description: "{tipo, versao, vigenteDesde}" }, '400': { $ref: '#/components/responses/BadRequest' }, '403': { $ref: '#/components/responses/Forbidden' }, '413': { description: Texto acima de 100 KiB } } }
+  /open/application:
+    get: { tags: [aplicacao], summary: "Ler pelo domínio do navegador (público, antes do login)", parameters: [{ name: domain, in: query, required: true, schema: { type: string } }], responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Identidade' } } } }, '400': { $ref: '#/components/responses/BadRequest' }, '404': { description: Nenhum domínio verificado casa, ou sem manifesto } } }
+  /ua/application/{org}:
+    parameters: [{ $ref: '#/components/parameters/org' }]
+    get: { tags: [aplicacao], summary: "Ler pela org (token de aplicação com a org)", security: [{ bearerAuth: [] }], responses: { '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Identidade' } } } }, '403': { $ref: '#/components/responses/Forbidden' }, '404': { description: Sem manifesto } } }
 components:
   securitySchemes:
     bearerAuth: { type: http, scheme: bearer }
   parameters:
+    org: { name: org, in: path, required: true, schema: { type: string } }
     orgName: { name: orgName, in: path, required: true, schema: { type: string } }
     orgOwner: { name: orgOwner, in: path, required: true, schema: { type: string } }
     roleName: { name: roleName, in: path, required: true, schema: { type: string } }
@@ -130,6 +155,30 @@ components:
         account: { type: object, required: [username], properties: { username: { type: string } } }
         role: { type: object, required: [name, owner], properties: { name: { type: string }, owner: { type: string } } }
         status: { type: string, description: "ACTIVE | SUSPENDED | CANCELED" }
+    Manifesto:
+      type: object
+      additionalProperties: false
+      required: [nome, esquema, autocadastro]
+      properties:
+        nome: { type: string, maxLength: 120 }
+        subtitulo: { type: string, maxLength: 240 }
+        icone: { type: string, description: "data:image/svg+xml | data:image/png;base64 | data:image/webp;base64, até 32 KiB" }
+        esquema: { type: string, enum: [verde, azul, ambar, roxo, cinza] }
+        autocadastro: { type: boolean }
+    Texto:
+      type: [object, "null"]
+      properties: { versao: { type: integer }, vigenteDesde: { type: integer, format: int64 }, texto: { type: string } }
+    Identidade:
+      type: object
+      properties:
+        org: { type: string }
+        nome: { type: string }
+        subtitulo: { type: [string, "null"] }
+        icone: { type: [string, "null"] }
+        esquema: { type: string }
+        autocadastro: { type: boolean }
+        termos: { $ref: '#/components/schemas/Texto' }
+        privacidade: { $ref: '#/components/schemas/Texto' }
     UaAccountRoleOrList:
       oneOf:
         - { $ref: '#/components/schemas/UaAccountRole' }

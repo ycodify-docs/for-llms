@@ -107,6 +107,7 @@ verificam para autorizar. Ver [fluxo de deploy](../03-fluxo-de-deploy.md) e [coo
 | `/ua` · Papel | [endpoints/ua-papel.md](endpoints/ua-papel.md) |
 | `/ua` · Associação conta-papel | [endpoints/ua-associacao.md](endpoints/ua-associacao.md) |
 | `/open` · Público (existência, registro, hash, e-mail) | [endpoints/publico.md](endpoints/publico.md) |
+| `/up` · `/open` · `/ua` · Manifesto da aplicação (marca, domínios, termos e privacidade) | [endpoints/aplicacao.md](endpoints/aplicacao.md) |
 
 Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md). Contrato de fio: [openapi.yaml](openapi.yaml).
 

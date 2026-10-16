@@ -2,6 +2,17 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.111 — 2026-10-16
+
+- **orgid: manifesto da aplicação por domínio** (`orgid/endpoints/aplicacao.md`, página nova). Quem publica
+  (`API_MASTER` na org) usa `/up/application/{org}`: manifesto versionado (nome, subtítulo, ícone em data URI,
+  esquema, autocadastro), domínios com prova de posse por TXT em `_yc-verificacao.<base>` e textos de termos e
+  privacidade em versões imutáveis. Quem lê usa `GET /open/application?domain=` (público, antes do login; exato
+  vence curinga, curinga mais longo vence o mais curto, só domínio verificado casa) ou `GET /ua/application/{org}`
+  (com sessão). Códigos novos no catálogo: `409` (domínio de outra org) e `413` (ícone > 32 KiB, texto > 100 KiB).
+  Índices: `orgid/README.md`, `orgid/erros.md`, `orgid/openapi.yaml`, `llms.txt`. Em `develop` do orgid
+  (`c67b548`), ainda não em produção.
+
 ## 1.110 — 2026-10-07
 
 - **monitor: mais de um chamador, e a rota alcançável de fora pela borda** (`monitor/README.md` §Mais de um
