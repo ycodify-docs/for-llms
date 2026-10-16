@@ -48,8 +48,8 @@ Catálogo: [../erros.md](../erros.md).
 
 ## Só em `/ua`: captcha e aceite de termos
 
-> ⚠️ **No ar desde 2026-10-16T18:47:51Z, mas atrás de um interruptor ainda desligado.** Até ele ser ligado, o
-> login é o descrito acima. O desafio já responde.
+> **Em vigor desde 2026-10-16T21:06:53Z.** Medido pela borda às 21:29:18Z: conta de org com manifesto, sem
+> captcha → `428 {"codigo":"captcha_ausente"}`.
 
 Para conta que tem papel em organização que publicou o [manifesto da aplicação](../../orgid/endpoints/aplicacao.md):
 
