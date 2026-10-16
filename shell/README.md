@@ -46,11 +46,20 @@ browser ──▶ casca (app) ──▶ BFF ──▶ plataforma (gateway: auth/
 
 ## Fluxo (login → menu → injeção)
 
+0. **Antes do login**, a casca pede ao BFF a **identidade da aplicação** pelo host por onde o usuário
+   chegou: o nome, o ícone, o esquema de cor, os termos e a política da **empresa**, ou o manifesto comum
+   da instalação ([bff — identidade](../bff/README.md#identidade-da-aplicação-appidentidade)). O título da
+   aba, o ícone e as cores já saem dela.
 1. **Login** → o BFF autentica no [auth](../auth/README.md), guarda o token **no servidor** (não vai ao
-   browser) e devolve a identidade + a **árvore de tenants** + os **papéis** (org-scoped) do token.
+   browser) e devolve a identidade + a **árvore de tenants** + os **papéis** (org-scoped) do token. Para
+   conta de org com manifesto, o login leva **captcha** (resolvido sem interação) e pede o **aceite** da
+   versão vigente dos termos ([bff — captcha e aceite](../bff/README.md#captcha-e-aceite-no-login)). Depois
+   do login, a identidade passa a ser a da **org ativa**; trocar para uma org de outra marca recarrega a
+   casca.
 2. A casca monta o **menu**: **Projeto → Contexto → Agregados**. Continua sendo **1 entrada por bounded
-   context** (da árvore de tenants); ao abrir o contexto, a casca pede a **capacidade** dele ao BFF e lista
-   os agregados autorizados, com a contagem de registros.
+   context** (da árvore de tenants). **Ao entrar na org, a casca pede a capacidade de todos os contextos**:
+   o contexto confirmado **sem agregado** para o papel sai do menu (enquanto carrega, ou com erro, ele
+   aparece), e abre-se o primeiro que tem agregado. Cada agregado vem com a contagem de registros.
 3. O usuário **escolhe um agregado** → a casca pede ao BFF a **capacidade**, o **manifesto de
    apresentação** e a **URL do miolo** do tenant.
 4. A casca **injeta o miolo** e passa o **hostContext**, com o agregado escolhido (ver
@@ -73,6 +82,7 @@ browser ──▶ casca (app) ──▶ BFF ──▶ plataforma (gateway: auth/
 - [ ] **Capacidade = UX** — a casca **esconde** o não-autorizado; o [persistence-crs](../persistence-crs/README.md)
       **revalida** cada comando no servidor. O gating da casca **nunca** é a fronteira de segurança.
 - [ ] **1 entrada de menu por bounded context** — é a "solda" com o miolo.
-- [ ] **A casca não muda por cliente** — só o **miolo** (e seus tokens de tema) varia.
+- [ ] **A casca não muda por cliente** — variam só o **miolo** e a **identidade da aplicação** (nome,
+      ícone, esquema, termos), que vem do manifesto da org e não do código.
 - [ ] **Papéis são org-scoped** — a capacidade é calculada com os papéis **da organização** do tenant
       selecionado, nunca globalmente (ver [autenticação](../06-autenticacao.md)).

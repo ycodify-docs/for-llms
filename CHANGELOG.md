@@ -2,6 +2,22 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.117 — 2026-10-16
+
+- **BFF e casca: identidade da aplicação, captcha e aceite no login, autocadastro e o menu sem contexto vazio**
+  (fatia do yc.app; no ar no Stager, com a 2ª etapa ligada desde 2026-10-16T21:07Z).
+  - `bff/README.md`: seção nova, **Identidade da aplicação** (`GET /app/identidade?host=`, pública;
+    `GET /session/app/identidade?org=`, com `aceitePendente`; `POST /session/app/aceite`). O login aceita `host`,
+    `captcha` e `aceite`, e recusa com `428`; `GET /captcha/desafio`. No autocadastro: `aceite` e `captcha` no
+    registro, `host` no hash (e-mail com link `/ativar`) e o `429` de um e-mail a cada 5 min. O `colorScheme` sai
+    das preferências da org (`PUT` com ele → `400`). A `manifestUrl` do miolo pode vir relativa.
+  - `shell/README.md`: a identidade antes do login, o captcha e o aceite, e o menu que tira o contexto sem
+    agregado depois de pedir a capacidade de todos.
+  - `shell/estilo.md`: o esquema vem do manifesto da aplicação, sem seletor na casca; o esquema `marinho` e o
+    token `dominante`; as telas públicas. Corrigida a frase que dizia que o tenant sobrescreve `--yc-brand` por
+    configuração: nada alimenta essa sobrescrita.
+  - `shell/injecao.md`: a URL do miolo relativa, resolvida contra a origem da casca.
+
 ## 1.116 — 2026-10-16
 
 - **O esquema `marinho` e o captcha e aceite da 1.115 estão no ar desde 2026-10-16T18:47:51Z.** O `marinho` já vale
