@@ -2,6 +2,15 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.113 — 2026-10-16
+
+- **orgid: o e-mail do hash em `/ua` ganha o link no domínio da empresa e um limite de envio**
+  (`orgid/endpoints/publico.md` §Só em `/ua`; `orgid/erros.md` ganha `429`). `GET /open/ua/hash/for/{R|PR}/by/{username}`
+  aceita `?domain=`: domínio verificado de org da conta → link `https://<host>/ativar?username=&hash=` (`&acao=PR`
+  na troca de senha) e nome da empresa no remetente e no assunto; senão `400`. Sem `domain`, o e-mail de sempre.
+  Um e-mail a cada 5 min por conta → `429` com `Retry-After`. Em `develop` do orgid (`6e6aefc`), ainda não em
+  produção.
+
 ## 1.112 — 2026-10-16
 
 - **orgid: o manifesto da aplicação está em produção** (`orgid/endpoints/aplicacao.md`, cabeçalho;

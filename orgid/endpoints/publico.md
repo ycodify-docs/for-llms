@@ -106,6 +106,25 @@ Solicita um **hash** de vida curta (enviado ao usuário por e-mail) para `{actio
 **Resposta:** `200` — `{}` (efeito: envio do hash) · `404` — `"account not found: no hash was generated
 and no e-mail was sent."`
 
+### Só em `/ua`: link no domínio da empresa e um e-mail a cada 5 min
+
+> ⚠️ **Em `develop` do orgid (`6e6aefc`), ainda não em produção.** Até o deploy, vale o parágrafo acima.
+
+| Query | Significado |
+|---|---|
+| `domain` | opcional — o host por onde a pessoa chegou (`location.hostname`), sem porta |
+
+- **Sem `domain`**, o e-mail é o de sempre: remetente e assunto da Ycodify, só o hash para copiar.
+- **Com `domain`**, o host tem de casar um domínio **verificado** de uma organização em que a conta tem papel
+  (a regra do [manifesto da aplicação](aplicacao.md)). Então o e-mail leva o link
+  `https://<host>/ativar?username=<u>&hash=<h>` (com `&acao=PR` na troca de senha) e o **nome da empresa** no
+  remetente exibido e no assunto; o endereço continua o da plataforma. Host que não casa, ou de org que não é
+  da conta → `400`, sem gerar hash. Com `domain`, `{action}` só aceita `R` ou `PR` (`400`).
+- **No máximo um e-mail a cada 5 min por conta**, somando `R` e `PR`, com ou sem `domain`: antes disso,
+  `429` com o cabeçalho `Retry-After` (segundos) e o corpo `{"error": "…", "retryAfterSeconds": <n>}`, sem gerar
+  hash nem mandar nada.
+- O hash vale **10 minutos**.
+
 ## PUT /open/up/account/{username}/{action}/hash/{hash}
 ## PUT /open/ua/account/{username}/{action}/hash/{hash}
 Executa a ação do hash.
