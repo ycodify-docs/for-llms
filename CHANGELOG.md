@@ -2,6 +2,15 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.119 — 2026-10-26
+
+- **auth: segundo access token em ES256 e a chave pública em JWKS** (`auth/endpoints/sign-in.md` §Token ES256 e
+  chave pública; `auth/README.md`, índice e CP-12; `auth/openapi.yaml`). O login e a renovação devolvem também
+  `accessTokenEs256`: os mesmos claims e o mesmo `iss`, assinado em ES256 com `kid`. A chave pública sai em
+  `GET /ua/.well-known/jwks.json`, público. O `accessToken` HS512 não muda. Em `develop` (auth `ca02e61`, composer
+  `aaad2c2`), ainda não no ar: sem a chave configurada, o campo não vem e o JWKS responde `{"keys":[]}`.
+  yc-platform-v3/composer#11.
+
 ## 1.118 — 2026-10-16
 
 - **auth e orgid: o captcha e o aceite da 1.115 estão em vigor desde 2026-10-16T21:06:53Z** (`auth/endpoints/sign-in.md`,
