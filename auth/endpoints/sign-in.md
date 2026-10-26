@@ -33,6 +33,24 @@ Use `accessToken` em `Authorization: Bearer <token>` nas chamadas seguintes — 
 `token`: quem lê `.token` fica sem token. O token embute usuário, papéis,
 organizações e tenants. Ver [README — claims](../README.md#o-que-o-login-retorna-token--claims).
 
+## Token ES256 e chave pública (JWKS)
+
+> **Em `develop` (auth `ca02e61`, composer `aaad2c2`), ainda não no ar em 2026-10-26.** Liga quando a chave for
+> configurada e implantada (pedido à infra). Até lá, o campo não vem na resposta e o JWKS responde `{"keys":[]}`.
+
+Para o serviço que precisa validar o token **sem guardar o segredo compartilhado**, o login (`/up` e `/ua`) e a
+[renovação](renovar.md) devolvem também:
+
+| Campo | Tipo | Significado |
+|---|---|---|
+| `accessTokenEs256` | string | o mesmo token de acesso, com os mesmos claims, o mesmo emissor (`iss` = `YC-AuthService`), o mesmo `sub` e a mesma validade, assinado em **ES256** (ECDSA P-256) com `kid` no cabeçalho |
+
+- **Chave pública:** `GET /ua/.well-known/jwks.json`, público → `200 {"keys":[{"kty":"EC","crv":"P-256","use":"sig",
+  "alg":"ES256","kid":"…","x":"…","y":"…"}]}`. Escolha a chave pelo `kid` do cabeçalho do token.
+- **Para validar:** confira a assinatura ES256 com a chave daquele `kid`, depois `iss` = `YC-AuthService` e `exp`.
+- **O `accessToken` não muda.** É ele que vai em `Authorization` para os serviços da plataforma. O
+  `accessTokenEs256` serve só a quem valida pela chave pública.
+
 ## Diferenças entre domínios
 - **`/up`** (plataforma): valida e, se a conta estiver **pendente** (em validação), retorna `403`.
 - **`/ua`** (externo): além de validar, **descobre os tenants** do usuário e os inclui no token.

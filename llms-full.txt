@@ -2226,6 +2226,7 @@ usuário (via forger) e os inclui no token.
 | Login (plataforma) | `POST /up/sign-in` | [endpoints/sign-in.md](endpoints/sign-in.md) |
 | Login (externo) | `POST /ua/sign-in` | [endpoints/sign-in.md](endpoints/sign-in.md) |
 | Renovar token | `GET /up/sign-in/renew` | [endpoints/renovar.md](endpoints/renovar.md) |
+| Chave pública do token ES256 (JWKS) | `GET /ua/.well-known/jwks.json` | [endpoints/sign-in.md](endpoints/sign-in.md#token-es256-e-chave-pública-jwks) |
 
 Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md). Contrato de fio: [openapi.yaml](openapi.yaml).
 
@@ -2256,7 +2257,8 @@ de duração maior, internamente.) Trate o token como **opaco**; não dependa de
 ## Pontos de coordenação
 
 - **CP-12** — auth **emite** o token que **todos** os demais serviços **validam** (mesmo segredo
-  compartilhado). É o início da cadeia de autorização.
+  compartilhado). É o início da cadeia de autorização. Quem não pode guardar o segredo valida o
+  `accessTokenEs256` pela chave pública ([sign-in — JWKS](endpoints/sign-in.md#token-es256-e-chave-pública-jwks)).
 - auth → **orgid** (validar credenciais, obter usuário/papéis/organizações).
 - auth → **forger** (no `/ua`, descobrir os tenants do usuário para o token).
 - auth → **cache** (registrar a sessão; sessão única por usuário).
@@ -2308,6 +2310,24 @@ lugar dele, o login responde `401` de corpo vazio; sem nenhum dos dois, `401` `m
 Use `accessToken` em `Authorization: Bearer <token>` nas chamadas seguintes — a chave é `accessToken`, e não
 `token`: quem lê `.token` fica sem token. O token embute usuário, papéis,
 organizações e tenants. Ver [README — claims](../README.md#o-que-o-login-retorna-token--claims).
+
+## Token ES256 e chave pública (JWKS)
+
+> **Em `develop` (auth `ca02e61`, composer `aaad2c2`), ainda não no ar em 2026-10-26.** Liga quando a chave for
+> configurada e implantada (pedido à infra). Até lá, o campo não vem na resposta e o JWKS responde `{"keys":[]}`.
+
+Para o serviço que precisa validar o token **sem guardar o segredo compartilhado**, o login (`/up` e `/ua`) e a
+[renovação](renovar.md) devolvem também:
+
+| Campo | Tipo | Significado |
+|---|---|---|
+| `accessTokenEs256` | string | o mesmo token de acesso, com os mesmos claims, o mesmo emissor (`iss` = `YC-AuthService`), o mesmo `sub` e a mesma validade, assinado em **ES256** (ECDSA P-256) com `kid` no cabeçalho |
+
+- **Chave pública:** `GET /ua/.well-known/jwks.json`, público → `200 {"keys":[{"kty":"EC","crv":"P-256","use":"sig",
+  "alg":"ES256","kid":"…","x":"…","y":"…"}]}`. Escolha a chave pelo `kid` do cabeçalho do token.
+- **Para validar:** confira a assinatura ES256 com a chave daquele `kid`, depois `iss` = `YC-AuthService` e `exp`.
+- **O `accessToken` não muda.** É ele que vai em `Authorization` para os serviços da plataforma. O
+  `accessTokenEs256` serve só a quem valida pela chave pública.
 
 ## Diferenças entre domínios
 - **`/up`** (plataforma): valida e, se a conta estiver **pendente** (em validação), retorna `403`.
@@ -11908,6 +11928,15 @@ O usuário abre um relato novo.
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.119 — 2026-10-26
+
+- **auth: segundo access token em ES256 e a chave pública em JWKS** (`auth/endpoints/sign-in.md` §Token ES256 e
+  chave pública; `auth/README.md`, índice e CP-12; `auth/openapi.yaml`). O login e a renovação devolvem também
+  `accessTokenEs256`: os mesmos claims e o mesmo `iss`, assinado em ES256 com `kid`. A chave pública sai em
+  `GET /ua/.well-known/jwks.json`, público. O `accessToken` HS512 não muda. Em `develop` (auth `ca02e61`, composer
+  `aaad2c2`), ainda não no ar: sem a chave configurada, o campo não vem e o JWKS responde `{"keys":[]}`.
+  yc-platform-v3/composer#11.
 
 ## 1.118 — 2026-10-16
 
