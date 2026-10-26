@@ -2,6 +2,13 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.120 — 2026-10-26
+
+- **auth: o `accessTokenEs256` e o JWKS da 1.119 estão em vigor desde 2026-10-26T13:45:34Z**
+  (`auth/endpoints/sign-in.md` §Token ES256 e chave pública). Sai o aviso "ainda não no ar". Pela borda, o JWKS
+  está em `GET https://api.ycodify.com/v3/auth/ua/.well-known/jwks.json`, sem credencial e só por `GET`. Medido às
+  14:02:47Z: `200` com `kid` = `auth-es256-20261026`. yc-platform-v3/composer#11.
+
 ## 1.119 — 2026-10-26
 
 - **auth: segundo access token em ES256 e a chave pública em JWKS** (`auth/endpoints/sign-in.md` §Token ES256 e

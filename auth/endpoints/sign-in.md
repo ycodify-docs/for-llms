@@ -35,8 +35,8 @@ organizações e tenants. Ver [README — claims](../README.md#o-que-o-login-ret
 
 ## Token ES256 e chave pública (JWKS)
 
-> **Em `develop` (auth `ca02e61`, composer `aaad2c2`), ainda não no ar em 2026-10-26.** Liga quando a chave for
-> configurada e implantada (pedido à infra). Até lá, o campo não vem na resposta e o JWKS responde `{"keys":[]}`.
+> **Em vigor desde 2026-10-26T13:45:34Z.** Medido pela borda às 14:02:47Z, sem credencial: o JWKS responde `200`
+> com a chave `kid` = `auth-es256-20261026`.
 
 Para o serviço que precisa validar o token **sem guardar o segredo compartilhado**, o login (`/up` e `/ua`) e a
 [renovação](renovar.md) devolvem também:
@@ -47,6 +47,8 @@ Para o serviço que precisa validar o token **sem guardar o segredo compartilhad
 
 - **Chave pública:** `GET /ua/.well-known/jwks.json`, público → `200 {"keys":[{"kty":"EC","crv":"P-256","use":"sig",
   "alg":"ES256","kid":"…","x":"…","y":"…"}]}`. Escolha a chave pelo `kid` do cabeçalho do token.
+  **Pela borda:** `GET https://api.ycodify.com/v3/auth/ua/.well-known/jwks.json`, **sem nenhuma credencial**: nem
+  `X-Forger-Credential`, que o resto de `/v3/auth/` exige. Só `GET`.
 - **Para validar:** confira a assinatura ES256 com a chave daquele `kid`, depois `iss` = `YC-AuthService` e `exp`.
 - **O `accessToken` não muda.** É ele que vai em `Authorization` para os serviços da plataforma. O
   `accessTokenEs256` serve só a quem valida pela chave pública.
