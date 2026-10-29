@@ -10,8 +10,16 @@ Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`.
 
 `GET /a/{boundedContext}/{aggregateType}/{id}`
 
-- `200` — estado atual do agregado (JSON), reconstituído a partir dos seus eventos.
+- `200` — estado atual do agregado (JSON), reconstituído a partir dos seus eventos, mais a chave
+  **`_version`**: a versão do agregado, que é o número do último evento dele.
 - `204` — agregado não encontrado.
+
+**`_version` não é dado do agregado.** Ela não vem do modelo, não está no evento nem na projeção, e não
+conta para o `204` do recorte por coluna. Serve para o **comando condicional**: devolvida em
+`_expectedVersion`, faz o comando ser recusado se o agregado mudou desde esta leitura (ver
+[comando § Comando condicional pela versão](comando.md#comando-condicional-pela-versão)). Os dois nomes são
+diferentes de propósito: devolver o corpo desta leitura como payload do comando **não** liga o
+condicional.
 
 **Datas no estado:** `Timestamp` vem como `"2026-09-15T09:00:00"` — **UTC, sem fuso** — e `Date` como
 `"1990-04-02"`. Inclusive o carimbo automático de cada evento (o `whenAttribute`, como `criadaem`):

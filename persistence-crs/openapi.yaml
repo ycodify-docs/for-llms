@@ -20,7 +20,7 @@ paths:
         - { $ref: '#/components/parameters/tenant' }
       requestBody:
         required: true
-        description: "O comando pelo seu nome. Em transições, inclua status = estado atual (exceto criação). Ver spec/model-format.md."
+        description: "O comando pelo seu nome. Em transições, inclua status = estado atual (exceto criação). Opcional: _expectedVersion = a _version lida; diferente da atual → 510. Ver spec/model-format.md e endpoints/comando.md."
         content: { application/json: { schema: { type: object, additionalProperties: { type: object } } } }
       responses:
         '200': { description: OK, content: { application/json: { schema: { type: object, properties: { id: { type: string }, status: { type: string } } } } } }
@@ -35,7 +35,7 @@ paths:
         - { $ref: '#/components/parameters/aggregateType' }
         - { $ref: '#/components/parameters/uuid' }
         - { $ref: '#/components/parameters/tenant' }
-      responses: { '200': { description: Estado atual }, '204': { description: Não encontrado }, '510': { $ref: '#/components/responses/StateOrProcessing' } }
+      responses: { '200': { description: "Estado atual, mais _version (inteiro: a versão do agregado, para _expectedVersion do comando)" }, '204': { description: Não encontrado }, '510': { $ref: '#/components/responses/StateOrProcessing' } }
   /a/{boundedContext}/{aggregateType}/{uuid}/history:
     get:
       summary: Ler histórico de eventos do agregado

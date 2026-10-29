@@ -77,6 +77,10 @@ A atualização da **projeção** acontece **depois**, de forma assíncrona, pel
     pretendido ao fim da execução (`endState`).
   - Se o `status` enviado divergir do estado real (outro comando avançou antes), a operação é rejeitada
     (`510`) e deve ser **reenviada** sobre o estado atualizado.
+- **Comando condicional pela versão (opcional):** o `status` não distingue duas passagens pelo mesmo
+  estado (`a → b → a`). Quem precisa disso manda `_expectedVersion` = a `_version` lida em
+  `GET /a/{bc}/{tipo}/{id}`; versão diferente → `510`. Sem o campo, nada muda. Ver
+  [endpoints/comando.md § Comando condicional pela versão](endpoints/comando.md#comando-condicional-pela-versão).
 
 ## Regras de payload (checklist)
 
