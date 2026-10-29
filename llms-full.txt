@@ -8041,6 +8041,7 @@ saiu e o endpoint interno passou a simplesmente não recortar.
 ## Contents
 - Do arquivo à rota
 - Forma do arquivo
+- Ambiente de execução
 - O que o processador recebe
 - O que o processador devolve
 - Erros
@@ -8095,6 +8096,29 @@ aguardado. Ver [contextos.md](contextos.md).
 
 Republicar no mesmo caminho substitui a versão anterior: a chamada seguinte já executa o código novo,
 sem versão antiga presa em memória.
+
+## Ambiente de execução
+
+O arquivo é carregado como um **módulo Node.js comum** (CommonJS: `module.exports` e `require`), na
+**linha 18 do Node.js**. A versão exata dentro da linha 18 não é fixada: escreva código que rode em
+qualquer Node 18.
+
+**Os módulos nativos do Node estão disponíveis** por `require`, com ou sem o prefixo `node:`:
+`require('node:crypto')` e `require('crypto')` resolvem para o mesmo módulo. Não há lista de módulos
+permitidos nem bloqueio de módulo nativo. Uso típico: conferir assinatura ou calcular hash com
+`createPublicKey`, `verify` ou `createHash` do `node:crypto`.
+
+```js
+const crypto = require('node:crypto');
+
+module.exports = async (data) => {
+  const hash = crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex');
+  return { ...data, hash };
+};
+```
+
+> Contrato só para módulos **nativos**. Pacote de terceiros (npm) não faz parte do que a publicação
+> entrega: o que não estiver na árvore publicada não pode ser considerado disponível.
 
 ## O que o processador recebe
 
