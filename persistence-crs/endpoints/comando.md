@@ -83,6 +83,10 @@ que é a `_version` da [leitura do agregado](agregado-leitura.md#estado-atual):
 - Dois comandos que leram a **mesma** versão passam os dois nesta checagem, e o segundo a gravar recebe
   `510` da concorrência otimista do event store.
 
+> **No ar em teste** (`/v3/persistence/t/`) desde 2026-10-29T15:09:38Z, na imagem
+> `yc-interpreter:amd64-ff32b1f-c7b2`. **Produção (`/v3/persistence/`) ainda não.** Ali o campo é ignorado,
+> e a leitura não traz `_version`.
+
 ## Resposta
 
 `200`:

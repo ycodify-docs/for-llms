@@ -2,6 +2,15 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.121 — 2026-10-29
+
+- **persistence-crs: comando condicional pela versão** (`persistence-crs/endpoints/comando.md` §Comando condicional
+  pela versão; `endpoints/agregado-leitura.md`; `README.md`, regra de concorrência; `openapi.yaml`).
+  `GET /a/{bc}/{tipo}/{id}` passa a devolver `_version`, a versão do agregado. O comando aceita o campo opcional
+  `_expectedVersion`: diferente da versão atual dá `510`, antes da regra de negócio; inválido dá `400`; sem o campo,
+  nada muda. Em teste (`/v3/persistence/t/`) desde 2026-10-29T15:09:38Z (`yc-interpreter:amd64-ff32b1f-c7b2`),
+  produção ainda não. yc.cqrs-c `3db2834`, persistence-crs `0ff7359`. yc-platform-v3/interpreter#3.
+
 ## 1.120 — 2026-10-26
 
 - **auth: o `accessTokenEs256` e o JWKS da 1.119 estão em vigor desde 2026-10-26T13:45:34Z**

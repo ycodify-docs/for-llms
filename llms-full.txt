@@ -3998,6 +3998,10 @@ A atualização da **projeção** acontece **depois**, de forma assíncrona, pel
     pretendido ao fim da execução (`endState`).
   - Se o `status` enviado divergir do estado real (outro comando avançou antes), a operação é rejeitada
     (`510`) e deve ser **reenviada** sobre o estado atualizado.
+- **Comando condicional pela versão (opcional):** o `status` não distingue duas passagens pelo mesmo
+  estado (`a → b → a`). Quem precisa disso manda `_expectedVersion` = a `_version` lida em
+  `GET /a/{bc}/{tipo}/{id}`; versão diferente → `510`. Sem o campo, nada muda. Ver
+  [endpoints/comando.md § Comando condicional pela versão](endpoints/comando.md#comando-condicional-pela-versão).
 
 ## Regras de payload (checklist)
 
@@ -4123,6 +4127,34 @@ tenant (ver [forger/model](../../forger/endpoints/model.md) e [examples/](../../
 > `510` (alguém avançou o agregado antes; reenvie sobre o estado atualizado). Ver
 > [README — regra do status](../README.md#estados-transições-e-concorrência).
 
+### Comando condicional pela versão
+
+O `status` não distingue duas vezes o mesmo estado: num ciclo `a → b → a`, um comando atrasado que leu o
+primeiro `a` passa. Para isso há o campo **opcional `_expectedVersion`**, com a versão que o cliente leu,
+que é a `_version` da [leitura do agregado](agregado-leitura.md#estado-atual):
+
+```json
+{ "<nomeDoComando>": { "id": "<uuid>", "status": "a", "_expectedVersion": 7, "...": "..." } }
+```
+
+| `_expectedVersion` | O que acontece |
+|---|---|
+| ausente | nada muda — é o comportamento de quem não manda o campo |
+| igual à versão atual | o comando segue |
+| diferente | `510`, com as duas versões na mensagem, **antes** da regra de negócio |
+| não é inteiro ≥ 0 | `400` |
+
+- Na criação a versão atual é `0`.
+- O campo **não** entra no evento nem no `data` da regra de negócio.
+- Se o modelo declarar um atributo chamado `_expectedVersion`, o campo é do modelo e o condicional não se
+  liga. Um atributo `version` continua sendo atributo.
+- Dois comandos que leram a **mesma** versão passam os dois nesta checagem, e o segundo a gravar recebe
+  `510` da concorrência otimista do event store.
+
+> **No ar em teste** (`/v3/persistence/t/`) desde 2026-10-29T15:09:38Z, na imagem
+> `yc-interpreter:amd64-ff32b1f-c7b2`. **Produção (`/v3/persistence/`) ainda não.** Ali o campo é ignorado,
+> e a leitura não traz `_version`.
+
 ## Resposta
 
 `200`:
@@ -4142,13 +4174,15 @@ A ordem real, que importa para entender o que já rodou quando um erro chega:
 2. **carga do estado** do agregado;
 3. **autorização por papel** (`command.<cmd>.roles`) — **antes** da regra de negócio. Quem não tem o
    papel recebe `403` **sem** o processor do br-service ter sido executado;
-4. **regra/coordenação no br-service**, se o modelo declarar;
-5. **validação da transição** (`fromState` contra o `status` enviado);
-6. **gravação do evento**, que notifica o es-n;
-7. resposta.
+4. **versão esperada** (`_expectedVersion`), se o comando a trouxer — estado velho é `510` **sem** o
+   processor ter sido executado;
+5. **regra/coordenação no br-service**, se o modelo declarar;
+6. **validação da transição** (`fromState` contra o `status` enviado);
+7. **gravação do evento**, que notifica o es-n;
+8. resposta.
 
 > **Onde as datas são normalizadas:** na leitura do corpo, antes do passo 1 — por isso uma data inválida
-> é recusada sem carregar estado nenhum —, e **de novo depois do passo 4**, porque a regra de negócio pode
+> é recusada sem carregar estado nenhum —, e **de novo depois do passo 5**, porque a regra de negócio pode
 > devolver datas que substituem as do corpo.
 
 > A ordem entre 3 e 4 mudou em 2026-09-05. Antes o br-service rodava primeiro e a checagem de papel vinha
@@ -4158,7 +4192,7 @@ A ordem real, que importa para entender o que já rodou quando um erro chega:
 
 > **Não existe validação do estado de destino (`endState`).** Versões anteriores desta página descreviam
 > um passo que compararia o estado resultante com o `endState` do modelo; ele não existe no serviço. O
-> que é verificado é a **origem** (`fromState`), no passo 5.
+> que é verificado é a **origem** (`fromState`), no passo 6.
 
 ### `null` explícito, chave omitida e o que o processor devolve
 
@@ -4196,9 +4230,9 @@ que o processor do br devolver. Em `String`, `""` continua sendo `""`.
 
 | Código | Quando |
 |---|---|
-| `400` | `valueObject` na forma errada (a causa mais comum) · **data em forma irreconhecível** — a mensagem nomeia o campo, inclusive `grupo.campo` |
+| `400` | `valueObject` na forma errada (a causa mais comum) · **data em forma irreconhecível** — a mensagem nomeia o campo, inclusive `grupo.campo` · `_expectedVersion` que não é inteiro ≥ 0 |
 | `403` | tenant não autorizado, **ou** usuário sem o papel exigido pelo comando |
-| `510` | falha de transição (`fromState` não casa o `status` enviado) **e o resto**: corpo malformado, agregado ou comando desconhecido, `id` ausente num comando de transição |
+| `510` | falha de transição (`fromState` não casa o `status` enviado) · **`_expectedVersion` diferente da versão atual** **e o resto**: corpo malformado, agregado ou comando desconhecido, `id` ausente num comando de transição |
 
 ⚠️ **`510` não significa "erro do servidor" aqui.** Boa parte dos erros de payload cai nele — corpo
 malformado, nome de comando inexistente, `id` faltando. Antes de suspeitar de indisponibilidade, leia a
@@ -4220,8 +4254,16 @@ Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`.
 
 `GET /a/{boundedContext}/{aggregateType}/{id}`
 
-- `200` — estado atual do agregado (JSON), reconstituído a partir dos seus eventos.
+- `200` — estado atual do agregado (JSON), reconstituído a partir dos seus eventos, mais a chave
+  **`_version`**: a versão do agregado, que é o número do último evento dele.
 - `204` — agregado não encontrado.
+
+**`_version` não é dado do agregado.** Ela não vem do modelo, não está no evento nem na projeção, e não
+conta para o `204` do recorte por coluna. Serve para o **comando condicional**: devolvida em
+`_expectedVersion`, faz o comando ser recusado se o agregado mudou desde esta leitura (ver
+[comando § Comando condicional pela versão](comando.md#comando-condicional-pela-versão)). Os dois nomes são
+diferentes de propósito: devolver o corpo desta leitura como payload do comando **não** liga o
+condicional.
 
 **Datas no estado:** `Timestamp` vem como `"2026-09-15T09:00:00"` — **UTC, sem fuso** — e `Date` como
 `"1990-04-02"`. Inclusive o carimbo automático de cada evento (o `whenAttribute`, como `criadaem`):
@@ -11954,6 +11996,15 @@ O usuário abre um relato novo.
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.121 — 2026-10-29
+
+- **persistence-crs: comando condicional pela versão** (`persistence-crs/endpoints/comando.md` §Comando condicional
+  pela versão; `endpoints/agregado-leitura.md`; `README.md`, regra de concorrência; `openapi.yaml`).
+  `GET /a/{bc}/{tipo}/{id}` passa a devolver `_version`, a versão do agregado. O comando aceita o campo opcional
+  `_expectedVersion`: diferente da versão atual dá `510`, antes da regra de negócio; inválido dá `400`; sem o campo,
+  nada muda. Em teste (`/v3/persistence/t/`) desde 2026-10-29T15:09:38Z (`yc-interpreter:amd64-ff32b1f-c7b2`),
+  produção ainda não. yc.cqrs-c `3db2834`, persistence-crs `0ff7359`. yc-platform-v3/interpreter#3.
 
 ## 1.120 — 2026-10-26
 
