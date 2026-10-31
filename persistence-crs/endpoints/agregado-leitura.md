@@ -36,10 +36,6 @@ condicional.
 no horário de Brasília, a conversão é do front (exemplo em
 [persistence-q § Resposta](../../persistence-q/endpoints/consulta.md#resposta)).
 
-> Antes de `yc-interpreter:amd64-260913c` — em teste desde essa imagem, **produção ainda não** —, este
-> endpoint devolvia a data **como o cliente a
-> mandou** — com fuso, fração ou espaço — e o carimbo automático com espaço (`2026-09-13 20:19:09`).
-
 ## Histórico de eventos
 
 `GET /a/{boundedContext}/{aggregateType}/{id}/history`
@@ -95,7 +91,7 @@ GET /a/{bc}/{type}/{id}   ou   GET .../{id}/history
 > registro, então responde igual para um `{id}` que existe e um que não existe — não revela existência. Já
 > o recorte por proprietário responde `204`, de propósito: ali um `403` entregaria a existência do agregado
 > a quem não é o titular. Ao depurar um `204` inesperado, verifique o recorte do modelo antes de procurar o
-> dado. *(Até 2026-10-01 o papel fora de `roles.read` também respondia `204`.)*
+> dado.
 
 **`loguser` aparece nas duas respostas** — no estado e em cada evento — com o `username` de quem executou
 aquele comando: [model-format — `loguser`](../spec/model-format.md#loguser-quem-executou-cada-comando).

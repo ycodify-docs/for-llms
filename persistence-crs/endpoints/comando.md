@@ -83,10 +83,6 @@ que é a `_version` da [leitura do agregado](agregado-leitura.md#estado-atual):
 - Dois comandos que leram a **mesma** versão passam os dois nesta checagem, e o segundo a gravar recebe
   `510` da concorrência otimista do event store.
 
-> **No ar em teste** (`/v3/persistence/t/`) desde 2026-10-29T15:09:38Z, na imagem
-> `yc-interpreter:amd64-ff32b1f-c7b2`. **Produção (`/v3/persistence/`) ainda não.** Ali o campo é ignorado,
-> e a leitura não traz `_version`.
-
 ## Resposta
 
 `200`:
@@ -117,10 +113,7 @@ A ordem real, que importa para entender o que já rodou quando um erro chega:
 > é recusada sem carregar estado nenhum —, e **de novo depois do passo 5**, porque a regra de negócio pode
 > devolver datas que substituem as do corpo.
 
-> A ordem entre 3 e 4 mudou em 2026-09-05. Antes o br-service rodava primeiro e a checagem de papel vinha
-> depois — quem não tinha o papel fazia a regra executar inteira e recebia as mensagens dela de volta.
-> Se você depende de ver a mensagem do processor para diagnosticar permissão, esse caminho não existe
-> mais: sem papel, o `403` vem antes.
+> Sem papel, o `403` vem antes da regra: a mensagem do processor não serve para diagnosticar permissão.
 
 > **Não existe validação do estado de destino (`endState`).** Versões anteriores desta página descreviam
 > um passo que compararia o estado resultante com o `endState` do modelo; ele não existe no serviço. O
@@ -144,19 +137,9 @@ São três regras diferentes, e confundi-las é o engano comum:
   veio no corpo. Detalhe em [br-service](../../br-service/README.md).
 - Dentro de `valueObject` o `null` segue como `null` do JSON, sem mudança.
 
-> ⚠️ **Até o conserto de 2026-09-25** (ufrn.loco3 `66b1313`, persistence-crs `4f61f82`), o `null`
-> explícito divergia: na criação, um `null` em atributo numérico fazia a linha **não materializar** na
-> projeção, e em texto gravava a string `"null"`; na transição, a projeção **preservava** o valor
-> anterior enquanto o agregado gravava `null`. Tudo com `200`. Linha com `"null"` em texto gravada antes
-> disso continua lá: é dado, e não se corrige sozinha.
-
 **`""` em `Date` ou `Timestamp` não é data.** Em atributo opcional ele é tratado como `null`; em atributo
 `nullable: false` é `400`, com o nome do campo. Vale também para campo de `valueObject` em grupo e para o
 que o processor do br devolver. Em `String`, `""` continua sendo `""`.
-
-> ⚠️ **Até o conserto de 2026-09-25** (yc.cqrs-c `c111bf8`), `""` em data respondia `200`, e o agregado
-> gravava `""`. Já a projeção falhava ao gravar: na criação a linha não materializava, e na transição
-> ficava o valor anterior.
 
 ## Erros
 

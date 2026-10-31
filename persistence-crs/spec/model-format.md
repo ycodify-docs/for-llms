@@ -86,8 +86,7 @@ cadastra em execução. O feed está em [es-n — assinatura externa](../../es-n
 **O motor de comandos não lê esta chave.** Mudar o filtro é republicar o modelo: a próxima leitura já usa a
 declaração nova, e o cursor de quem lê não se perde. Remover a assinatura do modelo faz o feed responder `404`.
 
-> **Estado em 2026-10-01:** a **validação na publicação** vale desde 04:23:36Z — declaração fora da forma é
-> recusada com `400`. O feed está no ar na instância de teste; na de produção, ainda não.
+Declaração fora da forma é recusada na publicação com `400`.
 
 ### Snapshot do agregado (`snapshot`)
 
@@ -119,9 +118,6 @@ usá-los. O retrato guarda o estado da sua versão, e **alterar o modelo não o 
 `whenAttribute` de um agregado, por exemplo, vê o nome antigo seguir no estado que veio do retrato.
 
 **O `/history` e o feed leem os eventos, não o retrato:** evento apagado some dos dois.
-
-> **Estado em 2026-10-31:** a publicação aceita e valida esta chave desde 13:54:38Z. O motor que a lê está **em teste**
-> (`/v3/persistence/t`) desde 14:18:13Z; em produção (`/v3/persistence`), ainda não, e lá a chave publicada não tem efeito.
 
 ## Nível do agregado
 
@@ -397,12 +393,8 @@ O que o BFF faz com ela (marcadores por tipo, o que o processor devolve):
 
 #### `references` — o atributo que aponta outro agregado
 
-> **Estado em 2026-09-29:** a forma e o significado estão definidos aqui, e esta é a referência
-> autoritativa. A **validação na publicação** está no forger em `develop`, **ainda não em produção**
-> ([forger — `references`](../../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references));
-> o **BFF ainda não lê** a chave
-> ([bff — declarada no modelo](../../bff/README.md#declarada-no-modelo-references-pedida-e-ainda-não-em-vigor)).
-> Até valer, a referência exibida pela tela vem só do `options` por referência do manifesto.
+A forma e o significado estão definidos aqui. A validação na publicação é do
+[forger — `references`](../../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references).
 
 ```jsonc
 "agenda.aula": {
@@ -518,8 +510,7 @@ da regra.
 **Onde NÃO acontece — e a data segue exatamente como você mandou:**
 - dentro de valueObject de **tipo direto** (`{"type": "Json"}`): o modelo não diz que há data lá dentro;
 - em campo `String`, mesmo que o texto seja uma data ou uma hora (`"06:00"`);
-- em dado gravado **antes** de `yc-interpreter:amd64-260913c` — a imagem em que isto passou a valer em teste;
-  **produção ainda não tem**, e lá nenhuma data é normalizada.
+- em evento já gravado: ele segue como foi gravado.
 
 **Recusas:** forma irreconhecível — `"13/09/2026"`, `"ontem"`, epoch num `Date` — é **`400`** que nomeia o
 campo (`no campo 'notafiscal.datacompra': …`). `"13/09/2026"` é recusado de propósito: dia e mês trocam de

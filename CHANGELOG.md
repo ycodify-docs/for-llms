@@ -2,6 +2,26 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.129 — 2026-10-31
+
+- **Páginas de persistence-crs, persistence-q e es-n sem falha nem estado.** Por ordem do dono, página diz como se usa; o
+  que era estado e história mora aqui. Conteúdo que saiu das páginas:
+  - **Em teste, produção não:** snapshot do agregado desde 2026-10-31T14:18:13Z (publicação da chave desde 13:54:38Z);
+    comando condicional desde 2026-10-29T15:09:38Z (`amd64-ff32b1f-c7b2`; em produção o campo é ignorado e a leitura não
+    traz `_version`); datas normalizadas desde `amd64-260913c`; feed de assinatura em `/v3/es/t/` desde
+    2026-10-01T04:19:19Z (validação na publicação desde 04:23:36Z; falta o papel de assinante na gestão de contas); modelo
+    relido a cada requisição desde `amd64-260910`.
+  - **`references`, em 2026-09-29:** validação no forger em `develop`; o BFF ainda não lia a chave, e a tela usava o
+    `options` por referência do manifesto.
+  - **Consertos de 2026-09-25:** `null` explícito (`ufrn.loco3@66b1313`, `persistence-crs@4f61f82`): antes, na criação, `null`
+    em numérico não materializava a linha, em texto gravava `"null"`, que segue no dado gravado, e na transição a projeção
+    preservava o valor anterior. `""` em data (`yc.cqrs-c@c111bf8`): antes respondia `200` e a projeção falhava ao gravar.
+  - **2026-09-10:** cópia do modelo em memória, por até uma hora, desligada em teste; a doc mandava invalidar as duas chaves.
+  - **2026-09-09:** em `amd64-260909`, sem o `b`, a entity com recorte pela rota interna e a consulta sem credencial davam
+    `403`; a partir de `amd64-260909b`, não.
+  - **2026-09-05:** a checagem de papel passou a vir antes do br-service. **2026-10-01:** papel fora de `roles.read` deixou
+    de responder `204`. **Até `amd64-260913c`:** o agregado devolvia a data como o cliente mandou.
+
 ## 1.128 — 2026-10-31
 
 - **persistence-q e persistence-crs: `400` por valor fora da forma** nas listas de erro (`persistence-q/erros.md`,
