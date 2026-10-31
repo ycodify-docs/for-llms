@@ -11,6 +11,7 @@
 ## Contents
 - Estrutura de topo
 - Assinaturas externas
+- Snapshot do agregado
 - Nível do agregado
 - Atributos e tipos
 - Comandos
@@ -29,7 +30,8 @@
     "aggregate": {
       "<bc>.<aggregateType>": { ... } // um ou mais agregados
     },
-    "subscriptions": { ... }          // OPCIONAL — ver "Assinaturas externas"
+    "subscriptions": { ... },         // OPCIONAL — ver "Assinaturas externas"
+    "snapshot": { ... }               // OPCIONAL — ver "Snapshot do agregado"
   }
 }
 ```
@@ -86,6 +88,32 @@ declaração nova, e o cursor de quem lê não se perde. Remover a assinatura do
 
 > **Estado em 2026-10-01:** a **validação na publicação** vale desde 04:23:36Z — declaração fora da forma é
 > recusada com `400`. O feed está no ar na instância de teste; na de produção, ainda não.
+
+### Snapshot do agregado (`snapshot`)
+
+Sem snapshot, cada comando e cada leitura de agregado refazem o estado a partir de **todos** os eventos dele.
+Com snapshot, partem do último retrato e aplicam só os eventos posteriores. A configuração é **do tenant**: vale
+para todos os agregados do modelo.
+
+```jsonc
+"acme.vendas": {
+  "aggregate": { ... },
+  "snapshot": { "enabled": true, "nthEvent": 50 }
+}
+```
+
+| Parte | Regra |
+|---|---|
+| **lugar** | **dentro** de `<org>.<projeto>`, irmã de `aggregate` |
+| `enabled` | `true` liga. Ausente, ou a chave `snapshot` inteira ausente: desligado |
+| `nthEvent` | inteiro a partir de 2: grava-se o retrato quando a versão do agregado é múltipla dele. Abaixo de 2: desligado |
+
+Quem grava é o próprio comando, na mesma transação do evento. O estado e o `_version` devolvidos são os mesmos
+com ou sem snapshot. Desligar volta ao cálculo por todos os eventos. `/history` continua lendo todos os eventos.
+
+> **Estado em 2026-10-31:** o motor lê esta chave no código da `develop` e ainda não está implantado em nenhuma
+> instância. A publicação da chave depende do forger ([composer#12](https://github.com/yc-platform-v3/composer/issues/12));
+> enquanto isso, não há como ligar o snapshot num tenant.
 
 ## Nível do agregado
 

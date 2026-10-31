@@ -25,6 +25,16 @@
           "description": "Opcional. Assinaturas externas de eventos deste bounded context: nome -> declaracao. Quem le e o servico de eventos (feed por cursor); o motor de comandos nao le. Ver spec/model-format.md § Assinaturas externas.",
           "propertyNames": { "pattern": "^[a-z][a-z0-9-]{0,62}$" },
           "additionalProperties": { "$ref": "#/$defs/subscription" }
+        },
+        "snapshot": {
+          "type": "object",
+          "description": "Opcional. Snapshot do agregado, por tenant: vale para todos os agregados do modelo. Ver spec/model-format.md § Snapshot do agregado.",
+          "required": ["enabled", "nthEvent"],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "nthEvent": { "type": "integer", "minimum": 2 }
+          }
         }
       }
     },
