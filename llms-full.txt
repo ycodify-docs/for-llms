@@ -129,8 +129,8 @@ usá-los. O retrato guarda o estado da sua versão, e **alterar o modelo não o 
 
 **O `/history` e o feed leem os eventos, não o retrato:** evento apagado some dos dois.
 
-> **Estado em 2026-10-31:** a publicação aceita e valida esta chave desde 13:54:38Z. O motor que a lê está no
-> código da `develop` e ainda não está implantado em nenhuma instância: até lá, publicar a chave não liga o snapshot.
+> **Estado em 2026-10-31:** a publicação aceita e valida esta chave desde 13:54:38Z. O motor que a lê está **em teste**
+> (`/v3/persistence/t`) desde 14:18:13Z; em produção (`/v3/persistence`), ainda não, e lá a chave publicada não tem efeito.
 
 ## Nível do agregado
 
