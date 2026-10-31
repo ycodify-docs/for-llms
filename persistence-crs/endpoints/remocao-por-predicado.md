@@ -82,6 +82,7 @@ Trate `POST /e/by` como operação administrativa: exponha-a a quem você expori
 ## Erros
 
 `400` (corpo inválido; `where` vazio; `_connective` ausente ou diferente de `AND`/`OR`; `_maxRows`
-ausente ou `<= 0`; critério que não monta filtro; entidade não relacional), `403` (tenant),
+ausente ou `<= 0`; critério que não monta filtro; valor fora da forma em atributo numérico ou booleano;
+entidade não relacional), `403` (tenant),
 `409` (teto excedido — nada apagado), `510` (falha de aplicação).
 Catálogo: [../erros.md](../erros.md).

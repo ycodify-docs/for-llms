@@ -4588,7 +4588,8 @@ Trate `POST /e/by` como operação administrativa: exponha-a a quem você expori
 ## Erros
 
 `400` (corpo inválido; `where` vazio; `_connective` ausente ou diferente de `AND`/`OR`; `_maxRows`
-ausente ou `<= 0`; critério que não monta filtro; entidade não relacional), `403` (tenant),
+ausente ou `<= 0`; critério que não monta filtro; valor fora da forma em atributo numérico ou booleano;
+entidade não relacional), `403` (tenant),
 `409` (teto excedido — nada apagado), `510` (falha de aplicação).
 Catálogo: [../erros.md](../erros.md).
 
@@ -6894,7 +6895,7 @@ Detalhe dos controles em [query-controls.md](../query-controls.md).
 > o comando exige na escrita (ver [comando](../../persistence-crs/endpoints/comando.md)).
 
 ## Erros
-`400` (JSON inválido), `401`/`403` (autorização), `510` (falha de execução da consulta).
+`400` (JSON inválido; valor fora da forma em atributo numérico ou booleano), `401`/`403` (autorização), `510` (falha de execução da consulta).
 Catálogo: [../erros.md](../erros.md).
 
 <!-- ===== persistence-q/query-controls.md ===== -->
@@ -7172,7 +7173,7 @@ Consequências que importam na prática:
 
 | HTTP | Significado | Causas típicas | Correção |
 |---|---|---|---|
-| `400` | Requisição inválida | JSON malformado; estrutura de critério inválida. | Corrigir o corpo (modo array/object, um rótulo por item). |
+| `400` | Requisição inválida | JSON malformado; estrutura de critério inválida; valor fora da forma em atributo numérico ou booleano. | Corrigir o corpo (modo array/object, um rótulo por item). |
 | `401` / `403` | Não autorizado | Credencial inválida; `tenant-id` fora do escopo do usuário. | Usar credencial/tenant corretos. |
 | `510` | Falha de execução | Predicado/identificador não reconhecido; falha ao ler a projeção. | Usar o vocabulário do tenant; conferir a projeção/entity. |
 
