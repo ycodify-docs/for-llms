@@ -86,6 +86,8 @@ Exemplo:
   `ilike`, não como igualdade. É o único lugar onde a plataforma troca o operador por conta própria —
   se você quer igualdade com um `%` literal, use `eq`.
 - **`in` exige ao menos um valor.** Lista vazia é **`400`**.
+- **O valor precisa caber no tipo.** Em atributo numérico ou booleano, valor de outra forma é **`400`**. Em texto,
+  aspa simples é só um caractere do valor.
 - **Valor vazio ou só espaços não vira nada.** `{"cor": ""}` não filtra **e não traz a coluna** no
   resultado. Não é erro; é omissão silenciosa. Para "campo vazio", use `eq` com o valor que você quer
   comparar.
