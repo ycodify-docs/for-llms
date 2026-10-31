@@ -278,8 +278,9 @@ Fica **dentro** de `<org>.<projeto>`, ao lado de `aggregate`:
 O efeito de cada campo no motor está em
 [formato do modelo — snapshot do agregado](../../persistence-crs/spec/model-format.md#snapshot-do-agregado-snapshot).
 
-> **Estado em 2026-10-31:** a validação está na `develop` do forger e **ainda não está implantada em nenhuma
-> instância** ([composer#12](https://github.com/yc-platform-v3/composer/issues/12)).
+> **Implantada em 2026-10-31T13:54:38Z** (`forger@7045305`;
+> [composer#12](https://github.com/yc-platform-v3/composer/issues/12)). Modelo publicado antes disso não é
+> revalidado: uma declaração fora da forma que já estava no cache continua lá até a próxima publicação.
 
 ### Chaves que um modelo novo não precisa trazer
 
