@@ -2,6 +2,12 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.123 — 2026-10-31
+
+- **persistence-crs: chave `snapshot` no modelo** (`persistence-crs/spec/model-format.md` §Snapshot do agregado).
+  Configuração por tenant, dentro de `<org>.<projeto>`. O motor que a lê (`yc.cqrs-c@a3e1275`,
+  `yc.persistence@05c5481`) ainda não está implantado. `llms-full.txt` recebe a seção.
+
 ## 1.122 — 2026-10-31
 
 - **forger: chave `snapshot` no `.model.json`** (`forger/endpoints/model.md` §Snapshot do agregado). Opcional, dentro
