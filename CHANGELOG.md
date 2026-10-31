@@ -2,6 +2,14 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.122 — 2026-10-31
+
+- **forger: chave `snapshot` no `.model.json`** (`forger/endpoints/model.md` §Snapshot do agregado). Opcional, dentro
+  de `<org>.<projeto>`, ao lado de `aggregate`: `{ "enabled": <boolean>, "nthEvent": <inteiro a partir de 2> }`.
+  Fora dessa forma, ou com outra chave dentro dela, a publicação responde `400`; modelo sem a chave publica como
+  antes. No ar desde 2026-10-31T13:54:38Z (`yc-composer:amd64-9d056ca-94f9`, `forger@7045305`, infra#58).
+  yc-platform-v3/composer#12.
+
 ## 1.121 — 2026-10-29
 
 - **persistence-crs: comando condicional pela versão** (`persistence-crs/endpoints/comando.md` §Comando condicional
