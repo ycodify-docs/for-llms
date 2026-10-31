@@ -105,15 +105,16 @@ para todos os agregados do modelo.
 | Parte | Regra |
 |---|---|
 | **lugar** | **dentro** de `<org>.<projeto>`, irmã de `aggregate` |
-| `enabled` | `true` liga. Ausente, ou a chave `snapshot` inteira ausente: desligado |
-| `nthEvent` | inteiro a partir de 2: grava-se o retrato quando a versão do agregado é múltipla dele. Abaixo de 2: desligado |
+| **ausente** | sem a chave `snapshot`, o snapshot fica desligado |
+| `enabled` | obrigatório, booleano; `true` liga |
+| `nthEvent` | obrigatório, inteiro a partir de 2: grava-se o retrato quando a versão do agregado é múltipla dele |
+| **fora da forma** | campo ausente, `nthEvent` abaixo de 2 ou outra chave: recusado na publicação com `400` |
 
 Quem grava é o próprio comando, na mesma transação do evento. O estado e o `_version` devolvidos são os mesmos
 com ou sem snapshot. Desligar volta ao cálculo por todos os eventos. `/history` continua lendo todos os eventos.
 
-> **Estado em 2026-10-31:** o motor lê esta chave no código da `develop` e ainda não está implantado em nenhuma
-> instância. A publicação da chave depende do forger ([composer#12](https://github.com/yc-platform-v3/composer/issues/12));
-> enquanto isso, não há como ligar o snapshot num tenant.
+> **Estado em 2026-10-31:** o motor e o forger tratam esta chave no código da `develop`, e nenhum dos dois está
+> implantado com isso em nenhuma instância. Até lá, não há como ligar o snapshot num tenant.
 
 ## Nível do agregado
 
