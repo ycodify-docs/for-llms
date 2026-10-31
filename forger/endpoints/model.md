@@ -44,6 +44,7 @@ Erros: `400` (arquivo vazio, extensão diferente de `.json`, documento inválido
 > | `alias` vazio, só de espaços ou que não é texto, em comando ou evento | ver [nome de exibição](#nome-de-exibicao) |
 > | `references` com atributo, alvo, `valueKey` ou tipo que não se sustenta | ver [atributo que aponta outro agregado](#atributo-que-aponta-outro-agregado-references) |
 > | `subscriptions` fora da forma, ou com tipo ou evento que não é do modelo | ver [assinatura externa de eventos](#assinatura-externa-de-eventos-subscriptions) |
+> | `snapshot` fora da forma | ver [snapshot do agregado](#snapshot-do-agregado-snapshot) |
 
 **Depois do modelo, o manifesto de apresentação.** Publicar o modelo não basta para a tela ficar legível:
 rótulos, formatos e nome de exibição de quem é referenciado vêm do
@@ -251,6 +252,34 @@ Quem lê a declaração é o es-n, que serve o feed: ver
 > **Em produção desde 2026-10-01T04:23:36Z** (`forger@fb3201c`; ver [CHANGELOG 1.97](../../CHANGELOG.md)).
 > Modelo publicado antes disso não é revalidado: uma declaração que não se sustenta e já estava no cache
 > continua lá até a próxima publicação.
+
+### Snapshot do agregado: `snapshot`
+
+**Opcional.** Configura o snapshot do agregado para o tenant: vale para todos os aggregates do modelo. Decisão do
+dono em 2026-10-31. **Modelo sem a chave publica como antes**, e o snapshot fica desligado.
+
+Fica **dentro** de `<org>.<projeto>`, ao lado de `aggregate`:
+
+```jsonc
+{
+  "acme.agenda": {
+    "aggregate": { "agenda.aula": { … } },
+    "snapshot": { "enabled": true, "nthEvent": 50 }
+  }
+}
+```
+
+| Recusa, sempre `400` | Por quê |
+|---|---|
+| `snapshot` que não é objeto, ou chave desconhecida dentro dele | forma |
+| `enabled` ausente, ou que não é boolean | forma |
+| `nthEvent` ausente, que não é inteiro, ou abaixo de 2 | forma |
+
+O efeito de cada campo no motor está em
+[formato do modelo — snapshot do agregado](../../persistence-crs/spec/model-format.md#snapshot-do-agregado-snapshot).
+
+> **Estado em 2026-10-31:** a validação está na `develop` do forger e **ainda não está implantada em nenhuma
+> instância** ([composer#12](https://github.com/yc-platform-v3/composer/issues/12)).
 
 ### Chaves que um modelo novo não precisa trazer
 
