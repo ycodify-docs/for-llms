@@ -2,6 +2,11 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.126 — 2026-10-31
+
+- **persistence-q: valor no critério** (`query-controls.md`). Em atributo numérico ou booleano, valor de outra forma é
+  `400`; em texto, a aspa simples é só um caractere do valor (`ufrn.loco3`, interpreter#5). Ainda não implantado.
+
 ## 1.125 — 2026-10-31
 
 - **persistence-crs: snapshot do agregado em teste** desde 14:18:13Z (`yc-interpreter:amd64-69fa484-7460`,
