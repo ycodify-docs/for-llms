@@ -2,6 +2,13 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.130 — 2026-10-31
+
+- **Assinatura de eventos por tenant, em teste.** A leitura de eventos da assinatura filtra por tenant além do tipo
+  (`yc.es@24472e4`), em `/v3/persistence/t/` desde 2026-10-31T20:24:41Z (`amd64-d18cc6f-5192`); produção não. Antes,
+  a assinatura nascida no checkpoint 0 projetava no próprio tenant os eventos de outro tenant com o mesmo
+  `org.projeto.bc.tipo`. Linhas já projetadas assim não saem com o conserto.
+
 ## 1.129 — 2026-10-31
 
 - **Páginas de persistence-crs, persistence-q e es-n sem falha nem estado.** Por ordem do dono, página diz como se usa; o
