@@ -11,7 +11,9 @@ Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`.
 `GET /a/{boundedContext}/{aggregateType}/{id}`
 
 - `200` — estado atual do agregado (JSON), reconstituído a partir dos seus eventos, mais a chave
-  **`_version`**: a versão do agregado, que é o número do último evento dele.
+  **`_version`**: a versão do agregado, que é o número do último evento dele. Com o
+  [snapshot](../spec/model-format.md#snapshot-do-agregado-snapshot) ligado no modelo, parte do último retrato e
+  aplica só os eventos posteriores.
 - `204` — agregado não encontrado.
 
 **`_version` não é dado do agregado.** Ela não vem do modelo, não está no evento nem na projeção, e não
@@ -42,7 +44,7 @@ no horário de Brasília, a conversão é do front (exemplo em
 
 `GET /a/{boundedContext}/{aggregateType}/{id}/history`
 
-- `200` — lista (array) dos eventos do agregado, em ordem.
+- `200` — lista (array) dos eventos do agregado, em ordem: **todos**, sem paginação, com ou sem snapshot.
 - `204` — sem eventos.
 
 Cada evento traz **quem o executou**. Evento sem identidade registrada — o caso de um agregado escrito por
