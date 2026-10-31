@@ -135,5 +135,5 @@ Detalhe dos controles em [query-controls.md](../query-controls.md).
 > o comando exige na escrita (ver [comando](../../persistence-crs/endpoints/comando.md)).
 
 ## Erros
-`400` (JSON inválido), `401`/`403` (autorização), `510` (falha de execução da consulta).
+`400` (JSON inválido; valor fora da forma em atributo numérico ou booleano), `401`/`403` (autorização), `510` (falha de execução da consulta).
 Catálogo: [../erros.md](../erros.md).

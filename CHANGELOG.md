@@ -2,6 +2,11 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.128 — 2026-10-31
+
+- **persistence-q e persistence-crs: `400` por valor fora da forma** nas listas de erro (`persistence-q/erros.md`,
+  `persistence-q/endpoints/consulta.md`, `persistence-crs/endpoints/remocao-por-predicado.md`).
+
 ## 1.127 — 2026-10-31
 
 - **persistence-q: valor no critério em teste** desde 15:32:30Z (`yc-interpreter:amd64-9547df7-3c3a`, `ufrn.loco3@d023c54`,
