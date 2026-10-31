@@ -2,6 +2,11 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.127 — 2026-10-31
+
+- **persistence-q: valor no critério em teste** desde 15:32:30Z (`yc-interpreter:amd64-9547df7-3c3a`, `ufrn.loco3@d023c54`,
+  infra#61). Em produção, ainda não.
+
 ## 1.126 — 2026-10-31
 
 - **persistence-q: valor no critério** (`query-controls.md`). Em atributo numérico ou booleano, valor de outra forma é
