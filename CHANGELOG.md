@@ -2,6 +2,11 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.125 — 2026-10-31
+
+- **persistence-crs: snapshot do agregado em teste** desde 14:18:13Z (`yc-interpreter:amd64-69fa484-7460`,
+  `yc.cqrs-c@a3e1275`, `yc.persistence@05c5481`, infra#59). Em produção, ainda não.
+
 ## 1.124 — 2026-10-31
 
 - **persistence-crs: snapshot do agregado** (`spec/model-format.md` §Snapshot do agregado,
