@@ -2,6 +2,12 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.124 — 2026-10-31
+
+- **persistence-crs: snapshot do agregado** (`spec/model-format.md` §Snapshot do agregado,
+  `endpoints/agregado-leitura.md`). O que acontece ao mudar a configuração e o modelo, e o que `/history` e o feed
+  leem. A leitura de agregado aponta para a seção, e o `/history` diz que devolve todos os eventos, sem paginação.
+
 ## 1.123 — 2026-10-31
 
 - **persistence-crs: chave `snapshot` no modelo** (`persistence-crs/spec/model-format.md` §Snapshot do agregado).

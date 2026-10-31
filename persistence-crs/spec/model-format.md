@@ -110,8 +110,15 @@ para todos os agregados do modelo.
 | `nthEvent` | obrigatório, inteiro a partir de 2: grava-se o retrato quando a versão do agregado é múltipla dele |
 | **fora da forma** | campo ausente, `nthEvent` abaixo de 2 ou outra chave: recusado na publicação com `400` |
 
-Quem grava é o próprio comando, na mesma transação do evento. O estado e o `_version` devolvidos são os mesmos
-com ou sem snapshot. Desligar volta ao cálculo por todos os eventos. `/history` continua lendo todos os eventos.
+Quem grava é o próprio comando, na mesma transação do evento. Para o mesmo modelo, o estado e o `_version`
+devolvidos são os mesmos com ou sem snapshot. `/history` continua lendo todos os eventos.
+
+**Mudar a configuração** é republicar o modelo ([forger/model](../../forger/endpoints/model.md#snapshot-do-agregado-snapshot)).
+Desligar volta ao cálculo por todos os eventos, e os retratos já gravados ficam guardados, sem uso; religar volta a
+usá-los. O retrato guarda o estado da sua versão, e **alterar o modelo não o reescreve**: quem renomeia o
+`whenAttribute` de um agregado, por exemplo, vê o nome antigo seguir no estado que veio do retrato.
+
+**O `/history` e o feed leem os eventos, não o retrato:** evento apagado some dos dois.
 
 > **Estado em 2026-10-31:** a publicação aceita e valida esta chave desde 13:54:38Z. O motor que a lê está no
 > código da `develop` e ainda não está implantado em nenhuma instância: até lá, publicar a chave não liga o snapshot.
