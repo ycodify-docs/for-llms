@@ -113,8 +113,8 @@ para todos os agregados do modelo.
 Quem grava é o próprio comando, na mesma transação do evento. O estado e o `_version` devolvidos são os mesmos
 com ou sem snapshot. Desligar volta ao cálculo por todos os eventos. `/history` continua lendo todos os eventos.
 
-> **Estado em 2026-10-31:** o motor e o forger tratam esta chave no código da `develop`, e nenhum dos dois está
-> implantado com isso em nenhuma instância. Até lá, não há como ligar o snapshot num tenant.
+> **Estado em 2026-10-31:** a publicação aceita e valida esta chave desde 13:54:38Z. O motor que a lê está no
+> código da `develop` e ainda não está implantado em nenhuma instância: até lá, publicar a chave não liga o snapshot.
 
 ## Nível do agregado
 
