@@ -2,6 +2,12 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.134 — 2026-11-04
+
+- **orgid: `POST /ua/account-role/new-account/using/authority` em produção** desde 2026-11-04T19:22:22Z
+  (`yc-composer:amd64-3d52002-08cc`, `orgid@9e16a0b`, `yc-platform-v3/infra#77`). A criação de conta pela instância
+  ainda não foi medida: falta token de `API_MASTER`.
+
 ## 1.133 — 2026-11-04
 
 - **orgid: `POST /ua/account-role/new-account/using/authority`.** O `API_MASTER` do dono de um papel `/ua` cria uma

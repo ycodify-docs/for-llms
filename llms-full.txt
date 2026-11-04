@@ -3365,8 +3365,6 @@ tratada — ver [../erros.md](../erros.md)).
 Cria uma conta `/ua` e já a associa a um papel do dono, numa operação só. O papel pode ser **não público**.
 **Papel:** só **administrador** (`API_MASTER`) no `owner` do papel; engenheiro recebe `403`.
 
-> **Ainda não implantada:** está na `develop` do orgid (`orgid@9e16a0b`) e não está na imagem do composer.
-
 **Corpo** (JSON):
 
 | Campo | Tipo | Obrig. | Significado |
