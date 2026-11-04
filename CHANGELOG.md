@@ -2,6 +2,12 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.138 — 2026-11-04
+
+- **forger: o que o desmonte de um dataschema não apaga** (`forger@7045305`, `ResourceController.deleteDataSchema`,
+  `createDataSchema`). Os agregados do event store e o manifesto de apresentação ficam; recriar com o mesmo nome
+  gera outro `tenant-id`. Comportamento sem mudança.
+
 ## 1.137 — 2026-11-04
 
 - **forger: `tenantSecret` só vem no `201` de `POST /org/{org}/project`** (`forger@7045305`,
