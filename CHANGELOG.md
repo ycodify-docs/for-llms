@@ -2,6 +2,16 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.133 — 2026-11-04
+
+- **orgid: `POST /ua/account-role/new-account/using/authority`.** O `API_MASTER` do dono de um papel `/ua` cria uma
+  conta de aplicação já associada a esse papel, numa operação só, sem tornar o papel público (`orgid@9e16a0b`,
+  `yc-platform-v3/composer#13`). Até aqui, criar conta com papel não público obrigava a deixá-lo público por um
+  instante, chamar `POST /open/ua/account-role` e depois associar. Está na `develop` do orgid, não está implantada.
+- **orgid `/ua`: o papel exigido.** `ua-associacao.md` passa a dizer que "administrador / engenheiro (no `owner`
+  do papel)" é o papel de plataforma (`<owner>/API_MASTER` no claim `orgs`), e que a conta `/ua` não pertence a
+  organização nenhuma: ela se liga ao dono pelo papel.
+
 ## 1.132 — 2026-11-04
 
 - **Páginas do orgid sem histórico.** Por ordem do dono, a página diz o que é e como se usa agora; o que era histórico
