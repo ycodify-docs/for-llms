@@ -49,10 +49,6 @@ Atualiza um papel.
 **Resposta:** `200` (sem corpo) quando gravou · `400` se faltar o `id` · `404` se o papel não existe
 ou pertence a outro `owner`.
 
-> Até 2026-09-05 um `PUT` sem `id` respondia **`204`** e não gravava nada. `204` é família 2xx —
-> sucesso sem corpo —, então a mensagem de erro sumia no protocolo e o chamador seguia achando que
-> tinha configurado. Se você vir `204` aqui, está falando com uma versão antiga do orgid.
-
 ## GET /ua/role/by/name/{roleName}/owner/{roleOwner}
 Lê um papel.
 
@@ -78,10 +74,10 @@ Lista os papéis de um dono.
 > ⚠️ **É o único público do orgid que NÃO começa por `/open/`** — os segmentos estão invertidos
 > (`/ua/open/…` em vez de `/open/ua/…`). Isso não é cosmético: as regras de autorização da plataforma são
 > escritas sobre o prefixo `/open/**`, e **este path escapa delas** e cai na regra de autenticado. No
-> config de segurança do orgid standalone continua assim — liberados só `/open/**`, `/z/**`, um terceiro
+> config de segurança do orgid standalone ficam liberados só `/open/**`, `/z/**`, um terceiro
 > padrão interno (⚠️ **MASCARADO** como `/*/<rota-livre-interna>/**`: o literal não é este; o que importa é
 > que **existe** um terceiro, além dos dois acima), swagger e actuator —, então **o orgid sozinho responde
-> `401` aqui, apesar do "público" acima**. O que está implantado é o `composer`, que desde 2026-09-05 libera os **dois**
+> `401` aqui, apesar do "público" acima**. O que está implantado é o `composer`, que libera os **dois**
 > prefixos e faz o endpoint honrar o contrato documentado.
 >
 > Ao escrever gateway, proxy ou nova cadeia de segurança: **público no orgid = dois prefixos**,
@@ -105,7 +101,3 @@ Remove um papel.
 
 **Resposta:** `200` (sem corpo) quando removeu · `404` — `"O papel informado não existe: nada foi
 removido."`
-
-> ⚠️ Até 2026-09-05 este `DELETE` respondia **`204`** quando o papel não existia. Num `DELETE`, `204` é o
-> código **canônico de sucesso** — a leitura era a oposta da correta, e a remoção que não aconteceu passava
-> por feita. Ver [../erros.md](../erros.md).

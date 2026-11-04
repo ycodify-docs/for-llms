@@ -10,8 +10,8 @@
 > ⚠️ **O prefixo `/open/` não é o inventário completo dos públicos.** Existe **um** público fora dele —
 > `GET /ua/open/role/owner/{roleOwner}`, com os segmentos invertidos (ver [ua-papel.md](ua-papel.md)).
 > Quem deriva regra de autorização do prefixo `/open/**` **deixa esse de fora** e ele passa a exigir token
-> apesar de público. É o estado do `OrgIdSecurityConfig` do orgid standalone até hoje; o `composer`, que é
-> o que está implantado, libera os dois prefixos desde 2026-09-05.
+> apesar de público. O `OrgIdSecurityConfig` do orgid standalone faz isso; o `composer`, que é o que está
+> implantado, libera os dois prefixos.
 
 ## Contents
 - GET /open/up/account/by/username/{username}/exists
@@ -68,9 +68,6 @@ Cria a **conta** (estado inicial **pendente**) **e** a **organização**, vincul
 `400` — `"Papel desconhecido ou não autorizado."` se `role` vier com outro nome (inclusive os `API_*`): **nada
 é criado**, nem a conta, nem a organização.
 
-> O campo `role` está em produção desde 2026-10-07T17:06Z. Até então ele era ignorado: a conta era criada
-> só como administradora, **sem** o papel pedido e sem erro.
-
 ## POST /open/ua/account-role — registro (externo): conta + papel
 Cria uma conta **externa** e a associa a um **papel**.
 
@@ -89,14 +86,10 @@ Cria uma conta **externa** e a associa a um **papel**.
 **Resposta:** `200` (sem corpo) · `404` — `"role not found: the account was not created."` · `403` —
 `"role is not public: the account was not created."` · `409` se o `username` já existe.
 
-> ⚠️ **Só papel público**, em produção desde 2026-09-26 (ver [CHANGELOG 1.58](../../CHANGELOG.md)). Antes, a rota
-> aceitava **qualquer** papel existente, inclusive administrativo: quem não tinha credencial nenhuma criava
-> conta nova já com esse papel. Papel que o próprio usuário não pode escolher se associa pelo caminho
+> ⚠️ **Só papel público.** Papel que o próprio usuário não pode escolher se associa pelo caminho
 > autenticado, `POST /ua/account-role/using/authority` ([ua-associacao.md](ua-associacao.md)).
 
 ### Captcha e aceite no autocadastro
-
-> **Em vigor desde 2026-10-16T21:06:53Z.**
 
 | Campo novo | Tipo | Quando |
 |---|---|---|
@@ -123,8 +116,6 @@ Solicita um **hash** de vida curta (enviado ao usuário por e-mail) para `{actio
 and no e-mail was sent."`
 
 ### Só em `/ua`: link no domínio da empresa e um e-mail a cada 5 min
-
-> **Em produção desde 2026-10-16T17:21:35Z.** Ainda não foi medido em produção o envio real do e-mail com o link.
 
 | Query | Significado |
 |---|---|
@@ -160,14 +151,9 @@ Executa a ação do hash.
 **Resposta:** `200` (sem corpo) — em `R`, ativa a conta; em `PR`, troca a senha · `404` —
 `"account not found: the hash action was not executed."`
 
-> ⚠️ **Em `/ua`, `R` só ativa conta `PENDING`**, em produção desde 2026-09-26 (ver [CHANGELOG 1.66](../../CHANGELOG.md)).
-> Conta já `ACTIVE` responde `200` sem gravar nada; conta `SUSPENDED` responde `403`
-> (`"account is not pending: registration was not confirmed."`). Antes, `R` punha qualquer conta não
-> cancelada em `ACTIVE`: uma conta suspensa voltava a valer pelo próprio e-mail. **Em `/up` nada mudou.**
-
-> ⚠️ Até 2026-09-05 a conta inexistente respondia **`204`** nos dois endpoints acima. `204` é sucesso sem
-> corpo: em `PR`, o usuário recebia confirmação de uma troca de senha que nunca aconteceu. Ver
-> [../erros.md](../erros.md).
+> ⚠️ **Em `/ua`, `R` só ativa conta `PENDING`.** Conta já `ACTIVE` responde `200` sem gravar nada; conta
+> `SUSPENDED` responde `403` (`"account is not pending: registration was not confirmed."`). **Em `/up` esta
+> restrição não vale.**
 
 ## POST /open/ua/account/e-mail/send — enviar e-mail (externo)
 Envia uma notificação por e-mail.

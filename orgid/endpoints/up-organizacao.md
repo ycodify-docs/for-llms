@@ -105,5 +105,3 @@ conexão. **Remover a organização é o último passo.**
 `403` se não for administrador. Se não existir organização com esse nome **para esse dono**, a resposta
 também é `200` e nada é removido — confira `orgOwner`.
 
-> Em produção desde 2026-10-02T22:11Z. Até então esta rota respondia `403` a **qualquer** chamada,
-> inclusive do administrador da organização, e nenhuma organização era removida.

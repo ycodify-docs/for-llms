@@ -48,9 +48,6 @@ a associação **não foi criada** (`"account not found: the account-role associ
 `"role not found: …"`); corpo incompleto ou contexto que impede montar a associação → `510` (falha não
 tratada — ver [../erros.md](../erros.md)).
 
-> ⚠️ Até 2026-09-05 esse caso era **`204`**, que é sucesso sem corpo: a associação não era criada e o
-> chamador não tinha como saber.
-
 ## PUT /ua/account-role/role-owner/{roleOwner}/using/authority
 Atualiza associações em lote para um dono de papel.
 

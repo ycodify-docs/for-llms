@@ -35,8 +35,8 @@ engenheiro / analista / financeiro, e também `SKOS_MASTER` / `SKOS_ANALYST`.
 | `id` | id do vínculo |
 | `role` | o papel: `name` (`API_MASTER`, `API_ENGINEER`, `API_ANALYST`, `API_FINANCIAL`, `SKOS_MASTER`, `SKOS_ANALYST`), `status` |
 | `org` | a organização: `name`, `owner`, `alias`, `status` e os demais campos da org |
-| `accountStatus` | status da **conta neste vínculo**: `ACTIVE`, `SUSPENDED`, `CANCELED` ou `PENDING` |
-| `orgStatus` | status da **org neste vínculo**: `ACTIVE`, `SUSPENDED` ou `CANCELED` |
+| `accountStatus` | status da **conta neste vínculo**. A plataforma usa `ACTIVE`, `SUSPENDED` e `CANCELED` |
+| `orgStatus` | status da **org neste vínculo**. Usa os mesmos valores |
 
 - O item **não** tem um campo `status` próprio. O status do vínculo está em `accountStatus` e `orgStatus`.
   `org.status` é o status da organização, e o `status` de fora é o da conta.
@@ -44,14 +44,11 @@ engenheiro / analista / financeiro, e também `SKOS_MASTER` / `SKOS_ANALYST`.
   (`status` de fora) ou a **org** (`org.status`) está `CANCELED`. Se nenhum item sobrar, vem `204`.
   Para o papel valer, exija `accountStatus` = `ACTIVE` e `orgStatus` = `ACTIVE`. Se a org suspensa
   também não deve valer, exija ainda `org.status` = `ACTIVE`.
-- Um vínculo alterado com status nulo pode trazer a string `"null"` em `accountStatus` ou `orgStatus`.
-  Trate esse valor como **inválido**.
+- `accountStatus` e `orgStatus` são gravados **como o cliente os manda**, sem conferência de valor. Por isso
+  podem vir outro texto qualquer, inclusive a string `"null"`. Qualquer valor diferente de `ACTIVE` não vale.
 - O **`API_MASTER`** de quem criou a org vem nesta lista como qualquer outro papel. Ele nasce com a org,
   com `accountStatus` e `orgStatus` = `ACTIVE`. Se a org foi criada com um papel `SKOS_*`, esse papel vem
   num segundo item, com a mesma org.
-
-> A leitura por quem só tem `SKOS_*` está em produção desde 2026-10-07T17:06Z. Até então essa conta
-> recebia `403` aqui.
 
 ## PUT /up/account
 Atualiza o **perfil** da própria conta (o `username` é forçado ao do token).
@@ -79,9 +76,6 @@ Troca a senha da própria conta.
 
 **Resposta:** `200` (sem corpo) quando trocou · `404` se a conta não existe — **a senha não foi alterada**.
 
-> ⚠️ Até 2026-09-05 esse caso era `204`, que é sucesso: o usuário recebia confirmação de uma troca que não
-> aconteceu. Ver [../erros.md](../erros.md).
-
 ## DELETE /up/account/by/jwt
 Remove a conta do portador do token. Sem parâmetros/corpo. **Resposta:** `200`.
 
@@ -97,8 +91,6 @@ Lista as contas de uma org. **Papéis:** administrador / engenheiro / analista (
 ## GET /up/account/by/org/{orgName}/org-owner/{orgOwner}
 Igual ao anterior, qualificando o dono. **Papéis:** administrador / engenheiro / analista (na org), e também
 `SKOS_MASTER` (na org). `SKOS_ANALYST` não lista.
-
-> A listagem por `SKOS_MASTER` está em produção desde 2026-10-07T17:06Z.
 
 | Path-var | Significado |
 |---|---|

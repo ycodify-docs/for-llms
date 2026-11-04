@@ -2,6 +2,26 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.132 — 2026-11-04
+
+- **Páginas do orgid sem histórico.** Por ordem do dono, a página diz o que é e como se usa agora; o que era histórico
+  mora aqui. Conteúdo que saiu de `orgid/endpoints/`:
+  - **2026-10-16:** manifesto da aplicação em produção desde 14:34:24Z. O link de redefinição de senha está em produção
+    desde 17:21:35Z, sem medição do envio real do e-mail. O `captcha` do registro e o `aceitePendente` estão em vigor
+    desde 21:06:53Z. Publicar um manifesto e provar um domínio pelo TXT ainda não foi medido em produção.
+  - **2026-10-07T17:06Z:** `SKOS_MASTER`/`SKOS_ANALYST` em produção. Antes disso, quem só tinha `SKOS_*` recebia `403`
+    em `GET /up/account/by/jwt`; `POST /up/account-role-org` e as duas rotas de status respondiam `400` a esses
+    papéis; e o `role` do registro público era ignorado (a conta nascia só administradora, sem erro).
+  - **2026-10-02T22:11Z:** antes, `DELETE` da organização respondia `403` a qualquer chamada.
+  - **2026-09-26:** o registro público passou a aceitar só papel público (antes, qualquer papel, inclusive
+    administrativo). Em `/ua`, `R` passou a ativar só conta `PENDING` (antes, reativava conta suspensa). O titular deixou
+    de trocar o próprio status (antes, a ausência de `status` gravava `ACTIVE`).
+  - **2026-09-05:** o `composer` passou a liberar `/open/**` e `/ua/open/**`. Antes disso, onde hoje vem `404`
+    respondia-se `204`: em `R`/`PR` e na troca de senha com conta inexistente, em `PUT` de papel sem `id`, em `DELETE` de
+    papel inexistente, nos três `replace-*` e na associação de `/ua`.
+- **Correção da 1.131:** `accountStatus` e `orgStatus` são gravados como o cliente os manda, sem conferência de valor
+  (`orgid@3aab683`, `AccountRoleOrgServiceImpl` :113, :122, :307, :419-420). A 1.131 os listava como enum fechado.
+
 ## 1.131 — 2026-11-04
 
 - **orgid: os campos de `accountRoleOrgs` em `GET /up/account/by/jwt`.** A página só dizia que o campo existia. Agora
