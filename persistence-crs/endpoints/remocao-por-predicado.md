@@ -1,11 +1,10 @@
 # persistence-crs · endpoints · remoção por predicado
 
-> Remove **N linhas** de uma entidade pelo critério que você informar — não pela chave primária. Rota
-> própria, separada do [`/e`](entidade.md), porque o risco é outro: aqui um filtro errado alcança muitas
-> linhas de uma vez. Por isso a rota **conta antes**, exige um teto e, por padrão, **não apaga na primeira
-> chamada**.
+> Remove **N linhas** de uma entidade pelo critério que você informar — não pela chave primária. Aqui
+> um filtro errado alcança muitas linhas de uma vez. Por isso a rota **conta antes**, exige um teto e, por
+> padrão, **não apaga na primeira chamada**.
 > Pré-requisitos: [conceitos](../../02-conceitos.md), [autenticação](../../06-autenticacao.md).
-> Guia: [../README.md](../README.md). Para apagar **uma** linha por `id`, use [entidade](entidade.md).
+> Guia: [../README.md](../README.md). Não há rota de escrita direta de linha ([entidade](entidade.md)).
 
 > **URL externa.** `POST /e/by` é o path downstream; via gateway: **produção**
 > `POST /v3/persistence/c/e/by` · **teste** `POST /v3/persistence/t/c/e/by`.
@@ -14,10 +13,10 @@
 
 | Você quer… | Use |
 |---|---|
-| apagar **uma** linha, que você identifica por `id` | `POST /e` com `action: DELETE` ([entidade](entidade.md)) |
+| encerrar um registro do domínio | o [comando](comando.md) do agregado |
 | apagar **as linhas que casam um critério** | `POST /e/by` (este doc) |
 
-⚠️ Vale aqui a mesma advertência de [entidade](entidade.md): esta rota **não é comando**. Não passa pelo
+⚠️ Esta rota **não é comando**. Não passa pelo
 RBAC de comando nem pelo processor `br`, e a projeção de um agregado escrita por aqui fica fora do log de
 eventos.
 
@@ -43,7 +42,7 @@ Cabeçalhos: `Authorization` + `X-Tenant-Id`; `Content-Type: application/json`.
 |---|---|---|
 | `entity` | **sim** | a entidade cujas linhas serão removidas |
 | `where` | **sim**, e **não pode ser vazio** | o critério. Mesmos operadores da [consulta](../../persistence-q/query-controls.md) |
-| `_connective` | **sim** | `AND` ou `OR` — como os critérios se combinam. **Explícito de propósito**: no `/e` o `AND` é implícito e inverte o resultado de quem esperava `OR` |
+| `_connective` | **sim** | `AND` ou `OR` — como os critérios se combinam. **Explícito de propósito**: um `AND` implícito inverte o resultado de quem esperava `OR` |
 | `_maxRows` | **sim**, `> 0` | quantas linhas você **aceita** apagar. Se o filtro casar mais que isso, a resposta é `409` e **nada é apagado** |
 | `_dryRun` | não — **default `true`** | `true` conta e mostra, sem apagar. Para apagar, mande `false` |
 
@@ -72,7 +71,7 @@ Cabeçalhos: `Authorization` + `X-Tenant-Id`; `Content-Type: application/json`.
 
 ## Autorização — leia antes de expor esta rota
 
-A mesma do [`/e`](entidade.md): pertencer ao tenant **e** ter papel em `_conf.accessControl.write` da
+Pertencer ao tenant **e** ter papel em `_conf.accessControl.write` da
 entity. **Não há escopo por linha** — a checagem olha o papel de quem chama e nunca a linha alvo, então
 quem pode apagar uma linha pode apagar as de todas as pessoas. Regra de dono ("só o titular mexe no seu
 registro") vive em processor `br`, e esta rota não o executa.

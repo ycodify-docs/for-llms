@@ -2,6 +2,13 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.139 — 2026-11-04
+
+- **persistence-crs: `POST /e` saiu da doc.** A rota de escrita direta de linha (entidade e projeção) foi desligada no
+  código em `persistence-crs@36d48d9` (2026-09-23) e responde `404`; a doc seguia ensinando-a. `entidade.md` e
+  `projecao.md` dizem agora que ela não existe e o que usar; saíram as linhas do README e o `/e` do `openapi.yaml`.
+  `POST /e/by` (remoção por predicado) continua.
+
 ## 1.138 — 2026-11-04
 
 - **forger: o que o desmonte de um dataschema não apaga** (`forger@7045305`, `ResourceController.deleteDataSchema`,

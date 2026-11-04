@@ -3993,10 +3993,11 @@ No próximo login de bob, o token traz `acme/SKOS_ANALYST` no claim `orgs` enqua
 | Executar comando | `POST /a/{boundedContext}/{aggregateType}` | [endpoints/comando.md](endpoints/comando.md) |
 | Ler estado do agregado | `GET /a/{boundedContext}/{aggregateType}/{id}` | [endpoints/agregado-leitura.md](endpoints/agregado-leitura.md) |
 | Ler histórico de eventos | `GET /a/{boundedContext}/{aggregateType}/{id}/history` | [endpoints/agregado-leitura.md](endpoints/agregado-leitura.md) |
-| Escrever/remover linha de entidade | `POST /e` | [endpoints/entidade.md](endpoints/entidade.md) |
 | Remover linhas por predicado | `POST /e/by` | [endpoints/remocao-por-predicado.md](endpoints/remocao-por-predicado.md) |
-| Escrever projeção (mesma rota `/e`) | `POST /e` | [endpoints/projecao.md](endpoints/projecao.md) |
 | Consultar logs do serviço | `GET /logs/service/{service}/query/…` | [endpoints/logs.md](endpoints/logs.md) |
+
+Não há rota de escrita direta de linha: `POST /e` não existe ([entidade](endpoints/entidade.md),
+[projeção](endpoints/projecao.md)). Registro do domínio se escreve por [comando](endpoints/comando.md).
 
 Gramática do modelo de domínio: **[spec/model-format.md](spec/model-format.md)** (estrutura do
 `.model.json`: agregado, comando, evento, tipos). Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md).
@@ -4371,126 +4372,31 @@ aquele comando: [model-format — `loguser`](../spec/model-format.md#loguser-que
 
 <!-- ===== persistence-crs/endpoints/entidade.md ===== -->
 
-# persistence-crs · endpoints · entidade (CRUD convencional)
+# persistence-crs · endpoints · entidade (escrita direta de linha)
 
-> CRUD **direto** de linhas numa **entidade convencional** — uma tabela do domínio que **não** é
-> projeção de um agregado event-sourced. Escreve/atualiza/remove o registro em uma chamada, sem comando
-> nem evento. Para agregados (event-sourced), use [comando](comando.md); para consultar, use
-> [persistence-q](../../persistence-q/README.md).
-> Pré-requisitos: [conceitos](../../02-conceitos.md), [autenticação](../../06-autenticacao.md),
-> a entity precisa existir no esquema do tenant ([forger/entity](../../forger/endpoints/entity.md)).
-> Guia: [../README.md](../README.md).
+> **Não há rota para escrever uma linha diretamente.** `POST /e` (via gateway, `POST /v3/persistence/c/e` e
+> `POST /v3/persistence/t/c/e`) não existe e responde `404`. Guia: [../README.md](../README.md).
 
-> **URL externa — o segmento `t` escolhe o ambiente.** `POST /e` é o path **downstream**; via gateway:
-> **produção** `POST /v3/persistence/c/e` · **teste** `POST /v3/persistence/t/c/e`. Ver
-> [autenticação](../../06-autenticacao.md).
+## O que usar no lugar
 
-## Quando usar
+| Você quer… | Use |
+|---|---|
+| criar, alterar ou encerrar um registro do domínio | [comando](comando.md) no agregado: gera o evento, passa pelo RBAC de comando e pelo processor `br`, e a projeção é escrita a partir do evento |
+| remover as linhas que casam um critério | [remoção por predicado](remocao-por-predicado.md) (`POST /e/by`) |
+| ler linhas | [persistence-q — consulta](../../persistence-q/endpoints/consulta.md) |
 
-Duas formas de escrever no domínio:
-
-| Você quer… | Use | Como identifica a linha |
-|---|---|---|
-| Gravar um **agregado** (máquina de estados, histórico de eventos) | `POST /a/...` ([comando](comando.md)) | `aggregateid` (UUID) |
-| Gravar uma **entidade convencional** (tabela simples, sem event-sourcing) | `POST /e` (este doc) | `id` (chave primária) |
-
-Uma **entidade convencional** é modelada como qualquer entity ([forger/entity](../../forger/endpoints/entity.md)),
-porém **sem** as colunas de projeção de agregado (`aggregateid`, `status`, os `whenAttribute` de evento) —
-elas só são obrigatórias quando a entity **é** projeção de um agregado.
-
-> **⚠️ `/e` não recusa nada — nem projeção de agregado, nem linha de outra pessoa.** O controle de
-> acesso do `/e` é inteiro: (a) o token pertence ao tenant; (b) o papel do usuário está na lista
-> `_conf.accessControl.write` da entity. **Não há escopo por linha:** a checagem pergunta apenas *"este
-> usuário tem papel que escreve nesta tabela?"*, nunca *"esta linha é dele?"* — o `id` da linha alvo não
-> chega à função que autoriza. Quem tem o papel escreve em **qualquer** linha, inclusive na de outro
-> usuário do mesmo papel.
->
-> O `/e` **não é comando**: não consulta `command.roles` e **não chama o processor `br`** — onde vivem as
-> regras de escopo de dono ("só o titular altera seu registro"). Numa entity que **é** projeção de
-> agregado soma-se o dano ao event sourcing: a linha muda **sem evento**, projeção e log de eventos
-> divergem em silêncio, e um replay desfaz a alteração sem aviso.
->
-> Consequência prática: `/e` é escrita administrativa. Exponha-o só a quem você exporia o banco — a
-> plataforma não tem como distinguir o uso legítimo do abusivo. Ver [escrita de projeção](projecao.md).
-
-## Requisição
-
-`POST /e`
-
-Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`; `Content-Type: application/json`.
-
-> ⚠️ Os blocos abaixo são **ilustrativos**: `<...>` são placeholders, não JSON literal pronto para envio.
-
-Corpo (operação única) — `data` é **sempre um array** de linhas:
-
-```json
-{ "action": "CREATE | UPDATE | DELETE", "data": [ { "<atributo>": "<valor>" } ] }
-```
-
-Corpo (lote) — um **array** de operações no formato acima, aplicadas na ordem:
-
-```json
-[
-  { "action": "CREATE", "data": [ { "<atributo>": "<valor>" } ] },
-  { "action": "UPDATE", "data": [ { "id": "<pk>", "<atributo>": "<novo valor>" } ] },
-  { "action": "DELETE", "data": [ { "id": "<pk>" } ] }
-]
-```
-
-## Operações
-
-O verbo é escolhido pelo campo `action` (não pelo método HTTP — sempre `POST`):
-
-- **CREATE** — insere as linhas de `data`. A chave primária **`id`** é **gerada pela plataforma**
-  (omita-a). Devolve as linhas criadas com o `id` preenchido.
-- **UPDATE** — atualiza as linhas; cada objeto de `data` **deve conter `id`** (a linha a alterar) mais
-  os atributos a mudar.
-- **DELETE** — remove as linhas; cada objeto de `data` identifica a linha por **`id`**.
-
-> **Controle de acesso.** `_conf.accessControl` é uma lista de **papéis** por operação (`read`, `write`).
-> Autoriza a **entidade inteira**, não a linha: basta um papel do usuário constar da lista para que ele
-> escreva em qualquer registro da tabela. Não existe forma de expressar "só a própria linha" no
-> `accessControl` — regra de dono só existe em processor `br`, que o `/e` não executa. Ver
-> [forger/entity](../../forger/endpoints/entity.md).
-
-## Respostas
-
-| Ação | Sucesso | Corpo |
-|---|---|---|
-| `CREATE` | `201` | linhas criadas, com `id` gerado |
-| `UPDATE` | `200` | vazio |
-| `DELETE` | `200` | vazio |
-| lote (array) | `200` | vazio |
-
-Ação desconhecida → `400`. Falha de aplicação → `510`.
-
-## Comportamento
-
-A operação é aplicada **diretamente** à tabela da entity no banco do tenant, na requisição — **sem**
-comando, **sem** evento e **sem** validação de transição de estado. Não há reconstituição de agregado:
-é escrita de estado (linha), identificada pela chave primária `id`.
-
-## Ler (R)
-
-A leitura **não** é feita por `/e`. Para ler entidades (por chave, por critério, paginado), use
-[persistence-q — consulta](../../persistence-q/endpoints/consulta.md).
-
-## Erros
-
-`400` (ação/corpo inválido; identificador ausente), `403` (tenant não autorizado), `510` (falha de
-aplicação — ex.: violação de restrição, dado inconsistente; categoria **Aplicação de projeção**).
-Catálogo: [../erros.md](../erros.md).
+A linha de uma projeção é escrita só pelo caminho interno do serviço, a partir do evento despachado pelo
+[es-n](../../es-n/README.md). Ver [escrita de projeção](projecao.md).
 
 <!-- ===== persistence-crs/endpoints/remocao-por-predicado.md ===== -->
 
 # persistence-crs · endpoints · remoção por predicado
 
-> Remove **N linhas** de uma entidade pelo critério que você informar — não pela chave primária. Rota
-> própria, separada do [`/e`](entidade.md), porque o risco é outro: aqui um filtro errado alcança muitas
-> linhas de uma vez. Por isso a rota **conta antes**, exige um teto e, por padrão, **não apaga na primeira
-> chamada**.
+> Remove **N linhas** de uma entidade pelo critério que você informar — não pela chave primária. Aqui
+> um filtro errado alcança muitas linhas de uma vez. Por isso a rota **conta antes**, exige um teto e, por
+> padrão, **não apaga na primeira chamada**.
 > Pré-requisitos: [conceitos](../../02-conceitos.md), [autenticação](../../06-autenticacao.md).
-> Guia: [../README.md](../README.md). Para apagar **uma** linha por `id`, use [entidade](entidade.md).
+> Guia: [../README.md](../README.md). Não há rota de escrita direta de linha ([entidade](entidade.md)).
 
 > **URL externa.** `POST /e/by` é o path downstream; via gateway: **produção**
 > `POST /v3/persistence/c/e/by` · **teste** `POST /v3/persistence/t/c/e/by`.
@@ -4499,10 +4405,10 @@ Catálogo: [../erros.md](../erros.md).
 
 | Você quer… | Use |
 |---|---|
-| apagar **uma** linha, que você identifica por `id` | `POST /e` com `action: DELETE` ([entidade](entidade.md)) |
+| encerrar um registro do domínio | o [comando](comando.md) do agregado |
 | apagar **as linhas que casam um critério** | `POST /e/by` (este doc) |
 
-⚠️ Vale aqui a mesma advertência de [entidade](entidade.md): esta rota **não é comando**. Não passa pelo
+⚠️ Esta rota **não é comando**. Não passa pelo
 RBAC de comando nem pelo processor `br`, e a projeção de um agregado escrita por aqui fica fora do log de
 eventos.
 
@@ -4528,7 +4434,7 @@ Cabeçalhos: `Authorization` + `X-Tenant-Id`; `Content-Type: application/json`.
 |---|---|---|
 | `entity` | **sim** | a entidade cujas linhas serão removidas |
 | `where` | **sim**, e **não pode ser vazio** | o critério. Mesmos operadores da [consulta](../../persistence-q/query-controls.md) |
-| `_connective` | **sim** | `AND` ou `OR` — como os critérios se combinam. **Explícito de propósito**: no `/e` o `AND` é implícito e inverte o resultado de quem esperava `OR` |
+| `_connective` | **sim** | `AND` ou `OR` — como os critérios se combinam. **Explícito de propósito**: um `AND` implícito inverte o resultado de quem esperava `OR` |
 | `_maxRows` | **sim**, `> 0` | quantas linhas você **aceita** apagar. Se o filtro casar mais que isso, a resposta é `409` e **nada é apagado** |
 | `_dryRun` | não — **default `true`** | `true` conta e mostra, sem apagar. Para apagar, mande `false` |
 
@@ -4557,7 +4463,7 @@ Cabeçalhos: `Authorization` + `X-Tenant-Id`; `Content-Type: application/json`.
 
 ## Autorização — leia antes de expor esta rota
 
-A mesma do [`/e`](entidade.md): pertencer ao tenant **e** ter papel em `_conf.accessControl.write` da
+Pertencer ao tenant **e** ter papel em `_conf.accessControl.write` da
 entity. **Não há escopo por linha** — a checagem olha o papel de quem chama e nunca a linha alvo, então
 quem pode apagar uma linha pode apagar as de todas as pessoas. Regra de dono ("só o titular mexe no seu
 registro") vive em processor `br`, e esta rota não o executa.
@@ -4576,55 +4482,20 @@ Catálogo: [../erros.md](../erros.md).
 
 # persistence-crs · endpoints · escrita de projeção
 
-> Escrita direta numa **projeção** (criar/atualizar/remover linhas no banco de leitura). Guia:
+> **Não há rota externa para escrever numa projeção.** `POST /e` não existe e responde `404`. Guia:
 > [../README.md](../README.md).
->
-> **⚠️ Esta rota NÃO é o caminho do fluxo por evento.** No fluxo normal (es-n → projeção, CP-5) a linha é
-> gravada por um caminho **interno ao serviço**, que não passa por esta rota nem por requisição externa
-> alguma — e, por ser interno, não usa a autorização descrita abaixo. O que está documentado aqui é a
-> porta **externa**: o que você pode chamar.
->
-> **⚠️ E esta rota não é um endpoint de serviço:** é o **mesmo** `POST /e` de [entidade](entidade.md),
-> com a mesma e única autorização — pertencer ao tenant e ter papel em `_conf.accessControl.write`. Não
-> existe credencial de serviço. Qualquer usuário final que satisfaça esses dois pontos escreve aqui, em
-> **qualquer linha**, pulando o comando, o RBAC de comando e o processor `br`. Leia a advertência de
-> [entidade](entidade.md) antes de usar.
 
-## Requisição
+## Como a projeção é escrita
 
-`POST /e`
+A linha de uma projeção é gravada por um caminho **interno ao serviço**, que não passa por requisição
+externa: o [es-n](../../es-n/README.md) despacha o evento gravado pelo [comando](comando.md) e o serviço
+aplica a projeção.
 
-Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`.
+**Idempotência e ordenação são desse caminho.** A aplicação é deduplicada por evento e pode ser ordenada
+(nenhuma, estrita ou por agregado), conforme o despacho do es-n.
 
-Corpo (operação única):
-
-```json
-{ "action": "CREATE | UPDATE | DELETE", "data": [ { "...": "..." } ] }
-```
-
-Corpo (lote): um **array** de operações no formato acima.
-
-## Respostas
-
-| Ação | Sucesso |
-|---|---|
-| `CREATE` | `201` (devolve os dados criados) |
-| `UPDATE` | `200` |
-| `DELETE` | `200` |
-
-Ação desconhecida → `400`. Falha de aplicação → `510`.
-
-## Comportamento
-A operação é aplicada à projeção do tenant no banco de leitura, na requisição.
-
-**Idempotência e ordenação são do [es-n](../../es-n/README.md) e do caminho interno, não desta rota.** No
-fluxo dirigido por eventos a aplicação é deduplicada por evento e pode ser ordenada (nenhuma/estrita/por
-agregado), conforme o despacho do es-n. Uma chamada `POST /e` **não carrega identificador de evento
-algum** — não há por onde deduplicar, e reenviar aplica de novo.
-
-## Erros
-`400` (ação/corpo inválido), `403` (tenant), `510` (falha de aplicação — ex.: violação de restrição).
-Catálogo: [../erros.md](../erros.md).
+Para mudar uma linha de projeção, emita o [comando](comando.md) correspondente no agregado. Para remover
+linhas por critério, use [remoção por predicado](remocao-por-predicado.md).
 
 <!-- ===== persistence-crs/endpoints/logs.md ===== -->
 
