@@ -2,6 +2,12 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.137 — 2026-11-04
+
+- **forger: `tenantSecret` só vem no `201` de `POST /org/{org}/project`** (`forger@7045305`,
+  `ResourceController.createProject`, `ProjectRepository`, `DataSchemaRepository`). A página não dizia que nenhuma
+  rota o devolve depois, nem que ele é um só por contexto. Comportamento sem mudança.
+
 ## 1.136 — 2026-11-04
 
 - **orgid: os campos de `POST /up/org` conferidos contra o código** (`orgid@9e16a0b`, `OrgServiceImpl.create`,
