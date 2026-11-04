@@ -5,7 +5,9 @@
 > Guia: [../README.md](../README.md).
 >
 > **Comum:** `Authorization` obrigatório (exceto a listagem pública); POST/PUT enviam
-> `Content-Type: application/json`. **Papéis aceitos:** administrador / engenheiro (no `owner` do papel).
+> `Content-Type: application/json`. **Papéis aceitos:** administrador / engenheiro (no `owner` do papel). É o
+> papel **de plataforma** (`API_MASTER` / `API_ENGINEER`) na organização cujo nome é o `owner`, que o token
+> carrega no claim `orgs` como `<owner>/API_MASTER`. **Não** é um papel `/ua`.
 > Erros: [../erros.md](../erros.md).
 
 ## Contents

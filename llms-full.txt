@@ -3207,7 +3207,9 @@ Lista todas as contas sob um dono de papel. **Papéis:** administrador / engenhe
 > Guia: [../README.md](../README.md).
 >
 > **Comum:** `Authorization` obrigatório (exceto a listagem pública); POST/PUT enviam
-> `Content-Type: application/json`. **Papéis aceitos:** administrador / engenheiro (no `owner` do papel).
+> `Content-Type: application/json`. **Papéis aceitos:** administrador / engenheiro (no `owner` do papel). É o
+> papel **de plataforma** (`API_MASTER` / `API_ENGINEER`) na organização cujo nome é o `owner`, que o token
+> carrega no claim `orgs` como `<owner>/API_MASTER`. **Não** é um papel `/ua`.
 > Erros: [../erros.md](../erros.md).
 
 ## Contents
@@ -3514,8 +3516,9 @@ Cria uma conta **externa** e a associa a um **papel**.
 **Resposta:** `200` (sem corpo) · `404` — `"role not found: the account was not created."` · `403` —
 `"role is not public: the account was not created."` · `409` se o `username` já existe.
 
-> ⚠️ **Só papel público.** Papel que o próprio usuário não pode escolher se associa pelo caminho
-> autenticado, `POST /ua/account-role/using/authority` ([ua-associacao.md](ua-associacao.md)).
+> ⚠️ **Só papel público.** Papel que o próprio usuário não pode escolher fica com o administrador do dono do
+> papel: `POST /ua/account-role/new-account/using/authority` cria a conta já com ele, e
+> `POST /ua/account-role/using/authority` o associa a uma conta que já existe ([ua-associacao.md](ua-associacao.md)).
 
 ### Captcha e aceite no autocadastro
 

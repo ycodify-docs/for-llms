@@ -2,6 +2,12 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.135 — 2026-11-04
+
+- **orgid: `publico.md` e `ua-papel.md` acompanham a 1.133.** O autocadastro aponta a criação de conta com papel não
+  público pelo administrador do dono do papel. `ua-papel.md` diz, como `ua-associacao.md`, que "administrador /
+  engenheiro" é o papel de plataforma no `owner`. Comportamento sem mudança.
+
 ## 1.134 — 2026-11-04
 
 - **orgid: `POST /ua/account-role/new-account/using/authority` em produção** desde 2026-11-04T19:22:22Z
