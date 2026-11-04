@@ -5206,6 +5206,11 @@ Exigem `Authorization` e papel de administrador/engenheiro em `{org}`.
 Resposta `201`: `{ "id": <número>, "tenantSecret": "<uuid>", "tenantPid": "<uuid>", "message": "..." }`.
 Os identificadores de tenant retornados pertencem ao contexto. Erros: `400`, `403`, `500`.
 
+**`tenantSecret` só vem nesta resposta: guarde-o ao criar o contexto.** Nenhuma rota o devolve depois. O `GET`
+do contexto traz `secret` e `tenantpid`, e não traz o `tenantSecret`. Nas respostas de dataschema, o objeto `project`
+traz `secret` e `tenantsecret` como `***`. O `tenantSecret` é do **contexto**: um só para todos os dataschemas
+(tenants) criados nele.
+
 ## Ler / Listar
 
 - `GET /org/{org}/project/{project}` → `200`/`204`.
