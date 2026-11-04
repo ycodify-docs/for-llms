@@ -2,6 +2,15 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.136 — 2026-11-04
+
+- **orgid: os campos de `POST /up/org` conferidos contra o código** (`orgid@9e16a0b`, `OrgServiceImpl.create`,
+  `OrgController.create`). A página dava `email` como opcional e não citava `description`; os dois são obrigatórios
+  e dão `400` (medido pelo `coordination-57` às 19:09Z ao criar uma org). `alias` também é exigido: ausente, a criação
+  falha sem tratamento, em vez de dar `400`. `name` aceita só letras e no máximo 12 caracteres; `status` é ignorado;
+  `awsCredentials` é opcional. Resposta: `200` com o corpo, `owner` e `id`, e `409` para nome repetido do mesmo
+  dono. Comportamento sem mudança.
+
 ## 1.135 — 2026-11-04
 
 - **orgid: `publico.md` e `ua-papel.md` acompanham a 1.133.** O autocadastro aponta a criação de conta com papel não
