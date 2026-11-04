@@ -2,6 +2,14 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.131 — 2026-11-04
+
+- **orgid: os campos de `accountRoleOrgs` em `GET /up/account/by/jwt`.** A página só dizia que o campo existia. Agora
+  diz que cada item traz `accountStatus` e `orgStatus` e nenhum `status` próprio, e que o vínculo `SUSPENDED` ou `CANCELED`
+  continua na lista: só sai o item cuja conta ou org está `CANCELED`. Diz também que o `API_MASTER` de quem criou a org
+  vem na lista como os outros papéis. Comportamento lido no código de `orgid@3aab683` (v1.1.0, a que o `entradas.lock` do
+  composer declara). Não mudou nada no código.
+
 ## 1.130 — 2026-10-31
 
 - **Assinatura de eventos por tenant, em teste.** A leitura de eventos da assinatura filtra por tenant além do tipo

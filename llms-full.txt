@@ -2805,6 +2805,28 @@ engenheiro / analista / financeiro, e também `SKOS_MASTER` / `SKOS_ANALYST`.
 **Resposta:** `200` — conta (`id`, `username`, `name`, `email`, `status`, endereço, `accountRoleOrgs`;
 `password` = nulo); `204` se não encontrada.
 
+**`accountRoleOrgs`** — um item por vínculo **(conta, papel, org)**. Campo nulo não vem no JSON.
+
+| Campo do item | Significado |
+|---|---|
+| `id` | id do vínculo |
+| `role` | o papel: `name` (`API_MASTER`, `API_ENGINEER`, `API_ANALYST`, `API_FINANCIAL`, `SKOS_MASTER`, `SKOS_ANALYST`), `status` |
+| `org` | a organização: `name`, `owner`, `alias`, `status` e os demais campos da org |
+| `accountStatus` | status da **conta neste vínculo**: `ACTIVE`, `SUSPENDED`, `CANCELED` ou `PENDING` |
+| `orgStatus` | status da **org neste vínculo**: `ACTIVE`, `SUSPENDED` ou `CANCELED` |
+
+- O item **não** tem um campo `status` próprio. O status do vínculo está em `accountStatus` e `orgStatus`.
+  `org.status` é o status da organização, e o `status` de fora é o da conta.
+- **Vínculo `SUSPENDED` ou `CANCELED` continua na lista.** A resposta só tira o item quando a **conta**
+  (`status` de fora) ou a **org** (`org.status`) está `CANCELED`. Se nenhum item sobrar, vem `204`.
+  Para o papel valer, exija `accountStatus` = `ACTIVE` e `orgStatus` = `ACTIVE`. Se a org suspensa
+  também não deve valer, exija ainda `org.status` = `ACTIVE`.
+- Um vínculo alterado com status nulo pode trazer a string `"null"` em `accountStatus` ou `orgStatus`.
+  Trate esse valor como **inválido**.
+- O **`API_MASTER`** de quem criou a org vem nesta lista como qualquer outro papel. Ele nasce com a org,
+  com `accountStatus` e `orgStatus` = `ACTIVE`. Se a org foi criada com um papel `SKOS_*`, esse papel vem
+  num segundo item, com a mesma org.
+
 > A leitura por quem só tem `SKOS_*` está em produção desde 2026-10-07T17:06Z. Até então essa conta
 > recebia `403` aqui.
 
