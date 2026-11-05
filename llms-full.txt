@@ -5037,6 +5037,10 @@ Erros: `400` (nome fora do formato/ausente), `403`, `500`.
 `DELETE /org/{org}/dbconn/{dbconnId}/database/{id}` → `200`/`204`.
 **Bloqueado** se houver **dataschema** vinculado.
 
+**Apaga só o registro.** O banco e o usuário físicos continuam no PostgreSQL. Criar de novo com o mesmo nome
+falha com `"Database or user already exists: database '<org>_<nome>' user '<usuário>'"` até que alguém
+remova o banco e o usuário diretamente no PostgreSQL; nenhuma rota do forger faz isso.
+
 ## Ciclo de vida
 Metadados + efeito físico transacional (criação do banco). Ver [ciclo de vida geral](../README.md#ciclo-de-vida-geral-de-uma-requisição).
 

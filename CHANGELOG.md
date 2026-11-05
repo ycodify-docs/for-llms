@@ -9,6 +9,13 @@
   `projecao.md` dizem agora que ela não existe e o que usar; saíram as linhas do README e o `/e` do `openapi.yaml`.
   `POST /e/by` (remoção por predicado) continua.
 
+## 1.139 — 2026-11-04
+
+- **forger: remover database apaga só o registro** (`forger@7045305`, `ResourceController.deleteDatabase`,
+  `DatabaseRepository.deleteByIdAndDbConn`). O banco físico fica, e recriar com o mesmo nome falha com
+  "Database or user already exists" (medido pelo `coordination-57` às 23:59:19Z, com resposta `510`). Comportamento
+  sem mudança.
+
 ## 1.138 — 2026-11-04
 
 - **forger: o que o desmonte de um dataschema não apaga** (`forger@7045305`, `ResourceController.deleteDataSchema`,
