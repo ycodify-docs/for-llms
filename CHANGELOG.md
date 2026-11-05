@@ -2,6 +2,14 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.140 — 2026-11-05
+
+- **forger: tornar obrigatório (`nullable` de `true` para `false`) deixa de ser recusado pelo forger; quem julga é
+  o banco** (`forger@a6a2ffb`, `EntityComparator`). A recusa anterior falava de "linhas existentes" e nunca
+  consultava a tabela: recusava com `400` até com 0 linhas (medido pelo `coordination-57` às 03:03:31Z). Agora a
+  mudança vira `SET NOT NULL` (`yc.dbr-driver`), e o PostgreSQL recusa só se houver linha vazia. Vale para atributo
+  e associação. Ainda sem deploy.
+
 ## 1.139 — 2026-11-04
 
 - **persistence-crs: `POST /e` saiu da doc.** A rota de escrita direta de linha (entidade e projeção) foi desligada no
