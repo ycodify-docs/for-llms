@@ -360,7 +360,8 @@
  * - Check existing data compatibility before changing constraints
  *
  * Data migration considerations:
- * - nullable: false requires all existing rows to have non-null values
+ * - nullable: false is applied as SET NOT NULL; the database refuses it if any existing row is NULL
+ *   (an empty table always passes)
  * - unique: true requires all existing values to be unique
  * - length reduction may truncate existing data
  * - Adding default value only affects new rows
