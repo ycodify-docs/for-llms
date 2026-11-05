@@ -2,6 +2,11 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.141 — 2026-11-05
+
+- **forger: o `nullable` de `true` para `false` aplicado (1.140) está no ar** na imagem `yc-composer:amd64-cdbc354-7c51`,
+  desde 03:21:53Z, segundo a infra. A página deixa de dizer que a imagem no ar recusa.
+
 ## 1.140 — 2026-11-05
 
 - **forger: tornar obrigatório (`nullable` de `true` para `false`) deixa de ser recusado pelo forger; quem julga é
