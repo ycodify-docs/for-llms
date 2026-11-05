@@ -305,8 +305,6 @@ Vale igual para atributos e associações: declarar um atributo só com `nullabl
 
 **Tornar obrigatório (`nullable` de `true` para `false`) vira `SET NOT NULL` na tabela.** Quem recusa é o
 banco, e só se alguma linha tiver o campo vazio; com a tabela vazia, passa. Vale para atributo e associação.
-> **Vigência:** `forger@a6a2ffb`, ainda sem deploy. A imagem no ar recusa a mudança com `400`, mesmo com a
-> tabela vazia.
 
 Três detalhes que costumam morder:
 
