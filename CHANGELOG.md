@@ -2,6 +2,12 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.143 — 2026-11-07
+
+- **persistence-q e persistence-crs: o titular por lista (1.142) está em teste**, no `tinterpreter`
+  (`/v3/persistence/t/`), imagem `yc-interpreter:amd64-69839a6-cbbf`, desde 04:31:27Z, segundo a infra (`infra#92`).
+  Produção não recebeu.
+
 ## 1.142 — 2026-11-07
 
 - **persistence-q e persistence-crs: titular por lista.** `rows.by` que aponta um atributo `Json` com uma lista de
