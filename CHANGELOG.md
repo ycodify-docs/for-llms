@@ -2,6 +2,15 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.148 — 2026-11-07
+
+- **forger: a leitura interna das entities passa a ter doc.** `GET
+  /a35gry2b4d8ops/unsec/org/project/dataschema/{tenantId}/entities` já estava no ar e não estava documentada. Ver
+  [forger — entity](forger/endpoints/entity.md#ler-todas-as-entities-de-dentro-da-plataforma-sem-login). A forma da
+  resposta difere da do `Listar` autenticado. Lido no código em `forger@2535f27`
+  (`UnsecEntityController`, `EntityStateService.getCurrentSchemaStateAsJsonForExternalView`). Comportamento sem
+  mudança: é a doc que alcança o código.
+
 ## 1.147 — 2026-11-07
 
 - **forger: o modelo publicado se lê sem login, de dentro da plataforma.** Rota nova
