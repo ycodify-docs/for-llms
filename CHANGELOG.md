@@ -2,6 +2,12 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.146 — 2026-11-07
+
+- **persistence-crs e persistence-q: "papel vale só da org dona do tenant" (1.145) está em teste**, no `tinterpreter`
+  (`/v3/persistence/t/`), imagem `yc-interpreter:amd64-69839a6-e50b`, desde 05:36:27Z, segundo a infra (`infra#94`).
+  Produção não recebeu.
+
 ## 1.145 — 2026-11-07
 
 - **persistence-crs e persistence-q: papel vale só da org dona do tenant.** O papel era conferido só pelo nome, e
