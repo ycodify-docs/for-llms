@@ -2,6 +2,14 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.150 — 2026-11-07
+
+- **br-service: o comando que a coordenação devolve leva o autor do primeiro comando.** A página
+  [contextos](br-service/contextos.md), na seção de coordenação, dizia que ele saía sem credencial. Na verdade
+  ele sai com a identidade de quem iniciou a cadeia, e o papel dessa pessoa não é reavaliado no alvo. O
+  processador de coordenação continua sem `authToken`. O comportamento já valia desde a 1.38 e não mudou agora:
+  é a doc que alcança o código (`persistence-crs@711db9c`).
+
 ## 1.149 — 2026-11-07
 
 - **forger: a leitura interna do modelo publicado (1.147) está em produção**, no composer, imagem
