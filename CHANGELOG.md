@@ -2,6 +2,14 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.142 — 2026-11-07
+
+- **persistence-q e persistence-crs: titular por lista.** `rows.by` que aponta um atributo `Json` com uma lista de
+  usernames recorta a leitura para quem for elemento dela, por igualdade exata. Vale na projeção
+  (`ufrn.loco3@fa56789`, `ReadStatementTransformation`) e na leitura do agregado, `GET /a` e `/history`
+  (`persistence-crs@0b0c2e9`, `RecorteDeLeituraDoAgregado`). Antes, a lista nunca casava. Atributo de outro tipo
+  segue com igualdade, sem mudança. Pedido: `yc-platform-v3/interpreter#12`. Ainda sem deploy.
+
 ## 1.141 — 2026-11-05
 
 - **forger: o `nullable` de `true` para `false` aplicado (1.140) está no ar** na imagem `yc-composer:amd64-cdbc354-7c51`,
