@@ -311,6 +311,22 @@ Por agregado, o necessário é: `org`, `project`, `boundedContext`, `type`, `ten
 `GET /org/{org}/project/{project}/tenant/{tenantId}/model` → `200` com o conteúdo do modelo; `404` se
 não publicado.
 
+### Ler de dentro da plataforma, sem login
+
+`GET /a35gry2b4d8ops/unsec/tenant/{tenantId}/model`, **sem `Authorization` e sem `X-Forger-Credential`**. É para
+serviço da plataforma que não tem o token de ninguém, como o processador de coordenação do br-service. Responde:
+
+| Status | Quando |
+|---|---|
+| `200` | o tenant tem modelo publicado; o corpo é o conteúdo guardado, byte a byte, sem reconstrução |
+| `404` `{"error": "Model not found"}` | o tenant não tem modelo publicado |
+| `500` `{"error": "Model cache unavailable"}` | o cache distribuído falhou; não quer dizer que falte modelo |
+
+**Não se alcança pela borda:** o gateway barra `/unsec/`. Quem chama fala direto com o serviço, dentro da rede da
+plataforma, e o endereço é configuração de deploy.
+
+> **Ainda sem deploy** (`forger@dbb405e`; [composer#14](https://github.com/yc-platform-v3/composer/issues/14)).
+
 ## Listar (por contexto)
 
 `GET /org/{org}/project/{project}/model` → `200` array de
