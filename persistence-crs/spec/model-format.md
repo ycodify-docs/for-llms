@@ -552,7 +552,7 @@ Para filtrar por data numa consulta:
   (`type: "String"`) em `data.attribute` — o **estado atual** do agregado, base da **concorrência
   otimista** da transição. O comando de **criação NÃO** declara `status` (o agregado ainda não existe).
   Vale para **todo agregado, em todo bounded context**.
-- **`data.attribute`** — atributos **escalares** do agregado (uma coluna por atributo na projeção).
+- **`data.attribute`** — atributos **escalares** do agregado (uma coluna por atributo na projeção). A exceção é o tipo `Json`, que aceita também uma **lista**, por exemplo de usernames (`["ana", "bia"]`), e a projeção a grava como array JSON. É o que alimenta o recorte de leitura por lista (`roles.scope.read.<PAPEL>.rows.by`). Para o processor do br preencher o atributo, ele precisa vir no corpo do comando, mesmo `null`: a resposta do br só substitui chave que o comando já trouxe.
   **Não** inclua aqui o `whenAttribute` do evento (o carimbo, ex.: `criadaem`): ele é **auto-valorizado**
   e **não** é atributo de dados do comando — mas **é** coluna obrigatória da projeção (declarada na
   entity; ver [Eventos e `domainBus`](#eventos-e-domainbus) e [forger — entity](../../forger/endpoints/entity.md)).

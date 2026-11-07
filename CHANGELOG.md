@@ -2,6 +2,13 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.144 — 2026-11-07
+
+- **persistence-crs: `data.attribute` do tipo `Json` aceita lista.** O model-format dizia só "escalares". A lista
+  (ex.: `["ana","bia"]`) entra no corpo do comando, o processor do br pode substituí-la se a chave vier no corpo, e
+  a projeção a grava como array JSON. Medido pelo `coordination-91` no `tinterpreter`, 2026-11-07, às 04:56Z
+  (`coordination:dominio/prova/titular-por-lista/prova.py`). Comportamento sem mudança: é a doc que alcança o código.
+
 ## 1.143 — 2026-11-07
 
 - **persistence-q e persistence-crs: o titular por lista (1.142) está em teste**, no `tinterpreter`
