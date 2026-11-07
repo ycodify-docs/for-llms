@@ -325,7 +325,7 @@ serviço da plataforma que não tem o token de ninguém, como o processador de c
 **Não se alcança pela borda:** o gateway barra `/unsec/`. Quem chama fala direto com o serviço, dentro da rede da
 plataforma, e o endereço é configuração de deploy.
 
-> **Ainda sem deploy** (`forger@dbb405e`; [composer#14](https://github.com/yc-platform-v3/composer/issues/14)).
+> **Implantada em 2026-11-07T14:58:27Z** (`forger@2535f27`; [composer#14](https://github.com/yc-platform-v3/composer/issues/14)).
 
 ## Listar (por contexto)
 

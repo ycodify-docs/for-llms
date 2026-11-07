@@ -2,6 +2,11 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.149 — 2026-11-07
+
+- **forger: a leitura interna do modelo publicado (1.147) está em produção**, no composer, imagem
+  `yc-composer:amd64-aaab261-e319`, desde 14:58:27Z, segundo a infra (`yc-platform-v3/infra#102`).
+
 ## 1.148 — 2026-11-07
 
 - **forger: a leitura interna das entities passa a ter doc.** `GET
