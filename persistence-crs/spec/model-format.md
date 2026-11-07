@@ -217,6 +217,8 @@ string aparece em três lugares, e os três têm de concordar:
 | `scope.read.<PAPEL>.attributes` | os atributos que esse papel vê. O que ficar de fora não aparece no estado nem no `eventData` do `/history` |
 | `author` | os papéis que veem, no `/history`, quem executou cada evento |
 
+**Papel vale só da org dona do tenant.** Em `roles` do comando, `read`, `scope` e `author`, um papel casa apenas quando a conta o tem **na org dona do tenant**, como o token o declara (`PAPEL:org:…`). Um papel com o mesmo nome criado por outra org não vale aqui. O mesmo se aplica à consulta da projeção ([persistence-q](../../persistence-q/README.md)).
+
 As duas dimensões de `scope` são independentes: `rows` responde *quais agregados são seus*,
 `attributes` responde *quais campos você vê*. Um papel pode declarar uma, outra ou as duas. Chave da
 plataforma — `id`, `aggregateid`, `status`, `version` e os metadados de auditoria — atravessa o recorte

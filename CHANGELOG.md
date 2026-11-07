@@ -2,6 +2,14 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.145 — 2026-11-07
+
+- **persistence-crs e persistence-q: papel vale só da org dona do tenant.** O papel era conferido só pelo nome, e
+  um papel de outra org com o mesmo nome (ex.: `AUDITOR` criado pela `clubflow`) valia no tenant da `ycodify`, no
+  comando, na leitura do agregado e na consulta da projeção. Agora só vale o papel que o token liga à org dona do
+  tenant. Defeito de segurança medido pelo `coordination-91` (`yc-platform-v3/interpreter#13`); conserto em
+  `yc.pr@0341f5b`, `persistence-crs@afce2c8` e `persistence-q@22bffa4`. Ainda sem deploy.
+
 ## 1.144 — 2026-11-07
 
 - **persistence-crs: `data.attribute` do tipo `Json` aceita lista.** O model-format dizia só "escalares". A lista
