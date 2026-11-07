@@ -169,6 +169,12 @@ pedido, e nada que o desligue:
 O recorte compara **o atributo declarado em `rows.by`** com **quem está chamando**. Hoje "quem está
 chamando" é o **`username` do token** — então o atributo precisa conter esse mesmo valor.
 
+**Mais de um titular por linha:** declare o atributo de `rows.by` com tipo `Json` e grave nele a **lista** de
+usernames (`["ana", "bia"]`). A linha passa a ser de quem for **elemento** da lista, por igualdade exata: `ana` não
+casa com `anabela`, não há curinga, e lista vazia, valor nulo ou valor que não seja lista não casam com ninguém. O
+recorte do agregado faz o mesmo
+([model-format](../persistence-crs/spec/model-format.md#quem-pode-ler-o-agregado-roles)).
+
 Três consequências práticas, e a terceira é a que mais morde:
 
 - **o atributo se chama `username`.** O que a plataforma exige é que o **valor** seja o do token; o nome

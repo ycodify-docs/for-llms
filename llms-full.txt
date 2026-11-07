@@ -222,7 +222,7 @@ string aparece em três lugares, e os três têm de concordar:
 | Chave | O que declara |
 |---|---|
 | `read` | os papéis que alcançam o agregado. Quem não tem nenhum deles não o enxerga |
-| `scope.read.<PAPEL>.rows.by` | o atributo cujo valor precisa ser o **`username` do token** de quem pede — o proprietário |
+| `scope.read.<PAPEL>.rows.by` | o atributo cujo valor precisa ser o **`username` do token** de quem pede — o proprietário. Se o valor for uma **lista** (atributo `Json`, ex.: `["ana", "bia"]`), lê quem for **elemento** dela, por igualdade exata |
 | `scope.read.<PAPEL>.attributes` | os atributos que esse papel vê. O que ficar de fora não aparece no estado nem no `eventData` do `/history` |
 | `author` | os papéis que veem, no `/history`, quem executou cada evento |
 
