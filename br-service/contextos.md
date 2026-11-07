@@ -138,7 +138,10 @@ Os quatro campos são **obrigatórios**; faltar um ou trocar o tipo derruba o co
 > dispara N comandos, derruba o consumo. **Não existe fan-out**: uma coordenação emite exatamente um
 > comando. Precisar encerrar N filhos de um cancelamento não tem caminho por aqui hoje.
 
-O comando resultante é submetido **sem credencial** — ele não carrega o usuário que originou a cadeia.
+O comando resultante é submetido com a **identidade do autor do primeiro comando** da cadeia, e o
+papel dele **não é reavaliado** no comando-alvo: comando disparado por comando já autorizado conta
+como autorizado, e o evento do alvo registra esse autor. O processador de coordenação **não recebe**
+essa identidade: continua sem `authToken` e sem o usuário.
 
 ---
 
