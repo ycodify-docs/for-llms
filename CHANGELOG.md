@@ -2,6 +2,14 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.147 — 2026-11-07
+
+- **forger: o modelo publicado se lê sem login, de dentro da plataforma.** Rota nova
+  `GET /a35gry2b4d8ops/unsec/tenant/{tenantId}/model`: `200` com o conteúdo guardado, `404` sem modelo, `500` com o
+  cache em falha. O gateway a barra na borda. É para o processador de coordenação do br-service, que sela a versão
+  de um contrato. Ver [forger — model](forger/endpoints/model.md#ler-de-dentro-da-plataforma-sem-login). Código em
+  `forger@dbb405e`; pedido em `yc-platform-v3/composer#14`. Ainda sem deploy.
+
 ## 1.146 — 2026-11-07
 
 - **persistence-crs e persistence-q: "papel vale só da org dona do tenant" (1.145) está em teste**, no `tinterpreter`
