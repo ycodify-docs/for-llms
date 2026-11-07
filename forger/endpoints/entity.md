@@ -229,6 +229,35 @@ legítima em que o segundo artefato ainda não existe.
 > Em produção desde 2026-10-02T22:11Z; até então o esquema era apagado em qualquer estado. A ordem
 > completa para desmontar está em [dataschema — remover](dataschema.md#remover).
 
+### Ler todas as entities de dentro da plataforma, sem login
+
+`GET /a35gry2b4d8ops/unsec/org/project/dataschema/{tenantId}/entities`, **sem `Authorization` e sem
+`X-Forger-Credential`**. É para serviço da plataforma que não tem o token de ninguém. O `tenantId` basta: org,
+projeto e dataschema saem dele.
+
+`200` com **todas** as entities do dataschema num objeto só, chaveado pelo nome da entity. A forma **não é a do
+`Listar`** autenticado: em cada entity, `attributes` e `associations` vêm como **objeto chaveado pelo nome**, e não
+como lista, e há uma chave `components`, sempre vazia.
+
+```jsonc
+{
+  "contrato": {
+    "attributes":   { "titulo": { "name": "titulo", … }, "leitores": { "name": "leitores", … } },
+    "associations": { },
+    "components":   { },
+    …
+  }
+}
+```
+
+> Ilustrativo: `…` é placeholder, e os nomes são exemplos.
+
+Tenant inexistente ou dataschema sem estado **não** dão `404`: trate todo status diferente de `200` como falha.
+
+**Não se alcança pela borda:** o gateway barra `/unsec/`. Quem chama fala direto com o serviço, dentro da rede da
+plataforma, e o endereço é configuração de deploy. O modelo publicado do mesmo tenant tem rota irmã: ver
+[model — ler de dentro da plataforma](model.md#ler-de-dentro-da-plataforma-sem-login).
+
 ## Ciclo de vida (criar/atualizar)
 
 1. **Auth/validação** de caminho e corpo.
