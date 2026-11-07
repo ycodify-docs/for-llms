@@ -264,7 +264,7 @@
           "properties": {
             "orderingMode": { "type": "string", "enum": ["none", "strict", "per-aggregate"] },
             "triggerProjection": { "type": "array", "items": { "$ref": "#/$defs/dispatchTarget" } },
-            "triggerCoordination": { "type": "array", "items": { "$ref": "#/$defs/dispatchTarget" } }
+            "triggerCoordination": { "type": "array", "items": { "$ref": "#/$defs/coordinationTarget" } }
           }
         }
       }
@@ -277,6 +277,26 @@
         "targetTenantId": { "type": "string", "format": "uuid" },
         "br": { "type": "object", "properties": { "route": { "type": "string" } } }
       }
+    },
+    "coordinationTarget": {
+      "description": "Item de triggerCoordination: um dispatchTarget que pode declarar o prazo do despacho (schedule).",
+      "allOf": [{ "$ref": "#/$defs/dispatchTarget" }],
+      "properties": {
+        "schedule": { "$ref": "#/$defs/schedule" }
+      }
+    },
+    "schedule": {
+      "description": "Quando a coordenação sai. Uma chave só: atAttribute (o instante é o valor desse atributo do evento, Timestamp ou Date) ou after (duração ISO-8601 contada do carimbo do evento).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "atAttribute": { "type": "string", "pattern": "^[a-z]+$" },
+        "after": { "type": "string", "pattern": "^P" }
+      },
+      "oneOf": [
+        { "required": ["atAttribute"] },
+        { "required": ["after"] }
+      ]
     }
   }
 }

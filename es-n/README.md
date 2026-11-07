@@ -89,6 +89,8 @@ até três destinos, combináveis:
   projeção/coordenação alvo.
 - O destino **3** é consumido pelo persistence-crs, que aciona o **br-service** (coordenação) e, conforme
   o resultado, submete um **novo comando** — fechando a saga (CP-7).
+- O destino **3** pode ter **prazo**: item de `triggerCoordination` com `schedule` não sai na hora — é guardado e
+  despachado no instante marcado, pelo mesmo caminho. Ver [scheduler — agendamento](../scheduler/README.md).
 
 ### Topologia de filas é fixa e global, não por tenant nem dinâmica
 Ponto importante para quem modela domínios cross-contexto:

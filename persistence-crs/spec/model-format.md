@@ -672,6 +672,8 @@ Para filtrar por data numa consulta:
     ```jsonc
     { "name": "<alvo>", "targetTenantId": "<tenant-id destino>", "br": { "route": "<rota>" } }
     ```
+    O item de `triggerCoordination` aceita também **`schedule`**, o prazo do despacho — ver
+    [Coordenação com prazo](#coordenação-com-prazo-schedule).
   - Listas **vazias** = sem despacho extra (só a projeção do próprio contexto).
 
 ### Por onde a identidade passa na coordenação
@@ -751,6 +753,28 @@ identidade que atravessou a saga.
 
 > Declarar `triggerProjection`/`triggerCoordination` **não cria filas** — apenas roteia o despacho pelos
 > canais universais do es-n. Ver [arquitetura — de onde vêm as filas](../../01-arquitetura.md#origem-das-filas).
+
+### Coordenação com prazo (`schedule`)
+
+Por padrão a coordenação sai logo depois que o evento é gravado. Com `schedule`, ela sai **numa data marcada** — o
+vencimento de um contrato, o lembrete trinta dias depois de um cadastro — sem que ninguém abra o agregado e sem conta
+de serviço:
+
+```jsonc
+"triggerCoordination": [ {
+  "name": "expirarcontrato",
+  "targetTenantId": "<tenant-id>",
+  "br": { "route": "<rota do processor que decide>" },
+  "schedule": { "atAttribute": "expiraem" }      // ou: "schedule": { "after": "P30D" }
+} ]
+```
+
+- **`atAttribute`** — o nome de um atributo do evento cujo valor é o instante (`Timestamp` ou `Date`).
+- **`after`** — uma duração ISO-8601 (`PT2H`, `P30D`) contada do carimbo do evento (`whenAttribute`).
+
+Na hora marcada a mensagem segue o caminho de sempre: o processor recebe o **estado do agregado lido naquele
+instante** e decide — devolve `targetCommand` ou não devolve nada. O guia completo, com o que acontece em cada caso e
+como escrever o processor: [scheduler — agendamento](../../scheduler/README.md).
 
 ## Estados e transições
 
