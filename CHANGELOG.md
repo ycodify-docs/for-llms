@@ -32,6 +32,17 @@
   de um contrato. Ver [forger — model](forger/endpoints/model.md#ler-de-dentro-da-plataforma-sem-login). Código em
   `forger@dbb405e`; pedido em `yc-platform-v3/composer#14`. Ainda sem deploy.
 
+## 1.147 — 2026-11-07
+
+- **Nova fatia: [scheduler — agendamento](scheduler/README.md).** O item de `triggerCoordination` aceita
+  **`schedule`**: `{ "atAttribute": "<atributo Timestamp|Date do evento>" }` ou `{ "after": "<duração ISO-8601>" }`.
+  A coordenação sai na hora marcada, pelo mesmo caminho da imediata, e o processor decide pelo estado do agregado
+  naquele instante. O guia cobre a declaração, o que vale em cada caso, como escrever o processor, garantias e
+  limites. O [model-format](persistence-crs/spec/model-format.md#coordenação-com-prazo-schedule) ganha a subseção, o
+  [schema](persistence-crs/spec/model.schema.json) ganha `$defs.schedule` e `$defs.coordinationTarget`, e o
+  [guia do es-n](es-n/README.md) cita o prazo no destino 3. Código: `es-n@5a0c463`, `scheduler@657bfcb`,
+  `interpreter@39fe74b`. Ainda sem deploy.
+
 ## 1.146 — 2026-11-07
 
 - **persistence-crs e persistence-q: "papel vale só da org dona do tenant" (1.145) está em teste**, no `tinterpreter`

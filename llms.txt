@@ -61,6 +61,9 @@
 - [acionar processamento](es-n/endpoints/processar-eventos.md) · [Erros](es-n/erros.md) · [Exemplos](es-n/exemplos.md)
 - [Assinatura externa de eventos](es-n/endpoints/assinaturas.md): feed por cursor para quem está fora da plataforma — declarada no modelo; leitura, cursor, erros.
 
+## scheduler (agendamento) — coordenação com prazo
+- [Guia](scheduler/README.md): **`schedule`** no item de `triggerCoordination` — a coordenação sai numa data marcada (`atAttribute`) ou depois de um intervalo (`after`); o que vale em cada caso, como escrever o processor que decide na hora, garantias e limites. **Interno, sem endpoint público:** declara-se no modelo.
+
 ## br-service (regras e coordenação)
 - [Guia](br-service/README.md): porta de entrada por pergunta, posição no fluxo, forma canônica da rota, índice de endpoints.
 - [Os três contextos de invocação](br-service/contextos.md): o que chega, quantos argumentos, o que devolver e o que falha em cada um — e por que o envelope `processedData` é obrigatório no assíncrono e proibido no síncrono.
