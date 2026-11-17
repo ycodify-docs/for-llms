@@ -94,6 +94,14 @@ Para conta que tem papel em organização que publicou o [manifesto da aplicaç�
 
 O aceite é **uma vez por versão**: quem já aceitou a versão vigente não vê `aceite_pendente`.
 
+### Exceção: a conta de serviço
+
+A conta criada por [`POST /ua/account-role/new-account/using/authority`](../../orgid/endpoints/ua-associacao.md#post-uaaccount-rolenew-accountusingauthority)
+é **conta de serviço**: não é pessoa, e é com ela que um serviço (o palas) lê os dados da org. O login dela em
+`/ua/sign-in` **não pede captcha nem aceite**: não vem `captcha_ausente` nem `aceite_pendente`, e o `captcha`
+e o `aceite` do corpo, se enviados, são ignorados. Senha errada continua `401`. Conta criada por outra rota
+(autocadastro, `/open/ua/account-role`) **não** é de serviço e segue as regras acima.
+
 ## Comportamento
 Segue o [fluxo de login](../README.md#fluxo-de-login-ciclo-de-vida): valida (via identidade) → descobre
 contexto/tenants → emite token → registra sessão (login novo **invalida** sessões anteriores do usuário).

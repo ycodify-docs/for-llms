@@ -73,7 +73,8 @@ Cria uma conta `/ua` e já a associa a um papel do dono, numa operação só. O 
   "role": { "name": "ADMIN", "owner": "acme" } }
 ```
 
-A conta nasce **`ACTIVE`**. Nada é enviado por e-mail.
+A conta nasce **`ACTIVE`** e é **conta de serviço**: o [login](../../auth/endpoints/sign-in.md#exceção-a-conta-de-serviço)
+dela não pede captcha nem aceite de termos. Nada é enviado por e-mail.
 
 **Resposta:** `201` — `{ "id": <number> }` (id da conta) · `400` — corpo sem `account`, sem `role` ou sem
 `role.owner`, ou campo da conta inválido · `403` — o portador não tem `API_MASTER` no `owner` do papel · `404` —
