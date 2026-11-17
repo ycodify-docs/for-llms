@@ -7,7 +7,7 @@
 - **auth/orgid: a conta de serviço não pede captcha nem aceite no login.** A conta criada por `POST
   /ua/account-role/new-account/using/authority` ganha uma marca no orgid, e o `POST /ua/sign-in` dela dispensa
   `captcha` e `aceite`. Ver [login](auth/endpoints/sign-in.md#exceção-a-conta-de-serviço). Código em `orgid` (`develop`)
-  (`develop`), **ainda não em produção**: precisa da coluna `external.account.conta_de_servico` aplicada pela infra e do
+  (`develop`), **ainda não em produção**: precisa da coluna `external.account.desistema` aplicada pela infra e do
   deploy do composer. Contas de serviço criadas antes não têm a marca. Pedido: `yc-platform-v3/composer#16`.
 
 ## 1.150 — 2026-11-07
