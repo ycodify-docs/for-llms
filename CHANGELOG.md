@@ -2,6 +2,14 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.151 — 2026-11-17
+
+- **auth/orgid: a conta de serviço não pede captcha nem aceite no login.** A conta criada por `POST
+  /ua/account-role/new-account/using/authority` ganha uma marca no orgid, e o `POST /ua/sign-in` dela dispensa
+  `captcha` e `aceite`. Ver [login](auth/endpoints/sign-in.md#exceção-a-conta-de-serviço). Código em `orgid@19c2eb3`
+  (`develop`), **ainda não em produção**: precisa da tabela `manifest.conta_de_servico` aplicada pela infra e do
+  deploy do composer. Contas de serviço criadas antes não têm a marca. Pedido: `yc-platform-v3/composer#16`.
+
 ## 1.150 — 2026-11-07
 
 - **br-service: o comando que a coordenação devolve leva o autor do primeiro comando.** A página
