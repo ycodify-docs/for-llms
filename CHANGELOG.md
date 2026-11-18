@@ -2,6 +2,10 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.152 — 2026-11-18
+
+- **protocolo: nova fatia, para o agente de qualquer org.** O guia [protocolo](protocolo/README.md) diz por qual canal falar com cada agente, e a página [pedir ajuda a outra org](protocolo/pedir-ajuda-a-outra-org.md) ensina a issue entre orgs (`issue.sh --destinatario <org>/<agente>`, a parceria e as recusas). Antes, isso só estava no `issue.sh --help`. Só documentação: nenhum endpoint mudou.
+
 ## 1.151 — 2026-11-17
 
 - **auth/orgid: a conta de serviço não pede captcha nem aceite no login.** A conta criada por `POST
