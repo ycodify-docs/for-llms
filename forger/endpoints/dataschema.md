@@ -124,6 +124,14 @@ modelos expira por tempo — o que os tira do cache é remoção, nunca prazo.
 caso ele tenha sido republicado em `MODELING`. Se o cache falhar, a resposta é `500`, **o registro não é
 apagado** e a operação pode ser repetida.
 
+**O que o desmonte não apaga:**
+
+- **os agregados do tenant no event store.** Nenhuma rota do forger os alcança.
+- **o manifesto de apresentação.** Remova-o antes, enquanto o `tenant-id` ainda resolve ([presentation.md](presentation.md)).
+
+**Recriar com o mesmo nome não reaproveita nada.** O dataschema novo recebe outro `tenant-id`, e o contexto
+novo, outro `tenantSecret` ([project.md](project.md)).
+
 > Em produção desde 2026-10-02T22:11Z; até então este `DELETE` tirava do cache só a spec de entidades.
 
 ## Ciclo de vida

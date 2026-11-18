@@ -38,9 +38,7 @@ O `status` do corpo é **ignorado**: a conta mantém o que tem no cadastro.
 
 **Resposta:** `200` (sem corpo) quando gravou · `404` — `"account not found: nothing was updated."`
 
-> ⚠️ **O titular não troca o próprio status**, em produção desde 2026-09-26 (ver [CHANGELOG 1.66](../../CHANGELOG.md)).
-> Antes, `status` no corpo era gravado, e a **ausência** dele gravava `ACTIVE`: qualquer
-> edição de perfil reativava conta `SUSPENDED` e ativava conta `PENDING` sem confirmação.
+> ⚠️ **O titular não troca o próprio status.**
 
 ## PUT /ua/account/password
 Troca a senha (`username` forçado ao do token). **Auth:** token válido.
@@ -54,9 +52,6 @@ Troca a senha (`username` forçado ao do token). **Auth:** token válido.
 
 **Resposta:** `200` (sem corpo) quando trocou · `400` se a senha nova não tem formato adequado · `403` se
 a `oldPassword` não confere · `404` — `"account not found: the password was not changed."`
-
-> ⚠️ Até 2026-09-05 a conta inexistente respondia **`204`**, que é sucesso: o usuário recebia confirmação e
-> a senha não mudava. Se você ainda vir `204` aqui, está falando com uma versão antiga do orgid.
 
 ## GET /ua/account/by/username/{username}/role-owner/{roleOwner}/authority
 Lê uma conta no escopo de um dono de papel. **Papéis:** administrador / engenheiro (no `roleOwner`).

@@ -49,9 +49,6 @@ Vale para **criar** o vínculo (`POST /up/account-role-org`) e para **mudar o st
   vínculo (`accountStatus` e `orgStatus`). Com qualquer um diferente ele fica de fora, e o login não acusa
   erro.
 
-> Em produção desde 2026-10-07T17:06Z. Até então, `POST /up/account-role-org` e as duas rotas de status
-> respondiam `400` a `SKOS_MASTER` e `SKOS_ANALYST`.
-
 ## POST /up/account-role-org
 Cria o vínculo conta-papel-org. **Quem chama:** token com papel `API_MASTER`, `API_ENGINEER`,
 `API_ANALYST`, `API_FINANCIAL` ou `SKOS_MASTER`; e ainda tem de ser quem **gere** o papel pedido
@@ -128,10 +125,6 @@ Substitui a **conta administradora** do vínculo. **Papel:** administrador na or
 `replace-account`.
 
 **Resposta:** `200` quando substituiu · `404` — `"… não existe: a conta master não foi substituída."`
-
-> ⚠️ Até 2026-09-05 estes três `replace-*` respondiam **`204`** quando o vínculo, a conta ou a org não
-> existia. `204` é sucesso sem corpo: **trocar a conta administradora de uma organização virava no-op
-> silencioso**. Ver [../erros.md](../erros.md).
 
 ## PUT /up/account-role-org/replace-role
 Substitui o **papel** do vínculo. **Papel:** administrador na org.

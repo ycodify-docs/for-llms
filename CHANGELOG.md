@@ -2,6 +2,284 @@
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
 
+## 1.152 — 2026-11-18
+
+- **protocolo: nova fatia, para o agente de qualquer org.** O guia [protocolo](protocolo/README.md) diz por qual canal falar com cada agente, e a página [pedir ajuda a outra org](protocolo/pedir-ajuda-a-outra-org.md) ensina a issue entre orgs (`issue.sh --destinatario <org>/<agente>`, a parceria e as recusas). Antes, isso só estava no `issue.sh --help`. Só documentação: nenhum endpoint mudou.
+
+## 1.151 — 2026-11-17
+
+- **auth/orgid: a conta de serviço não pede captcha nem aceite no login.** A conta criada por `POST
+  /ua/account-role/new-account/using/authority` ganha uma marca no orgid, e o `POST /ua/sign-in` dela dispensa
+  `captcha` e `aceite`. Ver [login](auth/endpoints/sign-in.md#exceção-a-conta-de-serviço). Código em `orgid` (`develop`)
+  (`develop`), **ainda não em produção**: precisa da coluna `external.account.desistema` aplicada pela infra e do
+  deploy do composer. Contas de serviço criadas antes não têm a marca. Pedido: `yc-platform-v3/composer#16`.
+
+## 1.150 — 2026-11-07
+
+- **br-service: o comando que a coordenação devolve leva o autor do primeiro comando.** A página
+  [contextos](br-service/contextos.md), na seção de coordenação, dizia que ele saía sem credencial. Na verdade
+  ele sai com a identidade de quem iniciou a cadeia, e o papel dessa pessoa não é reavaliado no alvo. O
+  processador de coordenação continua sem `authToken`. O comportamento já valia desde a 1.38 e não mudou agora:
+  é a doc que alcança o código (`persistence-crs@711db9c`).
+
+## 1.149 — 2026-11-07
+
+- **forger: a leitura interna do modelo publicado (1.147) está em produção**, no composer, imagem
+  `yc-composer:amd64-aaab261-e319`, desde 14:58:27Z, segundo a infra (`yc-platform-v3/infra#102`).
+
+## 1.148 — 2026-11-07
+
+- **forger: a leitura interna das entities passa a ter doc.** `GET
+  /a35gry2b4d8ops/unsec/org/project/dataschema/{tenantId}/entities` já estava no ar e não estava documentada. Ver
+  [forger — entity](forger/endpoints/entity.md#ler-todas-as-entities-de-dentro-da-plataforma-sem-login). A forma da
+  resposta difere da do `Listar` autenticado. Lido no código em `forger@2535f27`
+  (`UnsecEntityController`, `EntityStateService.getCurrentSchemaStateAsJsonForExternalView`). Comportamento sem
+  mudança: é a doc que alcança o código.
+
+## 1.147 — 2026-11-07
+
+- **forger: o modelo publicado se lê sem login, de dentro da plataforma.** Rota nova
+  `GET /a35gry2b4d8ops/unsec/tenant/{tenantId}/model`: `200` com o conteúdo guardado, `404` sem modelo, `500` com o
+  cache em falha. O gateway a barra na borda. É para o processador de coordenação do br-service, que sela a versão
+  de um contrato. Ver [forger — model](forger/endpoints/model.md#ler-de-dentro-da-plataforma-sem-login). Código em
+  `forger@dbb405e`; pedido em `yc-platform-v3/composer#14`. Ainda sem deploy.
+
+## 1.147 — 2026-11-07
+
+- **Nova fatia: [scheduler — agendamento](scheduler/README.md).** O item de `triggerCoordination` aceita
+  **`schedule`**: `{ "atAttribute": "<atributo Timestamp|Date do evento>" }` ou `{ "after": "<duração ISO-8601>" }`.
+  A coordenação sai na hora marcada, pelo mesmo caminho da imediata, e o processor decide pelo estado do agregado
+  naquele instante. O guia cobre a declaração, o que vale em cada caso, como escrever o processor, garantias e
+  limites. O [model-format](persistence-crs/spec/model-format.md#coordenação-com-prazo-schedule) ganha a subseção, o
+  [schema](persistence-crs/spec/model.schema.json) ganha `$defs.schedule` e `$defs.coordinationTarget`, e o
+  [guia do es-n](es-n/README.md) cita o prazo no destino 3. Código: `es-n@5a0c463`, `scheduler@657bfcb`,
+  `interpreter@39fe74b`. Ainda sem deploy.
+
+## 1.146 — 2026-11-07
+
+- **persistence-crs e persistence-q: "papel vale só da org dona do tenant" (1.145) está em teste**, no `tinterpreter`
+  (`/v3/persistence/t/`), imagem `yc-interpreter:amd64-69839a6-e50b`, desde 05:36:27Z, segundo a infra (`infra#94`).
+  Produção não recebeu.
+
+## 1.145 — 2026-11-07
+
+- **persistence-crs e persistence-q: papel vale só da org dona do tenant.** O papel era conferido só pelo nome, e
+  um papel de outra org com o mesmo nome (ex.: `AUDITOR` criado pela `clubflow`) valia no tenant da `ycodify`, no
+  comando, na leitura do agregado e na consulta da projeção. Agora só vale o papel que o token liga à org dona do
+  tenant. Defeito de segurança medido pelo `coordination-91` (`yc-platform-v3/interpreter#13`); conserto em
+  `yc.pr@0341f5b`, `persistence-crs@afce2c8` e `persistence-q@22bffa4`. Ainda sem deploy.
+
+## 1.144 — 2026-11-07
+
+- **persistence-crs: `data.attribute` do tipo `Json` aceita lista.** O model-format dizia só "escalares". A lista
+  (ex.: `["ana","bia"]`) entra no corpo do comando, o processor do br pode substituí-la se a chave vier no corpo, e
+  a projeção a grava como array JSON. Medido pelo `coordination-91` no `tinterpreter`, 2026-11-07, às 04:56Z
+  (`coordination:dominio/prova/titular-por-lista/prova.py`). Comportamento sem mudança: é a doc que alcança o código.
+
+## 1.143 — 2026-11-07
+
+- **persistence-q e persistence-crs: o titular por lista (1.142) está em teste**, no `tinterpreter`
+  (`/v3/persistence/t/`), imagem `yc-interpreter:amd64-69839a6-cbbf`, desde 04:31:27Z, segundo a infra (`infra#92`).
+  Produção não recebeu.
+
+## 1.142 — 2026-11-07
+
+- **persistence-q e persistence-crs: titular por lista.** `rows.by` que aponta um atributo `Json` com uma lista de
+  usernames recorta a leitura para quem for elemento dela, por igualdade exata. Vale na projeção
+  (`ufrn.loco3@fa56789`, `ReadStatementTransformation`) e na leitura do agregado, `GET /a` e `/history`
+  (`persistence-crs@0b0c2e9`, `RecorteDeLeituraDoAgregado`). Antes, a lista nunca casava. Atributo de outro tipo
+  segue com igualdade, sem mudança. Pedido: `yc-platform-v3/interpreter#12`. Ainda sem deploy.
+
+## 1.141 — 2026-11-05
+
+- **forger: o `nullable` de `true` para `false` aplicado (1.140) está no ar** na imagem `yc-composer:amd64-cdbc354-7c51`,
+  desde 03:21:53Z, segundo a infra. A página deixa de dizer que a imagem no ar recusa.
+
+## 1.140 — 2026-11-05
+
+- **forger: tornar obrigatório (`nullable` de `true` para `false`) deixa de ser recusado pelo forger; quem julga é
+  o banco** (`forger@a6a2ffb`, `EntityComparator`). A recusa anterior falava de "linhas existentes" e nunca
+  consultava a tabela: recusava com `400` até com 0 linhas (medido pelo `coordination-57` às 03:03:31Z). Agora a
+  mudança vira `SET NOT NULL` (`yc.dbr-driver`), e o PostgreSQL recusa só se houver linha vazia. Vale para atributo
+  e associação. Ainda sem deploy.
+
+## 1.139 — 2026-11-04
+
+- **persistence-crs: `POST /e` saiu da doc.** A rota de escrita direta de linha (entidade e projeção) foi desligada no
+  código em `persistence-crs@36d48d9` (2026-09-23) e responde `404`; a doc seguia ensinando-a. `entidade.md` e
+  `projecao.md` dizem agora que ela não existe e o que usar; saíram as linhas do README e o `/e` do `openapi.yaml`.
+  `POST /e/by` (remoção por predicado) continua.
+
+## 1.139 — 2026-11-04
+
+- **forger: remover database apaga só o registro** (`forger@7045305`, `ResourceController.deleteDatabase`,
+  `DatabaseRepository.deleteByIdAndDbConn`). O banco físico fica, e recriar com o mesmo nome falha com
+  "Database or user already exists" (medido pelo `coordination-57` às 23:59:19Z, com resposta `510`). Comportamento
+  sem mudança.
+
+## 1.138 — 2026-11-04
+
+- **forger: o que o desmonte de um dataschema não apaga** (`forger@7045305`, `ResourceController.deleteDataSchema`,
+  `createDataSchema`). Os agregados do event store e o manifesto de apresentação ficam; recriar com o mesmo nome
+  gera outro `tenant-id`. Comportamento sem mudança.
+
+## 1.137 — 2026-11-04
+
+- **forger: `tenantSecret` só vem no `201` de `POST /org/{org}/project`** (`forger@7045305`,
+  `ResourceController.createProject`, `ProjectRepository`, `DataSchemaRepository`). A página não dizia que nenhuma
+  rota o devolve depois, nem que ele é um só por contexto. Comportamento sem mudança.
+
+## 1.136 — 2026-11-04
+
+- **orgid: os campos de `POST /up/org` conferidos contra o código** (`orgid@9e16a0b`, `OrgServiceImpl.create`,
+  `OrgController.create`). A página dava `email` como opcional e não citava `description`; os dois são obrigatórios
+  e dão `400` (medido pelo `coordination-57` às 19:09Z ao criar uma org). `alias` também é exigido: ausente, a criação
+  falha sem tratamento, em vez de dar `400`. `name` aceita só letras e no máximo 12 caracteres; `status` é ignorado;
+  `awsCredentials` é opcional. Resposta: `200` com o corpo, `owner` e `id`, e `409` para nome repetido do mesmo
+  dono. Comportamento sem mudança.
+
+## 1.135 — 2026-11-04
+
+- **orgid: `publico.md` e `ua-papel.md` acompanham a 1.133.** O autocadastro aponta a criação de conta com papel não
+  público pelo administrador do dono do papel. `ua-papel.md` diz, como `ua-associacao.md`, que "administrador /
+  engenheiro" é o papel de plataforma no `owner`. Comportamento sem mudança.
+
+## 1.134 — 2026-11-04
+
+- **orgid: `POST /ua/account-role/new-account/using/authority` em produção** desde 2026-11-04T19:22:22Z
+  (`yc-composer:amd64-3d52002-08cc`, `orgid@9e16a0b`, `yc-platform-v3/infra#77`). A criação de conta pela instância
+  ainda não foi medida: falta token de `API_MASTER`.
+
+## 1.133 — 2026-11-04
+
+- **orgid: `POST /ua/account-role/new-account/using/authority`.** O `API_MASTER` do dono de um papel `/ua` cria uma
+  conta de aplicação já associada a esse papel, numa operação só, sem tornar o papel público (`orgid@9e16a0b`,
+  `yc-platform-v3/composer#13`). Até aqui, criar conta com papel não público obrigava a deixá-lo público por um
+  instante, chamar `POST /open/ua/account-role` e depois associar. Está na `develop` do orgid, não está implantada.
+- **orgid `/ua`: o papel exigido.** `ua-associacao.md` passa a dizer que "administrador / engenheiro (no `owner`
+  do papel)" é o papel de plataforma (`<owner>/API_MASTER` no claim `orgs`), e que a conta `/ua` não pertence a
+  organização nenhuma: ela se liga ao dono pelo papel.
+
+## 1.132 — 2026-11-04
+
+- **Páginas do orgid sem histórico.** Por ordem do dono, a página diz o que é e como se usa agora; o que era histórico
+  mora aqui. Conteúdo que saiu de `orgid/endpoints/`:
+  - **2026-10-16:** manifesto da aplicação em produção desde 14:34:24Z. O link de redefinição de senha está em produção
+    desde 17:21:35Z, sem medição do envio real do e-mail. O `captcha` do registro e o `aceitePendente` estão em vigor
+    desde 21:06:53Z. Publicar um manifesto e provar um domínio pelo TXT ainda não foi medido em produção.
+  - **2026-10-07T17:06Z:** `SKOS_MASTER`/`SKOS_ANALYST` em produção. Antes disso, quem só tinha `SKOS_*` recebia `403`
+    em `GET /up/account/by/jwt`; `POST /up/account-role-org` e as duas rotas de status respondiam `400` a esses
+    papéis; e o `role` do registro público era ignorado (a conta nascia só administradora, sem erro).
+  - **2026-10-02T22:11Z:** antes, `DELETE` da organização respondia `403` a qualquer chamada.
+  - **2026-09-26:** o registro público passou a aceitar só papel público (antes, qualquer papel, inclusive
+    administrativo). Em `/ua`, `R` passou a ativar só conta `PENDING` (antes, reativava conta suspensa). O titular deixou
+    de trocar o próprio status (antes, a ausência de `status` gravava `ACTIVE`).
+  - **2026-09-05:** o `composer` passou a liberar `/open/**` e `/ua/open/**`. Antes disso, onde hoje vem `404`
+    respondia-se `204`: em `R`/`PR` e na troca de senha com conta inexistente, em `PUT` de papel sem `id`, em `DELETE` de
+    papel inexistente, nos três `replace-*` e na associação de `/ua`.
+- **Correção da 1.131:** `accountStatus` e `orgStatus` são gravados como o cliente os manda, sem conferência de valor
+  (`orgid@3aab683`, `AccountRoleOrgServiceImpl` :113, :122, :307, :419-420). A 1.131 os listava como enum fechado.
+
+## 1.131 — 2026-11-04
+
+- **orgid: os campos de `accountRoleOrgs` em `GET /up/account/by/jwt`.** A página só dizia que o campo existia. Agora
+  diz que cada item traz `accountStatus` e `orgStatus` e nenhum `status` próprio, e que o vínculo `SUSPENDED` ou `CANCELED`
+  continua na lista: só sai o item cuja conta ou org está `CANCELED`. Diz também que o `API_MASTER` de quem criou a org
+  vem na lista como os outros papéis. Comportamento lido no código de `orgid@3aab683` (v1.1.0, a que o `entradas.lock` do
+  composer declara). Não mudou nada no código.
+
+## 1.130 — 2026-10-31
+
+- **Assinatura de eventos por tenant, em teste.** A leitura de eventos da assinatura filtra por tenant além do tipo
+  (`yc.es@24472e4`), em `/v3/persistence/t/` desde 2026-10-31T20:24:41Z (`amd64-d18cc6f-5192`); produção não. Antes,
+  a assinatura nascida no checkpoint 0 projetava no próprio tenant os eventos de outro tenant com o mesmo
+  `org.projeto.bc.tipo`. Linhas já projetadas assim não saem com o conserto.
+
+## 1.129 — 2026-10-31
+
+- **Páginas de persistence-crs, persistence-q e es-n sem falha nem estado.** Por ordem do dono, página diz como se usa; o
+  que era estado e história mora aqui. Conteúdo que saiu das páginas:
+  - **Em teste, produção não:** snapshot do agregado desde 2026-10-31T14:18:13Z (publicação da chave desde 13:54:38Z);
+    comando condicional desde 2026-10-29T15:09:38Z (`amd64-ff32b1f-c7b2`; em produção o campo é ignorado e a leitura não
+    traz `_version`); datas normalizadas desde `amd64-260913c`; feed de assinatura em `/v3/es/t/` desde
+    2026-10-01T04:19:19Z (validação na publicação desde 04:23:36Z; falta o papel de assinante na gestão de contas); modelo
+    relido a cada requisição desde `amd64-260910`.
+  - **`references`, em 2026-09-29:** validação no forger em `develop`; o BFF ainda não lia a chave, e a tela usava o
+    `options` por referência do manifesto.
+  - **Consertos de 2026-09-25:** `null` explícito (`ufrn.loco3@66b1313`, `persistence-crs@4f61f82`): antes, na criação, `null`
+    em numérico não materializava a linha, em texto gravava `"null"`, que segue no dado gravado, e na transição a projeção
+    preservava o valor anterior. `""` em data (`yc.cqrs-c@c111bf8`): antes respondia `200` e a projeção falhava ao gravar.
+  - **2026-09-10:** cópia do modelo em memória, por até uma hora, desligada em teste; a doc mandava invalidar as duas chaves.
+  - **2026-09-09:** em `amd64-260909`, sem o `b`, a entity com recorte pela rota interna e a consulta sem credencial davam
+    `403`; a partir de `amd64-260909b`, não.
+  - **2026-09-05:** a checagem de papel passou a vir antes do br-service. **2026-10-01:** papel fora de `roles.read` deixou
+    de responder `204`. **Até `amd64-260913c`:** o agregado devolvia a data como o cliente mandou.
+
+## 1.128 — 2026-10-31
+
+- **persistence-q e persistence-crs: `400` por valor fora da forma** nas listas de erro (`persistence-q/erros.md`,
+  `persistence-q/endpoints/consulta.md`, `persistence-crs/endpoints/remocao-por-predicado.md`).
+
+## 1.127 — 2026-10-31
+
+- **persistence-q: valor no critério em teste** desde 15:32:30Z (`yc-interpreter:amd64-9547df7-3c3a`, `ufrn.loco3@d023c54`,
+  infra#61). Em produção, ainda não.
+
+## 1.126 — 2026-10-31
+
+- **persistence-q: valor no critério** (`query-controls.md`). Em atributo numérico ou booleano, valor de outra forma é
+  `400`; em texto, a aspa simples é só um caractere do valor (`ufrn.loco3`, interpreter#5). Ainda não implantado.
+
+## 1.125 — 2026-10-31
+
+- **persistence-crs: snapshot do agregado em teste** desde 14:18:13Z (`yc-interpreter:amd64-69fa484-7460`,
+  `yc.cqrs-c@a3e1275`, `yc.persistence@05c5481`, infra#59). Em produção, ainda não.
+
+## 1.124 — 2026-10-31
+
+- **persistence-crs: snapshot do agregado** (`spec/model-format.md` §Snapshot do agregado,
+  `endpoints/agregado-leitura.md`). O que acontece ao mudar a configuração e o modelo, e o que `/history` e o feed
+  leem. A leitura de agregado aponta para a seção, e o `/history` diz que devolve todos os eventos, sem paginação.
+
+## 1.123 — 2026-10-31
+
+- **persistence-crs: chave `snapshot` no modelo** (`persistence-crs/spec/model-format.md` §Snapshot do agregado).
+  Configuração por tenant, dentro de `<org>.<projeto>`. O motor que a lê (`yc.cqrs-c@a3e1275`,
+  `yc.persistence@05c5481`) ainda não está implantado. `llms-full.txt` recebe a seção.
+
+## 1.122 — 2026-10-31
+
+- **forger: chave `snapshot` no `.model.json`** (`forger/endpoints/model.md` §Snapshot do agregado). Opcional, dentro
+  de `<org>.<projeto>`, ao lado de `aggregate`: `{ "enabled": <boolean>, "nthEvent": <inteiro a partir de 2> }`.
+  Fora dessa forma, ou com outra chave dentro dela, a publicação responde `400`; modelo sem a chave publica como
+  antes. No ar desde 2026-10-31T13:54:38Z (`yc-composer:amd64-9d056ca-94f9`, `forger@7045305`, infra#58).
+  yc-platform-v3/composer#12.
+
+## 1.121 — 2026-10-29
+
+- **persistence-crs: comando condicional pela versão** (`persistence-crs/endpoints/comando.md` §Comando condicional
+  pela versão; `endpoints/agregado-leitura.md`; `README.md`, regra de concorrência; `openapi.yaml`).
+  `GET /a/{bc}/{tipo}/{id}` passa a devolver `_version`, a versão do agregado. O comando aceita o campo opcional
+  `_expectedVersion`: diferente da versão atual dá `510`, antes da regra de negócio; inválido dá `400`; sem o campo,
+  nada muda. Em teste (`/v3/persistence/t/`) desde 2026-10-29T15:09:38Z (`yc-interpreter:amd64-ff32b1f-c7b2`),
+  produção ainda não. yc.cqrs-c `3db2834`, persistence-crs `0ff7359`. yc-platform-v3/interpreter#3.
+
+## 1.120 — 2026-10-26
+
+- **auth: o `accessTokenEs256` e o JWKS da 1.119 estão em vigor desde 2026-10-26T13:45:34Z**
+  (`auth/endpoints/sign-in.md` §Token ES256 e chave pública). Sai o aviso "ainda não no ar". Pela borda, o JWKS
+  está em `GET https://api.ycodify.com/v3/auth/ua/.well-known/jwks.json`, sem credencial e só por `GET`. Medido às
+  14:02:47Z: `200` com `kid` = `auth-es256-20261026`. yc-platform-v3/composer#11.
+
+## 1.119 — 2026-10-26
+
+- **auth: segundo access token em ES256 e a chave pública em JWKS** (`auth/endpoints/sign-in.md` §Token ES256 e
+  chave pública; `auth/README.md`, índice e CP-12; `auth/openapi.yaml`). O login e a renovação devolvem também
+  `accessTokenEs256`: os mesmos claims e o mesmo `iss`, assinado em ES256 com `kid`. A chave pública sai em
+  `GET /ua/.well-known/jwks.json`, público. O `accessToken` HS512 não muda. Em `develop` (auth `ca02e61`, composer
+  `aaad2c2`), ainda não no ar: sem a chave configurada, o campo não vem e o JWKS responde `{"keys":[]}`.
+  yc-platform-v3/composer#11.
+
 ## 1.118 — 2026-10-16
 
 - **auth e orgid: o captcha e o aceite da 1.115 estão em vigor desde 2026-10-16T21:06:53Z** (`auth/endpoints/sign-in.md`,

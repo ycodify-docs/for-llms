@@ -40,6 +40,12 @@ paths:
         '200': { description: Token renovado, content: { application/json: { schema: { $ref: '#/components/schemas/JwtResponse' } } } }
         '401': { description: Token ausente/inválido/expirado }
         '417': { description: Falha de serviço dependente }
+  /ua/.well-known/jwks.json:
+    get:
+      tags: [login]
+      summary: Chave pública do accessTokenEs256 (JWKS) — público; keys vazio enquanto o ES256 não estiver ligado
+      responses:
+        '200': { description: JWK Set, content: { application/json: { schema: { $ref: '#/components/schemas/Jwks' } } } }
 components:
   securitySchemes:
     bearerAuth: { type: http, scheme: bearer }
@@ -54,6 +60,7 @@ components:
       type: object
       properties:
         accessToken: { type: string, description: "Token de acesso (usar em Authorization: Bearer)" }
+        accessTokenEs256: { type: string, description: "O mesmo token assinado em ES256, com kid; para quem valida pela chave pública do JWKS. Ausente com o ES256 desligado" }
         tokenType: { type: string, example: Bearer }
         id: { type: integer }
         username: { type: string }
@@ -61,3 +68,18 @@ components:
         email: { type: string }
         roles: { type: array, items: { type: string } }
         mcpSessionId: { type: string, format: uuid }
+    Jwks:
+      type: object
+      properties:
+        keys:
+          type: array
+          items:
+            type: object
+            properties:
+              kty: { type: string, example: EC }
+              crv: { type: string, example: P-256 }
+              use: { type: string, example: sig }
+              alg: { type: string, example: ES256 }
+              kid: { type: string }
+              x: { type: string, description: "coordenada x, base64url, 32 bytes" }
+              y: { type: string, description: "coordenada y, base64url, 32 bytes" }

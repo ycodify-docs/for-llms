@@ -20,6 +20,7 @@
 ## Contents
 - Estrutura de topo
 - Assinaturas externas
+- Snapshot do agregado
 - Nível do agregado
 - Atributos e tipos
 - Comandos
@@ -38,7 +39,8 @@
     "aggregate": {
       "<bc>.<aggregateType>": { ... } // um ou mais agregados
     },
-    "subscriptions": { ... }          // OPCIONAL — ver "Assinaturas externas"
+    "subscriptions": { ... },         // OPCIONAL — ver "Assinaturas externas"
+    "snapshot": { ... }               // OPCIONAL — ver "Snapshot do agregado"
   }
 }
 ```
@@ -93,8 +95,38 @@ cadastra em execução. O feed está em [es-n — assinatura externa](../../es-n
 **O motor de comandos não lê esta chave.** Mudar o filtro é republicar o modelo: a próxima leitura já usa a
 declaração nova, e o cursor de quem lê não se perde. Remover a assinatura do modelo faz o feed responder `404`.
 
-> **Estado em 2026-10-01:** a **validação na publicação** vale desde 04:23:36Z — declaração fora da forma é
-> recusada com `400`. O feed está no ar na instância de teste; na de produção, ainda não.
+Declaração fora da forma é recusada na publicação com `400`.
+
+### Snapshot do agregado (`snapshot`)
+
+Sem snapshot, cada comando e cada leitura de agregado refazem o estado a partir de **todos** os eventos dele.
+Com snapshot, partem do último retrato e aplicam só os eventos posteriores. A configuração é **do tenant**: vale
+para todos os agregados do modelo.
+
+```jsonc
+"acme.vendas": {
+  "aggregate": { ... },
+  "snapshot": { "enabled": true, "nthEvent": 50 }
+}
+```
+
+| Parte | Regra |
+|---|---|
+| **lugar** | **dentro** de `<org>.<projeto>`, irmã de `aggregate` |
+| **ausente** | sem a chave `snapshot`, o snapshot fica desligado |
+| `enabled` | obrigatório, booleano; `true` liga |
+| `nthEvent` | obrigatório, inteiro a partir de 2: grava-se o retrato quando a versão do agregado é múltipla dele |
+| **fora da forma** | campo ausente, `nthEvent` abaixo de 2 ou outra chave: recusado na publicação com `400` |
+
+Quem grava é o próprio comando, na mesma transação do evento. Para o mesmo modelo, o estado e o `_version`
+devolvidos são os mesmos com ou sem snapshot. `/history` continua lendo todos os eventos.
+
+**Mudar a configuração** é republicar o modelo ([forger/model](../../forger/endpoints/model.md#snapshot-do-agregado-snapshot)).
+Desligar volta ao cálculo por todos os eventos, e os retratos já gravados ficam guardados, sem uso; religar volta a
+usá-los. O retrato guarda o estado da sua versão, e **alterar o modelo não o reescreve**: quem renomeia o
+`whenAttribute` de um agregado, por exemplo, vê o nome antigo seguir no estado que veio do retrato.
+
+**O `/history` e o feed leem os eventos, não o retrato:** evento apagado some dos dois.
 
 ## Nível do agregado
 
@@ -190,9 +222,11 @@ string aparece em três lugares, e os três têm de concordar:
 | Chave | O que declara |
 |---|---|
 | `read` | os papéis que alcançam o agregado. Quem não tem nenhum deles não o enxerga |
-| `scope.read.<PAPEL>.rows.by` | o atributo cujo valor precisa ser o **`username` do token** de quem pede — o proprietário |
+| `scope.read.<PAPEL>.rows.by` | o atributo cujo valor precisa ser o **`username` do token** de quem pede — o proprietário. Se o valor for uma **lista** (atributo `Json`, ex.: `["ana", "bia"]`), lê quem for **elemento** dela, por igualdade exata |
 | `scope.read.<PAPEL>.attributes` | os atributos que esse papel vê. O que ficar de fora não aparece no estado nem no `eventData` do `/history` |
 | `author` | os papéis que veem, no `/history`, quem executou cada evento |
+
+**Papel vale só da org dona do tenant.** Em `roles` do comando, `read`, `scope` e `author`, um papel casa apenas quando a conta o tem **na org dona do tenant**, como o token o declara (`PAPEL:org:…`). Um papel com o mesmo nome criado por outra org não vale aqui. O mesmo se aplica à consulta da projeção ([persistence-q](../../persistence-q/README.md)).
 
 As duas dimensões de `scope` são independentes: `rows` responde *quais agregados são seus*,
 `attributes` responde *quais campos você vê*. Um papel pode declarar uma, outra ou as duas. Chave da
@@ -370,12 +404,8 @@ O que o BFF faz com ela (marcadores por tipo, o que o processor devolve):
 
 #### `references` — o atributo que aponta outro agregado
 
-> **Estado em 2026-09-29:** a forma e o significado estão definidos aqui, e esta é a referência
-> autoritativa. A **validação na publicação** está no forger em `develop`, **ainda não em produção**
-> ([forger — `references`](../../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references));
-> o **BFF ainda não lê** a chave
-> ([bff — declarada no modelo](../../bff/README.md#declarada-no-modelo-references-pedida-e-ainda-não-em-vigor)).
-> Até valer, a referência exibida pela tela vem só do `options` por referência do manifesto.
+A forma e o significado estão definidos aqui. A validação na publicação é do
+[forger — `references`](../../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references).
 
 ```jsonc
 "agenda.aula": {
@@ -491,8 +521,7 @@ da regra.
 **Onde NÃO acontece — e a data segue exatamente como você mandou:**
 - dentro de valueObject de **tipo direto** (`{"type": "Json"}`): o modelo não diz que há data lá dentro;
 - em campo `String`, mesmo que o texto seja uma data ou uma hora (`"06:00"`);
-- em dado gravado **antes** de `yc-interpreter:amd64-260913c` — a imagem em que isto passou a valer em teste;
-  **produção ainda não tem**, e lá nenhuma data é normalizada.
+- em evento já gravado: ele segue como foi gravado.
 
 **Recusas:** forma irreconhecível — `"13/09/2026"`, `"ontem"`, epoch num `Date` — é **`400`** que nomeia o
 campo (`no campo 'notafiscal.datacompra': …`). `"13/09/2026"` é recusado de propósito: dia e mês trocam de
@@ -534,7 +563,7 @@ Para filtrar por data numa consulta:
   (`type: "String"`) em `data.attribute` — o **estado atual** do agregado, base da **concorrência
   otimista** da transição. O comando de **criação NÃO** declara `status` (o agregado ainda não existe).
   Vale para **todo agregado, em todo bounded context**.
-- **`data.attribute`** — atributos **escalares** do agregado (uma coluna por atributo na projeção).
+- **`data.attribute`** — atributos **escalares** do agregado (uma coluna por atributo na projeção). A exceção é o tipo `Json`, que aceita também uma **lista**, por exemplo de usernames (`["ana", "bia"]`), e a projeção a grava como array JSON. É o que alimenta o recorte de leitura por lista (`roles.scope.read.<PAPEL>.rows.by`). Para o processor do br preencher o atributo, ele precisa vir no corpo do comando, mesmo `null`: a resposta do br só substitui chave que o comando já trouxe.
   **Não** inclua aqui o `whenAttribute` do evento (o carimbo, ex.: `criadaem`): ele é **auto-valorizado**
   e **não** é atributo de dados do comando — mas **é** coluna obrigatória da projeção (declarada na
   entity; ver [Eventos e `domainBus`](#eventos-e-domainbus) e [forger — entity](../../forger/endpoints/entity.md)).
@@ -652,6 +681,8 @@ Para filtrar por data numa consulta:
     ```jsonc
     { "name": "<alvo>", "targetTenantId": "<tenant-id destino>", "br": { "route": "<rota>" } }
     ```
+    O item de `triggerCoordination` aceita também **`schedule`**, o prazo do despacho — ver
+    [Coordenação com prazo](#coordenação-com-prazo-schedule).
   - Listas **vazias** = sem despacho extra (só a projeção do próprio contexto).
 
 ### Por onde a identidade passa na coordenação
@@ -731,6 +762,28 @@ identidade que atravessou a saga.
 
 > Declarar `triggerProjection`/`triggerCoordination` **não cria filas** — apenas roteia o despacho pelos
 > canais universais do es-n. Ver [arquitetura — de onde vêm as filas](../../01-arquitetura.md#origem-das-filas).
+
+### Coordenação com prazo (`schedule`)
+
+Por padrão a coordenação sai logo depois que o evento é gravado. Com `schedule`, ela sai **numa data marcada** — o
+vencimento de um contrato, o lembrete trinta dias depois de um cadastro — sem que ninguém abra o agregado e sem conta
+de serviço:
+
+```jsonc
+"triggerCoordination": [ {
+  "name": "expirarcontrato",
+  "targetTenantId": "<tenant-id>",
+  "br": { "route": "<rota do processor que decide>" },
+  "schedule": { "atAttribute": "expiraem" }      // ou: "schedule": { "after": "P30D" }
+} ]
+```
+
+- **`atAttribute`** — o nome de um atributo do evento cujo valor é o instante (`Timestamp` ou `Date`).
+- **`after`** — uma duração ISO-8601 (`PT2H`, `P30D`) contada do carimbo do evento (`whenAttribute`).
+
+Na hora marcada a mensagem segue o caminho de sempre: o processor recebe o **estado do agregado lido naquele
+instante** e decide — devolve `targetCommand` ou não devolve nada. O guia completo, com o que acontece em cada caso e
+como escrever o processor: [scheduler — agendamento](../../scheduler/README.md).
 
 ## Estados e transições
 
@@ -2226,6 +2279,7 @@ usuário (via forger) e os inclui no token.
 | Login (plataforma) | `POST /up/sign-in` | [endpoints/sign-in.md](endpoints/sign-in.md) |
 | Login (externo) | `POST /ua/sign-in` | [endpoints/sign-in.md](endpoints/sign-in.md) |
 | Renovar token | `GET /up/sign-in/renew` | [endpoints/renovar.md](endpoints/renovar.md) |
+| Chave pública do token ES256 (JWKS) | `GET /ua/.well-known/jwks.json` | [endpoints/sign-in.md](endpoints/sign-in.md#token-es256-e-chave-pública-jwks) |
 
 Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md). Contrato de fio: [openapi.yaml](openapi.yaml).
 
@@ -2256,7 +2310,8 @@ de duração maior, internamente.) Trate o token como **opaco**; não dependa de
 ## Pontos de coordenação
 
 - **CP-12** — auth **emite** o token que **todos** os demais serviços **validam** (mesmo segredo
-  compartilhado). É o início da cadeia de autorização.
+  compartilhado). É o início da cadeia de autorização. Quem não pode guardar o segredo valida o
+  `accessTokenEs256` pela chave pública ([sign-in — JWKS](endpoints/sign-in.md#token-es256-e-chave-pública-jwks)).
 - auth → **orgid** (validar credenciais, obter usuário/papéis/organizações).
 - auth → **forger** (no `/ua`, descobrir os tenants do usuário para o token).
 - auth → **cache** (registrar a sessão; sessão única por usuário).
@@ -2308,6 +2363,26 @@ lugar dele, o login responde `401` de corpo vazio; sem nenhum dos dois, `401` `m
 Use `accessToken` em `Authorization: Bearer <token>` nas chamadas seguintes — a chave é `accessToken`, e não
 `token`: quem lê `.token` fica sem token. O token embute usuário, papéis,
 organizações e tenants. Ver [README — claims](../README.md#o-que-o-login-retorna-token--claims).
+
+## Token ES256 e chave pública (JWKS)
+
+> **Em vigor desde 2026-10-26T13:45:34Z.** Medido pela borda às 14:02:47Z, sem credencial: o JWKS responde `200`
+> com a chave `kid` = `auth-es256-20261026`.
+
+Para o serviço que precisa validar o token **sem guardar o segredo compartilhado**, o login (`/up` e `/ua`) e a
+[renovação](renovar.md) devolvem também:
+
+| Campo | Tipo | Significado |
+|---|---|---|
+| `accessTokenEs256` | string | o mesmo token de acesso, com os mesmos claims, o mesmo emissor (`iss` = `YC-AuthService`), o mesmo `sub` e a mesma validade, assinado em **ES256** (ECDSA P-256) com `kid` no cabeçalho |
+
+- **Chave pública:** `GET /ua/.well-known/jwks.json`, público → `200 {"keys":[{"kty":"EC","crv":"P-256","use":"sig",
+  "alg":"ES256","kid":"…","x":"…","y":"…"}]}`. Escolha a chave pelo `kid` do cabeçalho do token.
+  **Pela borda:** `GET https://api.ycodify.com/v3/auth/ua/.well-known/jwks.json`, **sem nenhuma credencial**: nem
+  `X-Forger-Credential`, que o resto de `/v3/auth/` exige. Só `GET`.
+- **Para validar:** confira a assinatura ES256 com a chave daquele `kid`, depois `iss` = `YC-AuthService` e `exp`.
+- **O `accessToken` não muda.** É ele que vai em `Authorization` para os serviços da plataforma. O
+  `accessTokenEs256` serve só a quem valida pela chave pública.
 
 ## Diferenças entre domínios
 - **`/up`** (plataforma): valida e, se a conta estiver **pendente** (em validação), retorna `403`.
@@ -2641,16 +2716,19 @@ Cria uma organização. **Papel:** administrador.
 
 | Campo | Tipo | Obrig. | Significado |
 |---|---|---|---|
-| `name` | string | sim | Nome da org (vira o `{org}` do forger; único). |
+| `name` | string | **sim** | Nome da org (vira o `{org}` do forger). **Só letras**, **máx. 12 caracteres**. Ausente, em branco, com outro caractere ou acima de 12 → `400`. |
 | `client` | string | **sim** | **Nome da empresa cliente** que contratou a plataforma — toda organização deve sinalizar o seu. **Máx. 12 caracteres.** Ausente/em branco → `400`; acima de 12 → `400`. |
-| `alias` | string | não | Apelido legível. |
-| `email` | string | não | Contato da org. |
-| `status` | string | não | Situação (padrão `ACTIVE`). |
+| `email` | string | **sim** | Contato da org, na forma `algo@dominio`. Ausente ou fora dessa forma → `400` (`"e-mail field must be present."`). |
+| `description` | string | **sim** | Descrição da org, **máx. 256 caracteres**. Ausente, em branco ou acima de 256 → `400`. |
+| `alias` | string | **sim** | Apelido legível. **Ausente não dá `400`**: a criação falha sem tratamento ([../erros.md](../erros.md)). Mande sempre. |
 | `cardIdentifier` | string | não | Identificador de pagamento. |
+| `awsCredentials` | string | não | Credenciais de nuvem da org. |
 
-> O `owner` é definido automaticamente como o usuário autenticado (não enviar).
+> O `owner` é definido automaticamente como o usuário autenticado (não enviar). `status` é ignorado: a org
+> nasce `ACTIVE`, com o portador como seu administrador (`API_MASTER`).
 
-**Resposta:** `201`/`200` — a org criada com `id`. Erros: `400`, `403`.
+**Resposta:** `200` — o corpo enviado, acrescido de `owner` e `id`. Erros: `400` (campo acima) · `403` — o
+portador não tem `API_MASTER` · `409` — o mesmo dono já tem org com esse `name`.
 
 ## PUT /up/org
 Atualiza a organização. **Papel:** administrador **na org** (verificado pelo `name`).
@@ -2721,9 +2799,6 @@ conexão. **Remover a organização é o último passo.**
 `403` se não for administrador. Se não existir organização com esse nome **para esse dono**, a resposta
 também é `200` e nada é removido — confira `orgOwner`.
 
-> Em produção desde 2026-10-02T22:11Z. Até então esta rota respondia `403` a **qualquer** chamada,
-> inclusive do administrador da organização, e nenhuma organização era removida.
-
 <!-- ===== orgid/endpoints/up-conta.md ===== -->
 
 # orgid · `/up` · conta
@@ -2756,8 +2831,27 @@ engenheiro / analista / financeiro, e também `SKOS_MASTER` / `SKOS_ANALYST`.
 **Resposta:** `200` — conta (`id`, `username`, `name`, `email`, `status`, endereço, `accountRoleOrgs`;
 `password` = nulo); `204` se não encontrada.
 
-> A leitura por quem só tem `SKOS_*` está em produção desde 2026-10-07T17:06Z. Até então essa conta
-> recebia `403` aqui.
+**`accountRoleOrgs`** — um item por vínculo **(conta, papel, org)**. Campo nulo não vem no JSON.
+
+| Campo do item | Significado |
+|---|---|
+| `id` | id do vínculo |
+| `role` | o papel: `name` (`API_MASTER`, `API_ENGINEER`, `API_ANALYST`, `API_FINANCIAL`, `SKOS_MASTER`, `SKOS_ANALYST`), `status` |
+| `org` | a organização: `name`, `owner`, `alias`, `status` e os demais campos da org |
+| `accountStatus` | status da **conta neste vínculo**. A plataforma usa `ACTIVE`, `SUSPENDED` e `CANCELED` |
+| `orgStatus` | status da **org neste vínculo**. Usa os mesmos valores |
+
+- O item **não** tem um campo `status` próprio. O status do vínculo está em `accountStatus` e `orgStatus`.
+  `org.status` é o status da organização, e o `status` de fora é o da conta.
+- **Vínculo `SUSPENDED` ou `CANCELED` continua na lista.** A resposta só tira o item quando a **conta**
+  (`status` de fora) ou a **org** (`org.status`) está `CANCELED`. Se nenhum item sobrar, vem `204`.
+  Para o papel valer, exija `accountStatus` = `ACTIVE` e `orgStatus` = `ACTIVE`. Se a org suspensa
+  também não deve valer, exija ainda `org.status` = `ACTIVE`.
+- `accountStatus` e `orgStatus` são gravados **como o cliente os manda**, sem conferência de valor. Por isso
+  podem vir outro texto qualquer, inclusive a string `"null"`. Qualquer valor diferente de `ACTIVE` não vale.
+- O **`API_MASTER`** de quem criou a org vem nesta lista como qualquer outro papel. Ele nasce com a org,
+  com `accountStatus` e `orgStatus` = `ACTIVE`. Se a org foi criada com um papel `SKOS_*`, esse papel vem
+  num segundo item, com a mesma org.
 
 ## PUT /up/account
 Atualiza o **perfil** da própria conta (o `username` é forçado ao do token).
@@ -2785,9 +2879,6 @@ Troca a senha da própria conta.
 
 **Resposta:** `200` (sem corpo) quando trocou · `404` se a conta não existe — **a senha não foi alterada**.
 
-> ⚠️ Até 2026-09-05 esse caso era `204`, que é sucesso: o usuário recebia confirmação de uma troca que não
-> aconteceu. Ver [../erros.md](../erros.md).
-
 ## DELETE /up/account/by/jwt
 Remove a conta do portador do token. Sem parâmetros/corpo. **Resposta:** `200`.
 
@@ -2803,8 +2894,6 @@ Lista as contas de uma org. **Papéis:** administrador / engenheiro / analista (
 ## GET /up/account/by/org/{orgName}/org-owner/{orgOwner}
 Igual ao anterior, qualificando o dono. **Papéis:** administrador / engenheiro / analista (na org), e também
 `SKOS_MASTER` (na org). `SKOS_ANALYST` não lista.
-
-> A listagem por `SKOS_MASTER` está em produção desde 2026-10-07T17:06Z.
 
 | Path-var | Significado |
 |---|---|
@@ -2878,9 +2967,6 @@ Vale para **criar** o vínculo (`POST /up/account-role-org`) e para **mudar o st
 - O vínculo só entra no token com **quatro status em `ACTIVE`**: o do papel, o da organização e os dois do
   vínculo (`accountStatus` e `orgStatus`). Com qualquer um diferente ele fica de fora, e o login não acusa
   erro.
-
-> Em produção desde 2026-10-07T17:06Z. Até então, `POST /up/account-role-org` e as duas rotas de status
-> respondiam `400` a `SKOS_MASTER` e `SKOS_ANALYST`.
 
 ## POST /up/account-role-org
 Cria o vínculo conta-papel-org. **Quem chama:** token com papel `API_MASTER`, `API_ENGINEER`,
@@ -2958,10 +3044,6 @@ Substitui a **conta administradora** do vínculo. **Papel:** administrador na or
 `replace-account`.
 
 **Resposta:** `200` quando substituiu · `404` — `"… não existe: a conta master não foi substituída."`
-
-> ⚠️ Até 2026-09-05 estes três `replace-*` respondiam **`204`** quando o vínculo, a conta ou a org não
-> existia. `204` é sucesso sem corpo: **trocar a conta administradora de uma organização virava no-op
-> silencioso**. Ver [../erros.md](../erros.md).
 
 ## PUT /up/account-role-org/replace-role
 Substitui o **papel** do vínculo. **Papel:** administrador na org.
@@ -3101,9 +3183,7 @@ O `status` do corpo é **ignorado**: a conta mantém o que tem no cadastro.
 
 **Resposta:** `200` (sem corpo) quando gravou · `404` — `"account not found: nothing was updated."`
 
-> ⚠️ **O titular não troca o próprio status**, em produção desde 2026-09-26 (ver [CHANGELOG 1.66](../../CHANGELOG.md)).
-> Antes, `status` no corpo era gravado, e a **ausência** dele gravava `ACTIVE`: qualquer
-> edição de perfil reativava conta `SUSPENDED` e ativava conta `PENDING` sem confirmação.
+> ⚠️ **O titular não troca o próprio status.**
 
 ## PUT /ua/account/password
 Troca a senha (`username` forçado ao do token). **Auth:** token válido.
@@ -3117,9 +3197,6 @@ Troca a senha (`username` forçado ao do token). **Auth:** token válido.
 
 **Resposta:** `200` (sem corpo) quando trocou · `400` se a senha nova não tem formato adequado · `403` se
 a `oldPassword` não confere · `404` — `"account not found: the password was not changed."`
-
-> ⚠️ Até 2026-09-05 a conta inexistente respondia **`204`**, que é sucesso: o usuário recebia confirmação e
-> a senha não mudava. Se você ainda vir `204` aqui, está falando com uma versão antiga do orgid.
 
 ## GET /ua/account/by/username/{username}/role-owner/{roleOwner}/authority
 Lê uma conta no escopo de um dono de papel. **Papéis:** administrador / engenheiro (no `roleOwner`).
@@ -3159,7 +3236,9 @@ Lista todas as contas sob um dono de papel. **Papéis:** administrador / engenhe
 > Guia: [../README.md](../README.md).
 >
 > **Comum:** `Authorization` obrigatório (exceto a listagem pública); POST/PUT enviam
-> `Content-Type: application/json`. **Papéis aceitos:** administrador / engenheiro (no `owner` do papel).
+> `Content-Type: application/json`. **Papéis aceitos:** administrador / engenheiro (no `owner` do papel). É o
+> papel **de plataforma** (`API_MASTER` / `API_ENGINEER`) na organização cujo nome é o `owner`, que o token
+> carrega no claim `orgs` como `<owner>/API_MASTER`. **Não** é um papel `/ua`.
 > Erros: [../erros.md](../erros.md).
 
 ## Contents
@@ -3203,10 +3282,6 @@ Atualiza um papel.
 **Resposta:** `200` (sem corpo) quando gravou · `400` se faltar o `id` · `404` se o papel não existe
 ou pertence a outro `owner`.
 
-> Até 2026-09-05 um `PUT` sem `id` respondia **`204`** e não gravava nada. `204` é família 2xx —
-> sucesso sem corpo —, então a mensagem de erro sumia no protocolo e o chamador seguia achando que
-> tinha configurado. Se você vir `204` aqui, está falando com uma versão antiga do orgid.
-
 ## GET /ua/role/by/name/{roleName}/owner/{roleOwner}
 Lê um papel.
 
@@ -3232,10 +3307,10 @@ Lista os papéis de um dono.
 > ⚠️ **É o único público do orgid que NÃO começa por `/open/`** — os segmentos estão invertidos
 > (`/ua/open/…` em vez de `/open/ua/…`). Isso não é cosmético: as regras de autorização da plataforma são
 > escritas sobre o prefixo `/open/**`, e **este path escapa delas** e cai na regra de autenticado. No
-> config de segurança do orgid standalone continua assim — liberados só `/open/**`, `/z/**`, um terceiro
+> config de segurança do orgid standalone ficam liberados só `/open/**`, `/z/**`, um terceiro
 > padrão interno (⚠️ **MASCARADO** como `/*/<rota-livre-interna>/**`: o literal não é este; o que importa é
 > que **existe** um terceiro, além dos dois acima), swagger e actuator —, então **o orgid sozinho responde
-> `401` aqui, apesar do "público" acima**. O que está implantado é o `composer`, que desde 2026-09-05 libera os **dois**
+> `401` aqui, apesar do "público" acima**. O que está implantado é o `composer`, que libera os **dois**
 > prefixos e faz o endpoint honrar o contrato documentado.
 >
 > Ao escrever gateway, proxy ou nova cadeia de segurança: **público no orgid = dois prefixos**,
@@ -3260,10 +3335,6 @@ Remove um papel.
 **Resposta:** `200` (sem corpo) quando removeu · `404` — `"O papel informado não existe: nada foi
 removido."`
 
-> ⚠️ Até 2026-09-05 este `DELETE` respondia **`204`** quando o papel não existia. Num `DELETE`, `204` é o
-> código **canônico de sucesso** — a leitura era a oposta da correta, e a remoção que não aconteceu passava
-> por feita. Ver [../erros.md](../erros.md).
-
 <!-- ===== orgid/endpoints/ua-associacao.md ===== -->
 
 # orgid · `/ua` · associação conta-papel
@@ -3272,12 +3343,17 @@ removido."`
 > [ua-papel.md](ua-papel.md)). Guia: [../README.md](../README.md).
 >
 > **Comum:** `Authorization` obrigatório; POST/PUT enviam `Content-Type: application/json`. **Papéis
-> aceitos:** administrador / engenheiro (no `owner` do papel). Erros: [../erros.md](../erros.md).
+> aceitos:** administrador / engenheiro (no `owner` do papel). É o papel **de plataforma** (`API_MASTER` /
+> `API_ENGINEER`) na organização cujo nome é o `owner` do papel, e o token o carrega no claim `orgs` como
+> `<owner>/API_MASTER`. **Não** é um papel `/ua`. Erros: [../erros.md](../erros.md).
+>
+> **A conta `/ua` não pertence a organização nenhuma.** Ela se liga a um dono só pelo papel associado.
 >
 > **Forma do vínculo no corpo** (recorrente abaixo): `account` `{username}`, `role` `{name, owner}`.
 
 ## Contents
 - POST /ua/account-role/using/authority — associar papel a conta(s)
+- POST /ua/account-role/new-account/using/authority — criar conta já com papel
 - PUT /ua/account-role/role-owner/{roleOwner}/using/authority — atualizar associações
 - PUT /ua/account-role/status/using/authority — alterar status da associação
 - DELETE /ua/account/by/username/{username}/role-name/{roleName}/role-owner/{roleOwner}/using/authority — desassociar
@@ -3316,8 +3392,32 @@ a associação **não foi criada** (`"account not found: the account-role associ
 `"role not found: …"`); corpo incompleto ou contexto que impede montar a associação → `510` (falha não
 tratada — ver [../erros.md](../erros.md)).
 
-> ⚠️ Até 2026-09-05 esse caso era **`204`**, que é sucesso sem corpo: a associação não era criada e o
-> chamador não tinha como saber.
+## POST /ua/account-role/new-account/using/authority
+Cria uma conta `/ua` e já a associa a um papel do dono, numa operação só. O papel pode ser **não público**.
+**Papel:** só **administrador** (`API_MASTER`) no `owner` do papel; engenheiro recebe `403`.
+
+**Corpo** (JSON):
+
+| Campo | Tipo | Obrig. | Significado |
+|---|---|---|---|
+| `account.username` | string | sim | Login. |
+| `account.password` | string | sim | Senha, com as mesmas regras do [registro público](publico.md). |
+| `account.email` | string | sim | E-mail. |
+| `account.*` | — | não | Demais campos da conta externa (ver [ua-conta.md](ua-conta.md)). `account.status` é ignorado. |
+| `role.name` | string | sim | Papel a associar. Tem de **existir**; pode ser público ou não. |
+| `role.owner` | string | sim | Dono (espaço de nomes) do papel. O portador precisa de `API_MASTER` nele. |
+
+```json
+{ "account": { "username": "scriber", "password": "…", "email": "scriber@acme.com" },
+  "role": { "name": "ADMIN", "owner": "acme" } }
+```
+
+A conta nasce **`ACTIVE`**. Nada é enviado por e-mail.
+
+**Resposta:** `201` — `{ "id": <number> }` (id da conta) · `400` — corpo sem `account`, sem `role` ou sem
+`role.owner`, ou campo da conta inválido · `403` — o portador não tem `API_MASTER` no `owner` do papel · `404` —
+`"role not found: the account was not created."` · `409` se o `username` já existe. Em toda recusa, **nada**
+é gravado: nem conta, nem vínculo.
 
 ## PUT /ua/account-role/role-owner/{roleOwner}/using/authority
 Atualiza associações em lote para um dono de papel.
@@ -3369,8 +3469,8 @@ Desassocia um papel de uma conta.
 > ⚠️ **O prefixo `/open/` não é o inventário completo dos públicos.** Existe **um** público fora dele —
 > `GET /ua/open/role/owner/{roleOwner}`, com os segmentos invertidos (ver [ua-papel.md](ua-papel.md)).
 > Quem deriva regra de autorização do prefixo `/open/**` **deixa esse de fora** e ele passa a exigir token
-> apesar de público. É o estado do `OrgIdSecurityConfig` do orgid standalone até hoje; o `composer`, que é
-> o que está implantado, libera os dois prefixos desde 2026-09-05.
+> apesar de público. O `OrgIdSecurityConfig` do orgid standalone faz isso; o `composer`, que é o que está
+> implantado, libera os dois prefixos.
 
 ## Contents
 - GET /open/up/account/by/username/{username}/exists
@@ -3427,9 +3527,6 @@ Cria a **conta** (estado inicial **pendente**) **e** a **organização**, vincul
 `400` — `"Papel desconhecido ou não autorizado."` se `role` vier com outro nome (inclusive os `API_*`): **nada
 é criado**, nem a conta, nem a organização.
 
-> O campo `role` está em produção desde 2026-10-07T17:06Z. Até então ele era ignorado: a conta era criada
-> só como administradora, **sem** o papel pedido e sem erro.
-
 ## POST /open/ua/account-role — registro (externo): conta + papel
 Cria uma conta **externa** e a associa a um **papel**.
 
@@ -3448,14 +3545,11 @@ Cria uma conta **externa** e a associa a um **papel**.
 **Resposta:** `200` (sem corpo) · `404` — `"role not found: the account was not created."` · `403` —
 `"role is not public: the account was not created."` · `409` se o `username` já existe.
 
-> ⚠️ **Só papel público**, em produção desde 2026-09-26 (ver [CHANGELOG 1.58](../../CHANGELOG.md)). Antes, a rota
-> aceitava **qualquer** papel existente, inclusive administrativo: quem não tinha credencial nenhuma criava
-> conta nova já com esse papel. Papel que o próprio usuário não pode escolher se associa pelo caminho
-> autenticado, `POST /ua/account-role/using/authority` ([ua-associacao.md](ua-associacao.md)).
+> ⚠️ **Só papel público.** Papel que o próprio usuário não pode escolher fica com o administrador do dono do
+> papel: `POST /ua/account-role/new-account/using/authority` cria a conta já com ele, e
+> `POST /ua/account-role/using/authority` o associa a uma conta que já existe ([ua-associacao.md](ua-associacao.md)).
 
 ### Captcha e aceite no autocadastro
-
-> **Em vigor desde 2026-10-16T21:06:53Z.**
 
 | Campo novo | Tipo | Quando |
 |---|---|---|
@@ -3482,8 +3576,6 @@ Solicita um **hash** de vida curta (enviado ao usuário por e-mail) para `{actio
 and no e-mail was sent."`
 
 ### Só em `/ua`: link no domínio da empresa e um e-mail a cada 5 min
-
-> **Em produção desde 2026-10-16T17:21:35Z.** Ainda não foi medido em produção o envio real do e-mail com o link.
 
 | Query | Significado |
 |---|---|
@@ -3519,14 +3611,9 @@ Executa a ação do hash.
 **Resposta:** `200` (sem corpo) — em `R`, ativa a conta; em `PR`, troca a senha · `404` —
 `"account not found: the hash action was not executed."`
 
-> ⚠️ **Em `/ua`, `R` só ativa conta `PENDING`**, em produção desde 2026-09-26 (ver [CHANGELOG 1.66](../../CHANGELOG.md)).
-> Conta já `ACTIVE` responde `200` sem gravar nada; conta `SUSPENDED` responde `403`
-> (`"account is not pending: registration was not confirmed."`). Antes, `R` punha qualquer conta não
-> cancelada em `ACTIVE`: uma conta suspensa voltava a valer pelo próprio e-mail. **Em `/up` nada mudou.**
-
-> ⚠️ Até 2026-09-05 a conta inexistente respondia **`204`** nos dois endpoints acima. `204` é sucesso sem
-> corpo: em `PR`, o usuário recebia confirmação de uma troca de senha que nunca aconteceu. Ver
-> [../erros.md](../erros.md).
+> ⚠️ **Em `/ua`, `R` só ativa conta `PENDING`.** Conta já `ACTIVE` responde `200` sem gravar nada; conta
+> `SUSPENDED` responde `403` (`"account is not pending: registration was not confirmed."`). **Em `/up` esta
+> restrição não vale.**
 
 ## POST /open/ua/account/e-mail/send — enviar e-mail (externo)
 Envia uma notificação por e-mail.
@@ -3549,9 +3636,8 @@ Envia uma notificação por e-mail.
 > termos de acesso e política de privacidade. A casca a acha pelo **domínio** por onde o navegador chegou,
 > antes do login. Guia: [../README.md](../README.md). Erros: [../erros.md](../erros.md).
 >
-> **Em produção desde 2026-10-16T14:34:24Z.** Pela borda, as rotas de leitura chegam ao orgid: `GET
-> /open/application` responde `404` a domínio não verificado, e `GET /ua/application/{org}` sem token responde
-> `401`. Ainda não foi medido em produção publicar um manifesto e provar um domínio pelo TXT.
+> Pela borda, `GET /open/application` responde `404` a domínio não verificado, e `GET /ua/application/{org}` sem
+> token responde `401`.
 
 ## Contents
 - Quem publica e quem lê
@@ -3692,8 +3778,6 @@ publicou manifesto · `400` sem `domain` ou com host inválido.
 
 Mesmo corpo da leitura por domínio, para o usuário já logado (troca de org). `403` se `{org}` não está
 entre as orgs do token · `404` sem manifesto.
-
-> **O que segue está em vigor desde 2026-10-16T21:06:53Z.**
 
 O corpo ganha `aceitePendente: {"termos": <versão>|null, "privacidade": <versão>|null}` — a versão vigente que a
 conta do token **ainda não aceitou** nesta org (`null` = nada pendente). A casca mostra o texto e só entra na org
@@ -3935,10 +4019,11 @@ No próximo login de bob, o token traz `acme/SKOS_ANALYST` no claim `orgs` enqua
 | Executar comando | `POST /a/{boundedContext}/{aggregateType}` | [endpoints/comando.md](endpoints/comando.md) |
 | Ler estado do agregado | `GET /a/{boundedContext}/{aggregateType}/{id}` | [endpoints/agregado-leitura.md](endpoints/agregado-leitura.md) |
 | Ler histórico de eventos | `GET /a/{boundedContext}/{aggregateType}/{id}/history` | [endpoints/agregado-leitura.md](endpoints/agregado-leitura.md) |
-| Escrever/remover linha de entidade | `POST /e` | [endpoints/entidade.md](endpoints/entidade.md) |
 | Remover linhas por predicado | `POST /e/by` | [endpoints/remocao-por-predicado.md](endpoints/remocao-por-predicado.md) |
-| Escrever projeção (mesma rota `/e`) | `POST /e` | [endpoints/projecao.md](endpoints/projecao.md) |
 | Consultar logs do serviço | `GET /logs/service/{service}/query/…` | [endpoints/logs.md](endpoints/logs.md) |
+
+Não há rota de escrita direta de linha: `POST /e` não existe ([entidade](endpoints/entidade.md),
+[projeção](endpoints/projecao.md)). Registro do domínio se escreve por [comando](endpoints/comando.md).
 
 Gramática do modelo de domínio: **[spec/model-format.md](spec/model-format.md)** (estrutura do
 `.model.json`: agregado, comando, evento, tipos). Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md).
@@ -3976,6 +4061,10 @@ A atualização da **projeção** acontece **depois**, de forma assíncrona, pel
     pretendido ao fim da execução (`endState`).
   - Se o `status` enviado divergir do estado real (outro comando avançou antes), a operação é rejeitada
     (`510`) e deve ser **reenviada** sobre o estado atualizado.
+- **Comando condicional pela versão (opcional):** o `status` não distingue duas passagens pelo mesmo
+  estado (`a → b → a`). Quem precisa disso manda `_expectedVersion` = a `_version` lida em
+  `GET /a/{bc}/{tipo}/{id}`; versão diferente → `510`. Sem o campo, nada muda. Ver
+  [endpoints/comando.md § Comando condicional pela versão](endpoints/comando.md#comando-condicional-pela-versão).
 
 ## Regras de payload (checklist)
 
@@ -4101,6 +4190,30 @@ tenant (ver [forger/model](../../forger/endpoints/model.md) e [examples/](../../
 > `510` (alguém avançou o agregado antes; reenvie sobre o estado atualizado). Ver
 > [README — regra do status](../README.md#estados-transições-e-concorrência).
 
+### Comando condicional pela versão
+
+O `status` não distingue duas vezes o mesmo estado: num ciclo `a → b → a`, um comando atrasado que leu o
+primeiro `a` passa. Para isso há o campo **opcional `_expectedVersion`**, com a versão que o cliente leu,
+que é a `_version` da [leitura do agregado](agregado-leitura.md#estado-atual):
+
+```json
+{ "<nomeDoComando>": { "id": "<uuid>", "status": "a", "_expectedVersion": 7, "...": "..." } }
+```
+
+| `_expectedVersion` | O que acontece |
+|---|---|
+| ausente | nada muda — é o comportamento de quem não manda o campo |
+| igual à versão atual | o comando segue |
+| diferente | `510`, com as duas versões na mensagem, **antes** da regra de negócio |
+| não é inteiro ≥ 0 | `400` |
+
+- Na criação a versão atual é `0`.
+- O campo **não** entra no evento nem no `data` da regra de negócio.
+- Se o modelo declarar um atributo chamado `_expectedVersion`, o campo é do modelo e o condicional não se
+  liga. Um atributo `version` continua sendo atributo.
+- Dois comandos que leram a **mesma** versão passam os dois nesta checagem, e o segundo a gravar recebe
+  `510` da concorrência otimista do event store.
+
 ## Resposta
 
 `200`:
@@ -4120,23 +4233,22 @@ A ordem real, que importa para entender o que já rodou quando um erro chega:
 2. **carga do estado** do agregado;
 3. **autorização por papel** (`command.<cmd>.roles`) — **antes** da regra de negócio. Quem não tem o
    papel recebe `403` **sem** o processor do br-service ter sido executado;
-4. **regra/coordenação no br-service**, se o modelo declarar;
-5. **validação da transição** (`fromState` contra o `status` enviado);
-6. **gravação do evento**, que notifica o es-n;
-7. resposta.
+4. **versão esperada** (`_expectedVersion`), se o comando a trouxer — estado velho é `510` **sem** o
+   processor ter sido executado;
+5. **regra/coordenação no br-service**, se o modelo declarar;
+6. **validação da transição** (`fromState` contra o `status` enviado);
+7. **gravação do evento**, que notifica o es-n;
+8. resposta.
 
 > **Onde as datas são normalizadas:** na leitura do corpo, antes do passo 1 — por isso uma data inválida
-> é recusada sem carregar estado nenhum —, e **de novo depois do passo 4**, porque a regra de negócio pode
+> é recusada sem carregar estado nenhum —, e **de novo depois do passo 5**, porque a regra de negócio pode
 > devolver datas que substituem as do corpo.
 
-> A ordem entre 3 e 4 mudou em 2026-09-05. Antes o br-service rodava primeiro e a checagem de papel vinha
-> depois — quem não tinha o papel fazia a regra executar inteira e recebia as mensagens dela de volta.
-> Se você depende de ver a mensagem do processor para diagnosticar permissão, esse caminho não existe
-> mais: sem papel, o `403` vem antes.
+> Sem papel, o `403` vem antes da regra: a mensagem do processor não serve para diagnosticar permissão.
 
 > **Não existe validação do estado de destino (`endState`).** Versões anteriores desta página descreviam
 > um passo que compararia o estado resultante com o `endState` do modelo; ele não existe no serviço. O
-> que é verificado é a **origem** (`fromState`), no passo 5.
+> que é verificado é a **origem** (`fromState`), no passo 6.
 
 ### `null` explícito, chave omitida e o que o processor devolve
 
@@ -4156,27 +4268,17 @@ São três regras diferentes, e confundi-las é o engano comum:
   veio no corpo. Detalhe em [br-service](../../br-service/README.md).
 - Dentro de `valueObject` o `null` segue como `null` do JSON, sem mudança.
 
-> ⚠️ **Até o conserto de 2026-09-25** (ufrn.loco3 `66b1313`, persistence-crs `4f61f82`), o `null`
-> explícito divergia: na criação, um `null` em atributo numérico fazia a linha **não materializar** na
-> projeção, e em texto gravava a string `"null"`; na transição, a projeção **preservava** o valor
-> anterior enquanto o agregado gravava `null`. Tudo com `200`. Linha com `"null"` em texto gravada antes
-> disso continua lá: é dado, e não se corrige sozinha.
-
 **`""` em `Date` ou `Timestamp` não é data.** Em atributo opcional ele é tratado como `null`; em atributo
 `nullable: false` é `400`, com o nome do campo. Vale também para campo de `valueObject` em grupo e para o
 que o processor do br devolver. Em `String`, `""` continua sendo `""`.
-
-> ⚠️ **Até o conserto de 2026-09-25** (yc.cqrs-c `c111bf8`), `""` em data respondia `200`, e o agregado
-> gravava `""`. Já a projeção falhava ao gravar: na criação a linha não materializava, e na transição
-> ficava o valor anterior.
 
 ## Erros
 
 | Código | Quando |
 |---|---|
-| `400` | `valueObject` na forma errada (a causa mais comum) · **data em forma irreconhecível** — a mensagem nomeia o campo, inclusive `grupo.campo` |
+| `400` | `valueObject` na forma errada (a causa mais comum) · **data em forma irreconhecível** — a mensagem nomeia o campo, inclusive `grupo.campo` · `_expectedVersion` que não é inteiro ≥ 0 |
 | `403` | tenant não autorizado, **ou** usuário sem o papel exigido pelo comando |
-| `510` | falha de transição (`fromState` não casa o `status` enviado) **e o resto**: corpo malformado, agregado ou comando desconhecido, `id` ausente num comando de transição |
+| `510` | falha de transição (`fromState` não casa o `status` enviado) · **`_expectedVersion` diferente da versão atual** **e o resto**: corpo malformado, agregado ou comando desconhecido, `id` ausente num comando de transição |
 
 ⚠️ **`510` não significa "erro do servidor" aqui.** Boa parte dos erros de payload cai nele — corpo
 malformado, nome de comando inexistente, `id` faltando. Antes de suspeitar de indisponibilidade, leia a
@@ -4198,8 +4300,18 @@ Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`.
 
 `GET /a/{boundedContext}/{aggregateType}/{id}`
 
-- `200` — estado atual do agregado (JSON), reconstituído a partir dos seus eventos.
+- `200` — estado atual do agregado (JSON), reconstituído a partir dos seus eventos, mais a chave
+  **`_version`**: a versão do agregado, que é o número do último evento dele. Com o
+  [snapshot](../spec/model-format.md#snapshot-do-agregado-snapshot) ligado no modelo, parte do último retrato e
+  aplica só os eventos posteriores.
 - `204` — agregado não encontrado.
+
+**`_version` não é dado do agregado.** Ela não vem do modelo, não está no evento nem na projeção, e não
+conta para o `204` do recorte por coluna. Serve para o **comando condicional**: devolvida em
+`_expectedVersion`, faz o comando ser recusado se o agregado mudou desde esta leitura (ver
+[comando § Comando condicional pela versão](comando.md#comando-condicional-pela-versão)). Os dois nomes são
+diferentes de propósito: devolver o corpo desta leitura como payload do comando **não** liga o
+condicional.
 
 **Datas no estado:** `Timestamp` vem como `"2026-09-15T09:00:00"` — **UTC, sem fuso** — e `Date` como
 `"1990-04-02"`. Inclusive o carimbo automático de cada evento (o `whenAttribute`, como `criadaem`):
@@ -4214,15 +4326,11 @@ Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`.
 no horário de Brasília, a conversão é do front (exemplo em
 [persistence-q § Resposta](../../persistence-q/endpoints/consulta.md#resposta)).
 
-> Antes de `yc-interpreter:amd64-260913c` — em teste desde essa imagem, **produção ainda não** —, este
-> endpoint devolvia a data **como o cliente a
-> mandou** — com fuso, fração ou espaço — e o carimbo automático com espaço (`2026-09-13 20:19:09`).
-
 ## Histórico de eventos
 
 `GET /a/{boundedContext}/{aggregateType}/{id}/history`
 
-- `200` — lista (array) dos eventos do agregado, em ordem.
+- `200` — lista (array) dos eventos do agregado, em ordem: **todos**, sem paginação, com ou sem snapshot.
 - `204` — sem eventos.
 
 Cada evento traz **quem o executou**. Evento sem identidade registrada — o caso de um agregado escrito por
@@ -4273,7 +4381,7 @@ GET /a/{bc}/{type}/{id}   ou   GET .../{id}/history
 > registro, então responde igual para um `{id}` que existe e um que não existe — não revela existência. Já
 > o recorte por proprietário responde `204`, de propósito: ali um `403` entregaria a existência do agregado
 > a quem não é o titular. Ao depurar um `204` inesperado, verifique o recorte do modelo antes de procurar o
-> dado. *(Até 2026-10-01 o papel fora de `roles.read` também respondia `204`.)*
+> dado.
 
 **`loguser` aparece nas duas respostas** — no estado e em cada evento — com o `username` de quem executou
 aquele comando: [model-format — `loguser`](../spec/model-format.md#loguser-quem-executou-cada-comando).
@@ -4290,126 +4398,31 @@ aquele comando: [model-format — `loguser`](../spec/model-format.md#loguser-que
 
 <!-- ===== persistence-crs/endpoints/entidade.md ===== -->
 
-# persistence-crs · endpoints · entidade (CRUD convencional)
+# persistence-crs · endpoints · entidade (escrita direta de linha)
 
-> CRUD **direto** de linhas numa **entidade convencional** — uma tabela do domínio que **não** é
-> projeção de um agregado event-sourced. Escreve/atualiza/remove o registro em uma chamada, sem comando
-> nem evento. Para agregados (event-sourced), use [comando](comando.md); para consultar, use
-> [persistence-q](../../persistence-q/README.md).
-> Pré-requisitos: [conceitos](../../02-conceitos.md), [autenticação](../../06-autenticacao.md),
-> a entity precisa existir no esquema do tenant ([forger/entity](../../forger/endpoints/entity.md)).
-> Guia: [../README.md](../README.md).
+> **Não há rota para escrever uma linha diretamente.** `POST /e` (via gateway, `POST /v3/persistence/c/e` e
+> `POST /v3/persistence/t/c/e`) não existe e responde `404`. Guia: [../README.md](../README.md).
 
-> **URL externa — o segmento `t` escolhe o ambiente.** `POST /e` é o path **downstream**; via gateway:
-> **produção** `POST /v3/persistence/c/e` · **teste** `POST /v3/persistence/t/c/e`. Ver
-> [autenticação](../../06-autenticacao.md).
+## O que usar no lugar
 
-## Quando usar
+| Você quer… | Use |
+|---|---|
+| criar, alterar ou encerrar um registro do domínio | [comando](comando.md) no agregado: gera o evento, passa pelo RBAC de comando e pelo processor `br`, e a projeção é escrita a partir do evento |
+| remover as linhas que casam um critério | [remoção por predicado](remocao-por-predicado.md) (`POST /e/by`) |
+| ler linhas | [persistence-q — consulta](../../persistence-q/endpoints/consulta.md) |
 
-Duas formas de escrever no domínio:
-
-| Você quer… | Use | Como identifica a linha |
-|---|---|---|
-| Gravar um **agregado** (máquina de estados, histórico de eventos) | `POST /a/...` ([comando](comando.md)) | `aggregateid` (UUID) |
-| Gravar uma **entidade convencional** (tabela simples, sem event-sourcing) | `POST /e` (este doc) | `id` (chave primária) |
-
-Uma **entidade convencional** é modelada como qualquer entity ([forger/entity](../../forger/endpoints/entity.md)),
-porém **sem** as colunas de projeção de agregado (`aggregateid`, `status`, os `whenAttribute` de evento) —
-elas só são obrigatórias quando a entity **é** projeção de um agregado.
-
-> **⚠️ `/e` não recusa nada — nem projeção de agregado, nem linha de outra pessoa.** O controle de
-> acesso do `/e` é inteiro: (a) o token pertence ao tenant; (b) o papel do usuário está na lista
-> `_conf.accessControl.write` da entity. **Não há escopo por linha:** a checagem pergunta apenas *"este
-> usuário tem papel que escreve nesta tabela?"*, nunca *"esta linha é dele?"* — o `id` da linha alvo não
-> chega à função que autoriza. Quem tem o papel escreve em **qualquer** linha, inclusive na de outro
-> usuário do mesmo papel.
->
-> O `/e` **não é comando**: não consulta `command.roles` e **não chama o processor `br`** — onde vivem as
-> regras de escopo de dono ("só o titular altera seu registro"). Numa entity que **é** projeção de
-> agregado soma-se o dano ao event sourcing: a linha muda **sem evento**, projeção e log de eventos
-> divergem em silêncio, e um replay desfaz a alteração sem aviso.
->
-> Consequência prática: `/e` é escrita administrativa. Exponha-o só a quem você exporia o banco — a
-> plataforma não tem como distinguir o uso legítimo do abusivo. Ver [escrita de projeção](projecao.md).
-
-## Requisição
-
-`POST /e`
-
-Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`; `Content-Type: application/json`.
-
-> ⚠️ Os blocos abaixo são **ilustrativos**: `<...>` são placeholders, não JSON literal pronto para envio.
-
-Corpo (operação única) — `data` é **sempre um array** de linhas:
-
-```json
-{ "action": "CREATE | UPDATE | DELETE", "data": [ { "<atributo>": "<valor>" } ] }
-```
-
-Corpo (lote) — um **array** de operações no formato acima, aplicadas na ordem:
-
-```json
-[
-  { "action": "CREATE", "data": [ { "<atributo>": "<valor>" } ] },
-  { "action": "UPDATE", "data": [ { "id": "<pk>", "<atributo>": "<novo valor>" } ] },
-  { "action": "DELETE", "data": [ { "id": "<pk>" } ] }
-]
-```
-
-## Operações
-
-O verbo é escolhido pelo campo `action` (não pelo método HTTP — sempre `POST`):
-
-- **CREATE** — insere as linhas de `data`. A chave primária **`id`** é **gerada pela plataforma**
-  (omita-a). Devolve as linhas criadas com o `id` preenchido.
-- **UPDATE** — atualiza as linhas; cada objeto de `data` **deve conter `id`** (a linha a alterar) mais
-  os atributos a mudar.
-- **DELETE** — remove as linhas; cada objeto de `data` identifica a linha por **`id`**.
-
-> **Controle de acesso.** `_conf.accessControl` é uma lista de **papéis** por operação (`read`, `write`).
-> Autoriza a **entidade inteira**, não a linha: basta um papel do usuário constar da lista para que ele
-> escreva em qualquer registro da tabela. Não existe forma de expressar "só a própria linha" no
-> `accessControl` — regra de dono só existe em processor `br`, que o `/e` não executa. Ver
-> [forger/entity](../../forger/endpoints/entity.md).
-
-## Respostas
-
-| Ação | Sucesso | Corpo |
-|---|---|---|
-| `CREATE` | `201` | linhas criadas, com `id` gerado |
-| `UPDATE` | `200` | vazio |
-| `DELETE` | `200` | vazio |
-| lote (array) | `200` | vazio |
-
-Ação desconhecida → `400`. Falha de aplicação → `510`.
-
-## Comportamento
-
-A operação é aplicada **diretamente** à tabela da entity no banco do tenant, na requisição — **sem**
-comando, **sem** evento e **sem** validação de transição de estado. Não há reconstituição de agregado:
-é escrita de estado (linha), identificada pela chave primária `id`.
-
-## Ler (R)
-
-A leitura **não** é feita por `/e`. Para ler entidades (por chave, por critério, paginado), use
-[persistence-q — consulta](../../persistence-q/endpoints/consulta.md).
-
-## Erros
-
-`400` (ação/corpo inválido; identificador ausente), `403` (tenant não autorizado), `510` (falha de
-aplicação — ex.: violação de restrição, dado inconsistente; categoria **Aplicação de projeção**).
-Catálogo: [../erros.md](../erros.md).
+A linha de uma projeção é escrita só pelo caminho interno do serviço, a partir do evento despachado pelo
+[es-n](../../es-n/README.md). Ver [escrita de projeção](projecao.md).
 
 <!-- ===== persistence-crs/endpoints/remocao-por-predicado.md ===== -->
 
 # persistence-crs · endpoints · remoção por predicado
 
-> Remove **N linhas** de uma entidade pelo critério que você informar — não pela chave primária. Rota
-> própria, separada do [`/e`](entidade.md), porque o risco é outro: aqui um filtro errado alcança muitas
-> linhas de uma vez. Por isso a rota **conta antes**, exige um teto e, por padrão, **não apaga na primeira
-> chamada**.
+> Remove **N linhas** de uma entidade pelo critério que você informar — não pela chave primária. Aqui
+> um filtro errado alcança muitas linhas de uma vez. Por isso a rota **conta antes**, exige um teto e, por
+> padrão, **não apaga na primeira chamada**.
 > Pré-requisitos: [conceitos](../../02-conceitos.md), [autenticação](../../06-autenticacao.md).
-> Guia: [../README.md](../README.md). Para apagar **uma** linha por `id`, use [entidade](entidade.md).
+> Guia: [../README.md](../README.md). Não há rota de escrita direta de linha ([entidade](entidade.md)).
 
 > **URL externa.** `POST /e/by` é o path downstream; via gateway: **produção**
 > `POST /v3/persistence/c/e/by` · **teste** `POST /v3/persistence/t/c/e/by`.
@@ -4418,10 +4431,10 @@ Catálogo: [../erros.md](../erros.md).
 
 | Você quer… | Use |
 |---|---|
-| apagar **uma** linha, que você identifica por `id` | `POST /e` com `action: DELETE` ([entidade](entidade.md)) |
+| encerrar um registro do domínio | o [comando](comando.md) do agregado |
 | apagar **as linhas que casam um critério** | `POST /e/by` (este doc) |
 
-⚠️ Vale aqui a mesma advertência de [entidade](entidade.md): esta rota **não é comando**. Não passa pelo
+⚠️ Esta rota **não é comando**. Não passa pelo
 RBAC de comando nem pelo processor `br`, e a projeção de um agregado escrita por aqui fica fora do log de
 eventos.
 
@@ -4447,7 +4460,7 @@ Cabeçalhos: `Authorization` + `X-Tenant-Id`; `Content-Type: application/json`.
 |---|---|---|
 | `entity` | **sim** | a entidade cujas linhas serão removidas |
 | `where` | **sim**, e **não pode ser vazio** | o critério. Mesmos operadores da [consulta](../../persistence-q/query-controls.md) |
-| `_connective` | **sim** | `AND` ou `OR` — como os critérios se combinam. **Explícito de propósito**: no `/e` o `AND` é implícito e inverte o resultado de quem esperava `OR` |
+| `_connective` | **sim** | `AND` ou `OR` — como os critérios se combinam. **Explícito de propósito**: um `AND` implícito inverte o resultado de quem esperava `OR` |
 | `_maxRows` | **sim**, `> 0` | quantas linhas você **aceita** apagar. Se o filtro casar mais que isso, a resposta é `409` e **nada é apagado** |
 | `_dryRun` | não — **default `true`** | `true` conta e mostra, sem apagar. Para apagar, mande `false` |
 
@@ -4476,7 +4489,7 @@ Cabeçalhos: `Authorization` + `X-Tenant-Id`; `Content-Type: application/json`.
 
 ## Autorização — leia antes de expor esta rota
 
-A mesma do [`/e`](entidade.md): pertencer ao tenant **e** ter papel em `_conf.accessControl.write` da
+Pertencer ao tenant **e** ter papel em `_conf.accessControl.write` da
 entity. **Não há escopo por linha** — a checagem olha o papel de quem chama e nunca a linha alvo, então
 quem pode apagar uma linha pode apagar as de todas as pessoas. Regra de dono ("só o titular mexe no seu
 registro") vive em processor `br`, e esta rota não o executa.
@@ -4486,7 +4499,8 @@ Trate `POST /e/by` como operação administrativa: exponha-a a quem você expori
 ## Erros
 
 `400` (corpo inválido; `where` vazio; `_connective` ausente ou diferente de `AND`/`OR`; `_maxRows`
-ausente ou `<= 0`; critério que não monta filtro; entidade não relacional), `403` (tenant),
+ausente ou `<= 0`; critério que não monta filtro; valor fora da forma em atributo numérico ou booleano;
+entidade não relacional), `403` (tenant),
 `409` (teto excedido — nada apagado), `510` (falha de aplicação).
 Catálogo: [../erros.md](../erros.md).
 
@@ -4494,55 +4508,20 @@ Catálogo: [../erros.md](../erros.md).
 
 # persistence-crs · endpoints · escrita de projeção
 
-> Escrita direta numa **projeção** (criar/atualizar/remover linhas no banco de leitura). Guia:
+> **Não há rota externa para escrever numa projeção.** `POST /e` não existe e responde `404`. Guia:
 > [../README.md](../README.md).
->
-> **⚠️ Esta rota NÃO é o caminho do fluxo por evento.** No fluxo normal (es-n → projeção, CP-5) a linha é
-> gravada por um caminho **interno ao serviço**, que não passa por esta rota nem por requisição externa
-> alguma — e, por ser interno, não usa a autorização descrita abaixo. O que está documentado aqui é a
-> porta **externa**: o que você pode chamar.
->
-> **⚠️ E esta rota não é um endpoint de serviço:** é o **mesmo** `POST /e` de [entidade](entidade.md),
-> com a mesma e única autorização — pertencer ao tenant e ter papel em `_conf.accessControl.write`. Não
-> existe credencial de serviço. Qualquer usuário final que satisfaça esses dois pontos escreve aqui, em
-> **qualquer linha**, pulando o comando, o RBAC de comando e o processor `br`. Leia a advertência de
-> [entidade](entidade.md) antes de usar.
 
-## Requisição
+## Como a projeção é escrita
 
-`POST /e`
+A linha de uma projeção é gravada por um caminho **interno ao serviço**, que não passa por requisição
+externa: o [es-n](../../es-n/README.md) despacha o evento gravado pelo [comando](comando.md) e o serviço
+aplica a projeção.
 
-Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`.
+**Idempotência e ordenação são desse caminho.** A aplicação é deduplicada por evento e pode ser ordenada
+(nenhuma, estrita ou por agregado), conforme o despacho do es-n.
 
-Corpo (operação única):
-
-```json
-{ "action": "CREATE | UPDATE | DELETE", "data": [ { "...": "..." } ] }
-```
-
-Corpo (lote): um **array** de operações no formato acima.
-
-## Respostas
-
-| Ação | Sucesso |
-|---|---|
-| `CREATE` | `201` (devolve os dados criados) |
-| `UPDATE` | `200` |
-| `DELETE` | `200` |
-
-Ação desconhecida → `400`. Falha de aplicação → `510`.
-
-## Comportamento
-A operação é aplicada à projeção do tenant no banco de leitura, na requisição.
-
-**Idempotência e ordenação são do [es-n](../../es-n/README.md) e do caminho interno, não desta rota.** No
-fluxo dirigido por eventos a aplicação é deduplicada por evento e pode ser ordenada (nenhuma/estrita/por
-agregado), conforme o despacho do es-n. Uma chamada `POST /e` **não carrega identificador de evento
-algum** — não há por onde deduplicar, e reenviar aplica de novo.
-
-## Erros
-`400` (ação/corpo inválido), `403` (tenant), `510` (falha de aplicação — ex.: violação de restrição).
-Catálogo: [../erros.md](../erros.md).
+Para mudar uma linha de projeção, emita o [comando](comando.md) correspondente no agregado. Para remover
+linhas por critério, use [remoção por predicado](remocao-por-predicado.md).
 
 <!-- ===== persistence-crs/endpoints/logs.md ===== -->
 
@@ -5084,6 +5063,10 @@ Erros: `400` (nome fora do formato/ausente), `403`, `500`.
 `DELETE /org/{org}/dbconn/{dbconnId}/database/{id}` → `200`/`204`.
 **Bloqueado** se houver **dataschema** vinculado.
 
+**Apaga só o registro.** O banco e o usuário físicos continuam no PostgreSQL. Criar de novo com o mesmo nome
+falha com `"Database or user already exists: database '<org>_<nome>' user '<usuário>'"` até que alguém
+remova o banco e o usuário diretamente no PostgreSQL; nenhuma rota do forger faz isso.
+
 ## Ciclo de vida
 Metadados + efeito físico transacional (criação do banco). Ver [ciclo de vida geral](../README.md#ciclo-de-vida-geral-de-uma-requisição).
 
@@ -5123,6 +5106,11 @@ Exigem `Authorization` e papel de administrador/engenheiro em `{org}`.
 
 Resposta `201`: `{ "id": <número>, "tenantSecret": "<uuid>", "tenantPid": "<uuid>", "message": "..." }`.
 Os identificadores de tenant retornados pertencem ao contexto. Erros: `400`, `403`, `500`.
+
+**`tenantSecret` só vem nesta resposta: guarde-o ao criar o contexto.** Nenhuma rota o devolve depois. O `GET`
+do contexto traz `secret` e `tenantpid`, e não traz o `tenantSecret`. Nas respostas de dataschema, o objeto `project`
+traz `secret` e `tenantsecret` como `***`. O `tenantSecret` é do **contexto**: um só para todos os dataschemas
+(tenants) criados nele.
 
 ## Ler / Listar
 
@@ -5268,6 +5256,14 @@ modelos expira por tempo — o que os tira do cache é remoção, nunca prazo.
 **Junto com o registro saem do cache os dois modelos do tenant**: a spec de entidades e o `.model.json`,
 caso ele tenha sido republicado em `MODELING`. Se o cache falhar, a resposta é `500`, **o registro não é
 apagado** e a operação pode ser repetida.
+
+**O que o desmonte não apaga:**
+
+- **os agregados do tenant no event store.** Nenhuma rota do forger os alcança.
+- **o manifesto de apresentação.** Remova-o antes, enquanto o `tenant-id` ainda resolve ([presentation.md](presentation.md)).
+
+**Recriar com o mesmo nome não reaproveita nada.** O dataschema novo recebe outro `tenant-id`, e o contexto
+novo, outro `tenantSecret` ([project.md](project.md)).
 
 > Em produção desde 2026-10-02T22:11Z; até então este `DELETE` tirava do cache só a spec de entidades.
 
@@ -5587,6 +5583,9 @@ que esvaziar**:
 Vale igual para atributos e associações: declarar um atributo só com `nullable` altera **apenas**
 `nullable` — `length`, `unique` e `comment` continuam como estavam.
 
+**Tornar obrigatório (`nullable` de `true` para `false`) vira `SET NOT NULL` na tabela.** Quem recusa é o
+banco, e só se alguma linha tiver o campo vazio; com a tabela vazia, passa. Vale para atributo e associação.
+
 Três detalhes que costumam morder:
 
 - **`null` explícito conta como ausente.** Para limpar, use o vazio do tipo (`[]`, `""`), não `null`.
@@ -5820,6 +5819,7 @@ Erros: `400` (arquivo vazio, extensão diferente de `.json`, documento inválido
 > | `alias` vazio, só de espaços ou que não é texto, em comando ou evento | ver [nome de exibição](#nome-de-exibicao) |
 > | `references` com atributo, alvo, `valueKey` ou tipo que não se sustenta | ver [atributo que aponta outro agregado](#atributo-que-aponta-outro-agregado-references) |
 > | `subscriptions` fora da forma, ou com tipo ou evento que não é do modelo | ver [assinatura externa de eventos](#assinatura-externa-de-eventos-subscriptions) |
+> | `snapshot` fora da forma | ver [snapshot do agregado](#snapshot-do-agregado-snapshot) |
 
 ### Recorte de leitura do aggregate: `roles`
 
@@ -6019,6 +6019,35 @@ Quem lê a declaração é o es-n, que serve o feed: ver
 > **Em produção desde 2026-10-01T04:23:36Z** (`forger@fb3201c`; ver [CHANGELOG 1.97](../../CHANGELOG.md)).
 > Modelo publicado antes disso não é revalidado: uma declaração que não se sustenta e já estava no cache
 > continua lá até a próxima publicação.
+
+### Snapshot do agregado: `snapshot`
+
+**Opcional.** Configura o snapshot do agregado para o tenant: vale para todos os aggregates do modelo. Decisão do
+dono em 2026-10-31. **Modelo sem a chave publica como antes**, e o snapshot fica desligado.
+
+Fica **dentro** de `<org>.<projeto>`, ao lado de `aggregate`:
+
+```jsonc
+{
+  "acme.agenda": {
+    "aggregate": { "agenda.aula": { … } },
+    "snapshot": { "enabled": true, "nthEvent": 50 }
+  }
+}
+```
+
+| Recusa, sempre `400` | Por quê |
+|---|---|
+| `snapshot` que não é objeto, ou chave desconhecida dentro dele | forma |
+| `enabled` ausente, ou que não é boolean | forma |
+| `nthEvent` ausente, que não é inteiro, ou abaixo de 2 | forma |
+
+O efeito de cada campo no motor está em
+[formato do modelo — snapshot do agregado](../../persistence-crs/spec/model-format.md#snapshot-do-agregado-snapshot).
+
+> **Implantada em 2026-10-31T13:54:38Z** (`forger@7045305`;
+> [composer#12](https://github.com/yc-platform-v3/composer/issues/12)). Modelo publicado antes disso não é
+> revalidado: uma declaração fora da forma que já estava no cache continua lá até a próxima publicação.
 
 ### Chaves que um modelo novo não precisa trazer
 
@@ -6762,7 +6791,7 @@ Detalhe dos controles em [query-controls.md](../query-controls.md).
 > o comando exige na escrita (ver [comando](../../persistence-crs/endpoints/comando.md)).
 
 ## Erros
-`400` (JSON inválido), `401`/`403` (autorização), `510` (falha de execução da consulta).
+`400` (JSON inválido; valor fora da forma em atributo numérico ou booleano), `401`/`403` (autorização), `510` (falha de execução da consulta).
 Catálogo: [../erros.md](../erros.md).
 
 <!-- ===== persistence-q/query-controls.md ===== -->
@@ -6853,6 +6882,8 @@ Exemplo:
   `ilike`, não como igualdade. É o único lugar onde a plataforma troca o operador por conta própria —
   se você quer igualdade com um `%` literal, use `eq`.
 - **`in` exige ao menos um valor.** Lista vazia é **`400`**.
+- **O valor precisa caber no tipo.** Em atributo numérico ou booleano, valor de outra forma é **`400`**. Em texto,
+  aspa simples é só um caractere do valor.
 - **Valor vazio ou só espaços não vira nada.** `{"cor": ""}` não filtra **e não traz a coluna** no
   resultado. Não é erro; é omissão silenciosa. Para "campo vazio", use `eq` com o valor que você quer
   comparar.
@@ -7038,7 +7069,7 @@ Consequências que importam na prática:
 
 | HTTP | Significado | Causas típicas | Correção |
 |---|---|---|---|
-| `400` | Requisição inválida | JSON malformado; estrutura de critério inválida. | Corrigir o corpo (modo array/object, um rótulo por item). |
+| `400` | Requisição inválida | JSON malformado; estrutura de critério inválida; valor fora da forma em atributo numérico ou booleano. | Corrigir o corpo (modo array/object, um rótulo por item). |
 | `401` / `403` | Não autorizado | Credencial inválida; `tenant-id` fora do escopo do usuário. | Usar credencial/tenant corretos. |
 | `510` | Falha de execução | Predicado/identificador não reconhecido; falha ao ler a projeção. | Usar o vocabulário do tenant; conferir a projeção/entity. |
 
@@ -7216,6 +7247,8 @@ até três destinos, combináveis:
   projeção/coordenação alvo.
 - O destino **3** é consumido pelo persistence-crs, que aciona o **br-service** (coordenação) e, conforme
   o resultado, submete um **novo comando** — fechando a saga (CP-7).
+- O destino **3** pode ter **prazo**: item de `triggerCoordination` com `schedule` não sai na hora — é guardado e
+  despachado no instante marcado, pelo mesmo caminho. Ver [scheduler — agendamento](../scheduler/README.md).
 
 ### Topologia de filas é fixa e global, não por tenant nem dinâmica
 Ponto importante para quem modela domínios cross-contexto:
@@ -7395,10 +7428,6 @@ comandos** automaticamente (saga), visíveis como novos eventos no histórico do
 > **onde**, nunca o conteúdo — o detalhe se lê pelas consultas normais, com o recorte de leitura de quem
 > consulta. Guia: [../README.md](../README.md).
 
-> **Estado em 2026-10-01:** **no ar na instância de teste** (`/v3/es/t/…`) desde 04:19:19Z, com a validação da
-> declaração na publicação do modelo em produção desde 04:23:36Z. **Na instância de produção (`/v3/es/…`), ainda
-> não.** Falta o papel de assinante na gestão de contas para a primeira leitura com conta real.
-
 ## Contents
 - A assinatura é declarada no modelo
 - Onde
@@ -7509,6 +7538,157 @@ ainda não lidos, contados até 10000; `pendingCapped` diz se o teto foi atingid
 Corpo do erro: `{ "status": <HTTP>, "message": "<motivo>" }` — exceto o `401`, que vem da camada de
 autenticação, antes do feed, com corpo próprio (`path`, `error`, `message`, `status`). Trate o `401` pelo
 status, não pelo corpo.
+
+<!-- ===== scheduler/README.md ===== -->
+
+# scheduler — agendamento
+
+> **Papel:** guarda uma coordenação declarada com **`schedule`** e a despacha **na hora marcada**. É o que deixa o
+> próprio domínio agir numa data — vencer um contrato, lembrar um cliente trinta dias depois, encerrar uma etapa
+> parada — sem que ninguém abra o agregado e sem conta de serviço.
+> **Interno:** roda dentro da persistência, **sem rota nem endpoint público**. Você não o chama: você **declara o
+> prazo no modelo**, e a plataforma agenda.
+> Pré-requisitos: [model-format — eventos e `domainBus`](../persistence-crs/spec/model-format.md#eventos-e-domainbus),
+> [contexto de coordenação do br-service](../br-service/contextos.md#2--coordenação--saga-assíncrono).
+
+## Quando usar
+
+| Use `schedule` para… | Não use para… |
+|---|---|
+| uma ação que o **tempo** dispara: vencimento, expiração, lembrete, prazo de etapa | uma reação imediata — sem `schedule`, a coordenação já sai logo depois do evento |
+| um prazo que **nasce de um dado do agregado** (`expiraem`) ou de um intervalo fixo (`P30D`) | repetir algo periodicamente — não há recorrência; encadeie (ver adiante) |
+| uma decisão que deve olhar o **estado na hora** | precisão de segundo — o despacho sai **alguns segundos** depois do instante |
+
+## Como declarar
+
+O prazo é uma propriedade do **item de `triggerCoordination`** do evento — o mesmo item que diz o `name`, o
+`targetTenantId` e a rota do processor. Uma chave só, dentro de `schedule`:
+
+| Chave | Valor | O instante do despacho |
+|---|---|---|
+| `atAttribute` | o nome de um atributo do **evento**, do tipo `Timestamp` ou `Date` | o valor desse atributo |
+| `after` | uma duração ISO-8601: `PT2H`, `PT720H`, `P30D` | o carimbo do evento (`whenAttribute`) **mais** a duração |
+
+### Exemplo: o contrato vence sozinho
+
+O contrato nasce `ativo` com uma data de vencimento. Na data, ele passa a `expirado` — a menos que tenha sido
+renovado antes.
+
+```jsonc
+"contratos.contrato": {
+  "command": {
+    "ativar": {
+      "data": { "attribute": {
+        "parte":    { "type": "String",    "length": 120, "nullable": false },
+        "expiraem": { "type": "Timestamp", "nullable": false }
+      } },
+      "fromState": [], "endState": "ativado", "roles": ["ADMIN"]
+    },
+    "renovar": {
+      "data": { "attribute": {
+        "status":   { "type": "String",    "length": 20, "nullable": false },
+        "expiraem": { "type": "Timestamp", "nullable": false }
+      } },
+      "fromState": ["ativado", "renovado"], "endState": "renovado", "roles": ["ADMIN"]
+    },
+    "expirar": {
+      "data": { "attribute": { "status": { "type": "String", "length": 20, "nullable": false } } },
+      "fromState": ["ativado", "renovado"], "endState": "expirado", "roles": ["ADMIN"]
+    }
+  },
+  "event": {
+    "ativado":  { "type": "ativado",  "whenAttribute": "ativadoem",  "payloadInherit": "command-data",
+                  "domainBus": { "triggerCoordination": [ {
+                    "name": "vencimento", "targetTenantId": "<tenant-id>",
+                    "br": { "route": "contratos/verificarvencimento" },
+                    "schedule": { "atAttribute": "expiraem" } } ] } },
+    "renovado": { "type": "renovado", "whenAttribute": "renovadoem", "payloadInherit": "command-data",
+                  "domainBus": { "triggerCoordination": [ {
+                    "name": "vencimento", "targetTenantId": "<tenant-id>",
+                    "br": { "route": "contratos/verificarvencimento" },
+                    "schedule": { "atAttribute": "expiraem" } } ] } },
+    "expirado": { "type": "expirado", "whenAttribute": "expiradoem", "payloadInherit": "command-data" }
+  }
+}
+```
+
+Cada `ativar` e cada `renovar` agenda um despacho para o `expiraem` que levou. Renovar **não cancela** o despacho
+anterior: ele acorda na data antiga, o processor vê que o contrato foi renovado para depois, e não faz nada. Quem
+decide é sempre o processor, olhando o estado — ver [como escrever o processor](#como-escrever-o-processor).
+
+## O que vale em cada caso
+
+| O item declara | O valor no evento | O que acontece |
+|---|---|---|
+| nada (`schedule` ausente) | — | sai **agora**, como sempre |
+| `atAttribute` | `Timestamp` no futuro (`2026-12-01T03:00:00`, UTC) | sai nesse instante |
+| `atAttribute` | `Date` (`2026-12-01`) | sai às **00:00 UTC** desse dia |
+| `atAttribute` | instante que já passou, ou agora | sai **agora** |
+| `atAttribute` | atributo **ausente, nulo ou vazio** no evento | **não sai**, nem agora nem depois — a coordenação dependia da data |
+| `after` | — | sai no carimbo do evento mais a duração; se isso já passou, sai agora |
+
+**Recusas — a coordenação não sai, e a falha fica registrada para o suporte:**
+
+- `atAttribute` e `after` juntos, ou `schedule` vazio;
+- chave desconhecida dentro de `schedule` (um erro de digitação como `atAtribute`);
+- `after` que não é duração ISO-8601, ou negativa;
+- valor do atributo que não é data nem instante.
+
+> ⚠️ **A publicação do modelo não confere `schedule`.** Um `schedule` mal escrito é aceito na publicação, o comando
+> responde normalmente, e a recusa só aparece **no despacho**, sem chegar a quem enviou o comando. Confira a forma
+> contra o [schema](../persistence-crs/spec/model.schema.json) (`$defs.schedule`) antes de publicar.
+
+> ⚠️ **`Date` vence à meia-noite UTC**, que é 21h do dia anterior em Brasília. Se o domínio entende "vence no fim
+> do dia 1º", use um `Timestamp` com a hora certa, ou faça o processor comparar do jeito que o domínio entende.
+
+## Na hora marcada
+
+O despacho agendado entra **no mesmo caminho** da coordenação imediata — nada muda do lado do processor:
+
+- o processor recebe o **evento original** (os dados como estavam quando o evento foi gravado), o
+  **`aggregateState` lido naquele instante**, o `targetTenantId` e o `sourceTenantId`
+  ([forma exata](../br-service/contextos.md#2--coordenação--saga-assíncrono));
+- **não há token**. O comando que o processor devolver é executado com a identidade de quem fez o comando de
+  origem, e o papel dela não é reavaliado — como em toda coordenação
+  ([por onde a identidade passa](../persistence-crs/spec/model-format.md#por-onde-a-identidade-passa-na-coordenação));
+- vale a mesma deduplicação por (evento, `name`): o mesmo despacho não executa o comando-alvo duas vezes.
+
+## Como escrever o processor
+
+**Decida pelo estado de agora, não pelo evento de antes.** Entre o agendamento e o despacho o agregado pode ter
+mudado: renovado, cancelado, expirado por outro caminho. O `aggregateState` traz o estado desse instante.
+
+```
+função(data):
+    contrato = data.aggregateState
+    se contrato.status não está em ["ativado", "renovado"]:  retorna {}        // já saiu do caminho: nada a fazer
+    se contrato.expiraem > agora_em_UTC():                    retorna {}        // foi renovado para depois
+    retorna { processedData: { targetCommand: {
+        boundedContext: "contratos", aggregateType: "contrato",
+        commandName: "expirar", data: { id: data.contrato.aggregateid, status: contrato.status } } } }
+```
+
+- **Não devolver `targetCommand` é o jeito certo de não fazer nada** — é o que torna inofensivo o despacho de uma
+  data que deixou de valer.
+- **Seja idempotente.** O despacho é entregue **pelo menos uma vez**: numa queda no meio do caminho, o mesmo
+  processor pode ser chamado de novo. Conferir o estado, como acima, já resolve.
+- **`aggregateState` pode chegar `{}`** quando o agregado de origem não é conhecido no tenant de destino
+  ([detalhe](../br-service/contextos.md#2--coordenação--saga-assíncrono)). Com `{}` não há como conferir o estado:
+  para prazo, prefira coordenar **no mesmo tenant** do agregado.
+- **Compare datas em UTC.** `Timestamp` é gravado e devolvido em UTC, sem fuso
+  ([datas](../persistence-crs/spec/model-format.md#datas-timestamp-e-date)).
+
+## Garantias e limites
+
+| | |
+|---|---|
+| **Durabilidade** | o agendamento fica guardado e sobrevive a reinício da plataforma |
+| **Entrega** | pelo menos uma vez, com retentativa espaçada se o despacho falhar; a deduplicação por (evento, `name`) impede o comando-alvo de rodar duas vezes |
+| **Precisão** | alguns segundos depois do instante marcado |
+| **Gravar o agendamento** | acontece quando o evento é despachado. Se não puder ser gravado nesse momento, há poucas retentativas; esgotadas, a coordenação **não sai** e fica registrada como pendente para o suporte, **sem reentrega automática** |
+| **Cancelar** | não há cancelamento pelo modelo: o processor decide, na hora, que não há nada a fazer |
+| **Repetir** | não há recorrência. Para um ciclo, encadeie: o comando-alvo grava um evento que agenda o próximo |
+| **Um alvo** | como em toda coordenação, um `targetCommand` por despacho ([detalhe](../persistence-crs/spec/model-format.md#o-que-o-processor-de-coordenação-devolve)) |
 
 <!-- ===== br-service/README.md ===== -->
 
@@ -7811,7 +7991,10 @@ Os quatro campos são **obrigatórios**; faltar um ou trocar o tipo derruba o co
 > dispara N comandos, derruba o consumo. **Não existe fan-out**: uma coordenação emite exatamente um
 > comando. Precisar encerrar N filhos de um cancelamento não tem caminho por aqui hoje.
 
-O comando resultante é submetido **sem credencial** — ele não carrega o usuário que originou a cadeia.
+O comando resultante é submetido com a **identidade do autor do primeiro comando** da cadeia, e o
+papel dele **não é reavaliado** no comando-alvo: comando disparado por comando já autorizado conta
+como autorizado, e o evento do alvo registra esse autor. O processador de coordenação **não recebe**
+essa identidade: continua sem `authToken` e sem o usuário.
 
 ---
 
@@ -8019,6 +8202,7 @@ saiu e o endpoint interno passou a simplesmente não recortar.
 ## Contents
 - Do arquivo à rota
 - Forma do arquivo
+- Ambiente de execução
 - O que o processador recebe
 - O que o processador devolve
 - Erros
@@ -8073,6 +8257,29 @@ aguardado. Ver [contextos.md](contextos.md).
 
 Republicar no mesmo caminho substitui a versão anterior: a chamada seguinte já executa o código novo,
 sem versão antiga presa em memória.
+
+## Ambiente de execução
+
+O arquivo é carregado como um **módulo Node.js comum** (CommonJS: `module.exports` e `require`), na
+**linha 18 do Node.js**. A versão exata dentro da linha 18 não é fixada: escreva código que rode em
+qualquer Node 18.
+
+**Os módulos nativos do Node estão disponíveis** por `require`, com ou sem o prefixo `node:`:
+`require('node:crypto')` e `require('crypto')` resolvem para o mesmo módulo. Não há lista de módulos
+permitidos nem bloqueio de módulo nativo. Uso típico: conferir assinatura ou calcular hash com
+`createPublicKey`, `verify` ou `createHash` do `node:crypto`.
+
+```js
+const crypto = require('node:crypto');
+
+module.exports = async (data) => {
+  const hash = crypto.createHash('sha256').update(JSON.stringify(data)).digest('hex');
+  return { ...data, hash };
+};
+```
+
+> Contrato só para módulos **nativos**. Pacote de terceiros (npm) não faz parte do que a publicação
+> entrega: o que não estiver na árvore publicada não pode ser considerado disponível.
 
 ## O que o processador recebe
 
@@ -11903,11 +12110,442 @@ Content-Type: application/json
 
 O usuário abre um relato novo.
 
+<!-- ===== protocolo/README.md ===== -->
+
+# protocolo — como os agentes falam entre si
+
+> **Para quem:** o agente (a sessão do Claude) de qualquer org da plataforma. Aqui está **por qual canal**
+> falar com cada um, e o que **nunca** fazer. O passo a passo de cada caso está nas páginas ligadas abaixo.
+
+## A regra de ouro
+
+**Mensagem sinaliza, issue prova.** A mensagem chega na hora e some com a sessão. A issue dura, mora no GitHub e
+tem dono, estado e resposta. O teste: **"se o outro não fizer, eu vou cobrar?"** Se sim, é issue.
+
+## Qual canal usar
+
+| O que você precisa | Canal | Como |
+|---|---|---|
+| Uma pergunta ou aviso a um agente **da sua org**, que está vivo | Mensagem, pela caixa | `federacao.sh --quem <projeto>` diz quem responde; `federacao.sh --enviar --para <alvo>` entrega |
+| Um pedido que cria obrigação (deploy, correção, mudança de regra) a um agente **da sua org** | Issue | `issue.sh --destinatario <agente> …` |
+| **Qualquer** pedido a um agente **de outra org** | **Issue, e só issue** | [Pedir ajuda a outra org](pedir-ajuda-a-outra-org.md) |
+
+## O que nunca fazer
+
+- **Mandar mensagem a um agente de outra org.** O gancho barra o envio e o registra como **incidente**: o agente
+  de fora está "fora da federação" da sua org. Não é falha a repetir nem a contornar. O caminho certo é a issue.
+- **Reenviar a mensagem depois do incidente.** O incidente fica registrado e aparece ao dono no painel; você não precisa
+  fazer nada além de seguir pela issue.
+- **Concluir que o outro agente "precisa entrar na sua federação".** Para pedir ajuda entre orgs não precisa:
+  basta a issue entre orgs.
+- **Abrir, comentar, rotular ou fechar issue à mão no GitHub.** Issue só existe pelo `issue.sh`.
+- **Escolher o destinatário pelo `ListAgents`.** Use `federacao.sh --quem`: o `ListAgents` mostra também sessões
+  de fora e sessões duplicadas.
+
+## Federação e parceria não são a mesma coisa
+
+- **Federação** é por org: quem o `API_MASTER` da org autorizou a trocar **mensagem** dentro dela.
+- **Parceria** é entre duas orgs: o `API_MASTER` de uma org autorizou a outra a abrir **issue** para os agentes dela.
+  Ela não dá mensagem, nem faz o agente de fora entrar na sua federação.
+
+## Páginas
+
+- [Pedir ajuda a outra org](pedir-ajuda-a-outra-org.md): abrir a issue, o que cada recusa quer dizer, o que
+  acompanhar depois, e como a org de destino autoriza.
+
+<!-- ===== protocolo/pedir-ajuda-a-outra-org.md ===== -->
+
+# Pedir ajuda a um agente de outra org
+
+> **Para quem:** o agente de uma org que precisa de algo de um agente de **outra org** (por exemplo, o agente do
+> `conceptnatal` pedindo um deploy à `infra` da `ycodify`, ou tirando uma dúvida com o agente do `yc.app`).
+> **O caminho é a issue.** Mensagem direta entre orgs é barrada pelo gancho e registrada como incidente. Voltar ao
+> [guia do protocolo](README.md).
+
+## Contents
+- Antes de abrir
+- Abrir a issue
+- Se a abertura for recusada
+- Depois de aberta
+- Quando a ajuda vem em cadeia (derivar)
+- Para o `API_MASTER` da org que recebe
+- Para o agente que recebe
+
+---
+
+## Antes de abrir
+
+O comando **confere tudo isto e não escreve nada** se faltar uma coisa. Você só precisa saber o nome do destino;
+o resto a recusa explica.
+
+1. **O destino é um agente canônico da org de destino**, escrito como `<org>/<agente>`: a org é o que vem antes da
+   `/`. Sem a org na frente, o nome vale na **sua** org. Não existe listagem de agentes entre orgs. Para achar o nome:
+   - **Tente o nome do projeto dele** (por exemplo `ycodify/yc.app`): se não for o nome canônico, a abertura sai
+     com código `4` e **não escreve nada**, e a mensagem pode sugerir o nome certo ("quis dizer '…'?").
+   - O prefixo do alias da sessão dele (`yc-app` em `yc-app-f6`) **não** é o nome do projeto: ele serve para o
+     `federacao.sh --quem`, não para o `--destinatario`.
+   - Se ainda assim não achar, pergunte o nome ao dono. **Hoje não há outro caminho** (nem listagem entre orgs): sem
+     sugestão e sem o dono, a issue espera até o nome aparecer. O `federacao.sh --quem <nome>` consulta a tabela da **sua**
+     org e dá "desconhecido" (exit 3) para um agente de fora; isso **não** quer dizer que ele não exista na outra org.
+2. **A org de destino aderiu ao protocolo.**
+3. **O `API_MASTER` da org de destino autorizou a sua org** a abrir issue para os agentes dela (a "parceria").
+   Do seu lado **não há comando que consulte** a parceria: tente abrir, e a recusa diz o que falta.
+
+## Abrir a issue
+
+```bash
+/opt/yc-federacao/atual/issues-bin/issue.sh \
+  --id <area>.<tipo>.<slug>.<AAAAMMDD> \
+  --autor <o seu nome canônico> \
+  --a-mando-de <dono|par:<agente>|proprio> \
+  --destinatario <org>/<agente> \
+  --pedido "<o que você quer, completo>" \
+  --raiz
+```
+
+| Campo | O que pôr |
+|---|---|
+| `--id` | O título: `<area>.<tipo>.<slug>.<AAAAMMDD>`. `<area>` é o componente onde a ação acontece, no vocabulário do projeto de **destino**. `<tipo>` é um de `deploy`, `config`, `incident`, `ops`, `sec`, `bug`, `padrao`, `duvida` (também em uso: `pedido`, `defeito`); para uma pergunta, `duvida`. `<slug>` é o tema em kebab-case. `<AAAAMMDD>` é a data de hoje, em UTC. Exemplo: `miolo.duvida.mecanismo-mais-leve.20261118`. |
+| `--autor` | O **nome canônico do seu agente** na tabela de agentes da **sua** org. Se errar, o comando recusa com `nao esta no registro canonico de agentes` e pode sugerir o certo. Na outra org ele aparece como `<sua org>/<autor>`. |
+| `--a-mando-de` | `dono` se o dono pediu; `proprio` se é iniciativa sua; `par:<agente>` se um colega relatou. |
+| `--pedido` | O texto inteiro. **O outro lado não conhece a sua conversa**: diga o que você faz, o que quer saber ou pedir, por que, e o que já mediu. Um pedido bom se entende sozinho. |
+| `--raiz` | Use se o trabalho começa aqui. Se a issue nasce de outra que você recebeu, use `--deriva-de <ref>`. |
+
+**O que sai quando dá certo** (exit 0): a linha `escrita: <org>:<dono>/<repo>#<n>`. **Guarde essa referência**:
+ela é a sua chave para acompanhar a issue. Ela nasce **no repositório do agente de destino**, na org dele, e
+**espera lá** mesmo que ele não esteja rodando agora. A issue na caixa dele é o aviso: **não mande mensagem**.
+
+## Se a abertura for recusada
+
+Em recusa **nada é escrito**, em lugar nenhum. Leia o código de saída e a mensagem:
+
+| Saída | Mensagem (trecho) | O que quer dizer | O que fazer |
+|---|---|---|---|
+| `3` | `a org <X> nao aderiu` | A org de destino não está no protocolo. | Confira o nome da org com o dono. |
+| `3` | `a org <X> nao autorizou issue da org <Y>` | Falta a parceria: o `API_MASTER` de `<X>` ainda não autorizou `<Y>`. | O dono da sua org pede ao `API_MASTER` de `<X>`; isso é entre as pessoas, **fora** do protocolo. Não há como contornar. |
+| `4` | `<agente> nao esta no registro canonico da org <X>` | O nome do destino não é canônico naquela org. | Use a sugestão, ou pergunte o nome ao dono. |
+| `4` | `<seu nome> nao esta no registro canonico de agentes` | O seu `--autor` não é canônico na sua org. | Use a sugestão. |
+| `2` | lista o que falta | Falta campo obrigatório. | Complete o comando. |
+| `5` | colisão | Já existe uma issue com esse `id` no destino. | Mude o slug, ou use o sufixo `.2`. |
+| `8` | o GitHub não respondeu | Nada foi escrito. | Repita mais tarde. |
+
+Recusa por falta de parceria **não é o caso de mandar mensagem**: ela seria barrada e viraria incidente.
+
+## Depois de aberta
+
+Da sua org, com a referência `<org>:<dono>/<repo>#<n>` que a abertura devolveu, **só estes dois atos valem**:
+
+```bash
+/opt/yc-federacao/atual/issues-bin/issue.sh --ver    <org>:<dono>/<repo>#<n>
+/opt/yc-federacao/atual/issues-bin/issue.sh --anotar <org>:<dono>/<repo>#<n> --por <o seu nome canônico> --nota "<texto>"
+```
+
+- `--ver` mostra o estado, de quem é a bola e o Registro. Só vê a issue que a **sua** org abriu lá.
+- `--anotar` só o **autor** pode. Quem não é o autor recebe saída `3`.
+- Ler, começar, devolver, aguardar e encerrar são de quem está **na org da issue**: daqui dão `3`.
+
+**Os avisos chegam à caixa da sua org** quando a bola volta para você (o destinatário pediu algo) e quando a issue
+se encerra, com a referência qualificada. Para ler a caixa da sua sessão: `federacao.sh --caixa --pendentes` lista
+o que ainda não foi lido, e `federacao.sh --caixa --ler <msg_id>` abre um aviso. A resposta mora na **issue**: o
+aviso só diz que ela existe. Se a sessão estiver ociosa, `--ver` consulta o estado a qualquer hora: o Registro mostra quando o destinatário a leu e
+quando começou a tratá-la.
+
+## Quando a ajuda vem em cadeia (derivar)
+
+Se você recebeu uma issue e, para cumpri-la, precisa pedir algo a um agente de outra org, **derive**:
+`--deriva-de <ref-da-que-recebeu> --destinatario <org>/<agente>`. A filha nasce na org de destino com o rastro
+da mãe, e a mãe **não se encerra** enquanto a filha de lá estiver aberta.
+
+## Para o `API_MASTER` da org que recebe
+
+- Ver quem pode abrir issue para os agentes da sua org: `federacao.sh --parceria`.
+- Autorizar uma org: `federacao.sh --parceria <org de origem>` (ato **assinado** com a sua chave) ou o painel.
+- Revogar: `federacao.sh --parceria <org de origem> --sai`. Depois de revogada, a issue **nova** é recusada;
+  as que já estavam abertas seguem até o fim.
+- A parceria nasce **sem ato**: sem o ato, toda abertura daquela org é recusada.
+
+## Para o agente que recebe
+
+A issue chega com autor `<org de origem>/<autor>` no repositório do seu projeto. Você a trata como qualquer
+outra: lê, marca `em_tratamento` antes de começar, anota, e encerra com a Solução. Para devolver a bola ao autor
+de fora, use `--aguardar --quem <org>/<autor>`: o aviso vai à caixa da org dele. **Responda pelo mesmo canal por
+onde veio:** na issue.
+
+## Referências
+
+- O texto completo dos comandos, na máquina de quem roda: `issue.sh --help` e `federacao.sh`.
+
 <!-- ===== CHANGELOG.md ===== -->
 
 # CHANGELOG — documentação pública (for-llms)
 
 > Histórico de revisões desta documentação. Datas em formato `AAAA-MM-DD`.
+
+## 1.150 — 2026-11-07
+
+- **br-service: o comando que a coordenação devolve leva o autor do primeiro comando.** A página
+  [contextos](br-service/contextos.md), na seção de coordenação, dizia que ele saía sem credencial. Na verdade
+  ele sai com a identidade de quem iniciou a cadeia, e o papel dessa pessoa não é reavaliado no alvo. O
+  processador de coordenação continua sem `authToken`. O comportamento já valia desde a 1.38 e não mudou agora:
+  é a doc que alcança o código (`persistence-crs@711db9c`).
+
+## 1.149 — 2026-11-07
+
+- **forger: a leitura interna do modelo publicado (1.147) está em produção**, no composer, imagem
+  `yc-composer:amd64-aaab261-e319`, desde 14:58:27Z, segundo a infra (`yc-platform-v3/infra#102`).
+
+## 1.148 — 2026-11-07
+
+- **forger: a leitura interna das entities passa a ter doc.** `GET
+  /a35gry2b4d8ops/unsec/org/project/dataschema/{tenantId}/entities` já estava no ar e não estava documentada. Ver
+  [forger — entity](forger/endpoints/entity.md#ler-todas-as-entities-de-dentro-da-plataforma-sem-login). A forma da
+  resposta difere da do `Listar` autenticado. Lido no código em `forger@2535f27`
+  (`UnsecEntityController`, `EntityStateService.getCurrentSchemaStateAsJsonForExternalView`). Comportamento sem
+  mudança: é a doc que alcança o código.
+
+## 1.147 — 2026-11-07
+
+- **forger: o modelo publicado se lê sem login, de dentro da plataforma.** Rota nova
+  `GET /a35gry2b4d8ops/unsec/tenant/{tenantId}/model`: `200` com o conteúdo guardado, `404` sem modelo, `500` com o
+  cache em falha. O gateway a barra na borda. É para o processador de coordenação do br-service, que sela a versão
+  de um contrato. Ver [forger — model](forger/endpoints/model.md#ler-de-dentro-da-plataforma-sem-login). Código em
+  `forger@dbb405e`; pedido em `yc-platform-v3/composer#14`. Ainda sem deploy.
+
+## 1.147 — 2026-11-07
+
+- **Nova fatia: [scheduler — agendamento](scheduler/README.md).** O item de `triggerCoordination` aceita
+  **`schedule`**: `{ "atAttribute": "<atributo Timestamp|Date do evento>" }` ou `{ "after": "<duração ISO-8601>" }`.
+  A coordenação sai na hora marcada, pelo mesmo caminho da imediata, e o processor decide pelo estado do agregado
+  naquele instante. O guia cobre a declaração, o que vale em cada caso, como escrever o processor, garantias e
+  limites. O [model-format](persistence-crs/spec/model-format.md#coordenação-com-prazo-schedule) ganha a subseção, o
+  [schema](persistence-crs/spec/model.schema.json) ganha `$defs.schedule` e `$defs.coordinationTarget`, e o
+  [guia do es-n](es-n/README.md) cita o prazo no destino 3. Código: `es-n@5a0c463`, `scheduler@657bfcb`,
+  `interpreter@39fe74b`. Ainda sem deploy.
+
+## 1.146 — 2026-11-07
+
+- **persistence-crs e persistence-q: "papel vale só da org dona do tenant" (1.145) está em teste**, no `tinterpreter`
+  (`/v3/persistence/t/`), imagem `yc-interpreter:amd64-69839a6-e50b`, desde 05:36:27Z, segundo a infra (`infra#94`).
+  Produção não recebeu.
+
+## 1.145 — 2026-11-07
+
+- **persistence-crs e persistence-q: papel vale só da org dona do tenant.** O papel era conferido só pelo nome, e
+  um papel de outra org com o mesmo nome (ex.: `AUDITOR` criado pela `clubflow`) valia no tenant da `ycodify`, no
+  comando, na leitura do agregado e na consulta da projeção. Agora só vale o papel que o token liga à org dona do
+  tenant. Defeito de segurança medido pelo `coordination-91` (`yc-platform-v3/interpreter#13`); conserto em
+  `yc.pr@0341f5b`, `persistence-crs@afce2c8` e `persistence-q@22bffa4`. Ainda sem deploy.
+
+## 1.144 — 2026-11-07
+
+- **persistence-crs: `data.attribute` do tipo `Json` aceita lista.** O model-format dizia só "escalares". A lista
+  (ex.: `["ana","bia"]`) entra no corpo do comando, o processor do br pode substituí-la se a chave vier no corpo, e
+  a projeção a grava como array JSON. Medido pelo `coordination-91` no `tinterpreter`, 2026-11-07, às 04:56Z
+  (`coordination:dominio/prova/titular-por-lista/prova.py`). Comportamento sem mudança: é a doc que alcança o código.
+
+## 1.143 — 2026-11-07
+
+- **persistence-q e persistence-crs: o titular por lista (1.142) está em teste**, no `tinterpreter`
+  (`/v3/persistence/t/`), imagem `yc-interpreter:amd64-69839a6-cbbf`, desde 04:31:27Z, segundo a infra (`infra#92`).
+  Produção não recebeu.
+
+## 1.142 — 2026-11-07
+
+- **persistence-q e persistence-crs: titular por lista.** `rows.by` que aponta um atributo `Json` com uma lista de
+  usernames recorta a leitura para quem for elemento dela, por igualdade exata. Vale na projeção
+  (`ufrn.loco3@fa56789`, `ReadStatementTransformation`) e na leitura do agregado, `GET /a` e `/history`
+  (`persistence-crs@0b0c2e9`, `RecorteDeLeituraDoAgregado`). Antes, a lista nunca casava. Atributo de outro tipo
+  segue com igualdade, sem mudança. Pedido: `yc-platform-v3/interpreter#12`. Ainda sem deploy.
+
+## 1.141 — 2026-11-05
+
+- **forger: o `nullable` de `true` para `false` aplicado (1.140) está no ar** na imagem `yc-composer:amd64-cdbc354-7c51`,
+  desde 03:21:53Z, segundo a infra. A página deixa de dizer que a imagem no ar recusa.
+
+## 1.140 — 2026-11-05
+
+- **forger: tornar obrigatório (`nullable` de `true` para `false`) deixa de ser recusado pelo forger; quem julga é
+  o banco** (`forger@a6a2ffb`, `EntityComparator`). A recusa anterior falava de "linhas existentes" e nunca
+  consultava a tabela: recusava com `400` até com 0 linhas (medido pelo `coordination-57` às 03:03:31Z). Agora a
+  mudança vira `SET NOT NULL` (`yc.dbr-driver`), e o PostgreSQL recusa só se houver linha vazia. Vale para atributo
+  e associação. Ainda sem deploy.
+
+## 1.139 — 2026-11-04
+
+- **persistence-crs: `POST /e` saiu da doc.** A rota de escrita direta de linha (entidade e projeção) foi desligada no
+  código em `persistence-crs@36d48d9` (2026-09-23) e responde `404`; a doc seguia ensinando-a. `entidade.md` e
+  `projecao.md` dizem agora que ela não existe e o que usar; saíram as linhas do README e o `/e` do `openapi.yaml`.
+  `POST /e/by` (remoção por predicado) continua.
+
+## 1.139 — 2026-11-04
+
+- **forger: remover database apaga só o registro** (`forger@7045305`, `ResourceController.deleteDatabase`,
+  `DatabaseRepository.deleteByIdAndDbConn`). O banco físico fica, e recriar com o mesmo nome falha com
+  "Database or user already exists" (medido pelo `coordination-57` às 23:59:19Z, com resposta `510`). Comportamento
+  sem mudança.
+
+## 1.138 — 2026-11-04
+
+- **forger: o que o desmonte de um dataschema não apaga** (`forger@7045305`, `ResourceController.deleteDataSchema`,
+  `createDataSchema`). Os agregados do event store e o manifesto de apresentação ficam; recriar com o mesmo nome
+  gera outro `tenant-id`. Comportamento sem mudança.
+
+## 1.137 — 2026-11-04
+
+- **forger: `tenantSecret` só vem no `201` de `POST /org/{org}/project`** (`forger@7045305`,
+  `ResourceController.createProject`, `ProjectRepository`, `DataSchemaRepository`). A página não dizia que nenhuma
+  rota o devolve depois, nem que ele é um só por contexto. Comportamento sem mudança.
+
+## 1.136 — 2026-11-04
+
+- **orgid: os campos de `POST /up/org` conferidos contra o código** (`orgid@9e16a0b`, `OrgServiceImpl.create`,
+  `OrgController.create`). A página dava `email` como opcional e não citava `description`; os dois são obrigatórios
+  e dão `400` (medido pelo `coordination-57` às 19:09Z ao criar uma org). `alias` também é exigido: ausente, a criação
+  falha sem tratamento, em vez de dar `400`. `name` aceita só letras e no máximo 12 caracteres; `status` é ignorado;
+  `awsCredentials` é opcional. Resposta: `200` com o corpo, `owner` e `id`, e `409` para nome repetido do mesmo
+  dono. Comportamento sem mudança.
+
+## 1.135 — 2026-11-04
+
+- **orgid: `publico.md` e `ua-papel.md` acompanham a 1.133.** O autocadastro aponta a criação de conta com papel não
+  público pelo administrador do dono do papel. `ua-papel.md` diz, como `ua-associacao.md`, que "administrador /
+  engenheiro" é o papel de plataforma no `owner`. Comportamento sem mudança.
+
+## 1.134 — 2026-11-04
+
+- **orgid: `POST /ua/account-role/new-account/using/authority` em produção** desde 2026-11-04T19:22:22Z
+  (`yc-composer:amd64-3d52002-08cc`, `orgid@9e16a0b`, `yc-platform-v3/infra#77`). A criação de conta pela instância
+  ainda não foi medida: falta token de `API_MASTER`.
+
+## 1.133 — 2026-11-04
+
+- **orgid: `POST /ua/account-role/new-account/using/authority`.** O `API_MASTER` do dono de um papel `/ua` cria uma
+  conta de aplicação já associada a esse papel, numa operação só, sem tornar o papel público (`orgid@9e16a0b`,
+  `yc-platform-v3/composer#13`). Até aqui, criar conta com papel não público obrigava a deixá-lo público por um
+  instante, chamar `POST /open/ua/account-role` e depois associar. Está na `develop` do orgid, não está implantada.
+- **orgid `/ua`: o papel exigido.** `ua-associacao.md` passa a dizer que "administrador / engenheiro (no `owner`
+  do papel)" é o papel de plataforma (`<owner>/API_MASTER` no claim `orgs`), e que a conta `/ua` não pertence a
+  organização nenhuma: ela se liga ao dono pelo papel.
+
+## 1.132 — 2026-11-04
+
+- **Páginas do orgid sem histórico.** Por ordem do dono, a página diz o que é e como se usa agora; o que era histórico
+  mora aqui. Conteúdo que saiu de `orgid/endpoints/`:
+  - **2026-10-16:** manifesto da aplicação em produção desde 14:34:24Z. O link de redefinição de senha está em produção
+    desde 17:21:35Z, sem medição do envio real do e-mail. O `captcha` do registro e o `aceitePendente` estão em vigor
+    desde 21:06:53Z. Publicar um manifesto e provar um domínio pelo TXT ainda não foi medido em produção.
+  - **2026-10-07T17:06Z:** `SKOS_MASTER`/`SKOS_ANALYST` em produção. Antes disso, quem só tinha `SKOS_*` recebia `403`
+    em `GET /up/account/by/jwt`; `POST /up/account-role-org` e as duas rotas de status respondiam `400` a esses
+    papéis; e o `role` do registro público era ignorado (a conta nascia só administradora, sem erro).
+  - **2026-10-02T22:11Z:** antes, `DELETE` da organização respondia `403` a qualquer chamada.
+  - **2026-09-26:** o registro público passou a aceitar só papel público (antes, qualquer papel, inclusive
+    administrativo). Em `/ua`, `R` passou a ativar só conta `PENDING` (antes, reativava conta suspensa). O titular deixou
+    de trocar o próprio status (antes, a ausência de `status` gravava `ACTIVE`).
+  - **2026-09-05:** o `composer` passou a liberar `/open/**` e `/ua/open/**`. Antes disso, onde hoje vem `404`
+    respondia-se `204`: em `R`/`PR` e na troca de senha com conta inexistente, em `PUT` de papel sem `id`, em `DELETE` de
+    papel inexistente, nos três `replace-*` e na associação de `/ua`.
+- **Correção da 1.131:** `accountStatus` e `orgStatus` são gravados como o cliente os manda, sem conferência de valor
+  (`orgid@3aab683`, `AccountRoleOrgServiceImpl` :113, :122, :307, :419-420). A 1.131 os listava como enum fechado.
+
+## 1.131 — 2026-11-04
+
+- **orgid: os campos de `accountRoleOrgs` em `GET /up/account/by/jwt`.** A página só dizia que o campo existia. Agora
+  diz que cada item traz `accountStatus` e `orgStatus` e nenhum `status` próprio, e que o vínculo `SUSPENDED` ou `CANCELED`
+  continua na lista: só sai o item cuja conta ou org está `CANCELED`. Diz também que o `API_MASTER` de quem criou a org
+  vem na lista como os outros papéis. Comportamento lido no código de `orgid@3aab683` (v1.1.0, a que o `entradas.lock` do
+  composer declara). Não mudou nada no código.
+
+## 1.130 — 2026-10-31
+
+- **Assinatura de eventos por tenant, em teste.** A leitura de eventos da assinatura filtra por tenant além do tipo
+  (`yc.es@24472e4`), em `/v3/persistence/t/` desde 2026-10-31T20:24:41Z (`amd64-d18cc6f-5192`); produção não. Antes,
+  a assinatura nascida no checkpoint 0 projetava no próprio tenant os eventos de outro tenant com o mesmo
+  `org.projeto.bc.tipo`. Linhas já projetadas assim não saem com o conserto.
+
+## 1.129 — 2026-10-31
+
+- **Páginas de persistence-crs, persistence-q e es-n sem falha nem estado.** Por ordem do dono, página diz como se usa; o
+  que era estado e história mora aqui. Conteúdo que saiu das páginas:
+  - **Em teste, produção não:** snapshot do agregado desde 2026-10-31T14:18:13Z (publicação da chave desde 13:54:38Z);
+    comando condicional desde 2026-10-29T15:09:38Z (`amd64-ff32b1f-c7b2`; em produção o campo é ignorado e a leitura não
+    traz `_version`); datas normalizadas desde `amd64-260913c`; feed de assinatura em `/v3/es/t/` desde
+    2026-10-01T04:19:19Z (validação na publicação desde 04:23:36Z; falta o papel de assinante na gestão de contas); modelo
+    relido a cada requisição desde `amd64-260910`.
+  - **`references`, em 2026-09-29:** validação no forger em `develop`; o BFF ainda não lia a chave, e a tela usava o
+    `options` por referência do manifesto.
+  - **Consertos de 2026-09-25:** `null` explícito (`ufrn.loco3@66b1313`, `persistence-crs@4f61f82`): antes, na criação, `null`
+    em numérico não materializava a linha, em texto gravava `"null"`, que segue no dado gravado, e na transição a projeção
+    preservava o valor anterior. `""` em data (`yc.cqrs-c@c111bf8`): antes respondia `200` e a projeção falhava ao gravar.
+  - **2026-09-10:** cópia do modelo em memória, por até uma hora, desligada em teste; a doc mandava invalidar as duas chaves.
+  - **2026-09-09:** em `amd64-260909`, sem o `b`, a entity com recorte pela rota interna e a consulta sem credencial davam
+    `403`; a partir de `amd64-260909b`, não.
+  - **2026-09-05:** a checagem de papel passou a vir antes do br-service. **2026-10-01:** papel fora de `roles.read` deixou
+    de responder `204`. **Até `amd64-260913c`:** o agregado devolvia a data como o cliente mandou.
+
+## 1.128 — 2026-10-31
+
+- **persistence-q e persistence-crs: `400` por valor fora da forma** nas listas de erro (`persistence-q/erros.md`,
+  `persistence-q/endpoints/consulta.md`, `persistence-crs/endpoints/remocao-por-predicado.md`).
+
+## 1.127 — 2026-10-31
+
+- **persistence-q: valor no critério em teste** desde 15:32:30Z (`yc-interpreter:amd64-9547df7-3c3a`, `ufrn.loco3@d023c54`,
+  infra#61). Em produção, ainda não.
+
+## 1.126 — 2026-10-31
+
+- **persistence-q: valor no critério** (`query-controls.md`). Em atributo numérico ou booleano, valor de outra forma é
+  `400`; em texto, a aspa simples é só um caractere do valor (`ufrn.loco3`, interpreter#5). Ainda não implantado.
+
+## 1.125 — 2026-10-31
+
+- **persistence-crs: snapshot do agregado em teste** desde 14:18:13Z (`yc-interpreter:amd64-69fa484-7460`,
+  `yc.cqrs-c@a3e1275`, `yc.persistence@05c5481`, infra#59). Em produção, ainda não.
+
+## 1.124 — 2026-10-31
+
+- **persistence-crs: snapshot do agregado** (`spec/model-format.md` §Snapshot do agregado,
+  `endpoints/agregado-leitura.md`). O que acontece ao mudar a configuração e o modelo, e o que `/history` e o feed
+  leem. A leitura de agregado aponta para a seção, e o `/history` diz que devolve todos os eventos, sem paginação.
+
+## 1.123 — 2026-10-31
+
+- **persistence-crs: chave `snapshot` no modelo** (`persistence-crs/spec/model-format.md` §Snapshot do agregado).
+  Configuração por tenant, dentro de `<org>.<projeto>`. O motor que a lê (`yc.cqrs-c@a3e1275`,
+  `yc.persistence@05c5481`) ainda não está implantado. `llms-full.txt` recebe a seção.
+
+## 1.122 — 2026-10-31
+
+- **forger: chave `snapshot` no `.model.json`** (`forger/endpoints/model.md` §Snapshot do agregado). Opcional, dentro
+  de `<org>.<projeto>`, ao lado de `aggregate`: `{ "enabled": <boolean>, "nthEvent": <inteiro a partir de 2> }`.
+  Fora dessa forma, ou com outra chave dentro dela, a publicação responde `400`; modelo sem a chave publica como
+  antes. No ar desde 2026-10-31T13:54:38Z (`yc-composer:amd64-9d056ca-94f9`, `forger@7045305`, infra#58).
+  yc-platform-v3/composer#12.
+
+## 1.121 — 2026-10-29
+
+- **persistence-crs: comando condicional pela versão** (`persistence-crs/endpoints/comando.md` §Comando condicional
+  pela versão; `endpoints/agregado-leitura.md`; `README.md`, regra de concorrência; `openapi.yaml`).
+  `GET /a/{bc}/{tipo}/{id}` passa a devolver `_version`, a versão do agregado. O comando aceita o campo opcional
+  `_expectedVersion`: diferente da versão atual dá `510`, antes da regra de negócio; inválido dá `400`; sem o campo,
+  nada muda. Em teste (`/v3/persistence/t/`) desde 2026-10-29T15:09:38Z (`yc-interpreter:amd64-ff32b1f-c7b2`),
+  produção ainda não. yc.cqrs-c `3db2834`, persistence-crs `0ff7359`. yc-platform-v3/interpreter#3.
+
+## 1.120 — 2026-10-26
+
+- **auth: o `accessTokenEs256` e o JWKS da 1.119 estão em vigor desde 2026-10-26T13:45:34Z**
+  (`auth/endpoints/sign-in.md` §Token ES256 e chave pública). Sai o aviso "ainda não no ar". Pela borda, o JWKS
+  está em `GET https://api.ycodify.com/v3/auth/ua/.well-known/jwks.json`, sem credencial e só por `GET`. Medido às
+  14:02:47Z: `200` com `kid` = `auth-es256-20261026`. yc-platform-v3/composer#11.
+
+## 1.119 — 2026-10-26
+
+- **auth: segundo access token em ES256 e a chave pública em JWKS** (`auth/endpoints/sign-in.md` §Token ES256 e
+  chave pública; `auth/README.md`, índice e CP-12; `auth/openapi.yaml`). O login e a renovação devolvem também
+  `accessTokenEs256`: os mesmos claims e o mesmo `iss`, assinado em ES256 com `kid`. A chave pública sai em
+  `GET /ua/.well-known/jwks.json`, público. O `accessToken` HS512 não muda. Em `develop` (auth `ca02e61`, composer
+  `aaad2c2`), ainda não no ar: sem a chave configurada, o campo não vem e o JWKS responde `{"keys":[]}`.
+  yc-platform-v3/composer#11.
 
 ## 1.118 — 2026-10-16
 
@@ -13618,3 +14256,4 @@ Primeira versão consolidada da documentação pública para agentes de IA.
 
 > Para regenerar `llms-full.txt` após editar qualquer `.md`, concatene os arquivos na ordem do
 > `llms.txt`.
+

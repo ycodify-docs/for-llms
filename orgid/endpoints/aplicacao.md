@@ -4,9 +4,8 @@
 > termos de acesso e política de privacidade. A casca a acha pelo **domínio** por onde o navegador chegou,
 > antes do login. Guia: [../README.md](../README.md). Erros: [../erros.md](../erros.md).
 >
-> **Em produção desde 2026-10-16T14:34:24Z.** Pela borda, as rotas de leitura chegam ao orgid: `GET
-> /open/application` responde `404` a domínio não verificado, e `GET /ua/application/{org}` sem token responde
-> `401`. Ainda não foi medido em produção publicar um manifesto e provar um domínio pelo TXT.
+> Pela borda, `GET /open/application` responde `404` a domínio não verificado, e `GET /ua/application/{org}` sem
+> token responde `401`.
 
 ## Contents
 - Quem publica e quem lê
@@ -147,8 +146,6 @@ publicou manifesto · `400` sem `domain` ou com host inválido.
 
 Mesmo corpo da leitura por domínio, para o usuário já logado (troca de org). `403` se `{org}` não está
 entre as orgs do token · `404` sem manifesto.
-
-> **O que segue está em vigor desde 2026-10-16T21:06:53Z.**
 
 O corpo ganha `aceitePendente: {"termos": <versão>|null, "privacidade": <versão>|null}` — a versão vigente que a
 conta do token **ainda não aceitou** nesta org (`null` = nada pendente). A casca mostra o texto e só entra na org

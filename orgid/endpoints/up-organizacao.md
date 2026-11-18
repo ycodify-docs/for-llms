@@ -25,16 +25,19 @@ Cria uma organização. **Papel:** administrador.
 
 | Campo | Tipo | Obrig. | Significado |
 |---|---|---|---|
-| `name` | string | sim | Nome da org (vira o `{org}` do forger; único). |
+| `name` | string | **sim** | Nome da org (vira o `{org}` do forger). **Só letras**, **máx. 12 caracteres**. Ausente, em branco, com outro caractere ou acima de 12 → `400`. |
 | `client` | string | **sim** | **Nome da empresa cliente** que contratou a plataforma — toda organização deve sinalizar o seu. **Máx. 12 caracteres.** Ausente/em branco → `400`; acima de 12 → `400`. |
-| `alias` | string | não | Apelido legível. |
-| `email` | string | não | Contato da org. |
-| `status` | string | não | Situação (padrão `ACTIVE`). |
+| `email` | string | **sim** | Contato da org, na forma `algo@dominio`. Ausente ou fora dessa forma → `400` (`"e-mail field must be present."`). |
+| `description` | string | **sim** | Descrição da org, **máx. 256 caracteres**. Ausente, em branco ou acima de 256 → `400`. |
+| `alias` | string | **sim** | Apelido legível. **Ausente não dá `400`**: a criação falha sem tratamento ([../erros.md](../erros.md)). Mande sempre. |
 | `cardIdentifier` | string | não | Identificador de pagamento. |
+| `awsCredentials` | string | não | Credenciais de nuvem da org. |
 
-> O `owner` é definido automaticamente como o usuário autenticado (não enviar).
+> O `owner` é definido automaticamente como o usuário autenticado (não enviar). `status` é ignorado: a org
+> nasce `ACTIVE`, com o portador como seu administrador (`API_MASTER`).
 
-**Resposta:** `201`/`200` — a org criada com `id`. Erros: `400`, `403`.
+**Resposta:** `200` — o corpo enviado, acrescido de `owner` e `id`. Erros: `400` (campo acima) · `403` — o
+portador não tem `API_MASTER` · `409` — o mesmo dono já tem org com esse `name`.
 
 ## PUT /up/org
 Atualiza a organização. **Papel:** administrador **na org** (verificado pelo `name`).
@@ -105,5 +108,3 @@ conexão. **Remover a organização é o último passo.**
 `403` se não for administrador. Se não existir organização com esse nome **para esse dono**, a resposta
 também é `200` e nada é removido — confira `orgOwner`.
 
-> Em produção desde 2026-10-02T22:11Z. Até então esta rota respondia `403` a **qualquer** chamada,
-> inclusive do administrador da organização, e nenhuma organização era removida.

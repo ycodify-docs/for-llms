@@ -25,6 +25,16 @@
           "description": "Opcional. Assinaturas externas de eventos deste bounded context: nome -> declaracao. Quem le e o servico de eventos (feed por cursor); o motor de comandos nao le. Ver spec/model-format.md § Assinaturas externas.",
           "propertyNames": { "pattern": "^[a-z][a-z0-9-]{0,62}$" },
           "additionalProperties": { "$ref": "#/$defs/subscription" }
+        },
+        "snapshot": {
+          "type": "object",
+          "description": "Opcional. Snapshot do agregado, por tenant: vale para todos os agregados do modelo. Ver spec/model-format.md § Snapshot do agregado.",
+          "required": ["enabled", "nthEvent"],
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "nthEvent": { "type": "integer", "minimum": 2 }
+          }
         }
       }
     },
@@ -254,7 +264,7 @@
           "properties": {
             "orderingMode": { "type": "string", "enum": ["none", "strict", "per-aggregate"] },
             "triggerProjection": { "type": "array", "items": { "$ref": "#/$defs/dispatchTarget" } },
-            "triggerCoordination": { "type": "array", "items": { "$ref": "#/$defs/dispatchTarget" } }
+            "triggerCoordination": { "type": "array", "items": { "$ref": "#/$defs/coordinationTarget" } }
           }
         }
       }
@@ -267,6 +277,26 @@
         "targetTenantId": { "type": "string", "format": "uuid" },
         "br": { "type": "object", "properties": { "route": { "type": "string" } } }
       }
+    },
+    "coordinationTarget": {
+      "description": "Item de triggerCoordination: um dispatchTarget que pode declarar o prazo do despacho (schedule).",
+      "allOf": [{ "$ref": "#/$defs/dispatchTarget" }],
+      "properties": {
+        "schedule": { "$ref": "#/$defs/schedule" }
+      }
+    },
+    "schedule": {
+      "description": "Quando a coordenação sai. Uma chave só: atAttribute (o instante é o valor desse atributo do evento, Timestamp ou Date) ou after (duração ISO-8601 contada do carimbo do evento).",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "atAttribute": { "type": "string", "pattern": "^[a-z]+$" },
+        "after": { "type": "string", "pattern": "^P" }
+      },
+      "oneOf": [
+        { "required": ["atAttribute"] },
+        { "required": ["after"] }
+      ]
     }
   }
 }

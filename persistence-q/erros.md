@@ -6,7 +6,7 @@
 
 | HTTP | Significado | Causas típicas | Correção |
 |---|---|---|---|
-| `400` | Requisição inválida | JSON malformado; estrutura de critério inválida. | Corrigir o corpo (modo array/object, um rótulo por item). |
+| `400` | Requisição inválida | JSON malformado; estrutura de critério inválida; valor fora da forma em atributo numérico ou booleano. | Corrigir o corpo (modo array/object, um rótulo por item). |
 | `401` / `403` | Não autorizado | Credencial inválida; `tenant-id` fora do escopo do usuário. | Usar credencial/tenant corretos. |
 | `510` | Falha de execução | Predicado/identificador não reconhecido; falha ao ler a projeção. | Usar o vocabulário do tenant; conferir a projeção/entity. |
 
@@ -37,9 +37,7 @@ Valem **apenas** para entity que declara recorte; entity sem a declaração não
 > a declaração ser corrigida. Elas existem porque o silêncio, aqui, seria pior — um papel escrito errado
 > não recortaria nada e a tabela inteira sairia com `200`.
 
-> **Consulta sem credencial nenhuma não é recusada — e não é recortada, a partir de
-> `yc-interpreter:amd64-260909b`.** Na imagem anterior do mesmo dia (`amd64-260909`, sem o `b`) ela era
-> recusada com `403`. As rotas internas de cluster
+> **Consulta sem credencial nenhuma não é recusada — e não é recortada.** As rotas internas de cluster
 > não têm usuário por construção, e ali a fronteira é **topológica**: elas não são expostas fora do
 > cluster. O recorte é controle **por usuário**; onde não há usuário, ele não se aplica — do mesmo modo
 > que o `accessControl` por papel também não se aplica nesse caminho. É por isso que o processor do

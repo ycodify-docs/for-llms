@@ -10,8 +10,18 @@ Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`.
 
 `GET /a/{boundedContext}/{aggregateType}/{id}`
 
-- `200` — estado atual do agregado (JSON), reconstituído a partir dos seus eventos.
+- `200` — estado atual do agregado (JSON), reconstituído a partir dos seus eventos, mais a chave
+  **`_version`**: a versão do agregado, que é o número do último evento dele. Com o
+  [snapshot](../spec/model-format.md#snapshot-do-agregado-snapshot) ligado no modelo, parte do último retrato e
+  aplica só os eventos posteriores.
 - `204` — agregado não encontrado.
+
+**`_version` não é dado do agregado.** Ela não vem do modelo, não está no evento nem na projeção, e não
+conta para o `204` do recorte por coluna. Serve para o **comando condicional**: devolvida em
+`_expectedVersion`, faz o comando ser recusado se o agregado mudou desde esta leitura (ver
+[comando § Comando condicional pela versão](comando.md#comando-condicional-pela-versão)). Os dois nomes são
+diferentes de propósito: devolver o corpo desta leitura como payload do comando **não** liga o
+condicional.
 
 **Datas no estado:** `Timestamp` vem como `"2026-09-15T09:00:00"` — **UTC, sem fuso** — e `Date` como
 `"1990-04-02"`. Inclusive o carimbo automático de cada evento (o `whenAttribute`, como `criadaem`):
@@ -26,15 +36,11 @@ Cabeçalhos: `Authorization` + cabeçalho de tenant `X-Tenant-Id`.
 no horário de Brasília, a conversão é do front (exemplo em
 [persistence-q § Resposta](../../persistence-q/endpoints/consulta.md#resposta)).
 
-> Antes de `yc-interpreter:amd64-260913c` — em teste desde essa imagem, **produção ainda não** —, este
-> endpoint devolvia a data **como o cliente a
-> mandou** — com fuso, fração ou espaço — e o carimbo automático com espaço (`2026-09-13 20:19:09`).
-
 ## Histórico de eventos
 
 `GET /a/{boundedContext}/{aggregateType}/{id}/history`
 
-- `200` — lista (array) dos eventos do agregado, em ordem.
+- `200` — lista (array) dos eventos do agregado, em ordem: **todos**, sem paginação, com ou sem snapshot.
 - `204` — sem eventos.
 
 Cada evento traz **quem o executou**. Evento sem identidade registrada — o caso de um agregado escrito por
@@ -85,7 +91,7 @@ GET /a/{bc}/{type}/{id}   ou   GET .../{id}/history
 > registro, então responde igual para um `{id}` que existe e um que não existe — não revela existência. Já
 > o recorte por proprietário responde `204`, de propósito: ali um `403` entregaria a existência do agregado
 > a quem não é o titular. Ao depurar um `204` inesperado, verifique o recorte do modelo antes de procurar o
-> dado. *(Até 2026-10-01 o papel fora de `roles.read` também respondia `204`.)*
+> dado.
 
 **`loguser` aparece nas duas respostas** — no estado e em cada evento — com o `username` de quem executou
 aquele comando: [model-format — `loguser`](../spec/model-format.md#loguser-quem-executou-cada-comando).

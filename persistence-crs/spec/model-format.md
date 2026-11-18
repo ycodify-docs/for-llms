@@ -11,6 +11,7 @@
 ## Contents
 - Estrutura de topo
 - Assinaturas externas
+- Snapshot do agregado
 - Nível do agregado
 - Atributos e tipos
 - Comandos
@@ -29,7 +30,8 @@
     "aggregate": {
       "<bc>.<aggregateType>": { ... } // um ou mais agregados
     },
-    "subscriptions": { ... }          // OPCIONAL — ver "Assinaturas externas"
+    "subscriptions": { ... },         // OPCIONAL — ver "Assinaturas externas"
+    "snapshot": { ... }               // OPCIONAL — ver "Snapshot do agregado"
   }
 }
 ```
@@ -84,8 +86,38 @@ cadastra em execução. O feed está em [es-n — assinatura externa](../../es-n
 **O motor de comandos não lê esta chave.** Mudar o filtro é republicar o modelo: a próxima leitura já usa a
 declaração nova, e o cursor de quem lê não se perde. Remover a assinatura do modelo faz o feed responder `404`.
 
-> **Estado em 2026-10-01:** a **validação na publicação** vale desde 04:23:36Z — declaração fora da forma é
-> recusada com `400`. O feed está no ar na instância de teste; na de produção, ainda não.
+Declaração fora da forma é recusada na publicação com `400`.
+
+### Snapshot do agregado (`snapshot`)
+
+Sem snapshot, cada comando e cada leitura de agregado refazem o estado a partir de **todos** os eventos dele.
+Com snapshot, partem do último retrato e aplicam só os eventos posteriores. A configuração é **do tenant**: vale
+para todos os agregados do modelo.
+
+```jsonc
+"acme.vendas": {
+  "aggregate": { ... },
+  "snapshot": { "enabled": true, "nthEvent": 50 }
+}
+```
+
+| Parte | Regra |
+|---|---|
+| **lugar** | **dentro** de `<org>.<projeto>`, irmã de `aggregate` |
+| **ausente** | sem a chave `snapshot`, o snapshot fica desligado |
+| `enabled` | obrigatório, booleano; `true` liga |
+| `nthEvent` | obrigatório, inteiro a partir de 2: grava-se o retrato quando a versão do agregado é múltipla dele |
+| **fora da forma** | campo ausente, `nthEvent` abaixo de 2 ou outra chave: recusado na publicação com `400` |
+
+Quem grava é o próprio comando, na mesma transação do evento. Para o mesmo modelo, o estado e o `_version`
+devolvidos são os mesmos com ou sem snapshot. `/history` continua lendo todos os eventos.
+
+**Mudar a configuração** é republicar o modelo ([forger/model](../../forger/endpoints/model.md#snapshot-do-agregado-snapshot)).
+Desligar volta ao cálculo por todos os eventos, e os retratos já gravados ficam guardados, sem uso; religar volta a
+usá-los. O retrato guarda o estado da sua versão, e **alterar o modelo não o reescreve**: quem renomeia o
+`whenAttribute` de um agregado, por exemplo, vê o nome antigo seguir no estado que veio do retrato.
+
+**O `/history` e o feed leem os eventos, não o retrato:** evento apagado some dos dois.
 
 ## Nível do agregado
 
@@ -181,9 +213,11 @@ string aparece em três lugares, e os três têm de concordar:
 | Chave | O que declara |
 |---|---|
 | `read` | os papéis que alcançam o agregado. Quem não tem nenhum deles não o enxerga |
-| `scope.read.<PAPEL>.rows.by` | o atributo cujo valor precisa ser o **`username` do token** de quem pede — o proprietário |
+| `scope.read.<PAPEL>.rows.by` | o atributo cujo valor precisa ser o **`username` do token** de quem pede — o proprietário. Se o valor for uma **lista** (atributo `Json`, ex.: `["ana", "bia"]`), lê quem for **elemento** dela, por igualdade exata |
 | `scope.read.<PAPEL>.attributes` | os atributos que esse papel vê. O que ficar de fora não aparece no estado nem no `eventData` do `/history` |
 | `author` | os papéis que veem, no `/history`, quem executou cada evento |
+
+**Papel vale só da org dona do tenant.** Em `roles` do comando, `read`, `scope` e `author`, um papel casa apenas quando a conta o tem **na org dona do tenant**, como o token o declara (`PAPEL:org:…`). Um papel com o mesmo nome criado por outra org não vale aqui. O mesmo se aplica à consulta da projeção ([persistence-q](../../persistence-q/README.md)).
 
 As duas dimensões de `scope` são independentes: `rows` responde *quais agregados são seus*,
 `attributes` responde *quais campos você vê*. Um papel pode declarar uma, outra ou as duas. Chave da
@@ -361,12 +395,8 @@ O que o BFF faz com ela (marcadores por tipo, o que o processor devolve):
 
 #### `references` — o atributo que aponta outro agregado
 
-> **Estado em 2026-09-29:** a forma e o significado estão definidos aqui, e esta é a referência
-> autoritativa. A **validação na publicação** está no forger em `develop`, **ainda não em produção**
-> ([forger — `references`](../../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references));
-> o **BFF ainda não lê** a chave
-> ([bff — declarada no modelo](../../bff/README.md#declarada-no-modelo-references-pedida-e-ainda-não-em-vigor)).
-> Até valer, a referência exibida pela tela vem só do `options` por referência do manifesto.
+A forma e o significado estão definidos aqui. A validação na publicação é do
+[forger — `references`](../../forger/endpoints/model.md#atributo-que-aponta-outro-agregado-references).
 
 ```jsonc
 "agenda.aula": {
@@ -482,8 +512,7 @@ da regra.
 **Onde NÃO acontece — e a data segue exatamente como você mandou:**
 - dentro de valueObject de **tipo direto** (`{"type": "Json"}`): o modelo não diz que há data lá dentro;
 - em campo `String`, mesmo que o texto seja uma data ou uma hora (`"06:00"`);
-- em dado gravado **antes** de `yc-interpreter:amd64-260913c` — a imagem em que isto passou a valer em teste;
-  **produção ainda não tem**, e lá nenhuma data é normalizada.
+- em evento já gravado: ele segue como foi gravado.
 
 **Recusas:** forma irreconhecível — `"13/09/2026"`, `"ontem"`, epoch num `Date` — é **`400`** que nomeia o
 campo (`no campo 'notafiscal.datacompra': …`). `"13/09/2026"` é recusado de propósito: dia e mês trocam de
@@ -525,7 +554,7 @@ Para filtrar por data numa consulta:
   (`type: "String"`) em `data.attribute` — o **estado atual** do agregado, base da **concorrência
   otimista** da transição. O comando de **criação NÃO** declara `status` (o agregado ainda não existe).
   Vale para **todo agregado, em todo bounded context**.
-- **`data.attribute`** — atributos **escalares** do agregado (uma coluna por atributo na projeção).
+- **`data.attribute`** — atributos **escalares** do agregado (uma coluna por atributo na projeção). A exceção é o tipo `Json`, que aceita também uma **lista**, por exemplo de usernames (`["ana", "bia"]`), e a projeção a grava como array JSON. É o que alimenta o recorte de leitura por lista (`roles.scope.read.<PAPEL>.rows.by`). Para o processor do br preencher o atributo, ele precisa vir no corpo do comando, mesmo `null`: a resposta do br só substitui chave que o comando já trouxe.
   **Não** inclua aqui o `whenAttribute` do evento (o carimbo, ex.: `criadaem`): ele é **auto-valorizado**
   e **não** é atributo de dados do comando — mas **é** coluna obrigatória da projeção (declarada na
   entity; ver [Eventos e `domainBus`](#eventos-e-domainbus) e [forger — entity](../../forger/endpoints/entity.md)).
@@ -643,6 +672,8 @@ Para filtrar por data numa consulta:
     ```jsonc
     { "name": "<alvo>", "targetTenantId": "<tenant-id destino>", "br": { "route": "<rota>" } }
     ```
+    O item de `triggerCoordination` aceita também **`schedule`**, o prazo do despacho — ver
+    [Coordenação com prazo](#coordenação-com-prazo-schedule).
   - Listas **vazias** = sem despacho extra (só a projeção do próprio contexto).
 
 ### Por onde a identidade passa na coordenação
@@ -722,6 +753,28 @@ identidade que atravessou a saga.
 
 > Declarar `triggerProjection`/`triggerCoordination` **não cria filas** — apenas roteia o despacho pelos
 > canais universais do es-n. Ver [arquitetura — de onde vêm as filas](../../01-arquitetura.md#origem-das-filas).
+
+### Coordenação com prazo (`schedule`)
+
+Por padrão a coordenação sai logo depois que o evento é gravado. Com `schedule`, ela sai **numa data marcada** — o
+vencimento de um contrato, o lembrete trinta dias depois de um cadastro — sem que ninguém abra o agregado e sem conta
+de serviço:
+
+```jsonc
+"triggerCoordination": [ {
+  "name": "expirarcontrato",
+  "targetTenantId": "<tenant-id>",
+  "br": { "route": "<rota do processor que decide>" },
+  "schedule": { "atAttribute": "expiraem" }      // ou: "schedule": { "after": "P30D" }
+} ]
+```
+
+- **`atAttribute`** — o nome de um atributo do evento cujo valor é o instante (`Timestamp` ou `Date`).
+- **`after`** — uma duração ISO-8601 (`PT2H`, `P30D`) contada do carimbo do evento (`whenAttribute`).
+
+Na hora marcada a mensagem segue o caminho de sempre: o processor recebe o **estado do agregado lido naquele
+instante** e decide — devolve `targetCommand` ou não devolve nada. O guia completo, com o que acontece em cada caso e
+como escrever o processor: [scheduler — agendamento](../../scheduler/README.md).
 
 ## Estados e transições
 

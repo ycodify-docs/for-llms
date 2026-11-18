@@ -49,6 +49,7 @@ usuário (via forger) e os inclui no token.
 | Login (plataforma) | `POST /up/sign-in` | [endpoints/sign-in.md](endpoints/sign-in.md) |
 | Login (externo) | `POST /ua/sign-in` | [endpoints/sign-in.md](endpoints/sign-in.md) |
 | Renovar token | `GET /up/sign-in/renew` | [endpoints/renovar.md](endpoints/renovar.md) |
+| Chave pública do token ES256 (JWKS) | `GET /ua/.well-known/jwks.json` | [endpoints/sign-in.md](endpoints/sign-in.md#token-es256-e-chave-pública-jwks) |
 
 Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md). Contrato de fio: [openapi.yaml](openapi.yaml).
 
@@ -79,7 +80,8 @@ de duração maior, internamente.) Trate o token como **opaco**; não dependa de
 ## Pontos de coordenação
 
 - **CP-12** — auth **emite** o token que **todos** os demais serviços **validam** (mesmo segredo
-  compartilhado). É o início da cadeia de autorização.
+  compartilhado). É o início da cadeia de autorização. Quem não pode guardar o segredo valida o
+  `accessTokenEs256` pela chave pública ([sign-in — JWKS](endpoints/sign-in.md#token-es256-e-chave-pública-jwks)).
 - auth → **orgid** (validar credenciais, obter usuário/papéis/organizações).
 - auth → **forger** (no `/ua`, descobrir os tenants do usuário para o token).
 - auth → **cache** (registrar a sessão; sessão única por usuário).

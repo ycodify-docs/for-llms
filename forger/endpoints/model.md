@@ -44,6 +44,7 @@ Erros: `400` (arquivo vazio, extensão diferente de `.json`, documento inválido
 > | `alias` vazio, só de espaços ou que não é texto, em comando ou evento | ver [nome de exibição](#nome-de-exibicao) |
 > | `references` com atributo, alvo, `valueKey` ou tipo que não se sustenta | ver [atributo que aponta outro agregado](#atributo-que-aponta-outro-agregado-references) |
 > | `subscriptions` fora da forma, ou com tipo ou evento que não é do modelo | ver [assinatura externa de eventos](#assinatura-externa-de-eventos-subscriptions) |
+> | `snapshot` fora da forma | ver [snapshot do agregado](#snapshot-do-agregado-snapshot) |
 
 **Depois do modelo, o manifesto de apresentação.** Publicar o modelo não basta para a tela ficar legível:
 rótulos, formatos e nome de exibição de quem é referenciado vêm do
@@ -252,6 +253,35 @@ Quem lê a declaração é o es-n, que serve o feed: ver
 > Modelo publicado antes disso não é revalidado: uma declaração que não se sustenta e já estava no cache
 > continua lá até a próxima publicação.
 
+### Snapshot do agregado: `snapshot`
+
+**Opcional.** Configura o snapshot do agregado para o tenant: vale para todos os aggregates do modelo. Decisão do
+dono em 2026-10-31. **Modelo sem a chave publica como antes**, e o snapshot fica desligado.
+
+Fica **dentro** de `<org>.<projeto>`, ao lado de `aggregate`:
+
+```jsonc
+{
+  "acme.agenda": {
+    "aggregate": { "agenda.aula": { … } },
+    "snapshot": { "enabled": true, "nthEvent": 50 }
+  }
+}
+```
+
+| Recusa, sempre `400` | Por quê |
+|---|---|
+| `snapshot` que não é objeto, ou chave desconhecida dentro dele | forma |
+| `enabled` ausente, ou que não é boolean | forma |
+| `nthEvent` ausente, que não é inteiro, ou abaixo de 2 | forma |
+
+O efeito de cada campo no motor está em
+[formato do modelo — snapshot do agregado](../../persistence-crs/spec/model-format.md#snapshot-do-agregado-snapshot).
+
+> **Implantada em 2026-10-31T13:54:38Z** (`forger@7045305`;
+> [composer#12](https://github.com/yc-platform-v3/composer/issues/12)). Modelo publicado antes disso não é
+> revalidado: uma declaração fora da forma que já estava no cache continua lá até a próxima publicação.
+
 ### Chaves que um modelo novo não precisa trazer
 
 Estas aparecem em modelos existentes e **nenhum serviço as lê**. Continuam sendo aceitas — não é preciso
@@ -280,6 +310,22 @@ Por agregado, o necessário é: `org`, `project`, `boundedContext`, `type`, `ten
 
 `GET /org/{org}/project/{project}/tenant/{tenantId}/model` → `200` com o conteúdo do modelo; `404` se
 não publicado.
+
+### Ler de dentro da plataforma, sem login
+
+`GET /a35gry2b4d8ops/unsec/tenant/{tenantId}/model`, **sem `Authorization` e sem `X-Forger-Credential`**. É para
+serviço da plataforma que não tem o token de ninguém, como o processador de coordenação do br-service. Responde:
+
+| Status | Quando |
+|---|---|
+| `200` | o tenant tem modelo publicado; o corpo é o conteúdo guardado, byte a byte, sem reconstrução |
+| `404` `{"error": "Model not found"}` | o tenant não tem modelo publicado |
+| `500` `{"error": "Model cache unavailable"}` | o cache distribuído falhou; não quer dizer que falte modelo |
+
+**Não se alcança pela borda:** o gateway barra `/unsec/`. Quem chama fala direto com o serviço, dentro da rede da
+plataforma, e o endereço é configuração de deploy.
+
+> **Implantada em 2026-11-07T14:58:27Z** (`forger@2535f27`; [composer#14](https://github.com/yc-platform-v3/composer/issues/14)).
 
 ## Listar (por contexto)
 

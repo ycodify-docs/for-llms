@@ -59,6 +59,30 @@ tenant (ver [forger/model](../../forger/endpoints/model.md) e [examples/](../../
 > `510` (alguém avançou o agregado antes; reenvie sobre o estado atualizado). Ver
 > [README — regra do status](../README.md#estados-transições-e-concorrência).
 
+### Comando condicional pela versão
+
+O `status` não distingue duas vezes o mesmo estado: num ciclo `a → b → a`, um comando atrasado que leu o
+primeiro `a` passa. Para isso há o campo **opcional `_expectedVersion`**, com a versão que o cliente leu,
+que é a `_version` da [leitura do agregado](agregado-leitura.md#estado-atual):
+
+```json
+{ "<nomeDoComando>": { "id": "<uuid>", "status": "a", "_expectedVersion": 7, "...": "..." } }
+```
+
+| `_expectedVersion` | O que acontece |
+|---|---|
+| ausente | nada muda — é o comportamento de quem não manda o campo |
+| igual à versão atual | o comando segue |
+| diferente | `510`, com as duas versões na mensagem, **antes** da regra de negócio |
+| não é inteiro ≥ 0 | `400` |
+
+- Na criação a versão atual é `0`.
+- O campo **não** entra no evento nem no `data` da regra de negócio.
+- Se o modelo declarar um atributo chamado `_expectedVersion`, o campo é do modelo e o condicional não se
+  liga. Um atributo `version` continua sendo atributo.
+- Dois comandos que leram a **mesma** versão passam os dois nesta checagem, e o segundo a gravar recebe
+  `510` da concorrência otimista do event store.
+
 ## Resposta
 
 `200`:
@@ -78,23 +102,22 @@ A ordem real, que importa para entender o que já rodou quando um erro chega:
 2. **carga do estado** do agregado;
 3. **autorização por papel** (`command.<cmd>.roles`) — **antes** da regra de negócio. Quem não tem o
    papel recebe `403` **sem** o processor do br-service ter sido executado;
-4. **regra/coordenação no br-service**, se o modelo declarar;
-5. **validação da transição** (`fromState` contra o `status` enviado);
-6. **gravação do evento**, que notifica o es-n;
-7. resposta.
+4. **versão esperada** (`_expectedVersion`), se o comando a trouxer — estado velho é `510` **sem** o
+   processor ter sido executado;
+5. **regra/coordenação no br-service**, se o modelo declarar;
+6. **validação da transição** (`fromState` contra o `status` enviado);
+7. **gravação do evento**, que notifica o es-n;
+8. resposta.
 
 > **Onde as datas são normalizadas:** na leitura do corpo, antes do passo 1 — por isso uma data inválida
-> é recusada sem carregar estado nenhum —, e **de novo depois do passo 4**, porque a regra de negócio pode
+> é recusada sem carregar estado nenhum —, e **de novo depois do passo 5**, porque a regra de negócio pode
 > devolver datas que substituem as do corpo.
 
-> A ordem entre 3 e 4 mudou em 2026-09-05. Antes o br-service rodava primeiro e a checagem de papel vinha
-> depois — quem não tinha o papel fazia a regra executar inteira e recebia as mensagens dela de volta.
-> Se você depende de ver a mensagem do processor para diagnosticar permissão, esse caminho não existe
-> mais: sem papel, o `403` vem antes.
+> Sem papel, o `403` vem antes da regra: a mensagem do processor não serve para diagnosticar permissão.
 
 > **Não existe validação do estado de destino (`endState`).** Versões anteriores desta página descreviam
 > um passo que compararia o estado resultante com o `endState` do modelo; ele não existe no serviço. O
-> que é verificado é a **origem** (`fromState`), no passo 5.
+> que é verificado é a **origem** (`fromState`), no passo 6.
 
 ### `null` explícito, chave omitida e o que o processor devolve
 
@@ -114,27 +137,17 @@ São três regras diferentes, e confundi-las é o engano comum:
   veio no corpo. Detalhe em [br-service](../../br-service/README.md).
 - Dentro de `valueObject` o `null` segue como `null` do JSON, sem mudança.
 
-> ⚠️ **Até o conserto de 2026-09-25** (ufrn.loco3 `66b1313`, persistence-crs `4f61f82`), o `null`
-> explícito divergia: na criação, um `null` em atributo numérico fazia a linha **não materializar** na
-> projeção, e em texto gravava a string `"null"`; na transição, a projeção **preservava** o valor
-> anterior enquanto o agregado gravava `null`. Tudo com `200`. Linha com `"null"` em texto gravada antes
-> disso continua lá: é dado, e não se corrige sozinha.
-
 **`""` em `Date` ou `Timestamp` não é data.** Em atributo opcional ele é tratado como `null`; em atributo
 `nullable: false` é `400`, com o nome do campo. Vale também para campo de `valueObject` em grupo e para o
 que o processor do br devolver. Em `String`, `""` continua sendo `""`.
-
-> ⚠️ **Até o conserto de 2026-09-25** (yc.cqrs-c `c111bf8`), `""` em data respondia `200`, e o agregado
-> gravava `""`. Já a projeção falhava ao gravar: na criação a linha não materializava, e na transição
-> ficava o valor anterior.
 
 ## Erros
 
 | Código | Quando |
 |---|---|
-| `400` | `valueObject` na forma errada (a causa mais comum) · **data em forma irreconhecível** — a mensagem nomeia o campo, inclusive `grupo.campo` |
+| `400` | `valueObject` na forma errada (a causa mais comum) · **data em forma irreconhecível** — a mensagem nomeia o campo, inclusive `grupo.campo` · `_expectedVersion` que não é inteiro ≥ 0 |
 | `403` | tenant não autorizado, **ou** usuário sem o papel exigido pelo comando |
-| `510` | falha de transição (`fromState` não casa o `status` enviado) **e o resto**: corpo malformado, agregado ou comando desconhecido, `id` ausente num comando de transição |
+| `510` | falha de transição (`fromState` não casa o `status` enviado) · **`_expectedVersion` diferente da versão atual** **e o resto**: corpo malformado, agregado ou comando desconhecido, `id` ausente num comando de transição |
 
 ⚠️ **`510` não significa "erro do servidor" aqui.** Boa parte dos erros de payload cai nele — corpo
 malformado, nome de comando inexistente, `id` faltando. Antes de suspeitar de indisponibilidade, leia a

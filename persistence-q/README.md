@@ -41,8 +41,7 @@
   [forger/dataschema](../forger/endpoints/dataschema.md#o-que-a-transição-faz-com-o-modelo-no-cache).
   **Não invalide cache à mão para propagar alteração:** fechar a edição do dataschema republica o
   modelo de leitura, e republicar o `.model.json` sobrescreve o de escrita. **Restart nunca foi
-  remédio.** *(Este item dizia, até 2026-09-10, que era preciso "invalidar o cache — as duas chaves do
-  modelo" antes de republicar. Era trabalho desnecessário.)*
+  remédio.**
   Detalhe: [persistence-crs/README §Depois de alterar o modelo](../persistence-crs/README.md).
 - **Linha que não aparece não é, necessariamente, consulta errada.** Se o comando respondeu `200` e a
   linha não está aqui, a projeção pode ter falhado ao ser aplicada — o `200` responde pela escrita, não
@@ -125,12 +124,6 @@ Uma entity pode declarar que um **papel** lê apenas as linhas de que o usuário
 da tabela deixa de existir para ele. O serviço acrescenta esse recorte ao critério que você enviou:
 não é preciso pedi-lo, e não é possível desligá-lo.
 
-> **⚠️ Versão importa, e o sufixo não é detalhe de nomenclatura.** Esta seção descreve o comportamento
-> a partir de **`yc-interpreter:amd64-260909b`**. Houve **duas** imagens no mesmo dia: na primeira
-> (`amd64-260909`, sem o `b`) a entity com recorte alcançada pela **rota interna de cluster** era
-> recusada com `403` — o que quebra qualquer processor que leia a projeção. **Não declare o recorte
-> contra superfície que ainda esteja na imagem sem o `b`.**
-
 ### Como se faz — o percurso inteiro
 
 O objetivo, dito em uma frase: *"quem tem o papel `OPERADOR` vê só a própria ficha; quem tem `ADMIN` vê
@@ -175,6 +168,12 @@ pedido, e nada que o desligue:
 
 O recorte compara **o atributo declarado em `rows.by`** com **quem está chamando**. Hoje "quem está
 chamando" é o **`username` do token** — então o atributo precisa conter esse mesmo valor.
+
+**Mais de um titular por linha:** declare o atributo de `rows.by` com tipo `Json` e grave nele a **lista** de
+usernames (`["ana", "bia"]`). A linha passa a ser de quem for **elemento** da lista, por igualdade exata: `ana` não
+casa com `anabela`, não há curinga, e lista vazia, valor nulo ou valor que não seja lista não casam com ninguém. O
+recorte do agregado faz o mesmo
+([model-format](../persistence-crs/spec/model-format.md#quem-pode-ler-o-agregado-roles)).
 
 Três consequências práticas, e a terceira é a que mais morde:
 
@@ -224,9 +223,6 @@ Processor do br-service que lê a projeção **não** é usuário, e a distinç�
 
 No caminho **assíncrono** não há escolha: não há JWT, e o endpoint interno é o único caminho. Detalhe
 do contrato em [br-service](../br-service/README.md).
-
-O endpoint interno **não recortar** vale a partir de `amd64-260909b` — antes dela ele era recusado com
-`403`, que é a razão de a versão importar aqui mais que em qualquer outra seção deste documento.
 
 > ⚠️ Usar o token do usuário para uma regra que precisa enxergar dado de outra pessoa devolve **lista
 > vazia com `200`** — não um erro. É o engano mais fácil de cometer aqui.

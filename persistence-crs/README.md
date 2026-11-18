@@ -36,10 +36,11 @@
 | Executar comando | `POST /a/{boundedContext}/{aggregateType}` | [endpoints/comando.md](endpoints/comando.md) |
 | Ler estado do agregado | `GET /a/{boundedContext}/{aggregateType}/{id}` | [endpoints/agregado-leitura.md](endpoints/agregado-leitura.md) |
 | Ler histórico de eventos | `GET /a/{boundedContext}/{aggregateType}/{id}/history` | [endpoints/agregado-leitura.md](endpoints/agregado-leitura.md) |
-| Escrever/remover linha de entidade | `POST /e` | [endpoints/entidade.md](endpoints/entidade.md) |
 | Remover linhas por predicado | `POST /e/by` | [endpoints/remocao-por-predicado.md](endpoints/remocao-por-predicado.md) |
-| Escrever projeção (mesma rota `/e`) | `POST /e` | [endpoints/projecao.md](endpoints/projecao.md) |
 | Consultar logs do serviço | `GET /logs/service/{service}/query/…` | [endpoints/logs.md](endpoints/logs.md) |
+
+Não há rota de escrita direta de linha: `POST /e` não existe ([entidade](endpoints/entidade.md),
+[projeção](endpoints/projecao.md)). Registro do domínio se escreve por [comando](endpoints/comando.md).
 
 Gramática do modelo de domínio: **[spec/model-format.md](spec/model-format.md)** (estrutura do
 `.model.json`: agregado, comando, evento, tipos). Erros: [erros.md](erros.md). Exemplos: [exemplos.md](exemplos.md).
@@ -77,6 +78,10 @@ A atualização da **projeção** acontece **depois**, de forma assíncrona, pel
     pretendido ao fim da execução (`endState`).
   - Se o `status` enviado divergir do estado real (outro comando avançou antes), a operação é rejeitada
     (`510`) e deve ser **reenviada** sobre o estado atualizado.
+- **Comando condicional pela versão (opcional):** o `status` não distingue duas passagens pelo mesmo
+  estado (`a → b → a`). Quem precisa disso manda `_expectedVersion` = a `_version` lida em
+  `GET /a/{bc}/{tipo}/{id}`; versão diferente → `510`. Sem o campo, nada muda. Ver
+  [endpoints/comando.md § Comando condicional pela versão](endpoints/comando.md#comando-condicional-pela-versão).
 
 ## Regras de payload (checklist)
 
@@ -134,16 +139,10 @@ duas casas diverge, e quando diverge as duas parecem autoridade.
   nessa janela que o modelo não está publicado. **O que morde não é editar: é deixar a edição aberta.**
 
 > ⚠️ **Não invalide cache à mão para propagar uma alteração.** A publicação e a remoção são da
-> plataforma. **Isto corrige o que este documento dizia até 2026-09-10**, quando mandava "invalidar as
-> DUAS chaves do modelo" antes de republicar — trabalho desnecessário. Se você seguia aquele texto, pode
-> parar.
+> plataforma.
 
-**Sobre cópia em memória do serviço.** Até `2026-09-10` cada instância guardava o modelo em memória por
-até uma hora, e a alteração podia "pegar" numa instância e não noutra. **Na instância de teste
-(`tinterpreter`), essas cópias estão desligadas desde a imagem `amd64-260910`**: o modelo é relido do
-serviço de cache a **cada requisição**, e republicar passa a valer na requisição seguinte. Onde elas
-continuarem ligadas, a defasagem de até uma hora ainda vale e o descarte da cópia é operação de
-plataforma. **Reiniciar o serviço nunca foi remédio** — ele repuxa o que estiver no cache.
+**O modelo é relido do serviço de cache a cada requisição**, e republicar vale na requisição seguinte.
+**Reiniciar o serviço não é remédio:** ele repuxa o que estiver no cache.
 
 > ⚠️ **O `200` do comando não prova que a projeção acompanhou.** Ele responde pela escrita; a projeção
 > é aplicada depois, a partir de uma fila. Se a linha não aparecer, a falha **está registrada** — a

@@ -4,12 +4,17 @@
 > [ua-papel.md](ua-papel.md)). Guia: [../README.md](../README.md).
 >
 > **Comum:** `Authorization` obrigatório; POST/PUT enviam `Content-Type: application/json`. **Papéis
-> aceitos:** administrador / engenheiro (no `owner` do papel). Erros: [../erros.md](../erros.md).
+> aceitos:** administrador / engenheiro (no `owner` do papel). É o papel **de plataforma** (`API_MASTER` /
+> `API_ENGINEER`) na organização cujo nome é o `owner` do papel, e o token o carrega no claim `orgs` como
+> `<owner>/API_MASTER`. **Não** é um papel `/ua`. Erros: [../erros.md](../erros.md).
+>
+> **A conta `/ua` não pertence a organização nenhuma.** Ela se liga a um dono só pelo papel associado.
 >
 > **Forma do vínculo no corpo** (recorrente abaixo): `account` `{username}`, `role` `{name, owner}`.
 
 ## Contents
 - POST /ua/account-role/using/authority — associar papel a conta(s)
+- POST /ua/account-role/new-account/using/authority — criar conta já com papel
 - PUT /ua/account-role/role-owner/{roleOwner}/using/authority — atualizar associações
 - PUT /ua/account-role/status/using/authority — alterar status da associação
 - DELETE /ua/account/by/username/{username}/role-name/{roleName}/role-owner/{roleOwner}/using/authority — desassociar
@@ -48,8 +53,33 @@ a associação **não foi criada** (`"account not found: the account-role associ
 `"role not found: …"`); corpo incompleto ou contexto que impede montar a associação → `510` (falha não
 tratada — ver [../erros.md](../erros.md)).
 
-> ⚠️ Até 2026-09-05 esse caso era **`204`**, que é sucesso sem corpo: a associação não era criada e o
-> chamador não tinha como saber.
+## POST /ua/account-role/new-account/using/authority
+Cria uma conta `/ua` e já a associa a um papel do dono, numa operação só. O papel pode ser **não público**.
+**Papel:** só **administrador** (`API_MASTER`) no `owner` do papel; engenheiro recebe `403`.
+
+**Corpo** (JSON):
+
+| Campo | Tipo | Obrig. | Significado |
+|---|---|---|---|
+| `account.username` | string | sim | Login. |
+| `account.password` | string | sim | Senha, com as mesmas regras do [registro público](publico.md). |
+| `account.email` | string | sim | E-mail. |
+| `account.*` | — | não | Demais campos da conta externa (ver [ua-conta.md](ua-conta.md)). `account.status` é ignorado. |
+| `role.name` | string | sim | Papel a associar. Tem de **existir**; pode ser público ou não. |
+| `role.owner` | string | sim | Dono (espaço de nomes) do papel. O portador precisa de `API_MASTER` nele. |
+
+```json
+{ "account": { "username": "scriber", "password": "…", "email": "scriber@acme.com" },
+  "role": { "name": "ADMIN", "owner": "acme" } }
+```
+
+A conta nasce **`ACTIVE`** e é **conta de serviço**: o [login](../../auth/endpoints/sign-in.md#exceção-a-conta-de-serviço)
+dela não pede captcha nem aceite de termos. Nada é enviado por e-mail.
+
+**Resposta:** `201` — `{ "id": <number> }` (id da conta) · `400` — corpo sem `account`, sem `role` ou sem
+`role.owner`, ou campo da conta inválido · `403` — o portador não tem `API_MASTER` no `owner` do papel · `404` —
+`"role not found: the account was not created."` · `409` se o `username` já existe. Em toda recusa, **nada**
+é gravado: nem conta, nem vínculo.
 
 ## PUT /ua/account-role/role-owner/{roleOwner}/using/authority
 Atualiza associações em lote para um dono de papel.

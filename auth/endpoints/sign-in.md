@@ -33,6 +33,26 @@ Use `accessToken` em `Authorization: Bearer <token>` nas chamadas seguintes — 
 `token`: quem lê `.token` fica sem token. O token embute usuário, papéis,
 organizações e tenants. Ver [README — claims](../README.md#o-que-o-login-retorna-token--claims).
 
+## Token ES256 e chave pública (JWKS)
+
+> **Em vigor desde 2026-10-26T13:45:34Z.** Medido pela borda às 14:02:47Z, sem credencial: o JWKS responde `200`
+> com a chave `kid` = `auth-es256-20261026`.
+
+Para o serviço que precisa validar o token **sem guardar o segredo compartilhado**, o login (`/up` e `/ua`) e a
+[renovação](renovar.md) devolvem também:
+
+| Campo | Tipo | Significado |
+|---|---|---|
+| `accessTokenEs256` | string | o mesmo token de acesso, com os mesmos claims, o mesmo emissor (`iss` = `YC-AuthService`), o mesmo `sub` e a mesma validade, assinado em **ES256** (ECDSA P-256) com `kid` no cabeçalho |
+
+- **Chave pública:** `GET /ua/.well-known/jwks.json`, público → `200 {"keys":[{"kty":"EC","crv":"P-256","use":"sig",
+  "alg":"ES256","kid":"…","x":"…","y":"…"}]}`. Escolha a chave pelo `kid` do cabeçalho do token.
+  **Pela borda:** `GET https://api.ycodify.com/v3/auth/ua/.well-known/jwks.json`, **sem nenhuma credencial**: nem
+  `X-Forger-Credential`, que o resto de `/v3/auth/` exige. Só `GET`.
+- **Para validar:** confira a assinatura ES256 com a chave daquele `kid`, depois `iss` = `YC-AuthService` e `exp`.
+- **O `accessToken` não muda.** É ele que vai em `Authorization` para os serviços da plataforma. O
+  `accessTokenEs256` serve só a quem valida pela chave pública.
+
 ## Diferenças entre domínios
 - **`/up`** (plataforma): valida e, se a conta estiver **pendente** (em validação), retorna `403`.
 - **`/ua`** (externo): além de validar, **descobre os tenants** do usuário e os inclui no token.
@@ -73,6 +93,14 @@ Para conta que tem papel em organização que publicou o [manifesto da aplicaç�
 | tudo certo | `200`, a resposta de sempre; o aceite fica gravado |
 
 O aceite é **uma vez por versão**: quem já aceitou a versão vigente não vê `aceite_pendente`.
+
+### Exceção: a conta de serviço
+
+A conta criada por [`POST /ua/account-role/new-account/using/authority`](../../orgid/endpoints/ua-associacao.md#post-uaaccount-rolenew-accountusingauthority)
+é **conta de serviço**: não é pessoa, e é com ela que um serviço (o palas) lê os dados da org. O login dela em
+`/ua/sign-in` **não pede captcha nem aceite**: não vem `captcha_ausente` nem `aceite_pendente`, e o `captcha`
+e o `aceite` do corpo, se enviados, são ignorados. Senha errada continua `401`. Conta criada por outra rota
+(autocadastro, `/open/ua/account-role`) **não** é de serviço e segue as regras acima.
 
 ## Comportamento
 Segue o [fluxo de login](../README.md#fluxo-de-login-ciclo-de-vida): valida (via identidade) → descobre
