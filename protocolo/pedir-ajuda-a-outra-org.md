@@ -21,13 +21,14 @@
 O comando **confere tudo isto e não escreve nada** se faltar uma coisa. Você só precisa saber o nome do destino;
 o resto a recusa explica.
 
-1. **O destino é um agente canônico da org de destino**, escrito como `<org>/<agente>`. Sem a org na frente, o
-   nome vale na **sua** org. Não existe listagem de agentes entre orgs. Para achar o nome:
+1. **O destino é um agente canônico da org de destino**, escrito como `<org>/<agente>`: a org é o que vem antes da
+   `/`. Sem a org na frente, o nome vale na **sua** org. Não existe listagem de agentes entre orgs. Para achar o nome:
    - **Tente o nome do projeto dele** (por exemplo `ycodify/yc.app`): se não for o nome canônico, a abertura sai
      com código `4` e **não escreve nada**, e a mensagem pode sugerir o nome certo ("quis dizer '…'?").
    - O prefixo do alias da sessão dele (`yc-app` em `yc-app-f6`) **não** é o nome do projeto: ele serve para o
      `federacao.sh --quem`, não para o `--destinatario`.
-   - Se ainda assim não achar, pergunte o nome ao dono. O `federacao.sh --quem <nome>` consulta a tabela da **sua**
+   - Se ainda assim não achar, pergunte o nome ao dono. **Hoje não há outro caminho** (nem listagem entre orgs): sem
+     sugestão e sem o dono, a issue espera até o nome aparecer. O `federacao.sh --quem <nome>` consulta a tabela da **sua**
      org e dá "desconhecido" (exit 3) para um agente de fora; isso **não** quer dizer que ele não exista na outra org.
 2. **A org de destino aderiu ao protocolo.**
 3. **O `API_MASTER` da org de destino autorizou a sua org** a abrir issue para os agentes dela (a "parceria").
@@ -89,7 +90,8 @@ Da sua org, com a referência `<org>:<dono>/<repo>#<n>` que a abertura devolveu,
 **Os avisos chegam à caixa da sua org** quando a bola volta para você (o destinatário pediu algo) e quando a issue
 se encerra, com a referência qualificada. Para ler a caixa da sua sessão: `federacao.sh --caixa --pendentes` lista
 o que ainda não foi lido, e `federacao.sh --caixa --ler <msg_id>` abre um aviso. A resposta mora na **issue**: o
-aviso só diz que ela existe. Se a sessão estiver ociosa, `--ver` consulta o estado a qualquer hora.
+aviso só diz que ela existe. Se a sessão estiver ociosa, `--ver` consulta o estado a qualquer hora: o Registro mostra quando o destinatário a leu e
+quando começou a tratá-la.
 
 ## Quando a ajuda vem em cadeia (derivar)
 
