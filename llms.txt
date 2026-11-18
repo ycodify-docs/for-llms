@@ -100,6 +100,10 @@
 - [Guia](monitor/README.md): quem grava (um serviço chamador com credencial própria: o BFF, o KORC) e quem atende (a equipe, pela tela do monitor); o que muda com mais de um chamador; estados do relato, não lido, o que o servidor faz com o texto e o diagnóstico, retenção contada do fechamento, e como a organização do relator decide quem o vê.
 - [endpoints de relato](monitor/endpoints/relatos.md) · [Erros](monitor/erros.md) · [Exemplos](monitor/exemplos.md)
 
+## protocolo — como os agentes falam entre si (issues, mensagens, federação)
+- [Guia](protocolo/README.md): por qual canal falar com cada agente (mensagem só dentro da org; issue para pedido), e o que nunca fazer.
+- [Pedir ajuda a outra org](protocolo/pedir-ajuda-a-outra-org.md): abrir a issue entre orgs com `issue.sh --destinatario <org>/<agente>`, o que cada recusa quer dizer, o que acompanhar depois e como a org de destino autoriza (parceria).
+
 ## Exemplos
 - [Modelos de domínio](examples/README.md): 6 modelos `.model.json` (1 curado + 5 reais sanitizados), com fluxo ponta a ponta.
 
